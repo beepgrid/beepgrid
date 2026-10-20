@@ -1,6 +1,6 @@
 # Capability and benchmark coverage
 
-This is an implementation/evidence matrix, not a claim that all design targets or commercial work are complete. The current workstream is the open source release. Maintained enterprise directory sync, managed cloud, billing and marketing are separate workstreams.
+This is an implementation/evidence matrix, not a claim that all design targets or commercial work are complete. The current workstream is the open source release. Maintained enterprise directory sync, managed cloud, billing and marketing are separate workstreams. Comparative local measurements are kept in a separate benchmark repository; they do not establish a production capacity or hosting-cost claim.
 
 Every scenario's cold/warm end-user setup time is **not measured by unfamiliar users**. The quickstart is reproducible and the scripts record automated drills, but a maintainer's successful command is not a usability study. A release candidate should get an independent fresh-install journey before public promotion.
 
@@ -32,7 +32,7 @@ Every scenario's cold/warm end-user setup time is **not measured by unfamiliar u
 | 24 | Selected fleet | Directory search by trusted owner/project/parent, explicit groups, production resolver preview | Dynamic selector language deferred; preview does not send |
 | 25 | Fleet progress | Permission-filtered structured status, fresh/stale sources and partial coverage | Cached worker-reported status; no exact overlap-blind sums or arbitrary private-tool queries |
 | 26 | Overseer commands | Safely returns CAPABILITY_UNSUPPORTED; direct structured group tasks work | Natural-language command translation deferred |
-| 27 | Provider failure | Temporary rejection, Retry-After, permanent failure, no automatic Unknown replay, fallback tests | Live provider contracts remain account-specific |
+| 27 | Provider failure | HTTP temporary rejection, Retry-After, permanent failure, no automatic Unknown replay and fallback tests | SMTP currently classifies all transport/rejection errors as unknown; explicit SMTP rejection retry/classification and slow-provider concurrency remain follow-ups. Live contracts are account-specific |
 | 28 | Engine/DB recovery | Engine and PostgreSQL container restart, worker reconnect, transactional inbox/outbox, real dump/restore reconciliation drill | Production RPO/RTO and post-snapshot external reconciliation not measured |
 | 29 | Lost event stream | Durable cursors, hidden-page advancement, current authorization and browser reconnect | Not a guarantee against every browser/provider outage |
 | 30 | Store conformance/upgrade | PostgreSQL 17, checksummed v1-to-current migration, concurrent migrators, race suite | SQLite and database-to-database migration unsupported |
@@ -44,6 +44,7 @@ Every scenario's cold/warm end-user setup time is **not measured by unfamiliar u
 - The SDK harness builds a separate server/schema, migrates it, runs six TypeScript and six Python tests with real HTTP, and cleans only its generated schema.
 - The dashboard/React suites cover separate directories, question focus, clarification, group review, semantic suggestions, stale fleet coverage, response denials and embeds.
 - The dump/restore drill uses generated test databases and a simulated external effect after the snapshot. Old credentials are revoked, approvals superseded and re-execution denied. Its report is `.local/recovery-drill.json`; local automated timing excludes manual business reconciliation and is not a production RTO.
+- Thirty local server qualification trials used up to 25 separate authenticated SDK worker processes and verified 3,890 replies/receipts, including jitter, lost committed responses, signed provider failures and real lease-expiry replacement. [Results and limitations](SERVER-PERFORMANCE.md) separate deterministic fleet performance from real Codex model checks; they are not a production capacity or hosting-cost guarantee.
 - `govulncheck` is run with the pinned toolchain, and npm audit/dependency notices cover the installed locked dependencies. Scans are point-in-time checks, not a security guarantee.
 
 ## Launch gates outside automated local implementation
@@ -55,3 +56,4 @@ The commercial product and website are not represented as complete by this open 
 ## Adversarial implementation audit
 
 See [the item-by-item audit](PHASE1-AUDIT.md) for all 85 checklist entries and [local performance measurements](PERFORMANCE.md) for raw samples and qualifications. The audit fixed current-authority, dispatch-lock, stale UI and SDK response-limit defects missed by earlier suites. Two actual Codex workers passed seven model turns with saved ChatGPT subscription authentication, canonical instance attribution, peer tasks, human clarification/decisions, an exact permit and one verified local fixture effect. This is a finite integration test, not a continuous model-hosting service.
+
