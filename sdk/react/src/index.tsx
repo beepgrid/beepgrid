@@ -15,7 +15,10 @@ export function useNotifRequest(client: Client, id: string) {
   const [request, setRequest] = useState<RequestItem | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const generation = useRef(0);
   useEffect(() => {
+    ++generation.current;
+    setBusy(false);
     const abort = new AbortController();
     setRequest(null);
     setError("");
@@ -30,7 +33,7 @@ export function useNotifRequest(client: Client, id: string) {
           setError("");
         }
       } catch (e) {
-        if (!abort.signal.aborted) setError((e as Error).message);
+        if (!abort.signal.aborted) { setRequest(null); setError((e as Error).message); }
       } finally {
         pending = false;
       }
@@ -38,22 +41,23 @@ export function useNotifRequest(client: Client, id: string) {
     void refresh();
     const timer = setInterval(() => void refresh(), 1000);
     return () => {
+      ++generation.current;
       abort.abort();
       clearInterval(timer);
     };
   }, [client, id]);
   async function respond(outcome: Response["outcome"], answer?: unknown) {
-    if (!request) return;
+    if (!request || request.id !== id) return;
+    const current = generation.current;
     setBusy(true);
     setError("");
     try {
-      setRequest(
-        await client.respond(id, { outcome, answer, version: request.version }),
-      );
+      const result = await client.respond(id, { outcome, answer, version: request.version });
+      if (current === generation.current) setRequest(result);
     } catch (e) {
-      setError((e as Error).message);
+      if (current === generation.current) setError((e as Error).message);
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
   return { request, error, busy, respond };
@@ -85,7 +89,7 @@ export function NotifRequest({
   return (
     <section className="notif-request" aria-label="Agent request">
       {error && <p role="alert">{error}</p>}
-      {!r ? (
+      {!r || r.id !== id ? (
         <p role="status">Loading request…</p>
       ) : (
         <>
@@ -110,6 +114,15 @@ export function NotifRequest({
               )}
               {r.kind === "approval" ? (
                 <div>
+                  {r.action && <dl aria-label="Exact action requiring approval">
+                    <dt>Action</dt><dd>{r.action.name}</dd>
+                    <dt>Executor</dt><dd>{r.action.executor_id}</dd>
+                    <dt>Resource</dt><dd>{r.action.resource}</dd>
+                    <dt>Resource version</dt><dd>{r.action.resource_version}</dd>
+                    <dt>Arguments</dt><dd><pre>{JSON.stringify(r.action.arguments, null, 2)}</pre></dd>
+                    <dt>Operation</dt><dd>{r.action.operation_key}</dd>
+                    <dt>Expires</dt><dd>{r.expires_at}</dd>
+                  </dl>}
                   <button
                     disabled={busy}
                     onClick={() => void respond("denied")}
@@ -192,7 +205,11 @@ export function NotifConversation({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const attempt = useRef({ body: "", key: "" });
+  const generation = useRef(0);
   useEffect(() => {
+    ++generation.current;
+    attempt.current = { body: "", key: "" };
+    setBusy(false);
     setC(null);
     setDraft("");
     setError("");
@@ -208,9 +225,9 @@ export function NotifConversation({
           undefined,
           { signal: abort.signal },
         );
-        if (!abort.signal.aborted) setC(next);
+        if (!abort.signal.aborted) { setC(next); setError(""); }
       } catch (e) {
-        if (!abort.signal.aborted) setError((e as Error).message);
+        if (!abort.signal.aborted) { setC(null); setError((e as Error).message); }
       } finally {
         pending = false;
       }
@@ -218,12 +235,15 @@ export function NotifConversation({
     void refresh();
     const timer = setInterval(() => void refresh(), 1000);
     return () => {
+      ++generation.current;
       abort.abort();
       clearInterval(timer);
     };
   }, [client, id]);
   async function send(e: FormEvent) {
     e.preventDefault();
+    if (!c || c.id !== id || busy) return;
+    const current = generation.current;
     setBusy(true);
     if (attempt.current.body !== draft || !attempt.current.key)
       attempt.current = { body: draft, key: crypto.randomUUID() };
@@ -232,19 +252,21 @@ export function NotifConversation({
         { conversation_id: id, body: draft },
         attempt.current.key,
       );
-      setDraft("");
-      attempt.current = { body: "", key: "" };
-      setError("");
+      if (current === generation.current) {
+        setDraft("");
+        attempt.current = { body: "", key: "" };
+        setError("");
+      }
     } catch (e) {
-      setError((e as Error).message);
+      if (current === generation.current) setError((e as Error).message);
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
   return (
     <section className="notif-conversation" aria-label="Conversation">
       {error && <p role="alert">{error}</p>}
-      {c ? (
+      {c && c.id === id ? (
         <>
           <h3>{c.title}</h3>
           <div role="log" aria-live="polite">
