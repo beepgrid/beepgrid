@@ -2,7 +2,9 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -17,6 +19,77 @@ func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.T
 	return ctx
 }
 func (q *queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+
+func TestConversationListBoundsUnrelatedHistoryAndPreservesVisibility(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	reader := testPerson(t, s, owner, "history-reader")
+	outsider := testPerson(t, s, owner, "unrelated-reader")
+	role := grant(t, s, owner, reader, []Rule{{Action: "view", TargetKind: "person", TargetID: owner.ID}})
+	if _, err := s.Pool.Exec(ctx, `INSERT INTO principals(id,scope,kind,external_id,name) SELECT 'directory_noise_'||n,$1,'agent','noise/'||n,'Unrelated agent '||n FROM generate_series(1,10000) n`, owner.Scope); err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range []string{
+		`INSERT INTO conversations(id,scope,title,created_by,created_at) SELECT 'visible_'||n,$1,'Visible '||n,$2,to_timestamp(1700000000)+n*interval '1 microsecond' FROM generate_series(1,250) n`,
+		`INSERT INTO conversations(id,scope,title,created_by,created_at) SELECT 'noise_'||n,$1,'Unrelated '||n,$2,to_timestamp(1800000000)+n*interval '1 microsecond' FROM generate_series(1,20000) n`,
+		`INSERT INTO participants(scope,conversation_id,principal_id) SELECT $1,id,$2 FROM conversations UNION ALL SELECT $1,id,CASE WHEN id LIKE 'visible_%' THEN $3 ELSE $4 END FROM conversations`,
+	} {
+		// Separate argument lists avoid untyped unused parameters in PostgreSQL.
+		args := []any{owner.Scope, owner.ID}
+		if strings.HasPrefix(statement, "INSERT INTO participants") {
+			args = append(args, reader.ID, outsider.ID)
+		}
+		if _, err := s.Pool.Exec(ctx, statement, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, err := s.Conversations(ctx, reader)
+	if err != nil || len(rows) != 200 {
+		t.Fatal(len(rows), err)
+	}
+	for i, row := range rows {
+		if row.ID != fmt.Sprint("visible_", 250-i) {
+			t.Fatal("private list, ordering or limit changed", i, row.ID)
+		}
+	}
+	adminRows, err := s.Conversations(ctx, owner)
+	if err != nil || len(adminRows) != 200 || adminRows[0].ID != "noise_20000" {
+		t.Fatal("administrator history changed", len(adminRows), err)
+	}
+	var raw []byte
+	if err := s.Pool.QueryRow(ctx, `EXPLAIN (ANALYZE,FORMAT JSON) `+conversationListSQL(false), owner.Scope, reader.ID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var plan []map[string]any
+	if err := json.Unmarshal(raw, &plan); err != nil {
+		t.Fatal(err)
+	}
+	scanned := map[string]float64{}
+	var visit func(map[string]any)
+	visit = func(node map[string]any) {
+		if relation, ok := node["Relation Name"].(string); ok {
+			count, _ := node["Actual Rows"].(float64)
+			removed, _ := node["Rows Removed by Filter"].(float64)
+			loops, _ := node["Actual Loops"].(float64)
+			scanned[relation] += (count + removed) * loops
+		}
+		children, _ := node["Plans"].([]any)
+		for _, child := range children {
+			visit(child.(map[string]any))
+		}
+	}
+	visit(plan[0]["Plan"].(map[string]any))
+	if scanned["conversations"] > 250 || scanned["principals"] > 400 {
+		t.Fatal("list scans unrelated workspace history/directory", scanned)
+	}
+	role.Rules = []Rule{}
+	if _, err := s.SaveRole(ctx, owner, role); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := s.Conversations(ctx, reader); err != nil || len(rows) != 0 {
+		t.Fatal("history snapshot retained revoked visibility", len(rows), err)
+	}
+}
 
 func TestIndividualContactFanoutUsesBoundedQueriesAndFreshAuthority(t *testing.T) {
 	s, owner := testStore(t)

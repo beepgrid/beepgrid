@@ -109,9 +109,7 @@ func newConversation(ctx context.Context, db DB, a Actor, title string, ids ...s
 }
 func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, error) {
 	ctx = withPolicySnapshot(ctx)
-	rows, e := s.Pool.Query(ctx, `WITH candidates AS (
- SELECT c.id,c.title,c.created_by,c.created_at FROM conversations c WHERE c.scope=$1 AND ($2 OR EXISTS(SELECT 1 FROM participants p WHERE p.scope=c.scope AND p.conversation_id=c.id AND p.principal_id=$3)) ORDER BY c.created_at DESC,c.id DESC LIMIT 200
- ) SELECT c.id,c.title,c.created_by,c.created_at,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind)) FILTER(WHERE p.id<>$3),'[]') FROM candidates c LEFT JOIN participants cp ON cp.scope=$1 AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id GROUP BY c.id,c.title,c.created_by,c.created_at ORDER BY c.created_at DESC,c.id DESC`, a.Scope, a.Admin, a.ID)
+	rows, e := s.Pool.Query(ctx, conversationListSQL(a.Admin), a.Scope, a.ID)
 	if e != nil {
 		return nil, e
 	}
@@ -155,6 +153,24 @@ func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, err
 		}
 	}
 	return out, nil
+}
+
+func conversationListSQL(admin bool) string {
+	candidates := `SELECT c.id,c.title,c.created_by,c.created_at FROM conversations c WHERE c.scope=$1 ORDER BY c.created_at DESC,c.id DESC LIMIT 200`
+	if !admin {
+		// Start with this person's memberships. The lateral lookup keeps a large
+		// workspace history from becoming a repeated full-table hash-join scan.
+		candidates = `SELECT c.id,c.title,c.created_by,c.created_at FROM participants visible
+ CROSS JOIN LATERAL (SELECT c.id,c.title,c.created_by,c.created_at FROM conversations c WHERE c.scope=visible.scope AND c.id=visible.conversation_id OFFSET 0) c
+ WHERE visible.scope=$1 AND visible.principal_id=$2 ORDER BY c.created_at DESC,c.id DESC LIMIT 200`
+	}
+	// Aggregate only each selected conversation's participants. A global join
+	// otherwise scans the directory again for each authenticated reader.
+	return `WITH candidates AS (` + candidates + `)
+ SELECT c.id,c.title,c.created_by,c.created_at,COALESCE(others.members,'[]') FROM candidates c
+ LEFT JOIN LATERAL (SELECT jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind)) FILTER(WHERE p.id<>$2) AS members
+ FROM participants cp JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id
+ WHERE cp.scope=$1 AND cp.conversation_id=c.id) others ON true ORDER BY c.created_at DESC,c.id DESC`
 }
 
 func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversation, error) {
