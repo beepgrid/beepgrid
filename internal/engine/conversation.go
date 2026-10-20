@@ -19,7 +19,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 	}
 	out := []recipient{}
 	if target.Kind == "group" {
-		allowedGroup := s.allowed(ctx, db, a, action, target, "", actionName)
+		allowedGroup := s.allowed(ctx, db, a, action, target, "*", actionName)
 		rows, e := db.Query(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at FROM memberships m JOIN principals p ON p.id=m.principal_id AND p.scope=m.scope WHERE m.scope=$1 AND m.group_id=$2 AND NOT p.disabled ORDER BY p.id LIMIT 1001`, a.Scope, target.ID)
 		if e != nil {
 			return nil, e
@@ -43,7 +43,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 		}
 		for _, p := range people {
 			pt := Target{p.Kind, p.ID}
-			if allowedGroup || s.allowed(ctx, db, a, action, pt, "", actionName) {
+			if allowedGroup || s.allowed(ctx, db, a, action, pt, "*", actionName) {
 				if allowedGroup {
 					pt = target
 				}
@@ -59,7 +59,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 		if e != nil {
 			return nil, e
 		}
-		if p.Disabled || !s.allowed(ctx, db, a, action, Target{"agent", p.ID}, "", actionName) {
+		if p.Disabled || !s.allowed(ctx, db, a, action, Target{"agent", p.ID}, "*", actionName) {
 			return nil, Denied()
 		}
 		out = append(out, recipient{p, target.ID, Target{"agent", p.ID}})
@@ -68,7 +68,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 		if e != nil {
 			return nil, Missing()
 		}
-		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "", actionName) {
+		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "*", actionName) {
 			return nil, Denied()
 		}
 		out = append(out, recipient{p, "", Target{p.Kind, p.ID}})
@@ -196,7 +196,7 @@ func (s *Store) conversationRecipients(ctx context.Context, db DB, a Actor, id, 
 	}
 	out := []recipient{}
 	for _, p := range all {
-		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "", "") {
+		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "*", "") {
 			return nil, Denied()
 		}
 		out = append(out, recipient{p, "", Target{p.Kind, p.ID}})
@@ -215,13 +215,27 @@ func insertMessage(ctx context.Context, db DB, a Actor, conv, body string) (Mess
 	return m, event(ctx, db, a, "message.created", conv, "", m)
 }
 func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, conv, action string, payload map[string]any, expiry time.Time) error {
-	payload["_policy"] = map[string]any{"credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
+	var info struct {
+		Request struct {
+			Action *Action `json:"action"`
+		} `json:"request"`
+	}
+	_ = json.Unmarshal(JSON(payload), &info)
+	actionName := ""
+	if info.Request.Action != nil {
+		actionName = info.Request.Action.Name
+	}
+	payload["_policy"] = map[string]any{"action_name": actionName, "credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
 	payload["conversation_id"] = conv
-	if _, e := db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,exact_instance,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, r.ExactInstance, JSON(payload), expiry); e != nil {
-		return e
+	queued := 0
+	if s.allowed(ctx, db, a, action, r.PolicyTarget, "", actionName) {
+		if _, e := db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,exact_instance,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, r.ExactInstance, JSON(payload), expiry); e != nil {
+			return e
+		}
+		queued++
 	}
 	// Destination dispatch is additional to the durable native inbox. One provider does not replace canonical history.
-	rows, e := db.Query(ctx, `SELECT d.connection_id,d.address FROM destinations d JOIN connections c ON c.id=d.connection_id AND c.scope=d.scope WHERE d.scope=$1 AND d.principal_id=$2 AND c.enabled`, a.Scope, r.ID)
+	rows, e := db.Query(ctx, `SELECT d.connection_id,d.address FROM destinations d JOIN connections c ON c.id=d.connection_id AND c.scope=d.scope WHERE d.scope=$1 AND d.principal_id=$2 AND c.enabled AND d.mode IN ('primary','copy') ORDER BY d.priority,d.id`, a.Scope, r.ID)
 	if e != nil {
 		return e
 	}
@@ -241,12 +255,16 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 		return e
 	}
 	for _, d := range dests {
-		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, "") {
+		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName) {
 			continue
 		}
 		if _, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry); e != nil {
 			return e
 		}
+		queued++
+	}
+	if queued == 0 {
+		return &Error{"NO_ELIGIBLE_ROUTE", "No permitted destination is configured for this recipient.", 403}
 	}
 	return nil
 }

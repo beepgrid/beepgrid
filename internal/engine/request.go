@@ -204,7 +204,7 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	if r.Kind == "approval" {
 		permission = "decide"
 	}
-	if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, "", actionName) {
+	if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, a.ProviderConnection, actionName) {
 		return Denied()
 	}
 	switch r.Kind {
@@ -248,9 +248,9 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	if e = s.requestEvent(ctx, tx, a, *out, "request.resolved"); e != nil {
 		return e
 	}
-	// Result delivery goes back to the original requester and is independent of the responder's provider.
-	rr := recipient{Principal: requester, PolicyTarget: Target{requester.Kind, requester.ID}}
-	return s.enqueue(ctx, tx, a, rr, id+"/result", out.ConversationID, permission, map[string]any{"type": "request.resolved", "request": out}, time.Now().Add(30*24*time.Hour))
+	// The canonical result has already passed response authorization. Notify the original requester.
+	_, e = tx.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, id+"/result", requester.ID, JSON(map[string]any{"type": "request.resolved", "request": out, "conversation_id": out.ConversationID, "_policy": map[string]string{"engine_result": id}}), time.Now().Add(30*24*time.Hour))
+	return e
 }
 func (s *Store) requestEvent(ctx context.Context, db DB, a Actor, r Request, kind string) error {
 	if e := event(ctx, db, a, kind, r.ConversationID, r.RequesterID, r); e != nil {

@@ -11,6 +11,7 @@ import (
 
 func (s *Server) channelRoutes() {
 	m := s.mux
+	m.HandleFunc("POST /integrations/webhook/{id}", s.incomingWebhook)
 	m.HandleFunc("GET /api/v1/connections", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.Connections(r.Context(), actor(r))
 		return ok(w, x, e)

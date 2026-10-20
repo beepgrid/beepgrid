@@ -35,6 +35,8 @@ type Connection struct {
 	Secret           string            `json:"secret,omitempty"`
 }
 type Destination struct {
+	Mode         string `json:"mode"`
+	Priority     int    `json:"priority"`
 	ID           string `json:"id"`
 	ConnectionID string `json:"connection_id"`
 	PrincipalID  string `json:"principal_id"`
@@ -153,6 +155,12 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 	return c, e
 }
 func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (Destination, error) {
+	if d.Mode == "" {
+		d.Mode = "primary"
+	}
+	if d.Mode != "primary" && d.Mode != "fallback" && d.Mode != "copy" {
+		return d, Bad("Destination mode must be primary, fallback or copy.")
+	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
 		if !a.Admin {
 			return Denied()
@@ -169,8 +177,15 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 				return Bad("Invalid email destination.")
 			}
 		}
-		d.ID = ID("dst")
-		if _, e := tx.Exec(ctx, `INSERT INTO destinations(id,scope,connection_id,principal_id,address) VALUES($1,$2,$3,$4,$5)`, d.ID, a.Scope, d.ConnectionID, d.PrincipalID, d.Address); e != nil {
+		if d.Mode == "primary" {
+			if _, e := tx.Exec(ctx, `UPDATE destinations SET mode='fallback' WHERE scope=$1 AND principal_id=$2 AND mode='primary'`, a.Scope, d.PrincipalID); e != nil {
+				return e
+			}
+		}
+		if d.ID == "" {
+			d.ID = ID("dst")
+		}
+		if _, e := tx.Exec(ctx, `INSERT INTO destinations(id,scope,connection_id,principal_id,address,mode,priority) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET address=EXCLUDED.address,mode=EXCLUDED.mode,priority=EXCLUDED.priority WHERE destinations.scope=EXCLUDED.scope AND destinations.principal_id=EXCLUDED.principal_id AND destinations.connection_id=EXCLUDED.connection_id`, d.ID, a.Scope, d.ConnectionID, d.PrincipalID, d.Address, d.Mode, d.Priority); e != nil {
 			return e
 		}
 		return event(ctx, tx, a, "destination.created", "", d.PrincipalID, d)
@@ -181,7 +196,7 @@ func (s *Store) Destinations(ctx context.Context, a Actor) ([]Destination, error
 	if !a.Admin {
 		return nil, Denied()
 	}
-	rows, e := s.Pool.Query(ctx, `SELECT id,connection_id,principal_id,address FROM destinations WHERE scope=$1`, a.Scope)
+	rows, e := s.Pool.Query(ctx, `SELECT id,connection_id,principal_id,address,mode,priority FROM destinations WHERE scope=$1`, a.Scope)
 	if e != nil {
 		return nil, e
 	}
@@ -189,7 +204,7 @@ func (s *Store) Destinations(ctx context.Context, a Actor) ([]Destination, error
 	out := []Destination{}
 	for rows.Next() {
 		var d Destination
-		if e = rows.Scan(&d.ID, &d.ConnectionID, &d.PrincipalID, &d.Address); e != nil {
+		if e = rows.Scan(&d.ID, &d.ConnectionID, &d.PrincipalID, &d.Address, &d.Mode, &d.Priority); e != nil {
 			return nil, e
 		}
 		out = append(out, d)
@@ -281,6 +296,7 @@ func VerifySlack(secret, timestamp, signature string, body []byte, now time.Time
 type DispatchResult struct {
 	State, Detail string
 	Retry         bool
+	RetryAfter    time.Duration
 }
 
 func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
@@ -325,7 +341,11 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	}
 	secret, e := s.unseal(encrypted)
 	if e != nil {
-		return e
+		_, updateErr := tx.Exec(ctx, `UPDATE deliveries SET state='failed',last_error='Provider secret cannot be decrypted; verify encryption key' WHERE id=$1`, d.ID)
+		if updateErr != nil {
+			return updateErr
+		}
+		return tx.Commit(ctx)
 	}
 	c.Secret = string(secret)
 	if e = tx.QueryRow(ctx, `UPDATE deliveries SET state='leased',generation=generation+1,attempts=attempts+1,lease_until=now()+interval '30 seconds' WHERE id=$1 RETURNING generation,attempts`, d.ID).Scan(&d.Generation, &d.Attempts); e != nil {
@@ -339,7 +359,14 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	next := time.Now()
 	if result.Retry && d.Attempts < 6 {
 		result.State = "queued"
-		next = next.Add(time.Duration(1<<min(d.Attempts, 8)) * time.Second)
+		delay := time.Duration(1<<min(d.Attempts, 8)) * time.Second
+		var jitter [1]byte
+		_, _ = rand.Read(jitter[:])
+		delay += time.Duration(jitter[0]) * time.Millisecond
+		if result.RetryAfter > delay {
+			delay = result.RetryAfter
+		}
+		next = next.Add(delay)
 	} else if result.Retry {
 		result.State = "failed"
 	}
@@ -358,6 +385,11 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	if _, e = tx.Exec(ctx, `INSERT INTO delivery_attempts(id,scope,delivery_id,generation,outcome,detail) VALUES($1,$2,$3,$4,$5,$6)`, ID("att"), scope, d.ID, d.Generation, result.State, result.Detail); e != nil {
 		return e
 	}
+	if result.State == "failed" {
+		if e = s.queueFallback(ctx, tx, scope, d); e != nil {
+			return e
+		}
+	}
 	return tx.Commit(ctx)
 }
 func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL string) DispatchResult {
@@ -372,9 +404,9 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 	}
 	if c.Kind == "email" {
 		if e := s.sendMail(ctx, c, d.Address, text); e != nil {
-			return DispatchResult{"unknown", "SMTP outcome uncertain: " + safeError(e), false}
+			return DispatchResult{State: "unknown", Detail: "SMTP outcome uncertain: " + safeError(e), Retry: false}
 		}
-		return DispatchResult{"provider_accepted", "SMTP server accepted the message.", false}
+		return DispatchResult{State: "provider_accepted", Detail: "SMTP server accepted the message.", Retry: false}
 	}
 	destination := c.Config["url"]
 	body := JSON(d.Payload)
@@ -388,11 +420,11 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 		body = JSON(slackBody)
 	}
 	if _, e := s.validURL(ctx, destination); e != nil {
-		return DispatchResult{"failed", "Provider URL is no longer permitted.", false}
+		return DispatchResult{State: "failed", Detail: "Provider URL is no longer permitted.", Retry: false}
 	}
 	req, e := http.NewRequestWithContext(ctx, "POST", destination, bytes.NewReader(body))
 	if e != nil {
-		return DispatchResult{"failed", "Invalid provider request.", false}
+		return DispatchResult{State: "failed", Detail: "Invalid provider request.", Retry: false}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.Kind == "slack" {
@@ -413,15 +445,15 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 	client := &http.Client{Timeout: 12 * time.Second, Transport: &http.Transport{DialContext: s.dial, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, e := client.Do(req)
 	if e != nil {
-		return DispatchResult{"unknown", "Provider response was not confirmed.", false}
+		return DispatchResult{State: "unknown", Detail: "Provider response was not confirmed.", Retry: false}
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 65536))
 	if resp.StatusCode == 429 || resp.StatusCode == 503 || resp.StatusCode == 502 || resp.StatusCode == 504 {
-		return DispatchResult{"failed", fmt.Sprintf("Temporary provider status %d", resp.StatusCode), true}
+		return DispatchResult{State: "failed", Detail: fmt.Sprintf("Temporary provider status %d", resp.StatusCode), Retry: true}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return DispatchResult{"failed", fmt.Sprintf("Provider rejected send with status %d", resp.StatusCode), false}
+		return DispatchResult{State: "failed", Detail: fmt.Sprintf("Provider rejected send with status %d", resp.StatusCode), Retry: false}
 	}
 	if c.Kind == "slack" {
 		var result struct {
@@ -429,10 +461,10 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 			Error string `json:"error"`
 		}
 		if json.Unmarshal(raw, &result) != nil || !result.OK {
-			return DispatchResult{"failed", "Slack did not accept the message.", false}
+			return DispatchResult{State: "failed", Detail: "Slack did not accept the message.", Retry: false}
 		}
 	}
-	return DispatchResult{"provider_accepted", "Provider accepted the message.", false}
+	return DispatchResult{State: "provider_accepted", Detail: "Provider accepted the message.", Retry: false}
 }
 func safeError(e error) string {
 	if e == nil {
@@ -525,4 +557,65 @@ func (s *Store) HasProviderEvent(ctx context.Context, scope, connection, id stri
 func (s *Store) RecordProviderEvent(ctx context.Context, scope, connection, id string) error {
 	_, e := s.Pool.Exec(ctx, `INSERT INTO provider_events(scope,connection_id,external_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, scope, connection, id)
 	return e
+}
+
+func (s *Store) WebhookActor(ctx context.Context, scope, connection, id string) (Actor, error) {
+	p, e := principal(ctx, s.Pool, scope, id)
+	if e != nil || p.Disabled || p.Kind != "service" {
+		return Actor{}, Denied()
+	}
+	return Actor{Principal: p, Scope: scope, CredentialKind: "provider", ProviderConnection: connection}, nil
+}
+
+func retryAfter(raw string, now time.Time) time.Duration {
+	var wait time.Duration
+	if n, e := strconv.Atoi(raw); e == nil {
+		wait = time.Duration(n) * time.Second
+	} else if at, e := http.ParseTime(raw); e == nil {
+		wait = at.Sub(now)
+	}
+	if wait < 0 {
+		return 0
+	}
+	if wait > time.Hour {
+		return time.Hour
+	}
+	return wait
+}
+
+// Fallback is only scheduled after a definite failure. Unknown outcomes remain for reconciliation.
+func (s *Store) queueFallback(ctx context.Context, db DB, scope string, previous Delivery) error {
+	d, e := deliveryScan(db.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND id=$2`, scope, previous.ID))
+	if e != nil {
+		return e
+	}
+	rows, e := db.Query(ctx, `SELECT x.connection_id,x.address FROM destinations x JOIN connections c ON c.id=x.connection_id AND c.scope=x.scope WHERE x.scope=$1 AND x.principal_id=$2 AND x.mode='fallback' AND c.enabled AND NOT EXISTS(SELECT 1 FROM deliveries d WHERE d.scope=x.scope AND d.operation_id=$3 AND d.recipient_id=x.principal_id AND d.connection_id=x.connection_id AND d.address=x.address) ORDER BY x.priority,x.id`, scope, d.RecipientID, d.OperationID)
+	if e != nil {
+		return e
+	}
+	type route struct{ id, address string }
+	routes := []route{}
+	for rows.Next() {
+		var r route
+		if e = rows.Scan(&r.id, &r.address); e != nil {
+			rows.Close()
+			return e
+		}
+		routes = append(routes, r)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return e
+	}
+	for _, r := range routes {
+		d.ConnectionID = r.id
+		d.Address = r.address
+		if !s.currentDeliveryPolicy(ctx, db, scope, d) {
+			continue
+		}
+		_, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`, ID("del"), scope, d.OperationID, d.RecipientID, r.id, r.address, JSON(d.Payload), d.ExpiresAt)
+		return e
+	}
+	return nil
 }

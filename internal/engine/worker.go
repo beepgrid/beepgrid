@@ -34,6 +34,7 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 		SenderID           string `json:"sender_id"`
 		Target             Target `json:"target"`
 		Action             string `json:"action"`
+		ActionName         string `json:"action_name"`
 	}
 	if json.Unmarshal(JSON(d.Payload["_policy"]), &policy) != nil || policy.SenderID == "" {
 		return false
@@ -76,7 +77,7 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 			return false
 		}
 	}
-	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, "")
+	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName)
 }
 func (s *Store) Inbox(ctx context.Context, a Actor) ([]Delivery, error) {
 	if a.InstanceID == "" {

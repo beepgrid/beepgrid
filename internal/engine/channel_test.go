@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -79,5 +80,71 @@ func TestProviderSecurityBoundaries(t *testing.T) {
 	}
 	if _, e := s.unseal([]byte("bad")); e == nil {
 		t.Fatal("invalid ciphertext accepted")
+	}
+}
+
+func TestPrimaryFallbackAndUnknownOutcome(t *testing.T) {
+	s, a := testStore(t)
+	s.AllowLocal = true
+	ctx := context.Background()
+	var primaryCount, fallbackCount atomic.Int32
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { primaryCount.Add(1); w.WriteHeader(400) }))
+	defer primary.Close()
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fallbackCount.Add(1); w.WriteHeader(202) }))
+	defer fallback.Close()
+	for i, raw := range []string{primary.URL, fallback.URL} {
+		c, e := s.SaveConnection(ctx, a, Connection{Name: fmt.Sprint("route-", i), Kind: "webhook", Config: map[string]string{"url": raw}, Enabled: true, Secret: "test-signing-secret"})
+		if e != nil {
+			t.Fatal(e)
+		}
+		mode := "primary"
+		if i == 1 {
+			mode = "fallback"
+		}
+		if _, e = s.SaveDestination(ctx, a, Destination{ConnectionID: c.ID, PrincipalID: a.ID, Address: "alerts", Mode: mode}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if _, e := s.Send(ctx, a, SendInput{Target: Target{"person", a.ID}, Body: "Route test"}, "routing"); e != nil {
+		t.Fatal(e)
+	}
+	var count int
+	_ = s.Pool.QueryRow(ctx, `SELECT count(*) FROM deliveries WHERE connection_id<>''`).Scan(&count)
+	if count != 1 {
+		t.Fatal("default sent everywhere", count)
+	}
+	if e := s.DispatchOnce(ctx, "http://localhost"); e != nil {
+		t.Fatal(e)
+	}
+	if e := s.DispatchOnce(ctx, "http://localhost"); e != nil {
+		t.Fatal(e)
+	}
+	if primaryCount.Load() != 1 || fallbackCount.Load() != 1 {
+		t.Fatal(primaryCount.Load(), fallbackCount.Load())
+	}
+	// A lost provider response is unknown and must not silently fall back.
+	unknown := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h := w.(http.Hijacker); c, _, _ := h.Hijack(); c.Close() }))
+	defer unknown.Close()
+	c, e := s.SaveConnection(ctx, a, Connection{Name: "Ambiguous", Kind: "webhook", Config: map[string]string{"url": unknown.URL}, Secret: "test-signing-secret", Enabled: true})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.SaveDestination(ctx, a, Destination{ConnectionID: c.ID, PrincipalID: a.ID, Address: "alerts", Mode: "primary"}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Send(ctx, a, SendInput{Target: Target{"person", a.ID}, Body: "Unknown"}, "unknown"); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.DispatchOnce(ctx, "http://localhost"); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.DispatchOnce(ctx, "http://localhost"); e != nil {
+		t.Fatal(e)
+	}
+	if fallbackCount.Load() != 1 {
+		t.Fatal("unknown outcome retried", fallbackCount.Load())
+	}
+	if retryAfter("120", time.Now()) != 120*time.Second || retryAfter("999999", time.Now()) != time.Hour {
+		t.Fatal("retry-after bounds")
 	}
 }

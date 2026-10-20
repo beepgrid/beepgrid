@@ -38,7 +38,7 @@ func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, targ
 			if r.TargetID != "*" && r.TargetID != target.ID {
 				continue
 			}
-			if r.ConnectionID != "" && r.ConnectionID != connection {
+			if r.ConnectionID != "" && r.ConnectionID != connection && connection != "*" {
 				continue
 			}
 			if r.ActionName != "" && r.ActionName != actionName {
