@@ -86,6 +86,7 @@ add('GET','/api/v1/deliveries',result=array(ref('Delivery')))
 add('POST','/api/v1/deliveries/{id}/retry',obj({}))
 for path in ('events','activity'):add('GET','/api/v1/'+path,result=array(ref('Event')))
 paths['/api/v1/events']['get']['parameters'] += [{'name':'after','in':'query','schema':{'type':'integer','minimum':0}},{'name':'stream','in':'query','schema':{'enum':['0','1']}}]
+paths['/api/v1/events']['get']['parameters'] += [{'name':'summary','in':'query','description':'With stream=1, summary=1 omits event data while preserving current authorization, metadata and replay cursors. Full events remain the default.','schema':{'enum':['0','1']}}]
 paths['/api/v1/events']['get']['responses']['200']['content']['text/event-stream']={'schema':{'type':'string'}}
 add('GET','/api/v1/answers',result=array(ref('SharedAnswer')))
 add('POST','/api/v1/answers',ref('PublishAnswer'),ref('SharedAnswer'))

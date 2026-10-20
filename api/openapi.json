@@ -4420,6 +4420,17 @@
                 "1"
               ]
             }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "description": "With stream=1, summary=1 omits event data while preserving current authorization, metadata and replay cursors. Full events remain the default.",
+            "schema": {
+              "enum": [
+                "0",
+                "1"
+              ]
+            }
           }
         ]
       }

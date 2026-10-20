@@ -407,7 +407,7 @@ export function App() {
   useEffect(() => {
     if (!me) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const source = new EventSource("/api/v1/events?stream=1");
+    const source = new EventSource("/api/v1/events?stream=1&summary=1");
     source.onopen = () => setLive("Live updates");
     source.onerror = () => setLive("Reconnecting");
     source.onmessage = () => {

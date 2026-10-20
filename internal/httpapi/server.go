@@ -487,7 +487,14 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 		if authErr != nil {
 			return nil
 		}
-		events, scanned, e := s.Store.EventPage(r.Context(), a, after, false)
+		var events []engine.Event
+		var scanned int64
+		var e error
+		if r.URL.Query().Get("summary") == "1" {
+			events, scanned, e = s.Store.EventSummaryPage(r.Context(), a, after)
+		} else {
+			events, scanned, e = s.Store.EventPage(r.Context(), a, after, false)
+		}
 		if e != nil {
 			return nil
 		}
