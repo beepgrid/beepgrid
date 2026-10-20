@@ -1453,9 +1453,14 @@ function RequestDetail({
   const [answer, setAnswer] = useState(""),
     [busy, setBusy] = useState(false),
     [share, setShare] = useState(false);
+  const detail = useRef<HTMLElement>(null);
   useEffect(() => {
     setAnswer("");
     setShare(false);
+    if (window.matchMedia?.("(max-width: 1120px)").matches) {
+      detail.current?.scrollIntoView({block:"start",behavior:"auto"});
+      detail.current?.focus({preventScroll:true});
+    }
   }, [r.id]);
   async function respond(outcome: string, value?: unknown) {
     setBusy(true);
@@ -1463,7 +1468,7 @@ function RequestDetail({
     setBusy(false);
   }
   return (
-    <section className="request-detail">
+    <section className="request-detail" ref={detail} tabIndex={-1} aria-label="Request details">
       <div className="detail-top">
         <span>
           {r.kind.toUpperCase()}

@@ -51,3 +51,7 @@ Every scenario's cold/warm end-user setup time is **not measured by unfamiliar u
 Select the public repository/package namespace and a private security-reporting contact before publication. Local Mailpit SMTP was exercised end to end. Validate production Slack/OIDC/SMTP against the deployment's real accounts, permissions and policies. Have an unfamiliar developer repeat the documented clean install and failure recovery. Run and publish capacity/cost measurements before claiming a fleet size or provider reliability SLA. Configure long-term retention/backups and review operational exposure for the deployment.
 
 The commercial product and website are not represented as complete by this open source checklist. The excluded speculative mini-apps, Try both and demonstration learning are not in either current phase.
+
+## Adversarial implementation audit
+
+See [the item-by-item audit](PHASE1-AUDIT.md) for all 85 checklist entries and [local performance measurements](PERFORMANCE.md) for raw samples and qualifications. The audit fixed current-authority, dispatch-lock, stale UI and SDK response-limit defects missed by earlier suites. Two actual Codex workers passed seven model turns with saved ChatGPT subscription authentication, canonical instance attribution, peer tasks, human clarification/decisions, an exact permit and one verified local fixture effect. This is a finite integration test, not a continuous model-hosting service.

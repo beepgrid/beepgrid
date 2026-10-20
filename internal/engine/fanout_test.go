@@ -3,6 +3,11 @@ package engine
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -86,5 +91,66 @@ func TestNativeFanoutAtomicPrivateReplayAndCurrentMembership(t *testing.T) {
 	var nowCount int
 	if e = s.Pool.QueryRow(ctx, `SELECT count(*) FROM messages WHERE scope=$1`, owner.Scope).Scan(&nowCount); e != nil || count != nowCount {
 		t.Fatal("partial send", count, nowCount, e)
+	}
+}
+
+func TestGroupFanoutWithProviderKeepsExternalAndPrivateNativeRoutes(t *testing.T) {
+	s, owner := testStore(t)
+	s.AllowLocal = true
+	ctx := context.Background()
+	person := testPerson(t, s, owner, "routed-person")
+	worker := testWorker(t, s, owner, "routed-worker")
+	var count atomic.Int32
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, e := io.ReadAll(r.Body)
+		if e != nil {
+			t.Error(e)
+		}
+		if strings.Contains(string(raw), "_policy") {
+			t.Error("policy metadata leaked")
+		}
+		count.Add(1)
+		w.WriteHeader(202)
+	}))
+	defer receiver.Close()
+	connection, e := s.SaveConnection(ctx, owner, Connection{Name: "Mixed group", Kind: "webhook", Config: map[string]string{"url": receiver.URL}, Secret: "fixture-signing-secret", Enabled: true})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.SaveDestination(ctx, owner, Destination{ConnectionID: connection.ID, PrincipalID: person.ID, Address: "person-only"}); e != nil {
+		t.Fatal(e)
+	}
+	group, e := s.SaveGroup(ctx, owner, Group{Name: "Mixed", Members: []string{person.ID, worker.ID}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	result, e := s.Send(ctx, worker, SendInput{Target: Target{"group", group.ID}, Body: "Mixed routes"}, "mixed")
+	if e != nil || len(result.Messages) != 2 {
+		t.Fatal(result, e)
+	}
+	for _, m := range result.Messages {
+		if m.InstanceID != worker.InstanceID {
+			t.Fatal("worker attribution lost", m)
+		}
+	}
+	var native, external int
+	if e = s.Pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE connection_id=''),count(*) FILTER(WHERE connection_id<>'') FROM deliveries WHERE scope=$1`, owner.Scope).Scan(&native, &external); e != nil || native != 2 || external != 1 {
+		t.Fatal(native, external, e)
+	}
+	if e = s.DispatchOnce(ctx, "http://localhost"); e != nil || count.Load() != 1 {
+		t.Fatal("provider path bypassed", count.Load(), e)
+	}
+	// A pure native worker-origin group also retains its authenticated instance.
+	if _, e = s.SaveConnection(ctx, owner, Connection{ID: connection.ID, Name: connection.Name, Kind: "webhook", Config: map[string]string{"url": receiver.URL}, Enabled: false}); e != nil {
+		t.Fatal(e)
+	}
+	result, e = s.Send(ctx, worker, SendInput{Target: Target{"group", group.ID}, Body: "Native instance"}, "native-instance")
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, m := range result.Messages {
+		if m.InstanceID != worker.InstanceID {
+			t.Fatal("batch instance attribution", m)
+		}
 	}
 }

@@ -269,3 +269,15 @@ it("removes an opened conversation after a live refresh loses read access", asyn
   await waitFor(()=>expect(screen.queryByText("Private revocable history")).toBeNull(),{timeout:4000});
   expect(await screen.findByText("Conversation unavailable")).toBeVisible();
 });
+
+it("brings selected request controls into view on a narrow layout", async () => {
+  vi.stubGlobal("matchMedia",()=>({matches:true}));
+  const scroll=vi.spyOn(Element.prototype,"scrollIntoView");
+  render(<App/>);
+  fireEvent.click(await screen.findByRole("button",{name:/Which format/}));
+  const detail=screen.getByRole("region",{name:"Request details"});
+  expect(detail).toHaveFocus();
+  expect(scroll).toHaveBeenCalledWith({block:"start",behavior:"auto"});
+  expect(screen.getByRole("button",{name:"Brief"})).toBeEnabled();
+  scroll.mockRestore();
+});

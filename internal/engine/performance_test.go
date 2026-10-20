@@ -18,7 +18,7 @@ func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.T
 }
 func (q *queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
 
-// These benchmarks include real PostgreSQL round trips and validate every returned result.
+// These benchmarks include real PostgreSQL round trips and assert the expected result counts.
 // Synthetic directory rows isolate read-path cost; enrollment and lifecycle correctness are tested separately.
 func BenchmarkCorePaths(b *testing.B) {
 	s, owner := testStore(b)
