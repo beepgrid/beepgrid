@@ -18,6 +18,54 @@ func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.T
 }
 func (q *queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
 
+func TestIndividualContactFanoutUsesBoundedQueriesAndFreshAuthority(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	sender := testPerson(t, s, owner, "individual-contact-sender")
+	role := grant(t, s, owner, sender, []Rule{{Action: "message", TargetKind: "person", TargetID: "*"}})
+	ids := []string{}
+	for i := range 32 {
+		ids = append(ids, testPerson(t, s, owner, fmt.Sprint("individual-contact-", i)).ID)
+	}
+	g, err := s.SaveGroup(ctx, owner, Group{Name: "individually permitted audience", Members: ids})
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := s.Pool.Config()
+	queries := &queryCounter{}
+	config.ConnConfig.Tracer = queries
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := s.Pool
+	s.Pool = pool
+	old.Close()
+	in := SendInput{Target: Target{"group", g.ID}, Body: "private, individually permitted message"}
+	out, err := s.Send(ctx, sender, in, "bounded-contact-rules")
+	if err != nil || len(out.Messages) != 32 {
+		t.Fatal(len(out.Messages), err)
+	}
+	if n := queries.total.Load(); n > 12 {
+		t.Fatal("database work scales with recipient role checks", n)
+	}
+	role.Rules = []Rule{}
+	if _, err = s.SaveRole(ctx, owner, role); err != nil {
+		t.Fatal(err)
+	}
+	queries.total.Store(0)
+	if _, err = s.Send(ctx, sender, in, "revoked-contact-rules"); ErrorStatus(err) != 403 {
+		t.Fatal("policy snapshot escaped its operation", err)
+	}
+	if n := queries.total.Load(); n > 12 {
+		t.Fatal("denied fanout repeats role reads", n)
+	}
+	var count int
+	if err = s.Pool.QueryRow(ctx, `SELECT count(*) FROM messages`).Scan(&count); err != nil || count != 32 {
+		t.Fatal("denial wrote partial history", count, err)
+	}
+}
+
 // These benchmarks include real PostgreSQL round trips and assert the expected result counts.
 // Synthetic directory rows isolate read-path cost; enrollment and lifecycle correctness are tested separately.
 func BenchmarkCorePaths(b *testing.B) {

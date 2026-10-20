@@ -333,6 +333,10 @@ func (s *Store) Send(ctx context.Context, a Actor, in SendInput, key string) (Se
 	return out, err
 }
 func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, key string, out *SendResult) error {
+	// Resolution may authorize each member through individual contact rules.
+	// Share one bounded snapshot across resolution and queueing, inside the
+	// workspace-locked transaction, rather than reloading roles per member.
+	ctx = withPolicySnapshot(ctx)
 	if !ValidText(in.Body, 32768) || len(in.Title) > 200 {
 		return Bad("Message body is required and must be at most 32768 bytes.")
 	}
