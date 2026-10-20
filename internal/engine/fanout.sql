@@ -31,5 +31,5 @@ WITH input AS MATERIALIZED (
           '_policy',jsonb_build_object('action_name','','credential_id',$6::text,'provider_connection',$7::text,'sender_id',$4::text,'target',i.policy_target,'action','message')),$8
  FROM input i JOIN written w ON w.id=i.message->>'id' RETURNING id
 )
-SELECT pg_notify('notif_work',json_build_array($1::text,i.recipient_id)::text)
+SELECT pg_notify('notif_work',json_build_array($1::text,i.recipient_id)::text), pg_notify('notif_events',$1)
 FROM input i JOIN queued q ON q.id=i.delivery_id

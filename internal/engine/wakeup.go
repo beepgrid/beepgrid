@@ -57,6 +57,13 @@ func (s *Store) WatchWork(a Actor) (<-chan struct{}, func()) {
 	return s.wakes.watch(a.Scope + "/" + a.ID)
 }
 
+// WatchEvents registers before the durable read to avoid the read/watch race.
+// Hints carry only a workspace ID, are coalesced per transaction by PostgreSQL,
+// and authorize nothing. Consumers must recheck credentials and visibility.
+func (s *Store) WatchEvents(a Actor) (<-chan struct{}, func()) {
+	return s.eventWakes.watch(a.Scope)
+}
+
 // Notifications are a wakeup hint only. PostgreSQL inbox rows remain authoritative and periodic reads recover missed hints.
 func (s *Store) startWakeups() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -68,13 +75,17 @@ func (s *Store) startWakeups() {
 		for ctx.Err() == nil {
 			conn, e := pgx.ConnectConfig(ctx, config)
 			if e == nil {
-				_, e = conn.Exec(ctx, `LISTEN notif_work`)
+				_, e = conn.Exec(ctx, `LISTEN notif_work; LISTEN notif_events`)
 			}
 			if e == nil {
 				for ctx.Err() == nil {
 					message, err := conn.WaitForNotification(ctx)
 					if err != nil {
 						break
+					}
+					if message.Channel == "notif_events" {
+						s.eventWakes.signal(message.Payload)
+						continue
 					}
 					var target []string
 					if json.Unmarshal([]byte(message.Payload), &target) == nil && len(target) == 2 {

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"github.com/notif-dev/notif/internal/engine"
@@ -13,6 +14,76 @@ import (
 	"testing"
 	"time"
 )
+
+func TestEventStreamCommitWakeReplayAndMissedHintFallback(t *testing.T) {
+	for _, summary := range []bool{false, true} {
+		t.Run(fmt.Sprint("summary-", summary), func(t *testing.T) {
+			s, c, server := setup(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+			defer cancel()
+			a, err := s.Authenticate(ctx, c.Token)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var cursor int64
+			if err = s.Pool.QueryRow(ctx, `SELECT sequence FROM scopes WHERE id=$1`, a.Scope).Scan(&cursor); err != nil {
+				t.Fatal(err)
+			}
+			url := server.URL + "/api/v1/events?stream=1"
+			if summary {
+				url += "&summary=1"
+			}
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			req.Header.Set("Authorization", "Bearer "+c.Token)
+			req.Header.Set("Last-Event-ID", fmt.Sprint(cursor))
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			reader := bufio.NewReader(res.Body)
+			readMessage := func(want string) {
+				t.Helper()
+				for {
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						t.Fatal(err)
+					}
+					if strings.Contains(line, want) {
+						return
+					}
+				}
+			}
+			readMessage(": keepalive")
+			sent, err := s.Send(ctx, a, engine.SendInput{Target: engine.Target{Kind: "person", ID: a.ID}, Body: "wake the stream"}, "stream-wake")
+			if err != nil {
+				t.Fatal(err)
+			}
+			readMessage(sent.ConversationID)
+			// Insert one durable event without a notification, as during a missed
+			// hint or listener reconnect. Fallback must still find it.
+			var seq int64
+			if err = s.Pool.QueryRow(ctx, `WITH bumped AS (UPDATE scopes SET sequence=sequence+1 WHERE id=$1 RETURNING sequence) INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data) SELECT $1,sequence,'missed-hint',$2,$3,'','{}'::jsonb FROM bumped RETURNING sequence`, a.Scope, a.ID, sent.ConversationID).Scan(&seq); err != nil {
+				t.Fatal(err)
+			}
+			readMessage("missed-hint")
+			res.Body.Close()
+			// Reconnect from the original cursor, retaining canonical IDs and
+			// private history even if no notification is replayed.
+			req, _ = http.NewRequestWithContext(ctx, "GET", url, nil)
+			req.Header.Set("Authorization", "Bearer "+c.Token)
+			req.Header.Set("Last-Event-ID", fmt.Sprint(cursor))
+			res, err = http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			reader = bufio.NewReader(res.Body)
+			readMessage(sent.ConversationID)
+			readMessage("missed-hint")
+		})
+	}
+}
 
 func TestSlowEventReaderHasBoundedWriteAndDoesNotBlockOtherRequests(t *testing.T) {
 	s, c, _ := setup(t)
