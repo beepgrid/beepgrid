@@ -483,11 +483,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 	defer tick.Stop()
 	ready, release := s.Store.WatchEvents(actor(r))
 	defer func() { release() }()
-	var lastRead time.Time
 	for {
 		// Authenticate on every read, including hints, so an open socket never
 		// substitutes for current credentials or event visibility.
-		lastRead = time.Now()
 		a, authErr := s.Store.RefreshActor(r.Context(), actor(r))
 		if authErr != nil {
 			return nil
@@ -533,16 +531,14 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 			// Durable fallback also bounds revocation and missed-hint recovery.
 		case <-ready:
 			// One closed channel coalesces a burst without an unbounded per-client
-			// queue. A short read floor prevents a busy workspace from querying
-			// once per commit on every connected browser.
-			if wait := time.Until(lastRead.Add(10 * time.Millisecond)); wait > 0 {
-				coalesce := time.NewTimer(wait)
-				select {
-				case <-r.Context().Done():
-					coalesce.Stop()
-					return nil
-				case <-coalesce.C:
-				}
+			// queue. Batch the first idle wake too, so a short burst does not
+			// make every browser repeatedly refetch a growing history.
+			coalesce := time.NewTimer(50 * time.Millisecond)
+			select {
+			case <-r.Context().Done():
+				coalesce.Stop()
+				return nil
+			case <-coalesce.C:
 			}
 			release()
 			ready, release = s.Store.WatchEvents(actor(r))

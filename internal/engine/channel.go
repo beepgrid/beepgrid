@@ -456,8 +456,8 @@ func (s *Store) prepareDispatch(ctx context.Context) error {
 // The workspace row lock serializes this decision with mutations and other
 // dispatchers. Completed history is excluded by the partial queue indexes.
 const eligibleProvider = `d.connection_id<>'' AND d.state='queued' AND d.next_at<=now()
- AND NOT EXISTS(SELECT 1 FROM deliveries busy WHERE busy.scope=d.scope AND busy.connection_id=d.connection_id AND busy.address=d.address AND busy.state='leased')
- AND NOT EXISTS(SELECT 1 FROM deliveries older WHERE older.scope=d.scope AND older.connection_id=d.connection_id AND older.address=d.address AND older.state='queued' AND older.next_at<=now() AND (older.next_at,older.id)<(d.next_at,d.id))`
+ AND NOT EXISTS(SELECT 1 FROM deliveries busy WHERE busy.connection_id<>'' AND busy.scope=d.scope AND busy.connection_id=d.connection_id AND busy.address=d.address AND busy.state='leased')
+ AND NOT EXISTS(SELECT 1 FROM deliveries older WHERE older.connection_id<>'' AND older.scope=d.scope AND older.connection_id=d.connection_id AND older.address=d.address AND older.state='queued' AND older.next_at<=now() AND (older.next_at,older.id)<(d.next_at,d.id))`
 
 func (s *Store) dispatchOne(ctx context.Context, publicURL string) (bool, error) {
 	if err := s.prepareDispatch(ctx); err != nil {
@@ -480,7 +480,7 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 	// Match mutation lock order: workspace first, then delivery. Skip busy
 	// workspaces so cancellation cannot deadlock and other tenants can progress.
 	var scope string
-	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND EXISTS(SELECT 1 FROM deliveries d WHERE d.scope=s.id AND  `+eligibleProvider+`) ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
+	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND (SELECT d.id FROM deliveries d WHERE d.scope=s.id AND `+eligibleProvider+` ORDER BY d.next_at,d.id LIMIT 1) IS NOT NULL ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
 	if e == pgx.ErrNoRows {
 		return nil, worked, nil
 	}
