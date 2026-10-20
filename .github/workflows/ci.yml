@@ -1,0 +1,36 @@
+name: verify
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: notif
+          POSTGRES_PASSWORD: notif
+          POSTGRES_DB: notif
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U notif"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      NOTIF_TEST_DATABASE_URL: postgres://notif:notif@localhost:5432/notif?sslmode=disable
+      NOTIF_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.26.10'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: make verify
+      - run: python3 scripts/recovery-drill.py
+      - run: docker build -t notif:ci .
+      - run: NOTIF_TEST_IMAGE=notif:ci python3 scripts/container-smoke.py
