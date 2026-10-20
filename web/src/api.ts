@@ -26,7 +26,11 @@ export type RequestItem = {
   choices: string[];
   state: string;
   version: number;
-  response?: { outcome: string; answer?: unknown; source_invalidated?: boolean };
+  response?: {
+    outcome: string;
+    answer?: unknown;
+    source_invalidated?: boolean;
+  };
   resolved_by?: string;
   expires_at: string;
   created_at: string;

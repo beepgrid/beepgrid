@@ -92,7 +92,17 @@ class Client:
 
     def run(self, handler: Callable[[dict[str, Any]], None], stop: Callable[[], bool] = lambda: False) -> None:
         while not stop():
-            for delivery in self.inbox():
+            try:
+                deliveries = self.call("GET", "/api/v1/worker/inbox?wait_ms=15000")
+            except NotifError as error:
+                if error.status < 500 and error.status != 429:
+                    raise
+                time.sleep(2)
+                continue
+            except (urllib.error.URLError, TimeoutError):
+                time.sleep(2)
+                continue
+            for delivery in deliveries:
                 handler(delivery)
                 self.ack(delivery)
             time.sleep(1)

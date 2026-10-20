@@ -137,17 +137,13 @@ describe("employee workspace", () => {
   it("keeps people and agents in separate directories", async () => {
     render(<App />);
     await screen.findByRole("heading", { name: "Inbox", level: 1 });
-    fireEvent.click(
-      screen.getByRole("button", { name: "People" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "People" }));
     expect(
       await screen.findByRole("heading", { name: "People", level: 1 }),
     ).toBeVisible();
     expect(screen.getAllByText("Alex Morgan").length).toBeGreaterThan(0);
     expect(screen.queryByText("research/scout")).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Agents" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Agents" }));
     expect(await screen.findByText("research/scout")).toBeVisible();
   });
   it("answers one request and focuses the remaining request", async () => {
@@ -187,9 +183,7 @@ describe("employee workspace", () => {
   it("manual person entry preserves department and human manager fields", async () => {
     render(<App />);
     await screen.findByRole("heading", { name: "Inbox", level: 1 });
-    fireEvent.click(
-      screen.getByRole("button", { name: "People" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "People" }));
     fireEvent.click(screen.getByRole("button", { name: "Add person" }));
     fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "Taylor" },

@@ -22,6 +22,7 @@ environment["PYTHONPATH"] = str(root / "sdk/python")
 binary = root / ".local/notif-sdk-test"
 binary.parent.mkdir(mode=0o700, exist_ok=True)
 subprocess.run(["go", "build", "-buildvcs=false", "-o", str(binary), "./cmd/notif"], cwd=root, check=True)
+subprocess.run([str(binary), "migrate"], cwd=root, env=environment, check=True)
 server = subprocess.Popen([str(binary), "serve"], cwd=root, env=environment, stdout=subprocess.DEVNULL,
                           stderr=subprocess.DEVNULL)
 try:

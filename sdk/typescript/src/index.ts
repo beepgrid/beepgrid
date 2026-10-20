@@ -229,7 +229,21 @@ export class Client {
     signal?: AbortSignal,
   ) {
     while (!signal?.aborted) {
-      const jobs = await this.inbox(signal);
+      let jobs: Delivery[];
+      try {
+        jobs = await this.call<Delivery[]>(
+          "GET",
+          "/api/v1/worker/inbox?wait_ms=15000",
+          undefined,
+          { signal },
+        );
+      } catch (e) {
+        if (signal?.aborted) throw e;
+        if (e instanceof NotifError && e.status < 500 && e.status !== 429)
+          throw e;
+        await delay(2000, signal);
+        continue;
+      }
       for (const job of jobs) {
         await handler(job);
         await this.ack(job);

@@ -53,7 +53,14 @@ type Data = {
   roles: Role[];
   connections: Connection[];
   events: EventItem[];
-  destinations: {id:string;connection_id:string;principal_id:string;address:string;mode:string;priority:number}[];
+  destinations: {
+    id: string;
+    connection_id: string;
+    principal_id: string;
+    address: string;
+    mode: string;
+    priority: number;
+  }[];
   bindings: { role_id: string; subject_kind: string; subject_id: string }[];
 };
 const emptyData: Data = {
@@ -371,7 +378,7 @@ export function App() {
           ["roles", "/roles"],
           ["connections", "/connections"],
           ["bindings", "/role-bindings"],
- ["destinations", "/destinations"],
+          ["destinations", "/destinations"],
         );
       const values = await Promise.all(
         entries.map(async ([k, p]) => [k, await api(p)]),
@@ -800,7 +807,8 @@ export function App() {
                 )}
               </div>
               {conversation ? (
-                <Chat key={conversation.id}
+                <Chat
+                  key={conversation.id}
                   conversation={conversation}
                   me={me}
                   name={name}
@@ -983,7 +991,18 @@ export function App() {
                     <div className="entity-name">
                       <Avatar person={p} />
                       <span>
-                        <strong>{p.name}</strong>{me.admin&&<button className="quiet small" onClick={()=>{setSelected(p.id);setModal("edit-person")}}>Edit profile</button>}
+                        <strong>{p.name}</strong>
+                        {me.admin && (
+                          <button
+                            className="quiet small"
+                            onClick={() => {
+                              setSelected(p.id);
+                              setModal("edit-person");
+                            }}
+                          >
+                            Edit profile
+                          </button>
+                        )}
                         <small>
                           {String(p.metadata.email ?? p.external_id)}
                         </small>
@@ -1127,7 +1146,37 @@ export function App() {
                     </div>
                     <div className="assigned">
                       Assigned to{" "}
-                      {data.bindings.filter(b=>b.role_id===role.id).length===0 ? "nobody yet" : data.bindings.filter(b=>b.role_id===role.id).map(b=><button className="binding-chip" key={b.subject_id} onClick={()=>void act(()=>api("/role-bindings",{...b,remove:true}),"Role removed")} aria-label={"Remove role from "+(data.groups.find(g=>g.id===b.subject_id)?.name??name(b.subject_id))}>{data.groups.find(g=>g.id===b.subject_id)?.name??name(b.subject_id)} ×</button>)}
+                      {data.bindings.filter((b) => b.role_id === role.id)
+                        .length === 0
+                        ? "nobody yet"
+                        : data.bindings
+                            .filter((b) => b.role_id === role.id)
+                            .map((b) => (
+                              <button
+                                className="binding-chip"
+                                key={b.subject_id}
+                                onClick={() =>
+                                  void act(
+                                    () =>
+                                      api("/role-bindings", {
+                                        ...b,
+                                        remove: true,
+                                      }),
+                                    "Role removed",
+                                  )
+                                }
+                                aria-label={
+                                  "Remove role from " +
+                                  (data.groups.find(
+                                    (g) => g.id === b.subject_id,
+                                  )?.name ?? name(b.subject_id))
+                                }
+                              >
+                                {data.groups.find((g) => g.id === b.subject_id)
+                                  ?.name ?? name(b.subject_id)}{" "}
+                                ×
+                              </button>
+                            ))}
                     </div>
                   </section>
                 ))
@@ -1167,7 +1216,20 @@ export function App() {
                           : "Needs credentials"}
                       </p>
                     </div>
-                    <button className="quiet" onClick={()=>void act(()=>api("/connections",{...c,enabled:!c.enabled}),"Connection updated")}><Badge tone={c.enabled ? "green" : "muted"}>{c.enabled ? "Enabled" : "Paused"}</Badge></button>
+                    <button
+                      className="quiet"
+                      onClick={() =>
+                        void act(
+                          () =>
+                            api("/connections", { ...c, enabled: !c.enabled }),
+                          "Connection updated",
+                        )
+                      }
+                    >
+                      <Badge tone={c.enabled ? "green" : "muted"}>
+                        {c.enabled ? "Enabled" : "Paused"}
+                      </Badge>
+                    </button>
                     <button
                       className="secondary"
                       onClick={() => {
@@ -1189,7 +1251,30 @@ export function App() {
                   </div>
                 ))}
               </div>
-              {data.destinations.map(d=><div className="destination-row" key={d.id}><strong>{name(d.principal_id)}</strong><span>{data.connections.find(c=>c.id===d.connection_id)?.name}</span><code>{d.address}</code><Badge>{d.mode}</Badge><button className="quiet" onClick={()=>void act(()=>api("/destinations/"+d.id+"/remove",{}),"Destination removed")}>Remove</button></div>)}
+              {data.destinations.map((d) => (
+                <div className="destination-row" key={d.id}>
+                  <strong>{name(d.principal_id)}</strong>
+                  <span>
+                    {
+                      data.connections.find((c) => c.id === d.connection_id)
+                        ?.name
+                    }
+                  </span>
+                  <code>{d.address}</code>
+                  <Badge>{d.mode}</Badge>
+                  <button
+                    className="quiet"
+                    onClick={() =>
+                      void act(
+                        () => api("/destinations/" + d.id + "/remove", {}),
+                        "Destination removed",
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
               <div className="info-note">
                 Email approvals open an authenticated web page. External
                 provider setup requires your own account and credentials.
@@ -1446,10 +1531,14 @@ function Chat({
   onSend: (body: string) => Promise<boolean>;
 }) {
   const draftKey = "notif-draft/" + me.person.id + "/" + c.id;
-  const [body, setBody] = useState(() => sessionStorage.getItem(draftKey) ?? ""),
+  const [body, setBody] = useState(
+      () => sessionStorage.getItem(draftKey) ?? "",
+    ),
     [busy, setBusy] = useState(false),
     end = useRef<HTMLDivElement>(null);
-  useEffect(() => { setBody(sessionStorage.getItem(draftKey) ?? ""); }, [draftKey]);
+  useEffect(() => {
+    setBody(sessionStorage.getItem(draftKey) ?? "");
+  }, [draftKey]);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [c.messages?.length]);
@@ -1493,7 +1582,10 @@ function Chat({
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
-          if (await onSend(body)) {setBody("");sessionStorage.removeItem(draftKey)}
+          if (await onSend(body)) {
+            setBody("");
+            sessionStorage.removeItem(draftKey);
+          }
           setBusy(false);
         }}
       >
@@ -1502,7 +1594,10 @@ function Chat({
           aria-label="Message"
           placeholder="Write a message…"
           value={body}
-          onChange={(e) => {setBody(e.target.value);sessionStorage.setItem(draftKey,e.target.value)}}
+          onChange={(e) => {
+            setBody(e.target.value);
+            sessionStorage.setItem(draftKey, e.target.value);
+          }}
           maxLength={32768}
           required
         />
@@ -1522,7 +1617,7 @@ function modalTitle(k: string) {
     (
       {
         person: "Add a person",
- "edit-person":"Edit person",
+        "edit-person": "Edit person",
         group: "Create a group",
         "edit-group": "Edit group",
         role: "Create a role",
@@ -1561,23 +1656,37 @@ function Forms({
   openConversation,
 }: FormsProps) {
   const entities = [...data.people, ...data.agents, ...data.services];
-  const existingPerson=data.people.find(p=>p.id===selected);
+  const existingPerson = data.people.find((p) => p.id === selected);
   const existingGroup = data.groups.find((x) => x.id === selected);
   const existingRole = data.roles.find((x) => x.id === selected);
   const existingConnection = data.connections.find((x) => x.id === selected);
   const [name, setName] = useState(
-      kind === "edit-person" ? (existingPerson?.name??"") : kind === "edit-group"
-        ? (existingGroup?.name ?? "")
-        : kind === "edit-role"
-          ? (existingRole?.name ?? "")
-          : kind === "edit-connection"
-            ? (existingConnection?.name ?? "")
-            : "",
+      kind === "edit-person"
+        ? (existingPerson?.name ?? "")
+        : kind === "edit-group"
+          ? (existingGroup?.name ?? "")
+          : kind === "edit-role"
+            ? (existingRole?.name ?? "")
+            : kind === "edit-connection"
+              ? (existingConnection?.name ?? "")
+              : "",
     ),
     [external, setExternal] = useState(""),
-    [department, setDepartment] = useState(kind==="edit-person"?String(existingPerson?.metadata.department??""):""),
-    [manager, setManager] = useState(kind==="edit-person"?String(existingPerson?.metadata.manager_id??""):""),
-    [email, setEmail] = useState(kind==="edit-person"?String(existingPerson?.metadata.email??""):""),
+    [department, setDepartment] = useState(
+      kind === "edit-person"
+        ? String(existingPerson?.metadata.department ?? "")
+        : "",
+    ),
+    [manager, setManager] = useState(
+      kind === "edit-person"
+        ? String(existingPerson?.metadata.manager_id ?? "")
+        : "",
+    ),
+    [email, setEmail] = useState(
+      kind === "edit-person"
+        ? String(existingPerson?.metadata.email ?? "")
+        : "",
+    ),
     [members, setMembers] = useState<string[]>(
       kind === "edit-group" ? (existingGroup?.members ?? []) : [],
     ),
@@ -1602,7 +1711,12 @@ function Forms({
     [address, setAddress] = useState(""),
     [busy, setBusy] = useState(false),
     [result, setResult] = useState<unknown>(null),
-    [action, setAction] = useState("message"),[subject,setSubject]=useState(""),[connectionID,setConnectionID]=useState(""),[actionName,setActionName]=useState(""),[signingSecret,setSigningSecret]=useState(""),[mode,setMode]=useState("primary");
+    [action, setAction] = useState("message"),
+    [subject, setSubject] = useState(""),
+    [connectionID, setConnectionID] = useState(""),
+    [actionName, setActionName] = useState(""),
+    [signingSecret, setSigningSecret] = useState(""),
+    [mode, setMode] = useState("primary");
   const targetOptions = [
     ...entities.map((e) => ({ id: e.id, label: e.name, kind: e.kind })),
     ...data.groups.map((g) => ({ id: g.id, label: g.name, kind: "group" })),
@@ -1612,8 +1726,14 @@ function Forms({
     setBusy(true);
     const success = await act(
       async () => {
-        if(kind==="edit-person") await api("/people/"+selected+"/profile",{name,department,manager_id:manager,email});
- else if (kind === "person")
+        if (kind === "edit-person")
+          await api("/people/" + selected + "/profile", {
+            name,
+            department,
+            manager_id: manager,
+            email,
+          });
+        else if (kind === "person")
           await api("/people", {
             name,
             external_id: external || name.toLowerCase().replaceAll(" ", "-"),
@@ -1647,20 +1767,30 @@ function Forms({
             name,
             kind: type,
             config,
-            secret: type==="slack"&&secret?JSON.stringify({bot_token:secret,signing_secret:signingSecret}):secret,
+            secret:
+              type === "slack" && secret
+                ? JSON.stringify({
+                    bot_token: secret,
+                    signing_secret: signingSecret,
+                  })
+                : secret,
             enabled: true,
           });
         else if (kind === "destination")
           await api("/destinations", {
             connection_id: selected,
             principal_id: target,
-            address,mode,
+            address,
+            mode,
           });
         else if (kind === "explain") {
           const option = targetOptions.find((t) => t.id === target)!;
           setResult(
             await api("/permissions/explain", {
-              action,subject_id:subject,connection_id:connectionID,action_name:actionName,
+              action,
+              subject_id: subject,
+              connection_id: connectionID,
+              action_name: actionName,
               target: { kind: option.kind, id: target },
             }),
           );
@@ -1754,7 +1884,7 @@ function Forms({
           />
         </Field>
       )}
-      {(kind === "person"||kind==="edit-person") && (
+      {(kind === "person" || kind === "edit-person") && (
         <>
           <Field label="Your person ID">
             <input
@@ -1895,8 +2025,38 @@ function Forms({
                     ))}
                 </select>
               </Field>
-              <Field label="Connection (optional)"><select value={r.connection_id??""} onChange={e=>setRules(rules.map((x,j)=>j===i?{...x,connection_id:e.target.value}:x))}><option value="">Any allowed transport</option>{data.connections.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-              <Field label="Action name (optional)"><input value={r.action_name??""} onChange={e=>setRules(rules.map((x,j)=>j===i?{...x,action_name:e.target.value}:x))} placeholder="deploy"/></Field>
+              <Field label="Connection (optional)">
+                <select
+                  value={r.connection_id ?? ""}
+                  onChange={(e) =>
+                    setRules(
+                      rules.map((x, j) =>
+                        j === i ? { ...x, connection_id: e.target.value } : x,
+                      ),
+                    )
+                  }
+                >
+                  <option value="">Any allowed transport</option>
+                  {data.connections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Action name (optional)">
+                <input
+                  value={r.action_name ?? ""}
+                  onChange={(e) =>
+                    setRules(
+                      rules.map((x, j) =>
+                        j === i ? { ...x, action_name: e.target.value } : x,
+                      ),
+                    )
+                  }
+                  placeholder="deploy"
+                />
+              </Field>
               <button
                 className="icon-button"
                 type="button"
@@ -2015,8 +2175,34 @@ function Forms({
               />
             </Field>
           ))}
-          {type==="webhook"&&<Field label="Incoming webhook sender (optional)"><select value={config.inbound_sender_id??""} onChange={e=>setConfig({...config,inbound_sender_id:e.target.value})}><option value="">Outgoing only</option>{data.services.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>}
-          {type==="slack"&&<Field label="Slack signing secret"><input type="password" value={signingSecret} onChange={e=>setSigningSecret(e.target.value)} required={Boolean(secret)||kind!=="edit-connection"} autoComplete="new-password"/></Field>}
+          {type === "webhook" && (
+            <Field label="Incoming webhook sender (optional)">
+              <select
+                value={config.inbound_sender_id ?? ""}
+                onChange={(e) =>
+                  setConfig({ ...config, inbound_sender_id: e.target.value })
+                }
+              >
+                <option value="">Outgoing only</option>
+                {data.services.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {type === "slack" && (
+            <Field label="Slack signing secret">
+              <input
+                type="password"
+                value={signingSecret}
+                onChange={(e) => setSigningSecret(e.target.value)}
+                required={Boolean(secret) || kind !== "edit-connection"}
+                autoComplete="new-password"
+              />
+            </Field>
+          )}
           <Field
             label={
               type === "slack"
@@ -2042,7 +2228,15 @@ function Forms({
           </Field>
         </>
       )}
-      {kind==="destination"&&<Field label="Delivery mode"><select value={mode} onChange={e=>setMode(e.target.value)}><option value="primary">Primary (replaces current primary)</option><option value="fallback">Fallback after definite failure</option><option value="copy">Explicit additional copy</option></select></Field>}
+      {kind === "destination" && (
+        <Field label="Delivery mode">
+          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="primary">Primary (replaces current primary)</option>
+            <option value="fallback">Fallback after definite failure</option>
+            <option value="copy">Explicit additional copy</option>
+          </select>
+        </Field>
+      )}
       {kind === "destination" && (
         <Field label="Destination address">
           <input
@@ -2053,7 +2247,43 @@ function Forms({
           />
         </Field>
       )}
-      {kind==="explain"&&<><Field label="Whose role permissions?"><select value={subject} onChange={e=>setSubject(e.target.value)}><option value="">My current credential</option>{entities.map(p=><option key={p.id} value={p.id}>{p.name} · {p.kind}</option>)}</select></Field><Field label="Connection"><select value={connectionID} onChange={e=>setConnectionID(e.target.value)}><option value="">Native web / worker</option>{data.connections.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Field><Field label="Action name"><input value={actionName} onChange={e=>setActionName(e.target.value)} placeholder="deploy"/></Field></>}
+      {kind === "explain" && (
+        <>
+          <Field label="Whose role permissions?">
+            <select
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+            >
+              <option value="">My current credential</option>
+              {entities.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} · {p.kind}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Connection">
+            <select
+              value={connectionID}
+              onChange={(e) => setConnectionID(e.target.value)}
+            >
+              <option value="">Native web / worker</option>
+              {data.connections.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Action name">
+            <input
+              value={actionName}
+              onChange={(e) => setActionName(e.target.value)}
+              placeholder="deploy"
+            />
+          </Field>
+        </>
+      )}
       {kind === "explain" && (
         <Field label="Action">
           <select value={action} onChange={(e) => setAction(e.target.value)}>
@@ -2216,7 +2446,8 @@ function Settings({
     [principal, setPrincipal] = useState(me.person.id),
     [kind, setKind] = useState("api"),
     [prefix, setPrefix] = useState("research/"),
-    [issued, setIssued] = useState(""),[serviceName,setServiceName]=useState("");
+    [issued, setIssued] = useState(""),
+    [serviceName, setServiceName] = useState("");
   const load = () =>
     api<Record<string, unknown>[]>("/credentials").then(setCredentials);
   useEffect(() => {
@@ -2225,7 +2456,44 @@ function Settings({
   return (
     <>
       <SharedAnswers />
-      <section className="settings-section"><h2>Software services</h2><p>Give applications and trusted agent launchers their own identity, separate from people and agents.</p><form className="token-form" onSubmit={e=>{e.preventDefault();void act(async()=>{await api("/services",{name:serviceName,external_id:serviceName.toLowerCase().replace(/[^a-z0-9]+/g,"-")});setServiceName("")},"Service created")}}><Field label="Service name"><input value={serviceName} onChange={e=>setServiceName(e.target.value)} required/></Field><button className="secondary">Add service</button></form>{people.filter(p=>p.kind==="service").map(p=><p key={p.id}><strong>{p.name}</strong> <code>{p.external_id}</code></p>)}</section>
+      <section className="settings-section">
+        <h2>Software services</h2>
+        <p>
+          Give applications and trusted agent launchers their own identity,
+          separate from people and agents.
+        </p>
+        <form
+          className="token-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void act(async () => {
+              await api("/services", {
+                name: serviceName,
+                external_id: serviceName
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-"),
+              });
+              setServiceName("");
+            }, "Service created");
+          }}
+        >
+          <Field label="Service name">
+            <input
+              value={serviceName}
+              onChange={(e) => setServiceName(e.target.value)}
+              required
+            />
+          </Field>
+          <button className="secondary">Add service</button>
+        </form>
+        {people
+          .filter((p) => p.kind === "service")
+          .map((p) => (
+            <p key={p.id}>
+              <strong>{p.name}</strong> <code>{p.external_id}</code>
+            </p>
+          ))}
+      </section>
       <section className="settings-section">
         <h2>Workspace</h2>
         <dl>
