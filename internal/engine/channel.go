@@ -619,3 +619,19 @@ func (s *Store) queueFallback(ctx context.Context, db DB, scope string, previous
 	}
 	return nil
 }
+
+func (s *Store) RemoveDestination(ctx context.Context, a Actor, id string) error {
+	return s.tx(ctx, a, func(tx pgx.Tx) error {
+		if !a.Admin {
+			return Denied()
+		}
+		tag, e := tx.Exec(ctx, `DELETE FROM destinations WHERE scope=$1 AND id=$2`, a.Scope, id)
+		if e != nil {
+			return e
+		}
+		if tag.RowsAffected() == 0 {
+			return Missing()
+		}
+		return event(ctx, tx, a, "destination.removed", "", a.ID, map[string]string{"id": id})
+	})
+}

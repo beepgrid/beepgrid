@@ -24,6 +24,9 @@ func (s *Server) channelRoutes() {
 		x, e := s.Store.SaveConnection(r.Context(), actor(r), in)
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/destinations/{id}/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		return ok(w, map[string]bool{"removed": true}, s.Store.RemoveDestination(r.Context(), actor(r), r.PathValue("id")))
+	}))
 	m.HandleFunc("GET /api/v1/destinations", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.Destinations(r.Context(), actor(r))
 		return ok(w, x, e)

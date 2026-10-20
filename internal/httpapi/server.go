@@ -18,7 +18,8 @@ import (
 
 type actorKey struct{}
 type Server struct {
-	oidc *oidcConfig
+	limits rateLimiter
+	oidc   *oidcConfig
 
 	Store     *engine.Store
 	PublicURL string
@@ -51,6 +52,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, &engine.Error{Code: "ORIGIN_DENIED", Message: "This origin is not allowed.", Status: 403})
 			return
 		}
+	}
+	if (r.URL.Path == "/api/v1/auth/login" || strings.HasPrefix(r.URL.Path, "/integrations/")) && !s.limits.allow("unauth/"+remoteIP(r), 120) {
+		w.Header().Set("Retry-After", "60")
+		writeError(w, &engine.Error{Code: "RATE_LIMITED", Message: "Try again shortly.", Status: 429})
+		return
 	}
 	s.mux.ServeHTTP(w, r)
 }
@@ -99,6 +105,11 @@ func (s *Server) protect(fn func(http.ResponseWriter, *http.Request) error) http
 		}
 		if a.CredentialKind == "enrollment" && r.URL.Path != "/api/v1/sessions" {
 			writeError(w, engine.Denied())
+			return
+		}
+		if !s.limits.allow("credential/"+a.CredentialID, 600) {
+			w.Header().Set("Retry-After", "60")
+			writeError(w, &engine.Error{Code: "RATE_LIMITED", Message: "Credential request rate exceeded.", Status: 429})
 			return
 		}
 		r = r.WithContext(context.WithValue(r.Context(), actorKey{}, a))
@@ -178,6 +189,14 @@ func (s *Server) routes() {
 		x, e := s.Store.CreatePerson(r.Context(), actor(r), in)
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/people/{id}/profile", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.CreatePerson
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.UpdatePerson(r.Context(), actor(r), r.PathValue("id"), in)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("POST /api/v1/people/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/agents/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/credentials", s.protect(func(w http.ResponseWriter, r *http.Request) error {
@@ -219,8 +238,22 @@ func (s *Server) routes() {
 		return ok(w, map[string]bool{"ok": true}, s.Store.Heartbeat(r.Context(), actor(r), in))
 	}))
 	m.HandleFunc("GET /api/v1/worker/inbox", s.protect(func(w http.ResponseWriter, r *http.Request) error {
-		x, e := s.Store.Inbox(r.Context(), actor(r))
-		return ok(w, x, e)
+		wait, _ := strconv.Atoi(r.URL.Query().Get("wait_ms"))
+		if wait < 0 || wait > 20000 {
+			return engine.Bad("wait_ms must be 0 to 20000")
+		}
+		deadline := time.Now().Add(time.Duration(wait) * time.Millisecond)
+		for {
+			x, e := s.Store.Inbox(r.Context(), actor(r))
+			if e != nil || len(x) > 0 || !time.Now().Before(deadline) {
+				return ok(w, x, e)
+			}
+			select {
+			case <-r.Context().Done():
+				return nil
+			case <-time.After(250 * time.Millisecond):
+			}
+		}
 	}))
 	m.HandleFunc("POST /api/v1/worker/inbox/{id}/ack", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in struct {
@@ -271,6 +304,7 @@ func (s *Server) routes() {
 	}))
 	m.HandleFunc("POST /api/v1/permissions/explain", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in struct {
+			SubjectID    string        `json:"subject_id"`
 			Action       string        `json:"action"`
 			Target       engine.Target `json:"target"`
 			ConnectionID string        `json:"connection_id"`
@@ -279,7 +313,7 @@ func (s *Server) routes() {
 		if e := decode(r, &in); e != nil {
 			return e
 		}
-		x, e := s.Store.Explain(r.Context(), actor(r), in.Action, in.Target, in.ConnectionID, in.ActionName)
+		x, e := s.Store.ExplainSubject(r.Context(), actor(r), in.SubjectID, in.Action, in.Target, in.ConnectionID, in.ActionName)
 		return ok(w, x, e)
 	}))
 	m.HandleFunc("POST /api/v1/route-preview", s.protect(func(w http.ResponseWriter, r *http.Request) error {

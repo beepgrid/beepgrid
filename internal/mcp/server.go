@@ -21,6 +21,9 @@ func schema(required []string, properties map[string]any) any {
 func textType() any { return map[string]string{"type": "string"} }
 func Tools() any {
 	return []tool{
+		{"receive", "Receive pending agent work over an outbound connection. Acknowledge only after durably handling it.", schema(nil, map[string]any{})},
+		{"acknowledge", "Acknowledge a delivery with its current lease generation.", schema([]string{"id", "generation"}, map[string]any{"id": textType(), "generation": map[string]string{"type": "integer"}})},
+		{"report_progress", "Publish bounded worker-reported structured progress.", schema(nil, map[string]any{"progress": map[string]string{"type": "object"}})},
 		{"list_agents", "List agents visible to the authenticated caller.", schema(nil, map[string]any{})},
 		{"send", "Send a message to a person, agent or group, or reply to a conversation.", schema([]string{"body"}, map[string]any{"body": textType(), "target": map[string]any{"type": "object", "properties": map[string]any{"kind": textType(), "id": textType()}, "required": []string{"kind", "id"}}, "conversation_id": textType(), "title": textType()})},
 		{"ask", "Create a durable question or approval and return its handle. The caller may continue working.", schema([]string{"target", "title"}, map[string]any{"target": map[string]any{"type": "object"}, "title": textType(), "body": textType(), "kind": textType(), "choices": map[string]any{"type": "array", "items": textType()}, "action": map[string]any{"type": "object"}, "shared_key": textType()})},
@@ -30,6 +33,17 @@ func Tools() any {
 	}
 }
 func Serve(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer) error {
+	done := make(chan struct{})
+	defer close(done)
+	if closer, ok := in.(io.ReadCloser); ok {
+		go func() {
+			select {
+			case <-ctx.Done():
+				_ = closer.Close()
+			case <-done:
+			}
+		}()
+	}
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 4096), 131072)
 	enc := json.NewEncoder(out)
@@ -95,6 +109,27 @@ func Serve(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer) er
 func call(ctx context.Context, c *notif.Client, name string, args json.RawMessage) (any, error) {
 	var value any
 	switch name {
+	case "receive":
+		return c.Inbox(ctx)
+	case "acknowledge":
+		var in struct {
+			ID         string `json:"id"`
+			Generation int64  `json:"generation"`
+		}
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		e := c.Ack(ctx, notif.Delivery{ID: in.ID, Generation: in.Generation})
+		return map[string]bool{"received": e == nil}, e
+	case "report_progress":
+		var in struct {
+			Progress map[string]any `json:"progress"`
+		}
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		e := c.Heartbeat(ctx, in.Progress)
+		return map[string]bool{"ok": e == nil}, e
 	case "list_agents":
 		e := c.Do(ctx, "GET", "/api/v1/agents", nil, &value, "")
 		return value, e

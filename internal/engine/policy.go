@@ -220,3 +220,28 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 	})
 	return g, err
 }
+
+// ExplainSubject deliberately simulates role grants, not an administrator credential a person might possess.
+func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, action string, target Target, connection, actionName string) (map[string]any, error) {
+	a := caller
+	if subject != "" {
+		if !caller.Admin && subject != caller.ID {
+			return nil, Denied()
+		}
+		p, e := principal(ctx, s.Pool, caller.Scope, subject)
+		if e != nil || p.Disabled {
+			return nil, Missing()
+		}
+		a = Actor{Principal: p, Scope: caller.Scope, CredentialKind: "api"}
+	}
+	result, e := s.Explain(ctx, a, action, target, connection, actionName)
+	if e != nil {
+		return nil, e
+	}
+	result["subject_id"] = a.ID
+	result["basis"] = "effective_role_grants"
+	if subject == "" && a.Admin {
+		result["basis"] = "administrator_credential"
+	}
+	return result, nil
+}

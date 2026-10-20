@@ -90,7 +90,15 @@ func run() error {
 	case "serve":
 		return serve(ctx, os.Args[2:])
 	case "mcp":
-		return mcp.Serve(ctx, notif.New(env("NOTIF_URL", "http://localhost:4010"), os.Getenv("NOTIF_TOKEN")), os.Stdin, os.Stdout)
+		c := notif.New(env("NOTIF_URL", "http://localhost:4010"), os.Getenv("NOTIF_TOKEN"))
+		if id := os.Getenv("NOTIF_AGENT_ID"); id != "" {
+			worker, _, e := c.Enroll(ctx, notif.EnrollInput{Agent: id, Name: env("NOTIF_AGENT_NAME", id), Capabilities: []string{"message", "request"}})
+			if e != nil {
+				return e
+			}
+			c = worker
+		}
+		return mcp.Serve(ctx, c, os.Stdin, os.Stdout)
 	case "demo":
 		return demo(ctx, os.Args[2:])
 	case "send":

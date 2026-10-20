@@ -95,3 +95,19 @@ func TestScopedEnrollmentAndRevocation(t *testing.T) {
 		t.Fatal("revoked actor reused")
 	}
 }
+
+func TestManualManagerEditingRejectsCycles(t *testing.T) {
+	s, a := testStore(t)
+	ctx := context.Background()
+	p, e := s.CreatePerson(ctx, a, CreatePerson{ExternalID: "direct", Name: "Direct", ManagerID: a.ID})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.UpdatePerson(ctx, a, a.ID, CreatePerson{Name: "Owner", ManagerID: p.ID}); ErrorStatus(e) != 400 {
+		t.Fatal("manager cycle", e)
+	}
+	updated, e := s.UpdatePerson(ctx, a, p.ID, CreatePerson{Name: "Renamed", Department: "Finance"})
+	if e != nil || updated.Name != "Renamed" || updated.Metadata["department"] != "Finance" {
+		t.Fatal(updated, e)
+	}
+}

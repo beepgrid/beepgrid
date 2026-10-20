@@ -279,3 +279,42 @@ func (s *Store) Agents(ctx context.Context, a Actor) ([]Agent, error) {
 	}
 	return out, nil
 }
+
+func (s *Store) UpdatePerson(ctx context.Context, a Actor, id string, in CreatePerson) (Principal, error) {
+	var out Principal
+	if !ValidText(in.Name, 120) || len(in.Department) > 200 || len(in.Email) > 320 {
+		return out, Bad("A bounded name, email and department are required.")
+	}
+	e := s.tx(ctx, a, func(tx pgx.Tx) error {
+		if !s.allowed(ctx, tx, a, "manage", Target{"person", id}, "", "") {
+			return Denied()
+		}
+		p, e := principal(ctx, tx, a.Scope, id)
+		if e != nil || p.Kind != "person" {
+			return Missing()
+		}
+		next := in.ManagerID
+		visited := map[string]bool{id: true}
+		for next != "" {
+			if visited[next] {
+				return Bad("Manager relationships cannot contain a cycle.")
+			}
+			visited[next] = true
+			m, e := principal(ctx, tx, a.Scope, next)
+			if e != nil || m.Kind != "person" {
+				return Bad("Manager must be a person in this workspace.")
+			}
+			next, _ = m.Metadata["manager_id"].(string)
+		}
+		_, e = tx.Exec(ctx, `UPDATE principals SET name=$3,metadata=metadata||$4::jsonb WHERE scope=$1 AND id=$2`, a.Scope, id, in.Name, JSON(map[string]string{"email": in.Email, "department": in.Department, "manager_id": in.ManagerID}))
+		if e != nil {
+			return e
+		}
+		out, e = principal(ctx, tx, a.Scope, id)
+		if e != nil {
+			return e
+		}
+		return event(ctx, tx, a, "person.updated", "", id, map[string]string{"id": id})
+	})
+	return out, e
+}

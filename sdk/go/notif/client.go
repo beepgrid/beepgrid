@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,9 +77,11 @@ type AskInput struct {
 	SharedKey      string     `json:"shared_key,omitempty"`
 }
 type Response struct {
-	Outcome string `json:"outcome"`
-	Answer  any    `json:"answer,omitempty"`
-	Version int    `json:"version"`
+	SourceAnswerID    string `json:"source_answer_id,omitempty"`
+	SourceInvalidated bool   `json:"source_invalidated,omitempty"`
+	Outcome           string `json:"outcome"`
+	Answer            any    `json:"answer,omitempty"`
+	Version           int    `json:"version"`
 }
 type Request struct {
 	ID             string    `json:"id"`
@@ -256,9 +259,19 @@ func (c *Client) Run(ctx context.Context, handler func(context.Context, Delivery
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
-		jobs, e := c.Inbox(ctx)
+		var jobs []Delivery
+		e := c.Do(ctx, "GET", "/api/v1/worker/inbox?wait_ms=15000", nil, &jobs, "")
 		if e != nil {
-			return e
+			var apiErr *APIError
+			if errors.As(e, &apiErr) && apiErr.Status < 500 && apiErr.Status != 429 {
+				return e
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(2 * time.Second):
+				continue
+			}
 		}
 		for _, d := range jobs {
 			if e = handler(ctx, d); e != nil {
