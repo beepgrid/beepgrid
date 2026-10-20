@@ -375,7 +375,7 @@ func (s *Store) Redeem(ctx context.Context, a Actor, id string, action Action) (
 			return Denied()
 		}
 		proposer := Actor{Principal: requester, Scope: a.Scope}
-		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked)`, a.Scope, requester.ID).Scan(&proposer.Admin)
+		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, requester.ID).Scan(&proposer.Admin)
 		if !s.allowed(ctx, tx, proposer, "ask", Target{a.Kind, a.ID}, "*", action.Name, &action) {
 			return Denied()
 		}
@@ -387,10 +387,30 @@ func (s *Store) Redeem(ctx context.Context, a Actor, id string, action Action) (
 			return Denied()
 		}
 		decider := Actor{Principal: approver, Scope: a.Scope}
-		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked)`, a.Scope, approver.ID).Scan(&decider.Admin)
+		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, approver.ID).Scan(&decider.Admin)
 		var decisionConnection string
 		_ = tx.QueryRow(ctx, `SELECT decision_connection FROM requests WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&decisionConnection)
 		if !s.allowed(ctx, tx, decider, "decide", Target{requester.Kind, requester.ID}, decisionConnection, action.Name, &action) {
+			return Denied()
+		}
+		// The approved audience and the proposer's contact grant must still be valid at execution.
+		var originalTarget Target
+		var targetJSON []byte
+		err := tx.QueryRow(ctx, `SELECT policy_target FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, *r.ResolvedBy).Scan(&targetJSON)
+		if err == nil {
+			if json.Unmarshal(targetJSON, &originalTarget) != nil {
+				return Denied()
+			}
+			if !s.allowed(ctx, tx, proposer, "ask", originalTarget, "*", action.Name, &action) {
+				return Denied()
+			}
+			if originalTarget.Kind == "group" {
+				var member bool
+				if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND group_id=$2 AND principal_id=$3)`, a.Scope, originalTarget.ID, *r.ResolvedBy).Scan(&member); err != nil || !member {
+					return Denied()
+				}
+			}
+		} else if err != pgx.ErrNoRows || !decider.Admin {
 			return Denied()
 		}
 		var raw, result []byte

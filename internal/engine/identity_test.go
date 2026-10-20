@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func testStore(t *testing.T) (*Store, Actor) {
+func testStore(t testing.TB) (*Store, Actor) {
 	t.Helper()
 	url := os.Getenv("NOTIF_TEST_DATABASE_URL")
 	if url == "" {

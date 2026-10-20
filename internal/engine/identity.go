@@ -272,8 +272,16 @@ func (s *Store) Heartbeat(ctx context.Context, a Actor, progress map[string]any)
 	if len(JSON(progress)) > 8192 {
 		return Bad("Progress payload too large.")
 	}
-	_, e := s.Pool.Exec(ctx, `UPDATE instances SET last_seen=now(),progress=$3 WHERE scope=$1 AND id=$2`, a.Scope, a.InstanceID, JSON(progress))
-	return e
+	return s.tx(ctx, a, func(tx pgx.Tx) error {
+		tag, e := tx.Exec(ctx, `UPDATE instances SET last_seen=now(),progress=$3 WHERE scope=$1 AND id=$2 AND credential_id=$4`, a.Scope, a.InstanceID, JSON(progress), a.CredentialID)
+		if e != nil {
+			return e
+		}
+		if tag.RowsAffected() != 1 {
+			return Denied()
+		}
+		return nil
+	})
 }
 
 func (s *Store) Agents(ctx context.Context, a Actor) ([]Agent, error) {

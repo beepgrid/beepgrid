@@ -158,7 +158,14 @@ func (s *Store) Bootstrap(ctx context.Context, scope, company, environment, toke
 	if err = tx.Commit(ctx); err != nil {
 		return Actor{}, err
 	}
-	return s.Authenticate(ctx, token)
+	actor, err := s.Authenticate(ctx, token)
+	if err != nil {
+		return Actor{}, err
+	}
+	if actor.Scope != scope || !actor.Admin {
+		return Actor{}, Denied()
+	}
+	return actor, nil
 }
 func (s *Store) Authenticate(ctx context.Context, token string) (Actor, error) {
 	var a Actor

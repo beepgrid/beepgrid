@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func testWorker(t *testing.T, s *Store, a Actor, name string) Actor {
+func testWorker(t testing.TB, s *Store, a Actor, name string) Actor {
 	t.Helper()
 	ctx := context.Background()
 	session, e := s.Enroll(ctx, a, EnrollInput{Agent: name, Name: name, Capabilities: []string{"message", "status", "task"}})
@@ -27,7 +27,7 @@ func testWorker(t *testing.T, s *Store, a Actor, name string) Actor {
 	}
 	return actor
 }
-func testPerson(t *testing.T, s *Store, a Actor, name string) Actor {
+func testPerson(t testing.TB, s *Store, a Actor, name string) Actor {
 	t.Helper()
 	ctx := context.Background()
 	p, e := s.CreatePerson(ctx, a, CreatePerson{ExternalID: name, Name: name})
@@ -44,7 +44,7 @@ func testPerson(t *testing.T, s *Store, a Actor, name string) Actor {
 	}
 	return out
 }
-func grant(t *testing.T, s *Store, a Actor, target Actor, rules []Rule) Role {
+func grant(t testing.TB, s *Store, a Actor, target Actor, rules []Rule) Role {
 	t.Helper()
 	r, e := s.SaveRole(context.Background(), a, Role{Name: ID("role"), Rules: rules})
 	if e != nil {

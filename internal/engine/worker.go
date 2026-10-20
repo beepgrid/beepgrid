@@ -51,13 +51,13 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 		}
 		sender.CredentialKind = "provider"
 	} else {
-		if e = db.QueryRow(ctx, `SELECT NOT revoked,kind FROM credentials WHERE scope=$1 AND id=$2 AND principal_id=$3`, scope, policy.CredentialID, p.ID).Scan(&valid, &sender.CredentialKind); e != nil || !valid {
+		if e = db.QueryRow(ctx, `SELECT NOT revoked AND (expires_at IS NULL OR expires_at>now()),kind FROM credentials WHERE scope=$1 AND id=$2 AND principal_id=$3`, scope, policy.CredentialID, p.ID).Scan(&valid, &sender.CredentialKind); e != nil || !valid {
 			return false
 		}
 	}
 	sender.Admin = sender.CredentialKind == "admin"
 	if sender.CredentialKind == "browser" {
-		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked)`, scope, p.ID).Scan(&sender.Admin)
+		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, scope, p.ID).Scan(&sender.Admin)
 	}
 	recipient, e := principal(ctx, db, scope, d.RecipientID)
 	if e != nil || recipient.Disabled {
