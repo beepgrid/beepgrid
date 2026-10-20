@@ -205,6 +205,11 @@ func serve(ctx context.Context, args []string) error {
 		return e
 	}
 	defer store.Close()
+	stopDiagnostics, e := startDiagnostics(ctx, store, os.Getenv("NOTIF_PROFILE_ADDR"))
+	if e != nil {
+		return e
+	}
+	defer stopDiagnostics()
 	store.AllowLocal = *dev
 	store.AttachmentsRoot = env("NOTIF_ATTACHMENTS_DIR", ".local/attachments")
 	if e = store.ConfigureMatcher(ctx, os.Getenv("NOTIF_MATCHER_URL"), os.Getenv("NOTIF_MATCHER_TOKEN")); e != nil {
