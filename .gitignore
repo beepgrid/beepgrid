@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.local/
+bin/
+node_modules/
+web/dist/
+coverage/
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+test-results/
+playwright-report/
+.DS_Store
