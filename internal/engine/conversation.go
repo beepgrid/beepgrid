@@ -117,13 +117,15 @@ func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, err
 		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt); e != nil {
 			return nil, e
 		}
-		out = append(out, c)
+		if s.canRead(ctx, s.Pool, a, c.ID) {
+			out = append(out, c)
+		}
 	}
 	return out, rows.Err()
 }
 func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversation, error) {
 	var c Conversation
-	if !canReadConversation(ctx, s.Pool, a, id) {
+	if !s.canRead(ctx, s.Pool, a, id) {
 		return c, Missing()
 	}
 	if e := s.Pool.QueryRow(ctx, `SELECT id,title,created_by,created_at FROM conversations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt); e != nil {
@@ -163,7 +165,7 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	return c, rows.Err()
 }
 func (s *Store) conversationRecipients(ctx context.Context, db DB, a Actor, id, action string) ([]recipient, error) {
-	if !canReadConversation(ctx, db, a, id) {
+	if !s.canRead(ctx, db, a, id) {
 		return nil, Missing()
 	}
 	rows, e := db.Query(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at FROM participants cp JOIN principals p ON p.id=cp.principal_id AND p.scope=cp.scope WHERE cp.scope=$1 AND cp.conversation_id=$2 AND p.id<>$3 AND NOT p.disabled`, a.Scope, id, a.ID)
@@ -205,7 +207,7 @@ func insertMessage(ctx context.Context, db DB, a Actor, conv, body string) (Mess
 	return m, event(ctx, db, a, "message.created", conv, "", m)
 }
 func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, conv, action string, payload map[string]any, expiry time.Time) error {
-	payload["_policy"] = map[string]any{"credential_id": a.CredentialID, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
+	payload["_policy"] = map[string]any{"credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
 	payload["conversation_id"] = conv
 	if _, e := db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,exact_instance,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, r.ExactInstance, JSON(payload), expiry); e != nil {
 		return e
@@ -308,7 +310,9 @@ func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, erro
 			return nil, e
 		}
 		_ = json.Unmarshal(raw, &x.Data)
-		out = append(out, x)
+		if x.ConversationID == "" || s.canRead(ctx, s.Pool, a, x.ConversationID) {
+			out = append(out, x)
+		}
 	}
 	return out, rows.Err()
 }

@@ -29,7 +29,11 @@ func (s *Store) request(ctx context.Context, db DB, a Actor, id string) (Request
 		return r, e
 	}
 	if a.ID != r.RequesterID && !a.Admin {
-		if !s.allowed(ctx, db, a, "view", Target{"request", id}, "", "") && !s.allowed(ctx, db, a, "view", Target{"*", "*"}, "", "") {
+		requester, err := principal(ctx, db, a.Scope, r.RequesterID)
+		if err != nil {
+			return r, err
+		}
+		if !s.allowed(ctx, db, a, "view", Target{requester.Kind, requester.ID}, "", "") {
 			return r, Missing()
 		}
 		_ = db.QueryRow(ctx, `SELECT conversation_id FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, a.ID).Scan(&r.ConversationID)

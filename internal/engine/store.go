@@ -23,6 +23,8 @@ type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Store struct {
+	AllowLocal bool
+
 	Pool      *pgxpool.Pool
 	SecretKey []byte
 }
@@ -50,7 +52,7 @@ func Open(ctx context.Context, url, schemaName string, key []byte) (*Store, erro
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{p, key}
+	s := &Store{Pool: p, SecretKey: key}
 	tx, err := p.Begin(ctx)
 	if err != nil {
 		p.Close()

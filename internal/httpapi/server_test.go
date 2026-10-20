@@ -1,0 +1,133 @@
+package httpapi
+
+import (
+	"context"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/notif-dev/notif/internal/engine"
+	"github.com/notif-dev/notif/sdk/go/notif"
+)
+
+func setup(t *testing.T) (*engine.Store, *notif.Client, *httptest.Server) {
+	t.Helper()
+	database := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	if database == "" {
+		t.Skip("Set NOTIF_TEST_DATABASE_URL to run HTTP and SDK integration tests.")
+	}
+	ctx := context.Background()
+	schema := "api_" + strings.TrimPrefix(engine.ID(""), "_")
+	s, e := engine.Open(ctx, database, schema, []byte("01234567890123456789012345678901"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	token := engine.Secret()
+	if _, e = s.Bootstrap(ctx, "test/dev", "Test company", "dev", token); e != nil {
+		t.Fatal(e)
+	}
+	h := New(s, "http://localhost", nil)
+	server := httptest.NewServer(h)
+	h.PublicURL = server.URL
+	t.Cleanup(func() { server.Close(); _, _ = s.Pool.Exec(ctx, `DROP SCHEMA `+schema+` CASCADE`); s.Close() })
+	return s, notif.New(server.URL, token), server
+}
+func TestGoSDKHTTPJourney(t *testing.T) {
+	_, admin, _ := setup(t)
+	ctx := context.Background()
+	var me struct {
+		Person notif.Person `json:"person"`
+	}
+	if e := admin.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
+		t.Fatal(e)
+	}
+	worker, session, e := admin.Enroll(ctx, notif.EnrollInput{Agent: "test/scout", Name: "Scout", Capabilities: []string{"message"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	var role struct {
+		ID string `json:"id"`
+	}
+	if e = admin.Do(ctx, "POST", "/api/v1/roles", map[string]any{"name": "Worker", "rules": []map[string]string{{"action": "view", "target_kind": "*", "target_id": "*"}, {"action": "message", "target_kind": "person", "target_id": me.Person.ID}, {"action": "ask", "target_kind": "person", "target_id": me.Person.ID}}}, &role, ""); e != nil {
+		t.Fatal(e)
+	}
+	if e = admin.Do(ctx, "POST", "/api/v1/role-bindings", map[string]any{"role_id": role.ID, "subject_kind": "principal", "subject_id": session.Agent.ID}, nil, ""); e != nil {
+		t.Fatal(e)
+	}
+	q, e := worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Can I continue?", Choices: []string{"Continue", "Wait"}}, "sdk-ask")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = admin.Send(ctx, notif.SendInput{ConversationID: q.ConversationID, Body: "What did you finish?"}, "clarification"); e != nil {
+		t.Fatal(e)
+	}
+	jobs, e := worker.Inbox(ctx)
+	if e != nil || len(jobs) != 1 {
+		t.Fatal(jobs, e)
+	}
+	if e = worker.Ack(ctx, jobs[0]); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = admin.Respond(ctx, q.ID, notif.Response{Outcome: "answered", Answer: "Continue", Version: q.Version}); e != nil {
+		t.Fatal(e)
+	}
+	result, e := worker.Wait(ctx, q.ID)
+	if e != nil || result.Response == nil || result.Response.Answer != "Continue" {
+		t.Fatal(result, e)
+	}
+	jobs, e = worker.Inbox(ctx)
+	if e != nil || len(jobs) != 1 || jobs[0].Payload.Type != "request.resolved" {
+		t.Fatal(jobs, e)
+	}
+}
+func TestBrowserSessionOriginAndRevocation(t *testing.T) {
+	store, admin, server := setup(t)
+	jar, _ := cookiejar.New(nil)
+	browser := &http.Client{Jar: jar}
+	req, _ := http.NewRequest("POST", server.URL+"/api/v1/auth/login", strings.NewReader(`{"token":"`+admin.Token+`"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, e := browser.Do(req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatal(resp.Status)
+	}
+	cookies := resp.Cookies()
+	if len(cookies) != 1 || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteStrictMode {
+		t.Fatal("unsafe browser cookie")
+	}
+	req, _ = http.NewRequest("POST", server.URL+"/api/v1/groups", strings.NewReader(`{"name":"evil","members":[]}`))
+	req.Header.Set("Origin", "https://evil.example")
+	resp, e = browser.Do(req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 403 {
+		t.Fatal("cross-origin mutation accepted")
+	}
+	resp, e = browser.Get(server.URL + "/api/v1/me")
+	if e != nil {
+		t.Fatal(e)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatal(resp.Status)
+	}
+	if _, e = store.Pool.Exec(context.Background(), `UPDATE credentials SET revoked=true WHERE kind='browser'`); e != nil {
+		t.Fatal(e)
+	}
+	resp, e = browser.Get(server.URL + "/api/v1/me")
+	if e != nil {
+		t.Fatal(e)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 401 {
+		t.Fatal("revoked cookie remained authorized")
+	}
+}

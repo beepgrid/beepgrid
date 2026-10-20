@@ -10,20 +10,21 @@ import (
 func deliveryScan(row pgx.Row) (Delivery, error) {
 	var d Delivery
 	var raw []byte
-	e := row.Scan(&d.ID, &d.RecipientID, &d.OperationID, &raw, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.ExpiresAt)
+	e := row.Scan(&d.ID, &d.RecipientID, &d.OperationID, &raw, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.Address, &d.ExpiresAt)
 	_ = json.Unmarshal(raw, &d.Payload)
 	return d, normalize(e)
 }
 
-const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,attempts,last_error,connection_id,expires_at`
+const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,attempts,last_error,connection_id,address,expires_at`
 
 // currentDeliveryPolicy rechecks the originating credential, group membership and route grants before exposing content.
 func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, d Delivery) bool {
 	var policy struct {
-		CredentialID string `json:"credential_id"`
-		SenderID     string `json:"sender_id"`
-		Target       Target `json:"target"`
-		Action       string `json:"action"`
+		CredentialID       string `json:"credential_id"`
+		ProviderConnection string `json:"provider_connection"`
+		SenderID           string `json:"sender_id"`
+		Target             Target `json:"target"`
+		Action             string `json:"action"`
 	}
 	if json.Unmarshal(JSON(d.Payload["_policy"]), &policy) != nil || policy.SenderID == "" {
 		return false
@@ -34,8 +35,15 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 	}
 	sender := Actor{Principal: p, Scope: scope}
 	var valid bool
-	if e = db.QueryRow(ctx, `SELECT NOT revoked AND (expires_at IS NULL OR expires_at>now()),kind FROM credentials WHERE scope=$1 AND id=$2 AND principal_id=$3`, scope, policy.CredentialID, p.ID).Scan(&valid, &sender.CredentialKind); e != nil || !valid {
-		return false
+	if policy.ProviderConnection != "" {
+		if e = db.QueryRow(ctx, `SELECT enabled FROM connections WHERE scope=$1 AND id=$2`, scope, policy.ProviderConnection).Scan(&valid); e != nil || !valid {
+			return false
+		}
+		sender.CredentialKind = "provider"
+	} else {
+		if e = db.QueryRow(ctx, `SELECT NOT revoked,kind FROM credentials WHERE scope=$1 AND id=$2 AND principal_id=$3`, scope, policy.CredentialID, p.ID).Scan(&valid, &sender.CredentialKind); e != nil || !valid {
+			return false
+		}
 	}
 	sender.Admin = sender.CredentialKind == "admin"
 	if sender.CredentialKind == "browser" {

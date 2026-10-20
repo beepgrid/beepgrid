@@ -67,6 +67,8 @@ type Agent struct {
 	Instances []Instance `json:"instances"`
 }
 type Actor struct {
+	ProviderConnection string `json:"-"`
+
 	Principal
 	Scope          string `json:"scope"`
 	CredentialID   string `json:"-"`
@@ -214,6 +216,8 @@ type Execution struct {
 	Result       any    `json:"result"`
 }
 type Delivery struct {
+	Address string `json:"address"`
+
 	ID           string         `json:"id"`
 	RecipientID  string         `json:"recipient_id"`
 	OperationID  string         `json:"operation_id"`
