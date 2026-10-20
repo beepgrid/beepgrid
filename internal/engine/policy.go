@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/jackc/pgx/v5"
+	"math"
 	"strings"
+	"time"
 )
 
-func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, target Target, connection, actionName string) bool {
+func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, target Target, connection, actionName string, descriptor ...*Action) bool {
 	if a.CredentialKind == "enrollment" {
 		return false
 	}
@@ -44,12 +46,19 @@ func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, targ
 			if r.ActionName != "" && r.ActionName != actionName {
 				continue
 			}
+			var actionDetail *Action
+			if len(descriptor) > 0 {
+				actionDetail = descriptor[0]
+			}
+			if !conditionsAllow(r.Conditions, actionDetail) {
+				continue
+			}
 			return true
 		}
 	}
 	return false
 }
-func (s *Store) Explain(ctx context.Context, a Actor, action string, target Target, connection, actionName string) (map[string]any, error) {
+func (s *Store) Explain(ctx context.Context, a Actor, action string, target Target, connection, actionName string, descriptor ...*Action) (map[string]any, error) {
 	if a.CredentialKind == "enrollment" {
 		return nil, Denied()
 	}
@@ -62,7 +71,7 @@ func (s *Store) Explain(ctx context.Context, a Actor, action string, target Targ
 			return map[string]any{"allowed": false, "reason": "Target unavailable or not permitted."}, nil
 		}
 	}
-	allowed := s.allowed(ctx, s.Pool, a, action, target, connection, actionName)
+	allowed := s.allowed(ctx, s.Pool, a, action, target, connection, actionName, descriptor...)
 	return map[string]any{"allowed": allowed, "action": action, "target": target, "reason": map[bool]string{true: "An effective role or administrator credential permits this operation.", false: "No effective permission permits this operation."}[allowed]}, nil
 }
 func (s *Store) Roles(ctx context.Context, a Actor) ([]Role, error) {
@@ -91,6 +100,17 @@ func (s *Store) SaveRole(ctx context.Context, a Actor, in Role) (Role, error) {
 		return in, Bad("A role name and at most 100 rules are required.")
 	}
 	for _, r := range in.Rules {
+		if r.Conditions != nil {
+			if r.Action != "ask" && r.Action != "decide" {
+				return in, Bad("Action conditions apply only to ask and decide rules.")
+			}
+			if len(r.Conditions.Resource) > 200 || len(r.Conditions.ResourceVersion) > 200 {
+				return in, Bad("Resource constraints exceed their limits.")
+			}
+			if r.Conditions.MaxAmountMinor != nil && (*r.Conditions.MaxAmountMinor < 0 || r.Conditions.Currency == "" || *r.Conditions.MaxAmountMinor > 1_000_000_000_000) {
+				return in, Bad("Amount ceiling requires a currency and 0 to 10^12 minor units.")
+			}
+		}
 		if !strings.Contains("|view|message|ask|decide|manage|*|", "|"+r.Action+"|") || r.TargetKind == "" || r.TargetID == "" {
 			return in, Bad("Invalid permission rule.")
 		}
@@ -222,7 +242,7 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 }
 
 // ExplainSubject deliberately simulates role grants, not an administrator credential a person might possess.
-func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, action string, target Target, connection, actionName string) (map[string]any, error) {
+func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, action string, target Target, connection, actionName string, descriptor ...*Action) (map[string]any, error) {
 	a := caller
 	if subject != "" {
 		if !caller.Admin && subject != caller.ID {
@@ -234,7 +254,7 @@ func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, actio
 		}
 		a = Actor{Principal: p, Scope: caller.Scope, CredentialKind: "api"}
 	}
-	result, e := s.Explain(ctx, a, action, target, connection, actionName)
+	result, e := s.Explain(ctx, a, action, target, connection, actionName, descriptor...)
 	if e != nil {
 		return nil, e
 	}
@@ -244,4 +264,45 @@ func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, actio
 		result["basis"] = "administrator_credential"
 	}
 	return result, nil
+}
+
+func conditionsAllow(c *RuleConditions, action *Action) bool {
+	if c == nil {
+		return true
+	}
+	if c.Before != nil && !time.Now().Before(*c.Before) {
+		return false
+	}
+	if action == nil {
+		return false
+	}
+	if c.Resource != "" && c.Resource != action.Resource {
+		return false
+	}
+	if c.ResourceVersion != "" && c.ResourceVersion != action.ResourceVersion {
+		return false
+	}
+	if c.Currency != "" && action.Arguments["currency"] != c.Currency {
+		return false
+	}
+	if c.MaxAmountMinor != nil {
+		var amount int64
+		switch n := action.Arguments["amount_minor"].(type) {
+		case int:
+			amount = int64(n)
+		case int64:
+			amount = n
+		case float64:
+			if n < 0 || n > 1e12 || n != math.Trunc(n) {
+				return false
+			}
+			amount = int64(n)
+		default:
+			return false
+		}
+		if amount < 0 || amount > *c.MaxAmountMinor {
+			return false
+		}
+	}
+	return true
 }

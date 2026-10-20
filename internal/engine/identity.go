@@ -196,15 +196,25 @@ func (s *Store) Enroll(ctx context.Context, a Actor, in EnrollInput) (Session, e
 		if count >= 10000 {
 			return &Error{"RATE_LIMITED", "Enrollment limit reached.", 429}
 		}
+		if in.ParentID != "" {
+			parent, e := principal(ctx, tx, a.Scope, in.ParentID)
+			if e != nil || parent.Kind != "agent" || (!a.Admin && parent.Metadata["enrolled_by"] != a.ID) {
+				return Denied()
+			}
+		}
 		p, e := scanPrincipal(tx.QueryRow(ctx, `SELECT `+principalFields+` FROM principals WHERE scope=$1 AND kind='agent' AND external_id=$2`, a.Scope, in.Agent))
 		if e != nil && ErrorStatus(e) != 404 {
 			return e
 		}
 		if e != nil {
-			meta := map[string]any{"enrolled_by": a.ID}
+			meta := map[string]any{"enrolled_by": a.ID, "parent_id": in.ParentID}
 			for _, k := range []string{"project", "type", "description"} {
 				if v, ok := in.Metadata[k]; ok {
-					meta[k] = v
+					label, ok := v.(string)
+					if !ok || len(label) > 512 {
+						return Bad("Agent labels must be bounded text.")
+					}
+					meta[k] = label
 				}
 			}
 			p = Principal{ID: ID("agt"), Kind: "agent", ExternalID: in.Agent, Name: in.Name, Metadata: meta, CreatedAt: time.Now()}
@@ -317,4 +327,12 @@ func (s *Store) UpdatePerson(ctx context.Context, a Actor, id string, in CreateP
 		return event(ctx, tx, a, "person.updated", "", id, map[string]string{"id": id})
 	})
 	return out, e
+}
+
+func (s *Store) SetResourceDisabled(ctx context.Context, a Actor, kind, id string, disabled bool) error {
+	p, e := principal(ctx, s.Pool, a.Scope, id)
+	if e != nil || p.Kind != kind {
+		return Missing()
+	}
+	return s.SetDisabled(ctx, a, id, disabled)
 }

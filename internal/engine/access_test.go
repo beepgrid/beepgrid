@@ -11,7 +11,7 @@ func TestRoleRevocationRemovesHistoryAndReplay(t *testing.T) {
 	ctx := context.Background()
 	w := testWorker(t, s, a, "source")
 	person := testPerson(t, s, a, "reviewer")
-	role := grant(t, s, a, person, []Rule{{"view", "agent", w.ID, "", ""}, {"message", "agent", w.ID, "", ""}})
+	role := grant(t, s, a, person, []Rule{{Action: "view", TargetKind: "agent", TargetID: w.ID, ConnectionID: "", ActionName: ""}, {Action: "message", TargetKind: "agent", TargetID: w.ID, ConnectionID: "", ActionName: ""}})
 	sent, e := s.Send(ctx, w, SendInput{Target: Target{"person", person.ID}, Body: "Sensitive report"}, "private-report")
 	if e != nil {
 		t.Fatal(e)
@@ -74,7 +74,7 @@ func TestReplayCursorAdvancesAcrossHiddenPage(t *testing.T) {
 	ctx := context.Background()
 	w := testWorker(t, s, a, "cursor-worker")
 	p := testPerson(t, s, a, "cursor-person")
-	role := grant(t, s, a, p, []Rule{{"view", "agent", w.ID, "", ""}, {"message", "agent", w.ID, "", ""}})
+	role := grant(t, s, a, p, []Rule{{Action: "view", TargetKind: "agent", TargetID: w.ID, ConnectionID: "", ActionName: ""}, {Action: "message", TargetKind: "agent", TargetID: w.ID, ConnectionID: "", ActionName: ""}})
 	for i := 0; i < 205; i++ {
 		if _, e := s.Send(ctx, w, SendInput{Target: Target{"person", p.ID}, Body: "private"}, fmt.Sprint("cursor-", i)); e != nil {
 			t.Fatal(e)

@@ -97,6 +97,9 @@ func (s *Store) Connections(ctx context.Context, a Actor) ([]Connection, error) 
 	return out, rows.Err()
 }
 func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Connection, error) {
+	if len(c.Secret) > 8192 || (c.Secret != "" && len(c.Secret) < 16) {
+		return c, Bad("Provider credentials must contain 16 to 8192 characters.")
+	}
 	if !ValidText(c.Name, 100) || len(JSON(c.Config)) > 8192 {
 		return c, Bad("A name and bounded configuration are required.")
 	}
@@ -297,6 +300,7 @@ type DispatchResult struct {
 	State, Detail string
 	Retry         bool
 	RetryAfter    time.Duration
+	Receipt       map[string]string
 }
 
 func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
@@ -309,7 +313,7 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 		return e
 	}
 	defer tx.Rollback(ctx)
-	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE connection_id<>'' AND state='queued' AND next_at<=now() AND scope IN(SELECT id FROM scopes WHERE NOT recovery_hold) ORDER BY next_at LIMIT 1 FOR UPDATE SKIP LOCKED`))
+	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE connection_id<>'' AND state='queued' AND next_at<=now() AND scope IN(SELECT id FROM scopes WHERE NOT recovery_hold) ORDER BY (SELECT last_dispatch_at FROM scopes WHERE id=deliveries.scope),next_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`))
 	if e == Missing() || ErrorStatus(e) == 404 {
 		return nil
 	}
@@ -351,9 +355,13 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	if e = tx.QueryRow(ctx, `UPDATE deliveries SET state='leased',generation=generation+1,attempts=attempts+1,lease_until=now()+interval '30 seconds' WHERE id=$1 RETURNING generation,attempts`, d.ID).Scan(&d.Generation, &d.Attempts); e != nil {
 		return e
 	}
+	if _, e = tx.Exec(ctx, `UPDATE scopes SET last_dispatch_at=now() WHERE id=$1`, scope); e != nil {
+		return e
+	}
 	if e = tx.Commit(ctx); e != nil {
 		return e
 	}
+	// Preserve private route metadata in storage; never send it to a provider.
 	delete(d.Payload, "_policy")
 	result := s.deliver(ctx, c, d, publicURL)
 	next := time.Now()
@@ -385,6 +393,12 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	if _, e = tx.Exec(ctx, `INSERT INTO delivery_attempts(id,scope,delivery_id,generation,outcome,detail) VALUES($1,$2,$3,$4,$5,$6)`, ID("att"), scope, d.ID, d.Generation, result.State, result.Detail); e != nil {
 		return e
 	}
+	if result.Receipt != nil {
+		conv, _ := d.Payload["conversation_id"].(string)
+		if e = s.recordThread(ctx, tx, scope, c.ID, result.Receipt["channel"], result.Receipt["thread"], conv, d.RecipientID); e != nil {
+			return e
+		}
+	}
 	if result.State == "failed" {
 		if e = s.queueFallback(ctx, tx, scope, d); e != nil {
 			return e
@@ -412,15 +426,23 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 	body := JSON(d.Payload)
 	if c.Kind == "slack" {
 		destination = "https://slack.com/api/chat.postMessage"
+		thread := ""
+		conv, _ := d.Payload["conversation_id"].(string)
+		_ = s.Pool.QueryRow(ctx, `SELECT thread_id FROM provider_threads WHERE connection_id=$1 AND conversation_id=$2 AND channel_id=$3 ORDER BY created_at LIMIT 1`, c.ID, conv, d.Address).Scan(&thread)
 		slackBody := map[string]any{"channel": d.Address, "text": text, "unfurl_links": false, "unfurl_media": false}
+		if thread != "" {
+			slackBody["thread_ts"] = thread
+		}
 		if q, ok := d.Payload["request"].(map[string]any); ok && q["kind"] == "approval" && d.Payload["type"] == "request" {
 			value := string(JSON(map[string]any{"request_id": q["id"], "version": q["version"]}))
 			slackBody["blocks"] = []any{map[string]any{"type": "section", "text": map[string]any{"type": "plain_text", "text": text}}, map[string]any{"type": "actions", "elements": []any{map[string]any{"type": "button", "action_id": "notif_approve", "text": map[string]string{"type": "plain_text", "text": "Approve"}, "value": value, "style": "primary"}, map[string]any{"type": "button", "action_id": "notif_deny", "text": map[string]string{"type": "plain_text", "text": "Deny"}, "value": value}}}}
 		}
 		body = JSON(slackBody)
 	}
-	if _, e := s.validURL(ctx, destination); e != nil {
-		return DispatchResult{State: "failed", Detail: "Provider URL is no longer permitted.", Retry: false}
+	if c.Kind != "slack" {
+		if _, e := s.validURL(ctx, destination); e != nil {
+			return DispatchResult{State: "failed", Detail: "Provider URL is no longer permitted."}
+		}
 	}
 	req, e := http.NewRequestWithContext(ctx, "POST", destination, bytes.NewReader(body))
 	if e != nil {
@@ -442,7 +464,13 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 		req.Header.Set("X-Notif-Signature", Signature(c.Secret, ts, body))
 		req.Header.Set("X-Notif-Event-ID", d.ID)
 	}
-	client := &http.Client{Timeout: 12 * time.Second, Transport: &http.Transport{DialContext: s.dial, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	transport := s.providerTransport
+	if transport == nil {
+		t := &http.Transport{DialContext: s.dial, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
+		defer t.CloseIdleConnections()
+		transport = t
+	}
+	client := &http.Client{Timeout: 12 * time.Second, Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, e := client.Do(req)
 	if e != nil {
 		return DispatchResult{State: "unknown", Detail: "Provider response was not confirmed.", Retry: false}
@@ -450,18 +478,29 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 65536))
 	if resp.StatusCode == 429 || resp.StatusCode == 503 || resp.StatusCode == 502 || resp.StatusCode == 504 {
-		return DispatchResult{State: "failed", Detail: fmt.Sprintf("Temporary provider status %d", resp.StatusCode), Retry: true}
+		return DispatchResult{State: "failed", Detail: fmt.Sprintf("Temporary provider status %d", resp.StatusCode), Retry: true, RetryAfter: retryAfter(resp.Header.Get("Retry-After"), time.Now())}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return DispatchResult{State: "failed", Detail: fmt.Sprintf("Provider rejected send with status %d", resp.StatusCode), Retry: false}
 	}
 	if c.Kind == "slack" {
 		var result struct {
-			OK    bool   `json:"ok"`
-			Error string `json:"error"`
+			OK      bool   `json:"ok"`
+			Error   string `json:"error"`
+			TS      string `json:"ts"`
+			Channel string `json:"channel"`
 		}
-		if json.Unmarshal(raw, &result) != nil || !result.OK {
-			return DispatchResult{State: "failed", Detail: "Slack did not accept the message.", Retry: false}
+		if json.Unmarshal(raw, &result) != nil {
+			return DispatchResult{State: "unknown", Detail: "Slack response was not readable."}
+		}
+		if !result.OK {
+			return DispatchResult{State: "failed", Detail: "Slack did not accept the message."}
+		}
+		conv, _ := d.Payload["conversation_id"].(string)
+		thread := result.TS
+		_ = s.Pool.QueryRow(ctx, `SELECT thread_id FROM provider_threads WHERE connection_id=$1 AND conversation_id=$2 AND channel_id=$3 ORDER BY created_at LIMIT 1`, c.ID, conv, d.Address).Scan(&thread)
+		if result.TS != "" {
+			return DispatchResult{State: "provider_accepted", Detail: "Slack accepted the message.", Receipt: map[string]string{"channel": d.Address, "thread": thread}}
 		}
 	}
 	return DispatchResult{State: "provider_accepted", Detail: "Provider accepted the message.", Retry: false}

@@ -199,6 +199,7 @@ func (s *Server) routes() {
 	}))
 	m.HandleFunc("POST /api/v1/people/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/agents/{id}/status", s.protect(s.setStatus))
+	m.HandleFunc("POST /api/v1/services/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/credentials", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in struct {
 			PrincipalID string `json:"principal_id"`
@@ -304,16 +305,17 @@ func (s *Server) routes() {
 	}))
 	m.HandleFunc("POST /api/v1/permissions/explain", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in struct {
-			SubjectID    string        `json:"subject_id"`
-			Action       string        `json:"action"`
-			Target       engine.Target `json:"target"`
-			ConnectionID string        `json:"connection_id"`
-			ActionName   string        `json:"action_name"`
+			SubjectID    string         `json:"subject_id"`
+			Descriptor   *engine.Action `json:"descriptor"`
+			Action       string         `json:"action"`
+			Target       engine.Target  `json:"target"`
+			ConnectionID string         `json:"connection_id"`
+			ActionName   string         `json:"action_name"`
 		}
 		if e := decode(r, &in); e != nil {
 			return e
 		}
-		x, e := s.Store.ExplainSubject(r.Context(), actor(r), in.SubjectID, in.Action, in.Target, in.ConnectionID, in.ActionName)
+		x, e := s.Store.ExplainSubject(r.Context(), actor(r), in.SubjectID, in.Action, in.Target, in.ConnectionID, in.ActionName, in.Descriptor)
 		return ok(w, x, e)
 	}))
 	m.HandleFunc("POST /api/v1/route-preview", s.protect(func(w http.ResponseWriter, r *http.Request) error {
@@ -430,7 +432,14 @@ func (s *Server) setStatus(w http.ResponseWriter, r *http.Request) error {
 	if e := decode(r, &in); e != nil {
 		return e
 	}
-	return ok(w, map[string]bool{"ok": true}, s.Store.SetDisabled(r.Context(), actor(r), r.PathValue("id"), in.Disabled))
+	kind := "agent"
+	if strings.Contains(r.URL.Path, "/people/") {
+		kind = "person"
+	}
+	if strings.Contains(r.URL.Path, "/services/") {
+		kind = "service"
+	}
+	return ok(w, map[string]bool{"ok": true}, s.Store.SetResourceDisabled(r.Context(), actor(r), kind, r.PathValue("id"), in.Disabled))
 }
 func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 	cursor := r.URL.Query().Get("after")

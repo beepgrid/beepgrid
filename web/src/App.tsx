@@ -400,10 +400,15 @@ export function App() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const source = new EventSource("/api/v1/events?stream=1");
     source.onmessage = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void refresh(), 180);
+      if (!timer)
+        timer = setTimeout(() => {
+          timer = undefined;
+          void refresh();
+        }, 2000);
     };
+    const presenceTimer = setInterval(() => void refresh(), 15000);
     return () => {
+      clearInterval(presenceTimer);
       source.close();
       if (timer) clearTimeout(timer);
     };
@@ -431,11 +436,19 @@ export function App() {
     setQuery("");
   }, [page]);
   useEffect(() => {
+    let active = true;
     if (page === "conversations" && selected)
       api<Conversation>("/conversations/" + selected)
-        .then(setConversation)
-        .catch((e) => setError(e.message));
+        .then((c) => {
+          if (active) setConversation(c);
+        })
+        .catch((e) => {
+          if (active) setError(e.message);
+        });
     else setConversation(null);
+    return () => {
+      active = false;
+    };
   }, [page, selected, data]);
   useEffect(() => {
     if (page === "agents" && selected)
@@ -792,7 +805,7 @@ export function App() {
                   <button
                     className={selected === c.id ? "selected" : ""}
                     key={c.id}
-                    onClick={() => setSelected(c.id)}
+                    onClick={() => openConversation(c.id)}
                   >
                     <Icon name="chat" />
                     <span>
@@ -1399,6 +1412,12 @@ function RequestDetail({
         </span>
       </div>
       <h2>{r.title}</h2>
+      {r.response?.source_invalidated && (
+        <p role="status" className="error">
+          The shared answer used here was invalidated. Review before relying on
+          it.
+        </p>
+      )}
       {r.body && <p className="request-body">{r.body}</p>}
       {r.action && (
         <div className="action-binding">
@@ -2057,6 +2076,101 @@ function Forms({
                   placeholder="deploy"
                 />
               </Field>
+              {["ask", "decide"].includes(r.action) && (
+                <details className="rule-conditions">
+                  <summary>Resource and amount limits</summary>
+                  <Field label="Exact resource (optional)">
+                    <input
+                      value={r.conditions?.resource ?? ""}
+                      onChange={(e) =>
+                        setRules(
+                          rules.map((x, j) =>
+                            j === i
+                              ? {
+                                  ...x,
+                                  conditions: {
+                                    ...x.conditions,
+                                    resource: e.target.value,
+                                  },
+                                }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Resource version (optional)">
+                    <input
+                      value={r.conditions?.resource_version ?? ""}
+                      onChange={(e) =>
+                        setRules(
+                          rules.map((x, j) =>
+                            j === i
+                              ? {
+                                  ...x,
+                                  conditions: {
+                                    ...x.conditions,
+                                    resource_version: e.target.value,
+                                  },
+                                }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Maximum amount in minor units">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={r.conditions?.max_amount_minor ?? ""}
+                      onChange={(e) =>
+                        setRules(
+                          rules.map((x, j) =>
+                            j === i
+                              ? {
+                                  ...x,
+                                  conditions: {
+                                    ...x.conditions,
+                                    max_amount_minor: e.target.value
+                                      ? Number(e.target.value)
+                                      : undefined,
+                                  },
+                                }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Currency (required with amount)">
+                    <input
+                      maxLength={3}
+                      value={r.conditions?.currency ?? ""}
+                      onChange={(e) =>
+                        setRules(
+                          rules.map((x, j) =>
+                            j === i
+                              ? {
+                                  ...x,
+                                  conditions: {
+                                    ...x.conditions,
+                                    currency: e.target.value.toUpperCase(),
+                                  },
+                                }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                  <small>
+                    For USD, 10000 minor units means $100.00. The action must
+                    provide amount_minor and currency.
+                  </small>
+                </details>
+              )}
               <button
                 className="icon-button"
                 type="button"
@@ -2155,14 +2269,14 @@ function Forms({
           {(type === "webhook"
             ? ["url"]
             : type === "slack"
-              ? ["team_id"]
+              ? ["team_id", "default_agent_id"]
               : ["smtp_addr", "from", "username"]
           ).map((k) => (
             <Field key={k} label={k.replaceAll("_", " ")}>
               <input
                 value={config[k] ?? ""}
                 onChange={(e) => setConfig({ ...config, [k]: e.target.value })}
-                required={k !== "username"}
+                required={k !== "username" && k !== "default_agent_id"}
                 placeholder={
                   k === "url"
                     ? "https://your-server.example/events"

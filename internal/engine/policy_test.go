@@ -16,7 +16,7 @@ func TestDirectionalConnectionGrantsAndGroupRemoval(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	role := grant(t, s, a, p, []Rule{{"view", "agent", w.ID, "", ""}, {"decide", "agent", w.ID, c.ID, "deploy"}})
+	role := grant(t, s, a, p, []Rule{{Action: "view", TargetKind: "agent", TargetID: w.ID, ConnectionID: "", ActionName: ""}, {Action: "decide", TargetKind: "agent", TargetID: w.ID, ConnectionID: c.ID, ActionName: "deploy"}})
 	explain, e := s.ExplainSubject(ctx, a, p.ID, "decide", Target{"agent", w.ID}, c.ID, "deploy")
 	if e != nil || explain["allowed"] != true {
 		t.Fatal(explain, e)
@@ -65,5 +65,69 @@ func TestWorkspaceAndExpiredCredentialIsolation(t *testing.T) {
 	}
 	if e = s.tx(ctx, w, func(_ pgx.Tx) error { return nil }); ErrorStatus(e) != 403 {
 		t.Fatal("expired worker wrote", e)
+	}
+}
+
+func TestAmountAndResourceLimitsAreRecheckedAtExecution(t *testing.T) {
+	s, a := testStore(t)
+	ctx := context.Background()
+	w := testWorker(t, s, a, "billing-agent")
+	p := testPerson(t, s, a, "finance-manager")
+	ceiling := int64(10000)
+	role := grant(t, s, a, p, []Rule{{Action: "view", TargetKind: "agent", TargetID: w.ID}, {Action: "decide", TargetKind: "agent", TargetID: w.ID, ActionName: "refund", Conditions: &RuleConditions{Resource: "invoice/1", MaxAmountMinor: &ceiling, Currency: "USD"}}})
+	ask := func(amount int64, key string) Request {
+		t.Helper()
+		q, e := s.Ask(ctx, w, AskInput{Target: Target{"person", p.ID}, Kind: "approval", Title: "Refund?", Action: &Action{Name: "refund", ExecutorID: w.ID, Resource: "invoice/1", ResourceVersion: "1", OperationKey: key, Arguments: map[string]any{"amount_minor": amount, "currency": "USD"}}}, key)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return q
+	}
+	tooMuch := ask(10001, "over-limit")
+	if _, e := s.Respond(ctx, p, tooMuch.ID, Response{Outcome: "approved", Version: 1}); ErrorStatus(e) != 403 {
+		t.Fatal("amount ceiling bypass", e)
+	}
+	q := ask(9900, "within-limit")
+	if _, e := s.Respond(ctx, p, q.ID, Response{Outcome: "approved", Version: 1}); e != nil {
+		t.Fatal(e)
+	}
+	current, e := s.ExplainSubject(ctx, a, p.ID, "decide", Target{"agent", w.ID}, "", "refund", q.Action)
+	if e != nil || current["allowed"] != true {
+		t.Fatal(current, e)
+	}
+	lower := int64(5000)
+	role.Rules[1].Conditions.MaxAmountMinor = &lower
+	if _, e = s.SaveRole(ctx, a, role); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Redeem(ctx, w, q.ID, *q.Action); ErrorStatus(e) != 403 {
+		t.Fatal("old limit survived policy update", e)
+	}
+}
+
+func TestPreviewDoesNotRevealHiddenRecipientMetadata(t *testing.T) {
+	s, a := testStore(t)
+	ctx := context.Background()
+	w := testWorker(t, s, a, "preview-source")
+	p := testPerson(t, s, a, "hidden-person")
+	g, e := s.SaveGroup(ctx, a, Group{Name: "Private team", Members: []string{p.ID}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	r, e := s.Roles(ctx, a)
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, role := range r {
+		if role.Name == "preview-source role" {
+			role.Rules = []Rule{{Action: "message", TargetKind: "group", TargetID: g.ID}}
+			if _, e = s.SaveRole(ctx, a, role); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
+	preview, e := s.Preview(ctx, w, Target{"group", g.ID}, "message")
+	if e != nil || preview["count"] != 1 || len(preview["recipients"].([]Principal)) != 0 {
+		t.Fatal(preview, e)
 	}
 }

@@ -13,13 +13,16 @@ type recipient struct {
 	PolicyTarget  Target
 }
 
-func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, action, actionName string) ([]recipient, error) {
+func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, action, actionName string, descriptor ...*Action) ([]recipient, error) {
+	if len(descriptor) > 0 && descriptor[0] != nil {
+		actionName = descriptor[0].Name
+	}
 	if err := target.Validate(); err != nil {
 		return nil, err
 	}
 	out := []recipient{}
 	if target.Kind == "group" {
-		allowedGroup := s.allowed(ctx, db, a, action, target, "*", actionName)
+		allowedGroup := s.allowed(ctx, db, a, action, target, "*", actionName, descriptor...)
 		rows, e := db.Query(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at FROM memberships m JOIN principals p ON p.id=m.principal_id AND p.scope=m.scope WHERE m.scope=$1 AND m.group_id=$2 AND NOT p.disabled ORDER BY p.id LIMIT 1001`, a.Scope, target.ID)
 		if e != nil {
 			return nil, e
@@ -43,7 +46,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 		}
 		for _, p := range people {
 			pt := Target{p.Kind, p.ID}
-			if allowedGroup || s.allowed(ctx, db, a, action, pt, "*", actionName) {
+			if allowedGroup || s.allowed(ctx, db, a, action, pt, "*", actionName, descriptor...) {
 				if allowedGroup {
 					pt = target
 				}
@@ -59,7 +62,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 		if e != nil {
 			return nil, e
 		}
-		if p.Disabled || !s.allowed(ctx, db, a, action, Target{"agent", p.ID}, "*", actionName) {
+		if p.Disabled || !s.allowed(ctx, db, a, action, Target{"agent", p.ID}, "*", actionName, descriptor...) {
 			return nil, Denied()
 		}
 		out = append(out, recipient{p, target.ID, Target{"agent", p.ID}})
@@ -68,7 +71,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 		if e != nil {
 			return nil, Missing()
 		}
-		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "*", actionName) {
+		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "*", actionName, descriptor...) {
 			return nil, Denied()
 		}
 		out = append(out, recipient{p, "", Target{p.Kind, p.ID}})
@@ -172,7 +175,11 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	}
 	return c, rows.Err()
 }
-func (s *Store) conversationRecipients(ctx context.Context, db DB, a Actor, id, action string) ([]recipient, error) {
+func (s *Store) conversationRecipients(ctx context.Context, db DB, a Actor, id, action string, descriptor ...*Action) ([]recipient, error) {
+	actionName := ""
+	if len(descriptor) > 0 && descriptor[0] != nil {
+		actionName = descriptor[0].Name
+	}
 	if !s.canRead(ctx, db, a, id) {
 		return nil, Missing()
 	}
@@ -196,7 +203,7 @@ func (s *Store) conversationRecipients(ctx context.Context, db DB, a Actor, id, 
 	}
 	out := []recipient{}
 	for _, p := range all {
-		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "*", "") {
+		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "*", actionName, descriptor...) {
 			return nil, Denied()
 		}
 		out = append(out, recipient{p, "", Target{p.Kind, p.ID}})
@@ -228,7 +235,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 	payload["_policy"] = map[string]any{"action_name": actionName, "credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
 	payload["conversation_id"] = conv
 	queued := 0
-	if s.allowed(ctx, db, a, action, r.PolicyTarget, "", actionName) {
+	if s.allowed(ctx, db, a, action, r.PolicyTarget, "", actionName, info.Request.Action) {
 		if _, e := db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,exact_instance,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, r.ExactInstance, JSON(payload), expiry); e != nil {
 			return e
 		}
@@ -254,8 +261,26 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 	if e != nil {
 		return e
 	}
+	// A verified incoming Slack thread is a route for this conversation only. It grants no contact permission.
+	rows, e = db.Query(ctx, `SELECT t.connection_id,t.channel_id FROM provider_threads t JOIN connections c ON c.id=t.connection_id AND c.scope=t.scope WHERE t.scope=$1 AND t.conversation_id=$2 AND t.person_id=$3 AND c.enabled`, a.Scope, conv, r.ID)
+	if e != nil {
+		return e
+	}
+	for rows.Next() {
+		var d dest
+		if e = rows.Scan(&d.id, &d.address); e != nil {
+			rows.Close()
+			return e
+		}
+		dests = append(dests, d)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return e
+	}
 	for _, d := range dests {
-		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName) {
+		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName, info.Request.Action) {
 			continue
 		}
 		if _, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry); e != nil {
@@ -270,57 +295,59 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 }
 func (s *Store) Send(ctx context.Context, a Actor, in SendInput, key string) (SendResult, error) {
 	var out SendResult
+	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.sendTx(ctx, tx, a, in, key, &out) })
+	return out, err
+}
+func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, key string, out *SendResult) error {
 	if !ValidText(in.Body, 32768) || len(in.Title) > 200 {
-		return out, Bad("Message body is required and must be at most 32768 bytes.")
+		return Bad("Message body is required and must be at most 32768 bytes.")
 	}
-	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		return idempotent(ctx, tx, a, "send", key, in, &out, func() error {
-			var rs []recipient
-			var e error
-			if in.ConversationID != "" {
-				rs, e = s.conversationRecipients(ctx, tx, a, in.ConversationID, "message")
-			} else {
-				rs, e = s.resolve(ctx, tx, a, in.Target, "message", "")
-			}
+
+	return idempotent(ctx, tx, a, "send", key, in, out, func() error {
+		var rs []recipient
+		var e error
+		if in.ConversationID != "" {
+			rs, e = s.conversationRecipients(ctx, tx, a, in.ConversationID, "message")
+		} else {
+			rs, e = s.resolve(ctx, tx, a, in.Target, "message", "")
+		}
+		if e != nil {
+			return e
+		}
+		out.Messages = []Message{}
+		if in.ConversationID != "" {
+			m, e := insertMessage(ctx, tx, a, in.ConversationID, in.Body)
 			if e != nil {
 				return e
 			}
-			out.Messages = []Message{}
-			if in.ConversationID != "" {
-				m, e := insertMessage(ctx, tx, a, in.ConversationID, in.Body)
-				if e != nil {
-					return e
-				}
-				out.Messages = append(out.Messages, m)
-				out.ConversationID = in.ConversationID
-				for _, r := range rs {
-					if e = s.enqueue(ctx, tx, a, r, m.ID, m.ConversationID, "message", map[string]any{"type": "message", "message": m}, time.Now().Add(7*24*time.Hour)); e != nil {
-						return e
-					}
-				}
-				return nil
-			}
+			out.Messages = append(out.Messages, m)
+			out.ConversationID = in.ConversationID
 			for _, r := range rs {
-				conv, e := newConversation(ctx, tx, a, in.Title, r.ID)
-				if e != nil {
-					return e
-				}
-				m, e := insertMessage(ctx, tx, a, conv, in.Body)
-				if e != nil {
-					return e
-				}
-				if out.ConversationID == "" {
-					out.ConversationID = conv
-				}
-				out.Messages = append(out.Messages, m)
-				if e = s.enqueue(ctx, tx, a, r, m.ID, conv, "message", map[string]any{"type": "message", "message": m}, time.Now().Add(7*24*time.Hour)); e != nil {
+				if e = s.enqueue(ctx, tx, a, r, m.ID, m.ConversationID, "message", map[string]any{"type": "message", "message": m}, time.Now().Add(7*24*time.Hour)); e != nil {
 					return e
 				}
 			}
 			return nil
-		})
+		}
+		for _, r := range rs {
+			conv, e := newConversation(ctx, tx, a, in.Title, r.ID)
+			if e != nil {
+				return e
+			}
+			m, e := insertMessage(ctx, tx, a, conv, in.Body)
+			if e != nil {
+				return e
+			}
+			if out.ConversationID == "" {
+				out.ConversationID = conv
+			}
+			out.Messages = append(out.Messages, m)
+			if e = s.enqueue(ctx, tx, a, r, m.ID, conv, "message", map[string]any{"type": "message", "message": m}, time.Now().Add(7*24*time.Hour)); e != nil {
+				return e
+			}
+		}
+		return nil
 	})
-	return out, err
 }
 func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, error) {
 	events, _, err := s.EventPage(ctx, a, after, false)
@@ -372,7 +399,9 @@ func (s *Store) Preview(ctx context.Context, a Actor, target Target, action stri
 	}
 	list := []Principal{}
 	for _, r := range rs {
-		list = append(list, r.Principal)
+		if a.Admin || r.ID == a.ID || s.allowed(ctx, s.Pool, a, "view", Target{r.Kind, r.ID}, "", "") {
+			list = append(list, r.Principal)
+		}
 	}
-	return map[string]any{"recipients": list, "count": len(list), "mode": "private_per_recipient", "sends": false}, nil
+	return map[string]any{"recipients": list, "count": len(rs), "hidden_recipients": len(rs) - len(list), "mode": "private_per_recipient", "sends": false}, nil
 }

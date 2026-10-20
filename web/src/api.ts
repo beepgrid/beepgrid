@@ -10,6 +10,13 @@ export type Entity = {
 };
 export type Target = { kind: string; id: string };
 export type Rule = {
+  conditions?: {
+    resource?: string;
+    resource_version?: string;
+    currency?: string;
+    max_amount_minor?: number;
+    before?: string;
+  };
   action: string;
   target_kind: string;
   target_id: string;

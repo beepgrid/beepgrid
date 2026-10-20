@@ -273,7 +273,21 @@ func demo(ctx context.Context, args []string) error {
 	}
 	// The demo explicitly grants narrowly named capabilities through the same role API.
 	var role map[string]any
-	if e := admin.Do(ctx, "POST", "/api/v1/roles", map[string]any{"name": "Demo " + *name + " " + notif.Key()[:6], "rules": []map[string]string{{"action": "view", "target_kind": "*", "target_id": "*"}, {"action": "message", "target_kind": "person", "target_id": me.Person.ID}, {"action": "ask", "target_kind": "person", "target_id": me.Person.ID}}}, &role, ""); e != nil {
+	var roles []map[string]any
+	if e := admin.Do(ctx, "GET", "/api/v1/roles", nil, &roles, ""); e != nil {
+		return e
+	}
+	for _, existing := range roles {
+		if existing["name"] == "Demo "+*name {
+			role = existing
+			break
+		}
+	}
+	var roleID any
+	if role != nil {
+		roleID = role["id"]
+	}
+	if e := admin.Do(ctx, "POST", "/api/v1/roles", map[string]any{"id": roleID, "name": "Demo " + *name, "rules": []map[string]string{{"action": "view", "target_kind": "*", "target_id": "*"}, {"action": "message", "target_kind": "person", "target_id": me.Person.ID}, {"action": "ask", "target_kind": "person", "target_id": me.Person.ID}}}, &role, ""); e != nil {
 		return e
 	}
 	c, session, e := admin.Enroll(ctx, notif.EnrollInput{Agent: "demo/" + *name, Name: *name, Capabilities: []string{"message", "status"}})
@@ -284,6 +298,7 @@ func demo(ctx context.Context, args []string) error {
 		return e
 	}
 	fmt.Printf("%s connected as %s (%s)\n", *name, session.Agent.ID, session.InstanceID)
+	_ = c.Heartbeat(ctx, map[string]any{"state": "ready", "runtime": "deterministic-example"})
 	if *ask {
 		q, e := c.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Which report format should I use?", Choices: []string{"Brief summary", "Detailed report"}}, "demo-question-"+session.InstanceID)
 		if e != nil {

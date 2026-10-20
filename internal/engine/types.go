@@ -85,6 +85,7 @@ type CreatePerson struct {
 	Email      string `json:"email"`
 }
 type EnrollInput struct {
+	ParentID     string         `json:"parent_id,omitempty"`
 	Agent        string         `json:"agent"`
 	Name         string         `json:"name"`
 	Capabilities []string       `json:"capabilities"`
@@ -112,12 +113,20 @@ type Credential struct {
 	ExpiresAt   *time.Time `json:"expires_at"`
 	Revoked     bool       `json:"revoked"`
 }
+type RuleConditions struct {
+	Resource        string     `json:"resource,omitempty"`
+	ResourceVersion string     `json:"resource_version,omitempty"`
+	MaxAmountMinor  *int64     `json:"max_amount_minor,omitempty"`
+	Currency        string     `json:"currency,omitempty"`
+	Before          *time.Time `json:"before,omitempty"`
+}
 type Rule struct {
-	Action       string `json:"action"`
-	TargetKind   string `json:"target_kind"`
-	TargetID     string `json:"target_id"`
-	ConnectionID string `json:"connection_id,omitempty"`
-	ActionName   string `json:"action_name,omitempty"`
+	Conditions   *RuleConditions `json:"conditions,omitempty"`
+	Action       string          `json:"action"`
+	TargetKind   string          `json:"target_kind"`
+	TargetID     string          `json:"target_id"`
+	ConnectionID string          `json:"connection_id,omitempty"`
+	ActionName   string          `json:"action_name,omitempty"`
 }
 type Role struct {
 	ID    string `json:"id"`

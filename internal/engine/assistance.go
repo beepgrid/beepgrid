@@ -23,9 +23,22 @@ func (s *Store) ConfigureMatcher(ctx context.Context, endpoint, token string) er
 	}
 	var mu sync.Mutex
 	last := map[string]time.Time{}
+	var hourStart time.Time
+	hourCount := 0
 	semaphore := make(chan struct{}, 2)
 	s.Matcher = func(ctx context.Context, q Request, answers []SharedAnswer) ([]MatchSuggestion, error) {
 		mu.Lock()
+		now := time.Now()
+		if now.Sub(hourStart) >= time.Hour {
+			hourStart = now
+			hourCount = 0
+			last = map[string]time.Time{}
+		}
+		if hourCount >= 1000 || len(last) >= 4096 {
+			mu.Unlock()
+			return nil, fmt.Errorf("matcher hourly budget exhausted")
+		}
+		hourCount++
 		if time.Since(last[q.RequesterID]) < time.Second {
 			mu.Unlock()
 			return nil, fmt.Errorf("matcher rate limited")
@@ -54,7 +67,9 @@ func (s *Store) ConfigureMatcher(ctx context.Context, endpoint, token string) er
 		if token != "" {
 			request.Header.Set("Authorization", "Bearer "+token)
 		}
-		client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{DialContext: s.dial, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		transport := &http.Transport{DialContext: s.dial, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
+		defer transport.CloseIdleConnections()
+		client := &http.Client{Timeout: 5 * time.Second, Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 		res, e := client.Do(request)
 		if e != nil {
 			return nil, e

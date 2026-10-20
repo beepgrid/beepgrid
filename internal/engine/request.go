@@ -37,6 +37,10 @@ func (s *Store) request(ctx context.Context, db DB, a Actor, id string) (Request
 		}
 		_ = db.QueryRow(ctx, `SELECT conversation_id FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, a.ID).Scan(&r.ConversationID)
 	}
+	if r.Response != nil && r.Response.SourceAnswerID != "" {
+		answer, e := scanAnswer(db.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2`, a.Scope, r.Response.SourceAnswerID))
+		r.Response.SourceInvalidated = e != nil || answer.Invalidated || answer.ValidUntil.Before(time.Now()) || !s.publisherCurrent(ctx, db, a.Scope, answer)
+	}
 	return r, nil
 }
 func (s *Store) Request(ctx context.Context, a Actor, id string) (Request, error) {
@@ -95,6 +99,12 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 	if in.Kind == "approval" && (in.Action == nil || !ValidText(in.Action.Name, 120) || in.Action.ExecutorID == "" || in.Action.Resource == "" || in.Action.ResourceVersion == "" || in.Action.OperationKey == "") {
 		return out, Bad("An approval requires an exact action, executor, resource version and operation key.")
 	}
+	if in.Kind != "approval" && in.Action != nil {
+		return out, Bad("Only approvals may carry an execution descriptor.")
+	}
+	if len(in.SharedKey) > 200 {
+		return out, Bad("Shared key exceeds 200 characters.")
+	}
 	if in.Kind != "question" && in.SharedKey != "" {
 		return out, Bad("Only informational questions may use shared keys.")
 	}
@@ -103,9 +113,9 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 			var rs []recipient
 			var e error
 			if in.ConversationID != "" {
-				rs, e = s.conversationRecipients(ctx, tx, a, in.ConversationID, "ask")
+				rs, e = s.conversationRecipients(ctx, tx, a, in.ConversationID, "ask", in.Action)
 			} else {
-				rs, e = s.resolve(ctx, tx, a, in.Target, "ask", "")
+				rs, e = s.resolve(ctx, tx, a, in.Target, "ask", "", in.Action)
 			}
 			if e != nil {
 				return e
@@ -115,7 +125,7 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 				if e != nil || executor.Disabled {
 					return Missing()
 				}
-				if !s.allowed(ctx, tx, a, "ask", Target{executor.Kind, executor.ID}, "", in.Action.Name) {
+				if !s.allowed(ctx, tx, a, "ask", Target{executor.Kind, executor.ID}, "*", in.Action.Name, in.Action) {
 					return Denied()
 				}
 			}
@@ -160,6 +170,9 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 			return s.reuseExact(ctx, tx, a, &out)
 		})
 	})
+	if err == nil {
+		return s.Request(ctx, a, out.ID)
+	}
 	return out, err
 }
 func (s *Store) Respond(ctx context.Context, a Actor, id string, in Response) (Request, error) {
@@ -219,7 +232,7 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	if r.Kind == "approval" {
 		permission = "decide"
 	}
-	if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, a.ProviderConnection, actionName) {
+	if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, a.ProviderConnection, actionName, r.Action) {
 		return Denied()
 	}
 	switch r.Kind {
@@ -348,7 +361,7 @@ func (s *Store) Redeem(ctx context.Context, a Actor, id string, action Action) (
 		}
 		proposer := Actor{Principal: requester, Scope: a.Scope}
 		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked)`, a.Scope, requester.ID).Scan(&proposer.Admin)
-		if !s.allowed(ctx, tx, proposer, "ask", Target{a.Kind, a.ID}, "", action.Name) {
+		if !s.allowed(ctx, tx, proposer, "ask", Target{a.Kind, a.ID}, "*", action.Name, &action) {
 			return Denied()
 		}
 		if r.ResolvedBy == nil {
@@ -362,7 +375,7 @@ func (s *Store) Redeem(ctx context.Context, a Actor, id string, action Action) (
 		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked)`, a.Scope, approver.ID).Scan(&decider.Admin)
 		var decisionConnection string
 		_ = tx.QueryRow(ctx, `SELECT decision_connection FROM requests WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&decisionConnection)
-		if !s.allowed(ctx, tx, decider, "decide", Target{requester.Kind, requester.ID}, decisionConnection, action.Name) {
+		if !s.allowed(ctx, tx, decider, "decide", Target{requester.Kind, requester.ID}, decisionConnection, action.Name, &action) {
 			return Denied()
 		}
 		var raw, result []byte
@@ -389,9 +402,9 @@ func (s *Store) ReportExecution(ctx context.Context, a Actor, id, state string, 
 		return out, Bad("Invalid reported execution state.")
 	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		var raw []byte
+		var raw, previousResult []byte
 		var prev string
-		e := tx.QueryRow(ctx, `SELECT id,request_id,executor_id,operation_key,descriptor,state FROM execution_intents WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&out.ID, &out.RequestID, &out.ExecutorID, &out.OperationKey, &raw, &prev)
+		e := tx.QueryRow(ctx, `SELECT id,request_id,executor_id,operation_key,descriptor,state,result FROM execution_intents WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&out.ID, &out.RequestID, &out.ExecutorID, &out.OperationKey, &raw, &prev, &previousResult)
 		if e != nil {
 			return e
 		}
@@ -399,9 +412,15 @@ func (s *Store) ReportExecution(ctx context.Context, a Actor, id, state string, 
 			return Denied()
 		}
 		if prev == "succeeded" || prev == "failed" {
-			if prev != state {
-				return Conflict("Execution already has a terminal report.")
+			var saved any
+			_ = json.Unmarshal(previousResult, &saved)
+			if prev != state || string(JSON(saved)) != string(JSON(result)) {
+				return Conflict("Execution already has a different terminal report.")
 			}
+			_ = json.Unmarshal(raw, &out.Action)
+			_ = json.Unmarshal(previousResult, &out.Result)
+			out.State = prev
+			return nil
 		}
 		if len(JSON(result)) > 32768 {
 			return Bad("Result too large.")
@@ -433,5 +452,20 @@ func (s *Store) Executions(ctx context.Context, a Actor) ([]Execution, error) {
 		_ = json.Unmarshal(result, &x.Result)
 		out = append(out, x)
 	}
-	return out, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Execution{}
+	for _, x := range out {
+		if a.Admin || x.ExecutorID == a.ID {
+			visible = append(visible, x)
+			continue
+		}
+		if _, e := s.request(ctx, s.Pool, a, x.RequestID); e == nil {
+			visible = append(visible, x)
+		}
+	}
+	return visible, nil
 }

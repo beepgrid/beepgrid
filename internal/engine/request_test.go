@@ -112,7 +112,7 @@ func TestPrivateGroupApprovalAndCurrentPermissions(t *testing.T) {
 	alice := testPerson(t, s, a, "alice")
 	bob := testPerson(t, s, a, "bob")
 	for _, p := range []Actor{alice, bob} {
-		grant(t, s, a, p, []Rule{{"view", "*", "*", "", ""}, {"message", "agent", w.ID, "", ""}, {"decide", "agent", w.ID, "", "refund"}})
+		grant(t, s, a, p, []Rule{{Action: "view", TargetKind: "*", TargetID: "*", ConnectionID: "", ActionName: ""}, {Action: "message", TargetKind: "agent", TargetID: w.ID, ConnectionID: "", ActionName: ""}, {Action: "decide", TargetKind: "agent", TargetID: w.ID, ConnectionID: "", ActionName: "refund"}})
 	}
 	g, e := s.SaveGroup(ctx, a, Group{Name: "Finance", Members: []string{alice.ID, bob.ID}})
 	if e != nil {

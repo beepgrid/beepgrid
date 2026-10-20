@@ -37,7 +37,7 @@ func (s *Store) UploadAttachment(ctx context.Context, a Actor, conv, name, media
 		return out, Bad("Attachments must be between 1 byte and 5 MiB.")
 	}
 	name = filepath.Base(strings.ReplaceAll(name, "\\", "/"))
-	if !ValidText(name, 200) || strings.ContainsAny(name, "\r\n\x00") {
+	if !ValidText(name, 200) || name == "." || name == "/" || strings.ContainsAny(name, "\r\n\x00") {
 		return out, Bad("Invalid filename.")
 	}
 	allowed := map[string]bool{"text/plain": true, "application/pdf": true, "application/json": true, "image/png": true, "image/jpeg": true, "image/webp": true}

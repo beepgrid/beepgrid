@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +18,8 @@ type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Store struct {
+	providerTransport http.RoundTripper
+
 	AttachmentsRoot string
 
 	Matcher Matcher
@@ -41,6 +44,12 @@ func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 	}
 	if held {
 		return &Error{"RECOVERY_HOLD", "This workspace is paused for restore reconciliation.", 503}
+	}
+	if a.ProviderConnection != "" {
+		var valid bool
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM connections c JOIN principals p ON p.scope=c.scope WHERE c.scope=$1 AND c.id=$2 AND c.enabled AND p.id=$3 AND NOT p.disabled)`, a.Scope, a.ProviderConnection, a.ID).Scan(&valid); err != nil || !valid {
+			return Denied()
+		}
 	}
 	if a.CredentialID != "" {
 		var valid bool

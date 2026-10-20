@@ -52,6 +52,7 @@ type Session struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 type EnrollInput struct {
+	ParentID     string         `json:"parent_id,omitempty"`
 	Agent        string         `json:"agent"`
 	Name         string         `json:"name"`
 	Capabilities []string       `json:"capabilities"`

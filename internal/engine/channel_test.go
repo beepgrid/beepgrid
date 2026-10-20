@@ -27,6 +27,7 @@ func TestSignedProviderRetriesAndEncryptedCredentials(t *testing.T) {
 			t.Error("private policy payload leaked")
 		}
 		if count.Add(1) == 1 {
+			w.Header().Set("Retry-After", "120")
 			w.WriteHeader(503)
 			return
 		}
@@ -56,6 +57,10 @@ func TestSignedProviderRetriesAndEncryptedCredentials(t *testing.T) {
 	var state string
 	if e = s.Pool.QueryRow(ctx, `SELECT state FROM deliveries WHERE connection_id=$1`, c.ID).Scan(&state); e != nil || state != "queued" {
 		t.Fatal(state, e)
+	}
+	var next time.Time
+	if e = s.Pool.QueryRow(ctx, `SELECT next_at FROM deliveries WHERE connection_id=$1`, c.ID).Scan(&next); e != nil || time.Until(next) < 119*time.Second {
+		t.Fatal("provider Retry-After ignored", next, e)
 	}
 	if _, e = s.Pool.Exec(ctx, `UPDATE deliveries SET next_at=now() WHERE connection_id=$1`, c.ID); e != nil {
 		t.Fatal(e)
