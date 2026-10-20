@@ -315,17 +315,54 @@ type DispatchResult struct {
 	Receipt       map[string]string
 }
 
+func (s *Store) newProviderTransport() *http.Transport {
+	return &http.Transport{
+		DialContext:         s.dial,
+		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12},
+		TLSHandshakeTimeout: 5 * time.Second,
+		IdleConnTimeout:     60 * time.Second,
+		MaxIdleConns:        32,
+		MaxIdleConnsPerHost: 2,
+		MaxConnsPerHost:     8,
+	}
+}
+
+// DispatchOnce preserves the one-delivery API used by callers and tests.
 func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
+	_, e := s.dispatchOne(ctx, publicURL)
+	return e
+}
+
+// DispatchBatch drains ready work without an artificial per-message pause.
+// Sends remain serial so provider thread creation and delivery order are kept.
+func (s *Store) DispatchBatch(ctx context.Context, publicURL string, limit int) (int, error) {
+	if limit < 1 || limit > 100 {
+		return 0, Bad("Dispatch batch must be between 1 and 100.")
+	}
+	for n := 0; n < limit; n++ {
+		worked, e := s.dispatchOne(ctx, publicURL)
+		if e != nil {
+			return n, e
+		}
+		if !worked {
+			return n, nil
+		}
+	}
+	return limit, nil
+}
+
+func (s *Store) dispatchOne(ctx context.Context, publicURL string) (bool, error) {
+	worked := false
 	if e := s.promoteQuestions(ctx); e != nil {
-		return e
+		return worked, e
 	}
 	// Recovering an expired provider lease is ambiguous: the previous send may have succeeded.
 	if _, e := s.Pool.Exec(ctx, `UPDATE deliveries SET state='unknown',last_error='Provider lease expired; reconcile before replay' WHERE connection_id<>'' AND state='leased' AND lease_until<now()`); e != nil {
-		return e
+		return worked, e
 	}
 	tx, e := s.Pool.Begin(ctx)
 	if e != nil {
-		return e
+		return worked, e
 	}
 	defer tx.Rollback(ctx)
 	// Match mutation lock order: workspace first, then delivery. Skip busy
@@ -333,30 +370,31 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	var scope string
 	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND EXISTS(SELECT 1 FROM deliveries d WHERE d.scope=s.id AND d.connection_id<>'' AND d.state='queued' AND d.next_at<=now()) ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
 	if e == pgx.ErrNoRows {
-		return nil
+		return worked, nil
 	}
 	if e != nil {
-		return e
+		return worked, e
 	}
 	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND connection_id<>'' AND state='queued' AND next_at<=now() ORDER BY next_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`, scope))
 	if ErrorStatus(e) == 404 {
-		return nil
+		return worked, nil
 	}
 	if e != nil {
-		return e
+		return worked, e
 	}
+	worked = true
 	if d.ExpiresAt.Before(time.Now()) || !s.currentDeliveryPolicy(ctx, tx, scope, d) {
 		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Expired or permission revoked' WHERE id=$1`, d.ID)
 		if e == nil {
 			e = tx.Commit(ctx)
 		}
-		return e
+		return worked, e
 	}
 	var c Connection
 	var raw, encrypted []byte
 	e = tx.QueryRow(ctx, `SELECT id,name,kind,config,secret,enabled FROM connections WHERE scope=$1 AND id=$2`, scope, d.ConnectionID).Scan(&c.ID, &c.Name, &c.Kind, &raw, &encrypted, &c.Enabled)
 	if e != nil {
-		return e
+		return worked, e
 	}
 	_ = json.Unmarshal(raw, &c.Config)
 	if !c.Enabled {
@@ -364,25 +402,25 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 		if e == nil {
 			e = tx.Commit(ctx)
 		}
-		return e
+		return worked, e
 	}
 	secret, e := s.unseal(encrypted)
 	if e != nil {
 		_, updateErr := tx.Exec(ctx, `UPDATE deliveries SET state='failed',last_error='Provider secret cannot be decrypted; verify encryption key' WHERE id=$1`, d.ID)
 		if updateErr != nil {
-			return updateErr
+			return worked, updateErr
 		}
-		return tx.Commit(ctx)
+		return worked, tx.Commit(ctx)
 	}
 	c.Secret = string(secret)
 	if e = tx.QueryRow(ctx, `UPDATE deliveries SET state='leased',generation=generation+1,attempts=attempts+1,lease_until=now()+interval '30 seconds' WHERE id=$1 RETURNING generation,attempts`, d.ID).Scan(&d.Generation, &d.Attempts); e != nil {
-		return e
+		return worked, e
 	}
 	if _, e = tx.Exec(ctx, `UPDATE scopes SET last_dispatch_at=now() WHERE id=$1`, scope); e != nil {
-		return e
+		return worked, e
 	}
 	if e = tx.Commit(ctx); e != nil {
-		return e
+		return worked, e
 	}
 	// Preserve private route metadata in storage; never send it to a provider.
 	delete(d.Payload, "_policy")
@@ -404,31 +442,31 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	}
 	tx, e = s.Pool.Begin(ctx)
 	if e != nil {
-		return e
+		return worked, e
 	}
 	defer tx.Rollback(ctx)
 	tag, e := tx.Exec(ctx, `UPDATE deliveries SET state=$3,next_at=$4,last_error=$5 WHERE id=$1 AND generation=$2 AND state='leased'`, d.ID, d.Generation, result.State, next, result.Detail)
 	if e != nil {
-		return e
+		return worked, e
 	}
 	if tag.RowsAffected() == 0 {
-		return Conflict("Provider delivery lease changed.")
+		return worked, Conflict("Provider delivery lease changed.")
 	}
 	if _, e = tx.Exec(ctx, `INSERT INTO delivery_attempts(id,scope,delivery_id,generation,outcome,detail) VALUES($1,$2,$3,$4,$5,$6)`, ID("att"), scope, d.ID, d.Generation, result.State, result.Detail); e != nil {
-		return e
+		return worked, e
 	}
 	if result.Receipt != nil {
 		conv, _ := d.Payload["conversation_id"].(string)
 		if e = s.recordThread(ctx, tx, scope, c.ID, result.Receipt["channel"], result.Receipt["thread"], conv, d.RecipientID); e != nil {
-			return e
+			return worked, e
 		}
 	}
 	if result.State == "failed" {
 		if e = s.queueFallback(ctx, tx, scope, d); e != nil {
-			return e
+			return worked, e
 		}
 	}
-	return tx.Commit(ctx)
+	return worked, tx.Commit(ctx)
 }
 func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL string) DispatchResult {
 	text := ""
@@ -490,7 +528,9 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 	}
 	transport := s.providerTransport
 	if transport == nil {
-		t := &http.Transport{DialContext: s.dial, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
+		// Only manually assembled test stores use the fallback. OpenExisting owns
+		// one bounded transport and closes idle connections with the store.
+		t := s.newProviderTransport()
 		defer t.CloseIdleConnections()
 		transport = t
 	}

@@ -231,7 +231,7 @@ func serve(ctx context.Context, args []string) error {
 		ticker := time.NewTicker(300 * time.Millisecond)
 		defer ticker.Stop()
 		for {
-			if e := store.DispatchOnce(workerCtx, public); e != nil && workerCtx.Err() == nil {
+			if _, e := store.DispatchBatch(workerCtx, public, 32); e != nil && workerCtx.Err() == nil {
 				slog.Error("dispatch failed", "error", e)
 			}
 			select {

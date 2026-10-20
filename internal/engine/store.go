@@ -34,6 +34,9 @@ type Store struct {
 }
 
 func (s *Store) Close() {
+	if transport, ok := s.providerTransport.(interface{ CloseIdleConnections() }); ok {
+		transport.CloseIdleConnections()
+	}
 	if s.stopWakeups != nil {
 		s.stopWakeups()
 		<-s.wakeupDone

@@ -111,6 +111,7 @@ func OpenExisting(ctx context.Context, url, name string, key []byte) (*Store, er
 		return nil, fmt.Errorf("schema must be migrated to version %s before serving", strconv.Itoa(SchemaVersion))
 	}
 	s := &Store{Pool: p, SecretKey: key}
+	s.providerTransport = s.newProviderTransport()
 	s.startWakeups()
 	return s, nil
 }
