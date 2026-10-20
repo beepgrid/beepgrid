@@ -475,13 +475,17 @@ func (s *Server) setStatus(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true}, s.Store.SetResourceDisabled(r.Context(), actor(r), kind, r.PathValue("id"), in.Disabled))
 }
 func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
-	cursor := r.URL.Query().Get("after")
+	cursor := r.Header.Get("Last-Event-ID")
 	if cursor == "" {
-		cursor = r.Header.Get("Last-Event-ID")
+		cursor = r.URL.Query().Get("after")
 	}
 	after, _ := strconv.ParseInt(cursor, 10, 64)
 	if after < 0 {
 		return engine.Bad("Invalid event cursor.")
+	}
+	conversation := r.URL.Query().Get("conversation_id")
+	if len(conversation) > 256 {
+		return engine.Bad("Invalid event conversation.")
 	}
 	if r.URL.Query().Get("stream") != "1" {
 		x, e := s.Store.Events(r.Context(), actor(r), after)
@@ -513,7 +517,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 		var scanned int64
 		var e error
 		if r.URL.Query().Get("summary") == "1" {
-			events, scanned, e = s.Store.EventSummaryPage(r.Context(), a, after)
+			events, scanned, e = s.Store.EventConversationPage(r.Context(), a, after, conversation)
 		} else {
 			events, scanned, e = s.Store.EventPage(r.Context(), a, after, false)
 		}

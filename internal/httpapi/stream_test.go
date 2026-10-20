@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/notif-dev/notif/internal/engine"
 	"github.com/notif-dev/notif/sdk/go/notif"
@@ -163,5 +164,82 @@ func TestOpenEventStreamRechecksRevokedCredential(t *testing.T) {
 	}
 	if time.Since(started) > 3*time.Second {
 		t.Fatal("revoked stream remained open")
+	}
+}
+
+func TestBrowserConversationStreamResumesHeaderAndProjectsCanonicalBody(t *testing.T) {
+	s, c, server := setup(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	a, e := s.Authenticate(ctx, c.Token)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, session, e := c.Enroll(ctx, notif.EnrollInput{Agent: "stream/selected", Name: "Stream worker"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	one, e := s.Send(ctx, a, engine.SendInput{Target: engine.Target{Kind: "agent", ID: session.Agent.ID}, Body: "old selected"}, "selected-old")
+	if e != nil {
+		t.Fatal(e)
+	}
+	two, e := s.Send(ctx, a, engine.SendInput{Target: engine.Target{Kind: "agent", ID: session.Agent.ID}, Body: "old unselected"}, "unselected-old")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var cursor int64
+	if e = s.Pool.QueryRow(ctx, `SELECT sequence FROM scopes WHERE id=$1`, a.Scope).Scan(&cursor); e != nil {
+		t.Fatal(e)
+	}
+	req, _ := http.NewRequestWithContext(ctx, "GET", server.URL+"/api/v1/events?stream=1&summary=1&after=0&conversation_id="+one.ConversationID, nil)
+	// The browser keeps its original after query when reconnecting. Its newer
+	// Last-Event-ID must win rather than replaying the complete old history.
+	req.Header.Set("Last-Event-ID", fmt.Sprint(cursor))
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	res, e := http.DefaultClient.Do(req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer res.Body.Close()
+	reader := bufio.NewReader(res.Body)
+	line, e := reader.ReadString('\n')
+	if e != nil || line != ": keepalive\n" {
+		t.Fatal("old query cursor overrode reconnect header", line, e)
+	}
+	full, e := s.Send(ctx, a, engine.SendInput{ConversationID: one.ConversationID, Body: "canonical streamed <é> body"}, "selected-new")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Send(ctx, a, engine.SendInput{ConversationID: two.ConversationID, Body: "must not transfer this body"}, "unselected-new"); e != nil {
+		t.Fatal(e)
+	}
+	seen := 0
+	for seen < 2 {
+		line, e = reader.ReadString('\n')
+		if e != nil {
+			t.Fatal(e)
+		}
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var ev engine.Event
+		if e = json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &ev); e != nil {
+			t.Fatal(e)
+		}
+		if ev.Kind != "message.created" {
+			continue
+		}
+		seen++
+		if ev.ConversationID == one.ConversationID {
+			var expected any
+			if e = json.Unmarshal([]byte(engine.JSON(full.Messages[0])), &expected); e != nil {
+				t.Fatal(e)
+			}
+			if string(engine.JSON(ev.Data)) != string(engine.JSON(expected)) {
+				t.Fatal("stream changed canonical message")
+			}
+		} else if ev.ConversationID != two.ConversationID || ev.Data != nil {
+			t.Fatal("unselected message payload transferred")
+		}
 	}
 }

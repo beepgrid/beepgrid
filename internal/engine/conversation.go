@@ -415,23 +415,31 @@ func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, erro
 
 // EventPage returns the scanned cursor even when current permissions hide a whole page.
 func (s *Store) EventPage(ctx context.Context, a Actor, after int64, recent bool) ([]Event, int64, error) {
-	return s.eventPage(ctx, a, after, recent, false)
+	return s.eventPage(ctx, a, after, recent, false, "")
 }
 
 // EventSummaryPage has identical visibility and cursors, but avoids reading
 // message bodies for clients that only use events to invalidate fetched data.
 func (s *Store) EventSummaryPage(ctx context.Context, a Actor, after int64) ([]Event, int64, error) {
-	return s.eventPage(ctx, a, after, false, true)
+	return s.eventPage(ctx, a, after, false, true, "")
 }
 
-func (s *Store) eventPage(ctx context.Context, a Actor, after int64, recent, summary bool) ([]Event, int64, error) {
+// EventConversationPage carries canonical message bodies only for the open
+// conversation. Other events retain summary visibility and scanned cursors.
+// Selecting an ID never grants access: the ordinary current-policy filter below
+// still applies, including after reconnect or permission revocation.
+func (s *Store) EventConversationPage(ctx context.Context, a Actor, after int64, conversation string) ([]Event, int64, error) {
+	return s.eventPage(ctx, a, after, false, true, conversation)
+}
+
+func (s *Store) eventPage(ctx context.Context, a Actor, after int64, recent, summary bool, conversation string) ([]Event, int64, error) {
 	ctx = withPolicySnapshot(ctx)
 	order := "ASC"
 	if recent {
 		order = "DESC"
 	}
 
-	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,CASE WHEN $5 THEN 'null'::jsonb ELSE e.data END,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND ($3 OR (e.conversation_id<>'' AND EXISTS(SELECT 1 FROM participants p WHERE p.scope=e.scope AND p.conversation_id=e.conversation_id AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence `+order+` LIMIT 200`, a.Scope, after, a.Admin, a.ID, summary)
+	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,CASE WHEN $5 AND NOT (e.kind='message.created' AND e.conversation_id=$6 AND $6<>'') THEN 'null'::jsonb ELSE e.data END,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND ($3 OR (e.conversation_id<>'' AND EXISTS(SELECT 1 FROM participants p WHERE p.scope=e.scope AND p.conversation_id=e.conversation_id AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence `+order+` LIMIT 200`, a.Scope, after, a.Admin, a.ID, summary, conversation)
 	if e != nil {
 		return nil, after, e
 	}

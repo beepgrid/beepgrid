@@ -66,6 +66,7 @@ beforeEach(() => {
     "EventSource",
     class {
       onmessage: unknown;
+      addEventListener() {}
       close() {}
     },
   );
@@ -253,7 +254,7 @@ it("stacks exact scoped questions and requires an explicit shared answer choice"
 it("removes an opened conversation after a live refresh loses read access", async () => {
   history.replaceState(null,"","/conversations/con_1");
   let source!: {onmessage?:()=>void};
-  vi.stubGlobal("EventSource",class {onmessage?:()=>void;constructor(){source=this;}close(){} });
+  vi.stubGlobal("EventSource",class {onmessage?:()=>void;constructor(){source=this;}addEventListener(){}close(){} });
   const original=vi.mocked(fetch).getMockImplementation()!;
   let denied=false;
   vi.mocked(fetch).mockImplementation(async(input,init)=>{

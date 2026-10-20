@@ -51,13 +51,15 @@ export type Conversation = {
   created_by: string;
   created_at: string;
   participants?: Entity[];
-  messages?: {
-    id: string;
-    body: string;
-    sender_id: string;
-    instance_id?: string;
-    created_at: string;
-  }[];
+  messages?: Message[];
+};
+export type Message = {
+  id: string;
+  conversation_id?: string;
+  body: string;
+  sender_id: string;
+  instance_id?: string;
+  created_at: string;
 };
 export type Group = { id: string; name: string; members: string[] };
 export type Role = { id: string; name: string; rules: Rule[] };
@@ -73,6 +75,8 @@ export type EventItem = {
   sequence: number;
   kind: string;
   actor_id: string;
+  conversation_id?: string;
+  recipient_id?: string;
   data: unknown;
   created_at: string;
 };

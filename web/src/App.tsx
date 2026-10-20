@@ -1,4 +1,5 @@
 import { Attachments } from "./Attachments";
+import { eventMessage, useLiveConversation } from "./live";
 import {
   AnswerSuggestions,
   PublishAnswerForm,
@@ -7,6 +8,7 @@ import {
 } from "./Assistance";
 import {
   useCallback,
+  memo,
   useEffect,
   useRef,
   useState,
@@ -30,6 +32,7 @@ import {
   type Me,
   type Target,
   type Rule,
+  type Message,
 } from "./api";
 
 const nav = [
@@ -356,12 +359,19 @@ export function App() {
     [modal, setModal] = useState<string | null>(null),
     [selected, setSelected] = useState<string | null>(null),
     [query, setQuery] = useState(""),
-    [conversation, setConversation] = useState<Conversation | null>(null),
+    [snapshotRevision, setSnapshotRevision] = useState(0),
+    [attachmentRevision, setAttachmentRevision] = useState(0),
     [instances, setInstances] = useState<Instance[]>([]),
     [tab, setTab] = useState("open"),
     [live, setLive] = useState("Connecting");
   const meRef = useRef(me);
   meRef.current = me;
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const activeConversation = page === "conversations" ? selected : null;
+  const { conversation, setConversation, acceptMessage } = useLiveConversation(me ? activeConversation : null, snapshotRevision, setError);
   const refreshGeneration = useRef(0);
   const refresh = useCallback(async () => {
     const generation = ++refreshGeneration.current;
@@ -389,12 +399,14 @@ export function App() {
       if (generation !== refreshGeneration.current) return;
       setMe(current);
       setData({ ...emptyData, ...Object.fromEntries(values) });
+      setSnapshotRevision(revision => revision + 1);
       setError("");
     } catch (e) {
       if (generation !== refreshGeneration.current) return;
       setData(emptyData);
       setConversation(null);
       setInstances([]);
+      setSnapshotRevision(revision => revision + 1);
       if (e instanceof APIError && e.status === 401) setMe(null);
       else setError((e as Error).message);
     } finally {
@@ -404,26 +416,76 @@ export function App() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  const reconcileTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scheduleRefresh = useCallback(() => {
+    if (!reconcileTimer.current)
+      reconcileTimer.current = setTimeout(() => {
+        reconcileTimer.current = undefined;
+        void refresh();
+      }, 2000);
+  }, [refresh]);
+  const streamCursor = useRef({ identity: "", sequence: 0 });
+  const streamIdentity = me ? JSON.stringify([me.company, me.environment, me.person.id]) : "";
+  useEffect(() => () => {
+    clearTimeout(reconcileTimer.current);
+    reconcileTimer.current = undefined;
+  }, [streamIdentity]);
   useEffect(() => {
     if (!me) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const source = new EventSource("/api/v1/events?stream=1&summary=1");
-    source.onopen = () => setLive("Live updates");
-    source.onerror = () => setLive("Reconnecting");
-    source.onmessage = () => {
-      if (!timer)
-        timer = setTimeout(() => {
-          timer = undefined;
-          void refresh();
-        }, 2000);
+    let active = true;
+    if (streamCursor.current.identity !== streamIdentity)
+      streamCursor.current = { identity: streamIdentity, sequence: Math.max(0, ...dataRef.current.events.map(e => e.sequence)) };
+    const query = new URLSearchParams({ stream: "1", summary: "1", after: String(streamCursor.current.sequence) });
+    if (activeConversation) query.set("conversation_id", activeConversation);
+    const source = new EventSource("/api/v1/events?" + query);
+    source.onopen = () => { if (active) setLive("Live updates"); };
+    source.onerror = () => { if (active) setLive("Reconnecting"); };
+    const reconcile = scheduleRefresh;
+    source.addEventListener("cursor", (event) => {
+      const sequence = Number((event as MessageEvent).lastEventId);
+      if (active && Number.isSafeInteger(sequence))
+        streamCursor.current.sequence = Math.max(streamCursor.current.sequence, sequence);
+    });
+    source.onmessage = (frame) => {
+      if (!active) return;
+      let event: EventItem;
+      try { event = JSON.parse(frame.data); }
+      catch { reconcile(); return; }
+      if (!Number.isSafeInteger(event.sequence) || typeof event.kind !== "string" ||
+          (frame.lastEventId && Number(frame.lastEventId) !== event.sequence)) { reconcile(); return; }
+      if (event.sequence <= streamCursor.current.sequence) return;
+      streamCursor.current.sequence = event.sequence;
+      if (pageRef.current === "activity") {
+        // Activity and delivery recovery retain authoritative snapshots. They
+        // have no growing-chat refetch problem to justify a second live cache.
+        reconcile();
+      }
+      if (event.kind === "message.created") {
+        if (event.conversation_id === activeConversation) {
+          const message = eventMessage(event);
+          if (message) acceptMessage(message);
+          else reconcile(); // Compatible fallback for older summary-only servers.
+        }
+        if (!dataRef.current.conversations.some(c => c.id === event.conversation_id)) reconcile();
+      } else if (event.kind === "attachment.created") {
+        if (event.conversation_id === activeConversation) setAttachmentRevision(revision => revision + 1);
+      } else if (!["worker.received", "delivery.retried", "execution.authorized", "execution.reported"].includes(event.kind)) {
+        // Request, directory and policy events still reconcile authoritative
+        // snapshots. A message or delivery receipt cannot alter those resources.
+        reconcile();
+      }
     };
-    const presenceTimer = setInterval(() => void refresh(), 15000);
     return () => {
-      clearInterval(presenceTimer);
+      active = false;
       source.close();
-      if (timer) clearTimeout(timer);
     };
-  }, [me?.person.id, refresh]);
+  }, [streamIdentity, activeConversation, scheduleRefresh, acceptMessage]);
+  useEffect(() => {
+    if (!streamIdentity) return;
+    // Navigation must not postpone the existing revocation/presence safety net.
+    const timer = setInterval(() => void refresh(), 15000);
+    return () => clearInterval(timer);
+  }, [streamIdentity, refresh]);
   useEffect(() => {
     const route = () => {
       const parts = location.pathname.split("/").filter(Boolean);
@@ -447,21 +509,8 @@ export function App() {
     setQuery("");
   }, [page]);
   useEffect(() => {
-    let active = true;
-    setConversation((old)=>old?.id === selected ? old : null);
-    if (page === "conversations" && selected)
-      api<Conversation>("/conversations/" + selected)
-        .then((c) => {
-          if (active) setConversation(c);
-        })
-        .catch((e) => {
-          if (active) {setConversation(null);setError(e.message);}
-        });
-    else setConversation(null);
-    return () => {
-      active = false;
-    };
-  }, [page, selected, data]);
+    if (page === "activity" && meRef.current) void refresh();
+  }, [page, refresh]);
   useEffect(() => {
     let active = true;
     setInstances([]);
@@ -470,17 +519,17 @@ export function App() {
         .then((value)=>{if(active)setInstances(value);})
         .catch((e) => {if(active){setInstances([]);setError(e.message);}});
     return ()=>{active=false;};
-  }, [page, selected, data]);
+  }, [page, selected, snapshotRevision]);
   const entities = [...data.people, ...data.agents, ...data.services];
   const who = (id?: string) => entities.find((p) => p.id === id);
   const name = (id?: string) =>
     who(id)?.name ?? (id ? id.slice(0, 12) : "Unknown");
-  async function act(task: () => Promise<unknown>, message = "Saved") {
+  async function act(task: () => Promise<unknown>, message = "Saved", reconcile = true) {
     try {
       await task();
       setNotice(message);
       setTimeout(() => setNotice(""), 3500);
-      await refresh();
+      if (reconcile) await refresh();
       return true;
     } catch (e) {
       await refresh();
@@ -883,6 +932,7 @@ export function App() {
                   conversation={conversation}
                   me={me}
                   name={name}
+                  attachmentRevision={attachmentRevision}
                   onSend={(body, key) =>
                     act(
                       () =>
@@ -892,6 +942,7 @@ export function App() {
                           { headers: { "Idempotency-Key": key, Prefer: "return=minimal" } },
                         ),
                       "Message sent",
+                      live !== "Live updates",
                     )
                   }
                 />
@@ -1647,11 +1698,13 @@ function Chat({
   me,
   name,
   onSend,
+  attachmentRevision,
 }: {
   conversation: Conversation;
   me: Me;
   name: (id: string) => string;
   onSend: (body: string, key: string) => Promise<boolean>;
+  attachmentRevision: number;
 }) {
   const sendAttempt = useRef({ body: "", key: "" });
   const draftKey = "notif-draft/" + me.person.id + "/" + c.id;
@@ -1665,7 +1718,7 @@ function Chat({
   }, [draftKey]);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
-  }, [c.messages?.length]);
+  }, [c.messages?.at(-1)?.id]);
   return (
     <section className="chat">
       <div className="chat-heading">
@@ -1684,23 +1737,11 @@ function Chat({
           </div>
         )}
         {c.messages?.map((m) => (
-          <article
-            className={
-              "message " + (m.sender_id === me.person.id ? "mine" : "")
-            }
-            key={m.id}
-          >
-            <div className="message-meta">
-              <strong>{name(m.sender_id)}</strong>
-              <span>{timeAgo(m.created_at)}</span>
-              {m.instance_id && <Badge>worker</Badge>}
-            </div>
-            <p>{m.body}</p>
-          </article>
+          <ChatMessage key={m.id} message={m} sender={name(m.sender_id)} mine={m.sender_id === me.person.id} />
         ))}
         <div ref={end} />
       </div>
-      <Attachments conversation={c.id} />
+      <Attachments conversation={c.id} revision={attachmentRevision} />
       <form
         className="composer"
         onSubmit={async (e) => {
@@ -1739,6 +1780,16 @@ function Chat({
     </section>
   );
 }
+const ChatMessage = memo(function ChatMessage({ message: m, sender, mine }: { message: Message; sender: string; mine: boolean }) {
+  return <article className={"message " + (mine ? "mine" : "")}>
+    <div className="message-meta">
+      <strong>{sender}</strong>
+      <span>{timeAgo(m.created_at)}</span>
+      {m.instance_id && <Badge>worker</Badge>}
+    </div>
+    <p>{m.body}</p>
+  </article>;
+});
 function modalTitle(k: string) {
   return (
     (
@@ -2555,11 +2606,14 @@ function Activity({
   const [view, setView] = useState("events"),
     [deliveries, setDeliveries] = useState<Record<string, unknown>[]>([]);
   useEffect(() => {
-    if (view === "deliveries")
-      api<Record<string, unknown>[]>("/deliveries")
-        .then(setDeliveries)
-        .catch(() => setDeliveries([]));
-  }, [view, data.events.length]);
+    if (view !== "deliveries") return;
+    const abort = new AbortController();
+    const load = () => void api<Record<string, unknown>[]>("/deliveries", undefined, { signal: abort.signal })
+      .then(value => { if (!abort.signal.aborted) setDeliveries(value); })
+      .catch(() => { if (!abort.signal.aborted) setDeliveries([]); });
+    load();
+    return () => abort.abort();
+  }, [view, data.events]);
   return (
     <>
       <div className="section-toolbar">

@@ -4447,13 +4447,25 @@
           {
             "name": "summary",
             "in": "query",
-            "description": "With stream=1, summary=1 omits event data while preserving current authorization, metadata and replay cursors. Full events remain the default.",
+            "description": "With stream=1, summary=1 omits event data while preserving current authorization, metadata and replay cursors, except canonical message.created bodies for an optional selected conversation_id. Full events remain the default.",
             "schema": {
               "enum": [
                 "0",
                 "1"
               ]
             }
+          },
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "description": "With stream=1 and summary=1, include canonical message.created data only for this readable conversation. All other event payloads remain null. This never grants access or filters out other visible event metadata.",
+            "schema": { "type": "string", "maxLength": 256 }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "Resume after the last complete event. Takes precedence over the initial after query during EventSource reconnection.",
+            "schema": { "type": "integer", "minimum": 0 }
           }
         ]
       }

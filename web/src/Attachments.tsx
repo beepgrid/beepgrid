@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 type Attachment = { id: string; file_name: string; size: number };
-export function Attachments({ conversation }: { conversation: string }) {
+export function Attachments({ conversation, revision = 0 }: { conversation: string; revision?: number }) {
   const [files, setFiles] = useState<Attachment[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
+    const abort = new AbortController();
     setFiles([]);
-    void api<Attachment[]>("/conversations/" + conversation + "/attachments")
-      .then(setFiles)
-      .catch((e) => setError(e.message));
-  }, [conversation]);
+    void api<Attachment[]>("/conversations/" + conversation + "/attachments", undefined, { signal: abort.signal })
+      .then(value => { if (!abort.signal.aborted) { setFiles(value); setError(""); } })
+      .catch(e => { if (!abort.signal.aborted) setError(e.message); });
+    return () => abort.abort();
+  }, [conversation, revision]);
   return (
     <div className="attachments">
       <div>
@@ -44,7 +46,7 @@ export function Attachments({ conversation }: { conversation: string }) {
               );
               const x = await r.json();
               if (!r.ok) throw new Error(x.error?.message ?? "Upload failed");
-              setFiles((old) => [...old, x]);
+              setFiles((old) => old.some(f => f.id === x.id) ? old : [...old, x]);
             } catch (e) {
               setError((e as Error).message);
             } finally {
