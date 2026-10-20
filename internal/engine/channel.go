@@ -16,7 +16,6 @@ import (
 	"net"
 	"net/http"
 	"net/mail"
-	"net/smtp"
 	"net/url"
 	"strconv"
 	"strings"
@@ -479,10 +478,7 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 		text += "\n" + publicURL + "/requests/" + fmt.Sprint(q["id"])
 	}
 	if c.Kind == "email" {
-		if e := s.sendMail(ctx, c, d.Address, text); e != nil {
-			return DispatchResult{State: "unknown", Detail: "SMTP outcome uncertain: " + safeError(e), Retry: false}
-		}
-		return DispatchResult{State: "provider_accepted", Detail: "SMTP server accepted the message.", Retry: false}
+		return s.sendMail(ctx, c, d.Address, text)
 	}
 	destination := c.Config["url"]
 	body := JSON(d.Payload)
@@ -574,62 +570,6 @@ func safeError(e error) string {
 		return ""
 	}
 	return fmt.Sprintf("%T", e)
-}
-func (s *Store) sendMail(ctx context.Context, c Connection, to, body string) error {
-	addr := c.Config["smtp_addr"]
-	host, _, e := net.SplitHostPort(addr)
-	if e != nil {
-		return e
-	}
-	conn, e := s.dial(ctx, "tcp", addr)
-	if e != nil {
-		return e
-	}
-	_ = conn.SetDeadline(time.Now().Add(12 * time.Second))
-	client, e := smtp.NewClient(conn, host)
-	if e != nil {
-		conn.Close()
-		return e
-	}
-	defer client.Close()
-	if yes, _ := client.Extension("STARTTLS"); yes {
-		if e = client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); e != nil {
-			return e
-		}
-	} else if !s.AllowLocal {
-		return fmt.Errorf("SMTP TLS required")
-	}
-	if c.Config["username"] != "" {
-		if e = client.Auth(smtp.PlainAuth("", c.Config["username"], c.Secret, host)); e != nil {
-			return e
-		}
-	}
-	from, e := mail.ParseAddress(c.Config["from"])
-	if e != nil {
-		return e
-	}
-	recipient, e := mail.ParseAddress(to)
-	if e != nil {
-		return e
-	}
-	if e = client.Mail(from.Address); e != nil {
-		return e
-	}
-	if e = client.Rcpt(recipient.Address); e != nil {
-		return e
-	}
-	w, e := client.Data()
-	if e != nil {
-		return e
-	}
-	_, e = fmt.Fprintf(w, "From: %s\r\nTo: %s\r\nSubject: Notif update\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n", from.String(), recipient.String(), body)
-	if e != nil {
-		return e
-	}
-	if e = w.Close(); e != nil {
-		return e
-	}
-	return client.Quit()
 }
 
 func (s *Store) InboundConnection(ctx context.Context, id string) (Connection, string, error) {
