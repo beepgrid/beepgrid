@@ -39,6 +39,8 @@ Back up PostgreSQL using a matching-version `pg_dump`/managed backup and the att
 
 Before upgrading: take a tested backup, stop or drain writers, run the new `notif migrate`, and start the new binary. Migrations are serialized, versioned, checksummed and transactional. A newer database refuses an older binary. Do not edit an applied migration. Downgrades require a compatible restored database and explicit effect reconciliation.
 
+Version 12 changes the private idempotency-receipt format to store a shared fan-out body once. Stop every older server process before this migration, including idle readers. The version check runs at startup; it does not coordinate a mixed-version rolling deployment. Existing full receipts remain readable and public responses retain their fields. The format-only migration intentionally adds no tables or columns.
+
 For local verification, `python3 scripts/recovery-drill.py` creates two generated test databases in the local PostgreSQL container, backs up approved work, simulates an external effect after the snapshot, restores the snapshot, rotates credentials and confirms that the obsolete approval cannot execute again. It deletes only its generated test databases. The local timing is not a production RPO/RTO claim.
 
 ## Restoring safely

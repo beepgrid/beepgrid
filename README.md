@@ -77,6 +77,8 @@ Transport receipt, a human decision and worker-reported execution are distinct e
 
 Start with [deployment and recovery](docs/OPERATIONS.md), [architecture](docs/ARCHITECTURE.md), [capability and benchmark coverage](docs/COVERAGE.md), [implementation checklist](docs/IMPLEMENTATION.md), and [contributing](CONTRIBUTING.md).
 
+See the [byte and memory qualification](docs/BYTE-MEMORY-PERFORMANCE.md) for Linux measurements, exact correctness coverage and retained comparison tradeoffs.
+
 ```sh
 docker compose up -d --wait
 bash scripts/verify.sh
