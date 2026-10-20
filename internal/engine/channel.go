@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -332,54 +333,124 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	return e
 }
 
-// DispatchBatch drains ready work without an artificial per-message pause.
-// Sends remain serial so provider thread creation and delivery order are kept.
+// DispatchBatch bounds independent provider sends to 16 workers. A destination
+// lane is leased in PostgreSQL, so replicas cannot race Slack thread creation
+// or overtake an in-flight send to the same provider address.
 func (s *Store) DispatchBatch(ctx context.Context, publicURL string, limit int) (int, error) {
 	if limit < 1 || limit > 100 {
 		return 0, Bad("Dispatch batch must be between 1 and 100.")
 	}
-	for n := 0; n < limit; n++ {
-		worked, e := s.dispatchOne(ctx, publicURL)
-		if e != nil {
-			return n, e
-		}
-		if !worked {
-			return n, nil
+	if err := s.prepareDispatch(ctx); err != nil {
+		return 0, err
+	}
+	// Keep the idle path to one claim, without launching a worker pool.
+	first, worked, err := s.claimProvider(ctx)
+	if err != nil || !worked {
+		return 0, err
+	}
+	n := 1
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	firstErr := error(nil)
+	run := func(job *providerJob) {
+		defer wg.Done()
+		for {
+			if job != nil {
+				if err := s.finishProvider(ctx, publicURL, job); err != nil {
+					mu.Lock()
+					if firstErr == nil {
+						firstErr = err
+					}
+					mu.Unlock()
+				}
+			}
+			mu.Lock()
+			if firstErr != nil || n >= limit {
+				mu.Unlock()
+				return
+			}
+			next, worked, err := s.claimProvider(ctx)
+			if err != nil {
+				firstErr = err
+			}
+			if worked {
+				n++
+			}
+			mu.Unlock()
+			if err != nil || !worked {
+				return
+			}
+			job = next
 		}
 	}
-	return limit, nil
+	// The claim mutex reserves the finite budget without pre-leasing a backlog
+	// behind slow I/O. Network calls hold neither this mutex nor a database lock.
+	wg.Add(1)
+	go run(first)
+	for range min(16, limit) - 1 {
+		wg.Add(1)
+		go run(nil)
+	}
+	wg.Wait()
+	return n, firstErr
 }
 
+type providerJob struct {
+	scope      string
+	connection Connection
+	delivery   Delivery
+}
+
+func (s *Store) prepareDispatch(ctx context.Context) error {
+	if err := s.promoteQuestions(ctx); err != nil {
+		return err
+	}
+	// An expired lease may already have caused an external effect.
+	_, err := s.Pool.Exec(ctx, `UPDATE deliveries SET state='unknown',last_error='Provider lease expired; reconcile before replay' WHERE connection_id<>'' AND state='leased' AND lease_until<now()`)
+	return err
+}
+
+// Only the first ready delivery in an idle destination lane can be claimed.
+// The workspace row lock serializes this decision with mutations and other
+// dispatchers. Completed history is excluded by the partial queue indexes.
+const eligibleProvider = `d.connection_id<>'' AND d.state='queued' AND d.next_at<=now()
+ AND NOT EXISTS(SELECT 1 FROM deliveries busy WHERE busy.scope=d.scope AND busy.connection_id=d.connection_id AND busy.address=d.address AND busy.state='leased')
+ AND NOT EXISTS(SELECT 1 FROM deliveries older WHERE older.scope=d.scope AND older.connection_id=d.connection_id AND older.address=d.address AND older.state='queued' AND older.next_at<=now() AND (older.next_at,older.id)<(d.next_at,d.id))`
+
 func (s *Store) dispatchOne(ctx context.Context, publicURL string) (bool, error) {
+	if err := s.prepareDispatch(ctx); err != nil {
+		return false, err
+	}
+	job, worked, err := s.claimProvider(ctx)
+	if err != nil || job == nil {
+		return worked, err
+	}
+	return worked, s.finishProvider(ctx, publicURL, job)
+}
+
+func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 	worked := false
-	if e := s.promoteQuestions(ctx); e != nil {
-		return worked, e
-	}
-	// Recovering an expired provider lease is ambiguous: the previous send may have succeeded.
-	if _, e := s.Pool.Exec(ctx, `UPDATE deliveries SET state='unknown',last_error='Provider lease expired; reconcile before replay' WHERE connection_id<>'' AND state='leased' AND lease_until<now()`); e != nil {
-		return worked, e
-	}
 	tx, e := s.Pool.Begin(ctx)
 	if e != nil {
-		return worked, e
+		return nil, worked, e
 	}
 	defer tx.Rollback(ctx)
 	// Match mutation lock order: workspace first, then delivery. Skip busy
 	// workspaces so cancellation cannot deadlock and other tenants can progress.
 	var scope string
-	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND EXISTS(SELECT 1 FROM deliveries d WHERE d.scope=s.id AND d.connection_id<>'' AND d.state='queued' AND d.next_at<=now()) ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
+	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND EXISTS(SELECT 1 FROM deliveries d WHERE d.scope=s.id AND  `+eligibleProvider+`) ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
 	if e == pgx.ErrNoRows {
-		return worked, nil
+		return nil, worked, nil
 	}
 	if e != nil {
-		return worked, e
+		return nil, worked, e
 	}
-	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND connection_id<>'' AND state='queued' AND next_at<=now() ORDER BY next_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`, scope))
+	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries d WHERE scope=$1 AND `+eligibleProvider+` ORDER BY next_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`, scope))
 	if ErrorStatus(e) == 404 {
-		return worked, nil
+		return nil, worked, nil
 	}
 	if e != nil {
-		return worked, e
+		return nil, worked, e
 	}
 	worked = true
 	if d.ExpiresAt.Before(time.Now()) || !s.currentDeliveryPolicy(ctx, tx, scope, d) {
@@ -387,13 +458,13 @@ func (s *Store) dispatchOne(ctx context.Context, publicURL string) (bool, error)
 		if e == nil {
 			e = tx.Commit(ctx)
 		}
-		return worked, e
+		return nil, worked, e
 	}
 	var c Connection
 	var raw, encrypted []byte
 	e = tx.QueryRow(ctx, `SELECT id,name,kind,config,secret,enabled FROM connections WHERE scope=$1 AND id=$2`, scope, d.ConnectionID).Scan(&c.ID, &c.Name, &c.Kind, &raw, &encrypted, &c.Enabled)
 	if e != nil {
-		return worked, e
+		return nil, worked, e
 	}
 	_ = json.Unmarshal(raw, &c.Config)
 	if !c.Enabled {
@@ -401,26 +472,31 @@ func (s *Store) dispatchOne(ctx context.Context, publicURL string) (bool, error)
 		if e == nil {
 			e = tx.Commit(ctx)
 		}
-		return worked, e
+		return nil, worked, e
 	}
 	secret, e := s.unseal(encrypted)
 	if e != nil {
 		_, updateErr := tx.Exec(ctx, `UPDATE deliveries SET state='failed',last_error='Provider secret cannot be decrypted; verify encryption key' WHERE id=$1`, d.ID)
 		if updateErr != nil {
-			return worked, updateErr
+			return nil, worked, updateErr
 		}
-		return worked, tx.Commit(ctx)
+		return nil, worked, tx.Commit(ctx)
 	}
 	c.Secret = string(secret)
 	if e = tx.QueryRow(ctx, `UPDATE deliveries SET state='leased',generation=generation+1,attempts=attempts+1,lease_until=now()+interval '30 seconds' WHERE id=$1 RETURNING generation,attempts`, d.ID).Scan(&d.Generation, &d.Attempts); e != nil {
-		return worked, e
+		return nil, worked, e
 	}
 	if _, e = tx.Exec(ctx, `UPDATE scopes SET last_dispatch_at=now() WHERE id=$1`, scope); e != nil {
-		return worked, e
+		return nil, worked, e
 	}
 	if e = tx.Commit(ctx); e != nil {
-		return worked, e
+		return nil, worked, e
 	}
+	return &providerJob{scope: scope, connection: c, delivery: d}, worked, nil
+}
+
+func (s *Store) finishProvider(ctx context.Context, publicURL string, job *providerJob) error {
+	scope, c, d := job.scope, job.connection, job.delivery
 	// Preserve private route metadata in storage; never send it to a provider.
 	delete(d.Payload, "_policy")
 	delete(d.Payload, "_cluster")
@@ -439,33 +515,33 @@ func (s *Store) dispatchOne(ctx context.Context, publicURL string) (bool, error)
 	} else if result.Retry {
 		result.State = "failed"
 	}
-	tx, e = s.Pool.Begin(ctx)
+	tx, e := s.Pool.Begin(ctx)
 	if e != nil {
-		return worked, e
+		return e
 	}
 	defer tx.Rollback(ctx)
 	tag, e := tx.Exec(ctx, `UPDATE deliveries SET state=$3,next_at=$4,last_error=$5 WHERE id=$1 AND generation=$2 AND state='leased'`, d.ID, d.Generation, result.State, next, result.Detail)
 	if e != nil {
-		return worked, e
+		return e
 	}
 	if tag.RowsAffected() == 0 {
-		return worked, Conflict("Provider delivery lease changed.")
+		return Conflict("Provider delivery lease changed.")
 	}
 	if _, e = tx.Exec(ctx, `INSERT INTO delivery_attempts(id,scope,delivery_id,generation,outcome,detail) VALUES($1,$2,$3,$4,$5,$6)`, ID("att"), scope, d.ID, d.Generation, result.State, result.Detail); e != nil {
-		return worked, e
+		return e
 	}
 	if result.Receipt != nil {
 		conv, _ := d.Payload["conversation_id"].(string)
 		if e = s.recordThread(ctx, tx, scope, c.ID, result.Receipt["channel"], result.Receipt["thread"], conv, d.RecipientID); e != nil {
-			return worked, e
+			return e
 		}
 	}
 	if result.State == "failed" {
 		if e = s.queueFallback(ctx, tx, scope, d); e != nil {
-			return worked, e
+			return e
 		}
 	}
-	return worked, tx.Commit(ctx)
+	return tx.Commit(ctx)
 }
 func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL string) DispatchResult {
 	text := ""
