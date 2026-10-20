@@ -102,77 +102,78 @@ func (s *Store) Answers(ctx context.Context, a Actor) ([]SharedAnswer, error) {
 }
 func (s *Store) PublishAnswer(ctx context.Context, a Actor, in PublishInput) (SharedAnswer, error) {
 	var out SharedAnswer
+	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.publishTx(ctx, tx, a, in, &out) })
+	return out, err
+}
+func (s *Store) publishTx(ctx context.Context, tx pgx.Tx, a Actor, in PublishInput, out *SharedAnswer) error {
 	if len(in.Audience) == 0 || len(in.Audience) > 1000 {
-		return out, Bad("An explicit reuse audience of 1 to 1000 identities is required.")
+		return Bad("An explicit reuse audience of 1 to 1000 identities is required.")
 	}
 	if in.ValidUntil.IsZero() {
 		in.ValidUntil = time.Now().Add(24 * time.Hour)
 	}
 	if in.ValidUntil.Before(time.Now()) || in.ValidUntil.After(time.Now().Add(90*24*time.Hour)) {
-		return out, Bad("Answer expiry must be within 90 days.")
+		return Bad("Answer expiry must be within 90 days.")
 	}
-	e := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !s.canPublish(ctx, tx, a) {
-			return Denied()
+	if !s.canPublish(ctx, tx, a) {
+		return Denied()
+	}
+	r, e := s.request(ctx, tx, a, in.RequestID)
+	if e != nil {
+		return e
+	}
+	if r.Kind != "question" || r.State != "resolved" || r.Response == nil || r.Response.Outcome != "answered" || r.ResolvedBy == nil {
+		return Bad("Only an answered informational question can be published.")
+	}
+	key := in.Key
+	if key == "" {
+		key = r.SharedKey
+	}
+	if !ValidText(key, 200) {
+		return Bad("A scoped reuse key is required, for example project/policy/version.")
+	}
+	if r.SharedKey != "" && key != r.SharedKey {
+		return Conflict("The source question already has a different shared key.")
+	}
+	for _, pid := range in.Audience {
+		p, e := principal(ctx, tx, a.Scope, pid)
+		if e != nil || p.Disabled {
+			return Bad("Every reuse audience member must be active in this workspace.")
 		}
-		r, e := s.request(ctx, tx, a, in.RequestID)
+	}
+	*out = SharedAnswer{ID: ID("ans"), Key: key, ContextHash: contextHash(key, r.Title, r.Body, r.Choices), Question: r.Title, Answer: r.Response.Answer, AuthorID: *r.ResolvedBy, PublisherID: a.ID, Audience: in.Audience, ValidUntil: in.ValidUntil, SourceRequest: r.ID}
+	if _, e = tx.Exec(ctx, `INSERT INTO shared_answers(id,scope,key,context_hash,question,answer,author_id,publisher_id,audience,valid_until,source_request) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, out.ID, a.Scope, key, out.ContextHash, out.Question, JSON(out.Answer), out.AuthorID, a.ID, JSON(out.Audience), in.ValidUntil, r.ID); e != nil {
+		return e
+	}
+	if e = event(ctx, tx, a, "answer.published", "", a.ID, map[string]any{"id": out.ID, "source_request": r.ID, "audience_count": len(out.Audience)}); e != nil {
+		return e
+	}
+	rows, e := tx.Query(ctx, `SELECT `+requestFields+` FROM requests r WHERE r.scope=$1 AND r.kind='question' AND r.state='open' AND r.expires_at>now() AND r.shared_key=$2`, a.Scope, key)
+	if e != nil {
+		return e
+	}
+	waiters := []Request{}
+	for rows.Next() {
+		r, e := scanRequest(rows)
 		if e != nil {
+			rows.Close()
 			return e
 		}
-		if r.Kind != "question" || r.State != "resolved" || r.Response == nil || r.Response.Outcome != "answered" || r.ResolvedBy == nil {
-			return Bad("Only an answered informational question can be published.")
-		}
-		key := in.Key
-		if key == "" {
-			key = r.SharedKey
-		}
-		if !ValidText(key, 200) {
-			return Bad("A scoped reuse key is required, for example project/policy/version.")
-		}
-		if r.SharedKey != "" && key != r.SharedKey {
-			return Conflict("The source question already has a different shared key.")
-		}
-		for _, pid := range in.Audience {
-			p, e := principal(ctx, tx, a.Scope, pid)
-			if e != nil || p.Disabled {
-				return Bad("Every reuse audience member must be active in this workspace.")
-			}
-		}
-		out = SharedAnswer{ID: ID("ans"), Key: key, ContextHash: contextHash(key, r.Title, r.Body, r.Choices), Question: r.Title, Answer: r.Response.Answer, AuthorID: *r.ResolvedBy, PublisherID: a.ID, Audience: in.Audience, ValidUntil: in.ValidUntil, SourceRequest: r.ID}
-		if _, e = tx.Exec(ctx, `INSERT INTO shared_answers(id,scope,key,context_hash,question,answer,author_id,publisher_id,audience,valid_until,source_request) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, out.ID, a.Scope, key, out.ContextHash, out.Question, JSON(out.Answer), out.AuthorID, a.ID, JSON(out.Audience), in.ValidUntil, r.ID); e != nil {
-			return e
-		}
-		if e = event(ctx, tx, a, "answer.published", "", a.ID, map[string]any{"id": out.ID, "source_request": r.ID, "audience_count": len(out.Audience)}); e != nil {
-			return e
-		}
-		rows, e := tx.Query(ctx, `SELECT `+requestFields+` FROM requests r WHERE r.scope=$1 AND r.kind='question' AND r.state='open' AND r.expires_at>now() AND r.shared_key=$2`, a.Scope, key)
-		if e != nil {
-			return e
-		}
-		waiters := []Request{}
-		for rows.Next() {
-			r, e := scanRequest(rows)
-			if e != nil {
-				rows.Close()
+		waiters = append(waiters, r)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return e
+	}
+	for _, r := range waiters {
+		if contains(out.Audience, r.RequesterID) && contextHash(key, r.Title, r.Body, r.Choices) == out.ContextHash {
+			if e = s.resolveFromAnswer(ctx, tx, a, r, *out); e != nil {
 				return e
 			}
-			waiters = append(waiters, r)
 		}
-		e = rows.Err()
-		rows.Close()
-		if e != nil {
-			return e
-		}
-		for _, r := range waiters {
-			if contains(out.Audience, r.RequesterID) && contextHash(key, r.Title, r.Body, r.Choices) == out.ContextHash {
-				if e = s.resolveFromAnswer(ctx, tx, a, r, out); e != nil {
-					return e
-				}
-			}
-		}
-		return nil
-	})
-	return out, e
+	}
+	return nil
 }
 func (s *Store) resolveFromAnswer(ctx context.Context, db DB, a Actor, r Request, answer SharedAnswer) error {
 	response := Response{Outcome: "answered", Answer: answer.Answer, Version: r.Version, SourceAnswerID: answer.ID}
@@ -366,6 +367,30 @@ func (s *Store) DecideProposal(ctx context.Context, a Actor, id string, accept b
 		}
 		_, e = tx.Exec(ctx, `UPDATE answer_proposals SET state=$3 WHERE scope=$1 AND id=$2`, a.Scope, id, next)
 		return e
+	})
+	return out, err
+}
+
+func (s *Store) RespondAndShare(ctx context.Context, a Actor, id string, in Response, audience []string) (Request, error) {
+	var out Request
+	if in.SourceAnswerID != "" || in.SourceInvalidated || in.ResponderInstanceID != "" {
+		return out, Bad("Answer provenance is assigned by the server.")
+	}
+	err := s.tx(ctx, a, func(tx pgx.Tx) error {
+		return idempotent(ctx, tx, a, "answer-and-share", id, map[string]any{"response": in, "audience": audience}, &out, func() error {
+			r, e := s.request(ctx, tx, a, id)
+			if e != nil {
+				return e
+			}
+			if r.Kind != "question" || r.SharedKey == "" {
+				return Bad("Only informational questions with an explicit shared key may be answered together.")
+			}
+			if e = s.respondTx(ctx, tx, a, id, in, &out); e != nil {
+				return e
+			}
+			var publication SharedAnswer
+			return s.publishTx(ctx, tx, a, PublishInput{RequestID: id, Key: r.SharedKey, Audience: audience, ValidUntil: time.Now().Add(24 * time.Hour)}, &publication)
+		})
 	})
 	return out, err
 }

@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-const requestFields = `r.id,r.requester_id,r.conversation_id,r.kind,r.title,r.body,r.choices,r.action,CASE WHEN r.state='open' AND r.expires_at<=now() THEN 'expired' ELSE r.state END,r.version,r.response,r.resolved_by,r.resolved_at,r.expires_at,r.created_at,r.shared_key`
+const requestFields = `r.id,r.requester_id,COALESCE(r.requester_instance,''),r.conversation_id,r.kind,r.title,r.body,r.choices,r.action,CASE WHEN r.state='open' AND r.expires_at<=now() THEN 'expired' ELSE r.state END,r.version,r.response,r.resolved_by,r.resolved_at,r.expires_at,r.created_at,r.shared_key`
 
 func scanRequest(row pgx.Row) (Request, error) {
 	var r Request
 	var choices, action, response []byte
-	e := row.Scan(&r.ID, &r.RequesterID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey)
+	e := row.Scan(&r.ID, &r.RequesterID, &r.RequesterInstanceID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey)
 	_ = json.Unmarshal(choices, &r.Choices)
 	if len(action) > 0 && string(action) != "null" {
 		_ = json.Unmarshal(action, &r.Action)
@@ -140,7 +140,7 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 					return e
 				}
 			}
-			out = Request{ID: ID("req"), RequesterID: a.ID, ConversationID: conv, Kind: in.Kind, Title: in.Title, Body: in.Body, Choices: in.Choices, Action: in.Action, State: "open", Version: 1, ExpiresAt: in.ExpiresAt, CreatedAt: time.Now(), SharedKey: in.SharedKey}
+			out = Request{RequesterInstanceID: a.InstanceID, ID: ID("req"), RequesterID: a.ID, ConversationID: conv, Kind: in.Kind, Title: in.Title, Body: in.Body, Choices: in.Choices, Action: in.Action, State: "open", Version: 1, ExpiresAt: in.ExpiresAt, CreatedAt: time.Now(), SharedKey: in.SharedKey}
 			if _, e = tx.Exec(ctx, `INSERT INTO requests(id,scope,requester_id,requester_instance,conversation_id,kind,title,body,choices,action,expires_at,shared_key) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12)`, out.ID, a.Scope, a.ID, a.InstanceID, conv, in.Kind, in.Title, in.Body, JSON(in.Choices), JSON(in.Action), in.ExpiresAt, in.SharedKey); e != nil {
 				return e
 			}
@@ -177,13 +177,14 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 }
 func (s *Store) Respond(ctx context.Context, a Actor, id string, in Response) (Request, error) {
 	var out Request
-	if in.SourceAnswerID != "" || in.SourceInvalidated {
+	if in.SourceAnswerID != "" || in.SourceInvalidated || in.ResponderInstanceID != "" {
 		return out, Bad("Answer provenance is assigned by the server.")
 	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.respondTx(ctx, tx, a, id, in, &out) })
 	return out, err
 }
 func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in Response, out *Request) error {
+	in.ResponderInstanceID = a.InstanceID
 	r, e := s.request(ctx, tx, a, id)
 	if e != nil {
 		return e
@@ -231,6 +232,20 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	permission := "message"
 	if r.Kind == "approval" {
 		permission = "decide"
+	}
+	var originalTarget Target
+	var rawTarget []byte
+	if e = tx.QueryRow(ctx, `SELECT policy_target FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, a.ID).Scan(&rawTarget); e == nil {
+		_ = json.Unmarshal(rawTarget, &originalTarget)
+	} else if !a.Admin {
+		return Denied()
+	}
+	if originalTarget.Kind != "" {
+		proposer := Actor{Principal: requester, Scope: a.Scope}
+		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, requester.ID).Scan(&proposer.Admin)
+		if requester.Disabled || !s.allowed(ctx, tx, proposer, "ask", originalTarget, "*", actionName, r.Action) {
+			return Denied()
+		}
 	}
 	if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, a.ProviderConnection, actionName, r.Action) {
 		return Denied()
@@ -331,7 +346,7 @@ func (s *Store) EndRequest(ctx context.Context, a Actor, id, state string, versi
 		if _, e = tx.Exec(ctx, `UPDATE requests SET state=$3,resolved_at=now() WHERE scope=$1 AND id=$2`, a.Scope, id, state); e != nil {
 			return e
 		}
-		if _, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled' WHERE scope=$1 AND operation_id=$2 AND state IN ('queued','leased')`, a.Scope, id); e != nil {
+		if _, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled' WHERE scope=$1 AND operation_id=$2 AND state IN ('queued','leased','waiting')`, a.Scope, id); e != nil {
 			return e
 		}
 		out, e = s.request(ctx, tx, a, id)
@@ -431,7 +446,7 @@ func (s *Store) ReportExecution(ctx context.Context, a Actor, id, state string, 
 		if _, e = tx.Exec(ctx, `UPDATE execution_intents SET state=$3,result=$4,updated_at=now() WHERE scope=$1 AND id=$2`, a.Scope, id, state, JSON(result)); e != nil {
 			return e
 		}
-		return event(ctx, tx, a, "execution.reported", "", a.ID, map[string]any{"execution": out, "evidence": "worker_reported"})
+		return event(ctx, tx, a, "execution.reported", "", a.ID, map[string]any{"execution": out, "evidence": "worker_reported", "instance_id": a.InstanceID})
 	})
 	return out, err
 }

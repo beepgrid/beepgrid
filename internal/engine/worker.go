@@ -91,7 +91,7 @@ func (s *Store) Inbox(ctx context.Context, a Actor) ([]Delivery, error) {
 	}
 	out := []Delivery{}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if _, e := tx.Exec(ctx, `UPDATE instances SET last_seen=now() WHERE scope=$1 AND id=$2`, a.Scope, a.InstanceID); e != nil {
+		if _, e := tx.Exec(ctx, `UPDATE instances SET last_seen=now() WHERE scope=$1 AND id=$2 AND last_seen<now()-interval '10 seconds'`, a.Scope, a.InstanceID); e != nil {
 			return e
 		}
 		rows, e := tx.Query(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND recipient_id=$2 AND connection_id='' AND expires_at>now() AND (exact_instance='' OR exact_instance=$3) AND ((state='queued' AND next_at<=now()) OR (state='leased' AND (lease_until<now() OR owner_instance=$3))) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`, a.Scope, a.ID, a.InstanceID)

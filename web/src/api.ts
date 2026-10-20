@@ -24,6 +24,7 @@ export type Rule = {
   action_name?: string;
 };
 export type RequestItem = {
+  requester_instance_id?: string;
   id: string;
   requester_id: string;
   conversation_id: string;
@@ -84,6 +85,7 @@ export type Instance = {
   progress: Record<string, unknown>;
 };
 export type Me = {
+  can_publish_answers?: boolean;
   person: Entity;
   admin: boolean;
   company: string;
@@ -135,4 +137,10 @@ export function timeAgo(value: string): string {
 }
 export function requestLabel(r: RequestItem) {
   return r.state === "resolved" ? (r.response?.outcome ?? "resolved") : r.state;
+}
+
+export function questionGroupKey(r: RequestItem) {
+  return r.kind === "question" && r.state === "open" && r.shared_key
+    ? JSON.stringify([r.shared_key, r.title, r.body, r.choices ?? []])
+    : r.id;
 }

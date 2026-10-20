@@ -234,6 +234,22 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 	}
 	payload["_policy"] = map[string]any{"action_name": actionName, "credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
 	payload["conversation_id"] = conv
+	externalState := "queued"
+	if r.Kind == "person" && payload["type"] == "request" {
+		var q Request
+		_ = json.Unmarshal(JSON(payload["request"]), &q)
+		if q.Kind == "question" && q.SharedKey != "" {
+			var leader string
+			e := db.QueryRow(ctx, `SELECT old.id FROM requests old JOIN request_audience ra ON ra.scope=old.scope AND ra.request_id=old.id WHERE old.scope=$1 AND old.id<>$2 AND old.kind='question' AND old.state='open' AND old.expires_at>now() AND old.shared_key=$3 AND old.title=$4 AND old.body=$5 AND old.choices=$6::jsonb AND ra.principal_id=$7 ORDER BY old.created_at,old.id LIMIT 1`, a.Scope, q.ID, q.SharedKey, q.Title, q.Body, JSON(q.Choices), r.ID).Scan(&leader)
+			if e != nil && e != pgx.ErrNoRows {
+				return e
+			}
+			if leader != "" {
+				externalState = "waiting"
+				payload["_cluster"] = leader
+			}
+		}
+	}
 	queued := 0
 	if s.allowed(ctx, db, a, action, r.PolicyTarget, "", actionName, info.Request.Action) {
 		if _, e := db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,exact_instance,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, r.ExactInstance, JSON(payload), expiry); e != nil {
@@ -283,7 +299,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName, info.Request.Action) {
 			continue
 		}
-		if _, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry); e != nil {
+		if _, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at,state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry, externalState); e != nil {
 			return e
 		}
 		queued++
@@ -291,7 +307,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 	if queued == 0 {
 		return &Error{"NO_ELIGIBLE_ROUTE", "No permitted destination is configured for this recipient.", 403}
 	}
-	return nil
+	return notifyWork(ctx, db, a.Scope, r.ID)
 }
 func (s *Store) Send(ctx context.Context, a Actor, in SendInput, key string) (SendResult, error) {
 	var out SendResult

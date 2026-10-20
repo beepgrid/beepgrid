@@ -20,42 +20,56 @@ func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, targ
 	if e != nil {
 		return false
 	}
-	defer rows.Close()
+
+	all := []Rule{}
 	for rows.Next() {
 		var raw []byte
 		if rows.Scan(&raw) != nil {
+			rows.Close()
 			return false
 		}
 		var rules []Rule
 		if json.Unmarshal(raw, &rules) != nil {
+			rows.Close()
 			return false
 		}
-		for _, r := range rules {
-			if r.Action != action && r.Action != "*" {
-				continue
-			}
-			if r.TargetKind != "*" && r.TargetKind != target.Kind {
-				continue
-			}
-			if r.TargetID != "*" && r.TargetID != target.ID {
-				continue
-			}
-			if r.ConnectionID != "" && r.ConnectionID != connection && connection != "*" {
-				continue
-			}
-			if r.ActionName != "" && r.ActionName != actionName {
-				continue
-			}
-			var actionDetail *Action
-			if len(descriptor) > 0 {
-				actionDetail = descriptor[0]
-			}
-			if !conditionsAllow(r.Conditions, actionDetail) {
-				continue
-			}
-			return true
-		}
+		all = append(all, rules...)
 	}
+	err := rows.Err()
+	rows.Close()
+	if err != nil {
+		return false
+	}
+	for _, r := range all {
+		if r.Action != action && r.Action != "*" {
+			continue
+		}
+		groupMember := false
+		if r.TargetKind == "group" && (target.Kind == "person" || target.Kind == "agent" || target.Kind == "service") && target.ID != "*" {
+			_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND principal_id=$2 AND (group_id=$3 OR $3='*'))`, a.Scope, target.ID, r.TargetID).Scan(&groupMember)
+		}
+		if !groupMember && r.TargetKind != "*" && r.TargetKind != target.Kind {
+			continue
+		}
+		if !groupMember && r.TargetID != "*" && r.TargetID != target.ID && !(r.TargetID == "$self" && target.ID == a.ID) {
+			continue
+		}
+		if r.ConnectionID != "" && r.ConnectionID != connection && connection != "*" {
+			continue
+		}
+		if r.ActionName != "" && r.ActionName != actionName {
+			continue
+		}
+		var detail *Action
+		if len(descriptor) > 0 {
+			detail = descriptor[0]
+		}
+		if !conditionsAllow(r.Conditions, detail) {
+			continue
+		}
+		return true
+	}
+
 	return false
 }
 func (s *Store) Explain(ctx context.Context, a Actor, action string, target Target, connection, actionName string, descriptor ...*Action) (map[string]any, error) {
@@ -272,6 +286,9 @@ func conditionsAllow(c *RuleConditions, action *Action) bool {
 	}
 	if c.Before != nil && !time.Now().Before(*c.Before) {
 		return false
+	}
+	if c.Resource == "" && c.ResourceVersion == "" && c.Currency == "" && c.MaxAmountMinor == nil {
+		return true
 	}
 	if action == nil {
 		return false

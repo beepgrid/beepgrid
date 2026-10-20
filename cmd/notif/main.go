@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -87,6 +88,10 @@ func run() error {
 		return nil
 	case "migrate":
 		return engine.Migrate(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"))
+	case "seed":
+		return seed(ctx, os.Args[2:])
+	case "trace":
+		return trace(ctx, os.Args[2:])
 	case "serve":
 		return serve(ctx, os.Args[2:])
 	case "mcp":
@@ -112,7 +117,10 @@ func run() error {
 		}
 		return json.NewEncoder(os.Stdout).Encode(r)
 	case "diagnose":
-		c := notif.New(env("NOTIF_URL", "http://localhost:4010"), os.Getenv("NOTIF_TOKEN"))
+		c, e := operatorClient()
+		if e != nil {
+			return e
+		}
 		var me any
 		if e := c.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
 			return e
@@ -211,7 +219,7 @@ func serve(ctx context.Context, args []string) error {
 	if e = handler.ConfigureOIDC(ctx, owner.Scope, os.Getenv("NOTIF_OIDC_ISSUER"), os.Getenv("NOTIF_OIDC_CLIENT_ID"), os.Getenv("NOTIF_OIDC_CLIENT_SECRET")); e != nil {
 		return e
 	}
-	server := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
+	server := &http.Server{Addr: addr, Handler: handler, BaseContext: func(net.Listener) context.Context { return ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	defer stopWorker()
 	go func() {

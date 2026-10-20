@@ -2079,3 +2079,29 @@ dialog::backdrop {
 .destination-row code {
   overflow-wrap: anywhere;
 }
+.shared-question-choice {
+  background: #edf4ef;
+  border: 1px solid #cdddce;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.rule-conditions {
+  flex-basis: 100%;
+  padding: 10px 0;
+  color: var(--muted);
+}
+.rule-conditions summary {
+  cursor: pointer;
+  color: #315d47;
+}
+.rule-conditions .field {
+  display: inline-flex;
+  margin: 10px 12px 5px 0;
+  width: 180px;
+}
+.live-dot.reconnecting {
+  background: #ad8241;
+}

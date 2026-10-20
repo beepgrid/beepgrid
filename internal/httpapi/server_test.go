@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/notif-dev/notif/internal/engine"
@@ -129,5 +130,47 @@ func TestBrowserSessionOriginAndRevocation(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 401 {
 		t.Fatal("revoked cookie remained authorized")
+	}
+}
+
+func TestSDKRetriesLostResponseAfterCommitWithoutDuplicate(t *testing.T) {
+	store, original, _ := setup(t)
+	ctx := context.Background()
+	var first atomic.Bool
+	handler := New(store, "http://localhost", nil)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/messages" && !first.Swap(true) {
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, r)
+			if recorder.Code != 200 {
+				t.Error("fixture did not commit", recorder.Code)
+			}
+			connection, _, e := w.(http.Hijacker).Hijack()
+			if e != nil {
+				t.Error(e)
+				return
+			}
+			connection.Close()
+			return
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer proxy.Close()
+	handler.PublicURL = proxy.URL
+	client := notif.New(proxy.URL, original.Token)
+	var me struct {
+		Person notif.Person `json:"person"`
+	}
+	if e := client.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
+		t.Fatal(e)
+	}
+	result, e := client.Send(ctx, notif.SendInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Body: "Committed before reply was lost"}, "lost-reply")
+	if e != nil || len(result.Messages) != 1 {
+		t.Fatal(result, e)
+	}
+	var count int
+	_ = store.Pool.QueryRow(ctx, `SELECT count(*) FROM messages WHERE body='Committed before reply was lost'`).Scan(&count)
+	if count != 1 {
+		t.Fatal("network replay duplicated accepted work", count)
 	}
 }

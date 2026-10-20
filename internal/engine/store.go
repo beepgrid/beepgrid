@@ -18,6 +18,9 @@ type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Store struct {
+	wakes             wakeHub
+	stopWakeups       context.CancelFunc
+	wakeupDone        chan struct{}
 	providerTransport http.RoundTripper
 
 	AttachmentsRoot string
@@ -30,7 +33,13 @@ type Store struct {
 	SecretKey []byte
 }
 
-func (s *Store) Close() { s.Pool.Close() }
+func (s *Store) Close() {
+	if s.stopWakeups != nil {
+		s.stopWakeups()
+		<-s.wakeupDone
+	}
+	s.Pool.Close()
+}
 func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
@@ -90,6 +99,9 @@ func event(ctx context.Context, db DB, a Actor, kind, conv, recipient string, da
 		return err
 	}
 	_, err := db.Exec(ctx, `INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data) VALUES($1,$2,$3,$4,$5,$6,$7)`, a.Scope, seq, kind, a.ID, conv, recipient, JSON(data))
+	if err == nil {
+		err = notifyWork(ctx, db, a.Scope, recipient)
+	}
 	return err
 }
 func idempotent(ctx context.Context, db DB, a Actor, op, key string, input, output any, fn func() error) error {

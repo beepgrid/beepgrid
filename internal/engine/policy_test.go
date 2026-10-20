@@ -131,3 +131,32 @@ func TestPreviewDoesNotRevealHiddenRecipientMetadata(t *testing.T) {
 		t.Fatal(preview, e)
 	}
 }
+
+func TestGroupTargetGrantAllowsIndividualMembersAndRevokesPendingContact(t *testing.T) {
+	s, a := testStore(t)
+	ctx := context.Background()
+	sender := testPerson(t, s, a, "group-sender")
+	receiver := testPerson(t, s, a, "group-receiver")
+	g, e := s.SaveGroup(ctx, a, Group{Name: "Finance", Members: []string{receiver.ID}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	grant(t, s, a, sender, []Rule{{Action: "view", TargetKind: "group", TargetID: g.ID}, {Action: "message", TargetKind: "group", TargetID: g.ID}, {Action: "ask", TargetKind: "group", TargetID: g.ID}})
+	grant(t, s, a, receiver, []Rule{{Action: "view", TargetKind: "person", TargetID: sender.ID}, {Action: "message", TargetKind: "person", TargetID: sender.ID}})
+	if _, e = s.Send(ctx, sender, SendInput{Target: Target{"person", receiver.ID}, Body: "Private contact through group grant"}, "group-individual"); e != nil {
+		t.Fatal(e)
+	}
+	q, e := s.Ask(ctx, sender, AskInput{Target: Target{"person", receiver.ID}, Title: "Can you review?"}, "pending-contact")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.SaveGroup(ctx, a, Group{ID: g.ID, Name: g.Name, Members: []string{}}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Send(ctx, sender, SendInput{Target: Target{"person", receiver.ID}, Body: "No longer permitted"}, "after-removal"); ErrorStatus(e) != 403 {
+		t.Fatal(e)
+	}
+	if _, e = s.Respond(ctx, receiver, q.ID, Response{Outcome: "answered", Answer: "Yes", Version: 1}); ErrorStatus(e) != 403 {
+		t.Fatal("pending request outlived contact grant", e)
+	}
+}

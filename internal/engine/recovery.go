@@ -23,7 +23,7 @@ func (s *Store) ReconcileRestored(ctx context.Context, scope, newOwnerToken stri
 	statements := []string{
 		`UPDATE scopes SET recovery_hold=true WHERE id=$1`,
 		`UPDATE credentials SET revoked=true WHERE scope=$1`,
-		`UPDATE deliveries SET state='unknown',last_error='Database restored; reconcile externally before replay' WHERE scope=$1 AND state IN ('queued','leased')`,
+		`UPDATE deliveries SET state='unknown',last_error='Database restored; reconcile externally before replay' WHERE scope=$1 AND state IN ('queued','leased','waiting')`,
 		`UPDATE execution_intents SET state='unknown',updated_at=now() WHERE scope=$1 AND state IN ('authorized','running')`,
 		`UPDATE requests SET state='superseded',resolved_at=now() WHERE scope=$1 AND kind IN ('approval','task') AND state IN ('open','resolved')`,
 		`UPDATE principals SET disabled=false WHERE scope=$1 AND kind='person' AND external_id='owner'`,

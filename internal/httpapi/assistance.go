@@ -7,6 +7,17 @@ import (
 
 func (s *Server) assistanceRoutes() {
 	m := s.mux
+	m.HandleFunc("POST /api/v1/requests/{id}/answer-and-share", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			engine.Response
+			Audience []string `json:"audience"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.RespondAndShare(r.Context(), actor(r), r.PathValue("id"), in.Response, in.Audience)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("GET /api/v1/answers", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.Answers(r.Context(), actor(r))
 		return ok(w, x, e)

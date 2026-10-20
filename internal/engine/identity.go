@@ -24,7 +24,9 @@ func principal(ctx context.Context, db DB, scope, id string) (Principal, error) 
 func (s *Store) Me(ctx context.Context, a Actor) (map[string]any, error) {
 	var company, env string
 	err := s.Pool.QueryRow(ctx, `SELECT company_name,environment FROM scopes WHERE id=$1`, a.Scope).Scan(&company, &env)
-	return map[string]any{"person": a.Principal, "instance_id": a.InstanceID, "admin": a.Admin, "company": company, "environment": env}, err
+	result := map[string]any{"identity_type": a.Kind, "instance_id": a.InstanceID, "admin": a.Admin, "can_publish_answers": s.canPublish(ctx, s.Pool, a), "company": company, "environment": env}
+	result[a.Kind] = a.Principal
+	return result, err
 }
 func (s *Store) CreatePerson(ctx context.Context, a Actor, in CreatePerson) (Principal, error) {
 	if !ValidText(in.Name, 120) || !ValidText(in.ExternalID, 200) {
@@ -245,7 +247,7 @@ func (s *Store) Instances(ctx context.Context, a Actor, agentID string) ([]Insta
 	if !s.allowed(ctx, s.Pool, a, "view", Target{"agent", agentID}, "", "") && a.ID != agentID {
 		return nil, Denied()
 	}
-	rows, e := s.Pool.Query(ctx, `SELECT i.id,i.agent_id,i.capabilities,i.progress,i.last_seen,CASE WHEN c.revoked OR c.expires_at<=now() THEN 'offline' WHEN i.last_seen>now()-interval '45 seconds' THEN 'connected' WHEN i.last_seen>now()-interval '2 minutes' THEN 'stale' ELSE 'offline' END FROM instances i JOIN credentials c ON c.id=i.credential_id WHERE i.scope=$1 AND i.agent_id=$2 ORDER BY i.created_at DESC LIMIT 1000`, a.Scope, agentID)
+	rows, e := s.Pool.Query(ctx, `SELECT i.id,i.agent_id,i.capabilities,i.progress,i.last_seen,CASE WHEN c.revoked OR c.expires_at<=now() OR EXISTS(SELECT 1 FROM principals p WHERE p.scope=i.scope AND p.id=i.agent_id AND p.disabled) THEN 'offline' WHEN i.last_seen>now()-interval '45 seconds' THEN 'connected' WHEN i.last_seen>now()-interval '2 minutes' THEN 'stale' ELSE 'offline' END FROM instances i JOIN credentials c ON c.id=i.credential_id WHERE i.scope=$1 AND i.agent_id=$2 ORDER BY i.created_at DESC LIMIT 1000`, a.Scope, agentID)
 	if e != nil {
 		return nil, e
 	}

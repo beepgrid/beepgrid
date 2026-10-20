@@ -216,3 +216,36 @@ describe("employee workspace", () => {
     expect(requestLabel({ state: "superseded" } as never)).toBe("superseded");
   });
 });
+
+it("stacks exact scoped questions and requires an explicit shared answer choice", async () => {
+  requests = [
+    { ...requests[0], shared_key: "report/v1" },
+    {
+      ...requests[0],
+      id: "req_clone",
+      requester_id: "agt_other",
+      conversation_id: "con_clone",
+      shared_key: "report/v1",
+    },
+  ];
+  render(<App />);
+  const row = await screen.findByRole("button", {
+    name: /Which format.*2 matching questions/,
+  });
+  fireEvent.click(row);
+  const share = screen.getByRole("checkbox", {
+    name: /Answer all 2 matching questions/,
+  });
+  expect(share).not.toBeChecked();
+  fireEvent.click(share);
+  fireEvent.click(screen.getByRole("button", { name: "Brief" }));
+  await waitFor(() =>
+    expect(
+      calls.some(
+        (c) =>
+          c.path === "/requests/req_1/answer-and-share" &&
+          (c.body as { audience: string[] }).audience.length === 2,
+      ),
+    ).toBe(true),
+  );
+});

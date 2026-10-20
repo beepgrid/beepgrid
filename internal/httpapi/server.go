@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/notif-dev/notif/api"
 	"github.com/notif-dev/notif/internal/engine"
 )
 
@@ -127,6 +128,10 @@ func ok(w http.ResponseWriter, value any, err error) error {
 }
 func (s *Server) routes() {
 	m := s.mux
+	m.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(api.OpenAPI)
+	})
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { output(w, 200, map[string]string{"status": "ok"}) })
 	m.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
@@ -245,15 +250,24 @@ func (s *Server) routes() {
 		}
 		deadline := time.Now().Add(time.Duration(wait) * time.Millisecond)
 		for {
+			ready, release := s.Store.WatchWork(actor(r))
 			x, e := s.Store.Inbox(r.Context(), actor(r))
 			if e != nil || len(x) > 0 || !time.Now().Before(deadline) {
+				release()
 				return ok(w, x, e)
 			}
+			pause := min(5*time.Second, time.Until(deadline))
+			timer := time.NewTimer(pause)
 			select {
 			case <-r.Context().Done():
+				timer.Stop()
+				release()
 				return nil
-			case <-time.After(250 * time.Millisecond):
+			case <-ready:
+				timer.Stop()
+			case <-timer.C:
 			}
+			release()
 		}
 	}))
 	m.HandleFunc("POST /api/v1/worker/inbox/{id}/ack", s.protect(func(w http.ResponseWriter, r *http.Request) error {
@@ -500,7 +514,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 }
 func ValidatePublicURL(raw string) error {
 	u, e := url.Parse(raw)
-	if e != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.Path != "" {
+	if e != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.Path != "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return engine.Bad("NOTIF_PUBLIC_URL must be an HTTP(S) origin without a path.")
 	}
 	return nil

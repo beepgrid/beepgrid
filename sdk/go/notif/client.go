@@ -78,25 +78,27 @@ type AskInput struct {
 	SharedKey      string     `json:"shared_key,omitempty"`
 }
 type Response struct {
-	SourceAnswerID    string `json:"source_answer_id,omitempty"`
-	SourceInvalidated bool   `json:"source_invalidated,omitempty"`
-	Outcome           string `json:"outcome"`
-	Answer            any    `json:"answer,omitempty"`
-	Version           int    `json:"version"`
+	ResponderInstanceID string `json:"responder_instance_id,omitempty"`
+	SourceAnswerID      string `json:"source_answer_id,omitempty"`
+	SourceInvalidated   bool   `json:"source_invalidated,omitempty"`
+	Outcome             string `json:"outcome"`
+	Answer              any    `json:"answer,omitempty"`
+	Version             int    `json:"version"`
 }
 type Request struct {
-	ID             string    `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	RequesterID    string    `json:"requester_id"`
-	Kind           string    `json:"kind"`
-	Title          string    `json:"title"`
-	Body           string    `json:"body"`
-	Choices        []string  `json:"choices"`
-	State          string    `json:"state"`
-	Version        int       `json:"version"`
-	Response       *Response `json:"response,omitempty"`
-	Action         *Action   `json:"action,omitempty"`
-	ExpiresAt      time.Time `json:"expires_at"`
+	RequesterInstanceID string    `json:"requester_instance_id,omitempty"`
+	ID                  string    `json:"id"`
+	ConversationID      string    `json:"conversation_id"`
+	RequesterID         string    `json:"requester_id"`
+	Kind                string    `json:"kind"`
+	Title               string    `json:"title"`
+	Body                string    `json:"body"`
+	Choices             []string  `json:"choices"`
+	State               string    `json:"state"`
+	Version             int       `json:"version"`
+	Response            *Response `json:"response,omitempty"`
+	Action              *Action   `json:"action,omitempty"`
+	ExpiresAt           time.Time `json:"expires_at"`
 }
 type SendInput struct {
 	Target         Target `json:"target"`
@@ -180,6 +182,14 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, key s
 		raw, readErr := io.ReadAll(io.LimitReader(res.Body, 4<<20))
 		res.Body.Close()
 		if readErr != nil {
+			if attempt < 2 && (method == "GET" || key != "") && ctx.Err() == nil {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Duration(attempt+1) * 200 * time.Millisecond):
+					continue
+				}
+			}
 			return readErr
 		}
 		if res.StatusCode >= 400 {

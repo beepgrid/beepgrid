@@ -34,6 +34,7 @@ export type Response = {
   version: number;
 };
 export type RequestItem = {
+  requester_instance_id?: string;
   id: string;
   requester_id: string;
   conversation_id: string;
@@ -44,7 +45,11 @@ export type RequestItem = {
   action?: Action;
   state: "open" | "resolved" | "cancelled" | "expired" | "superseded";
   version: number;
-  response?: Response;
+  response?: Response & {
+    responder_instance_id?: string;
+    source_answer_id?: string;
+    source_invalidated?: boolean;
+  };
   expires_at: string;
 };
 export type AskInput = {

@@ -42,3 +42,30 @@ func TestStdioFramingAndScopedTools(t *testing.T) {
 		t.Fatal(out.String())
 	}
 }
+
+func TestStableToolRetryKeyAndInvalidRequest(t *testing.T) {
+	calls := 0
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Header.Get("Idempotency-Key") != "saved-checkpoint-7" {
+			t.Error("lost caller retry key")
+		}
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if _, exists := body["idempotency_key"]; exists {
+			t.Error("MCP-only field leaked into strict REST body")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"message-1"}`))
+	}))
+	defer backend.Close()
+	input := `{ "jsonrpc":"1.0", "id":1,"method":"ping" }
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"send","arguments":{"body":"Hello","target":{"kind":"agent","id":"a"},"idempotency_key":"saved-checkpoint-7"}}}`
+	var out bytes.Buffer
+	if e := Serve(context.Background(), notif.New(backend.URL, "test"), strings.NewReader(input), &out); e != nil {
+		t.Fatal(e)
+	}
+	if calls != 1 || !strings.Contains(out.String(), "-32600") || !strings.Contains(out.String(), "message-1") {
+		t.Fatal(calls, out.String())
+	}
+}

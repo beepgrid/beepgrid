@@ -304,6 +304,9 @@ type DispatchResult struct {
 }
 
 func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
+	if e := s.promoteQuestions(ctx); e != nil {
+		return e
+	}
 	// Recovering an expired provider lease is ambiguous: the previous send may have succeeded.
 	if _, e := s.Pool.Exec(ctx, `UPDATE deliveries SET state='unknown',last_error='Provider lease expired; reconcile before replay' WHERE connection_id<>'' AND state='leased' AND lease_until<now()`); e != nil {
 		return e
@@ -363,6 +366,7 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 	}
 	// Preserve private route metadata in storage; never send it to a provider.
 	delete(d.Payload, "_policy")
+	delete(d.Payload, "_cluster")
 	result := s.deliver(ctx, c, d, publicURL)
 	next := time.Now()
 	if result.Retry && d.Attempts < 6 {

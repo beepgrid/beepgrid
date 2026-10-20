@@ -18,6 +18,7 @@ import {
   APIError,
   timeAgo,
   requestLabel,
+  questionGroupKey,
   type Entity,
   type RequestItem,
   type Conversation,
@@ -357,7 +358,8 @@ export function App() {
     [query, setQuery] = useState(""),
     [conversation, setConversation] = useState<Conversation | null>(null),
     [instances, setInstances] = useState<Instance[]>([]),
-    [tab, setTab] = useState("open");
+    [tab, setTab] = useState("open"),
+    [live, setLive] = useState("Connecting");
   const meRef = useRef(me);
   meRef.current = me;
   const refresh = useCallback(async () => {
@@ -399,6 +401,8 @@ export function App() {
     if (!me) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const source = new EventSource("/api/v1/events?stream=1");
+    source.onopen = () => setLive("Live updates");
+    source.onerror = () => setLive("Reconnecting");
     source.onmessage = () => {
       if (!timer)
         timer = setTimeout(() => {
@@ -469,6 +473,7 @@ export function App() {
       await refresh();
       return true;
     } catch (e) {
+      await refresh();
       setError((e as Error).message);
       return false;
     }
@@ -509,6 +514,16 @@ export function App() {
   const open = data.requests.filter((r) => r.state === "open"),
     current = data.requests.find((r) => r.id === selected),
     agent = data.agents.find((a) => a.id === selected);
+  const bundles = new Map<string, RequestItem[]>();
+  for (const r of open) {
+    const key = questionGroupKey(r);
+    bundles.set(key, [...(bundles.get(key) ?? []), r]);
+  }
+  const attention = [...bundles.values()].map((group) => group[0]);
+  const matching =
+    current?.state === "open"
+      ? (bundles.get(questionGroupKey(current)) ?? [current])
+      : [];
   const subtitle: Record<Page, string> = {
     inbox: "Questions and decisions that need a human.",
     conversations: "Keep the context. Continue the conversation.",
@@ -568,7 +583,7 @@ export function App() {
         <div className="sidebar-bottom">
           <span className="self-hosted">
             <i />
-            Self-hosted · local
+            Self-hosted
           </span>
           <div className="profile">
             <Avatar person={me.person} />
@@ -598,8 +613,12 @@ export function App() {
             <strong>{nav.find((x) => x[0] === page)?.[1]}</strong>
           </span>
           <div>
-            <span className="live-dot" />
-            Live updates <span className="environment">{me.environment}</span>
+            <span
+              className={
+                "live-dot " + (live !== "Live updates" ? "reconnecting" : "")
+              }
+            />
+            {live} <span className="environment">{me.environment}</span>
           </div>
         </div>
         <div className="content">
@@ -711,7 +730,7 @@ export function App() {
                   className={"split-workspace " + (current ? "has-detail" : "")}
                 >
                   <div className="request-list">
-                    {(tab === "open" ? open : data.requests).map((r) => (
+                    {(tab === "open" ? attention : data.requests).map((r) => (
                       <button
                         key={r.id}
                         className={
@@ -726,6 +745,13 @@ export function App() {
                             <span>{timeAgo(r.created_at)}</span>
                           </div>
                           <h3>{r.title}</h3>
+                          {(bundles.get(questionGroupKey(r))?.length ?? 0) >
+                            1 && (
+                            <Badge>
+                              {bundles.get(questionGroupKey(r))!.length}{" "}
+                              matching questions
+                            </Badge>
+                          )}
                           <div className="row-bottom">
                             <Badge
                               tone={r.kind === "approval" ? "amber" : "muted"}
@@ -757,18 +783,40 @@ export function App() {
                       me={me}
                       position={open.findIndex((r) => r.id === current.id) + 1}
                       total={open.length}
+                      matchingCount={matching.length}
+                      matchingNames={[
+                        ...new Set(matching.map((r) => name(r.requester_id))),
+                      ]}
                       onClose={() => setSelected(null)}
                       onConversation={() =>
                         openConversation(current.conversation_id)
                       }
-                      onRespond={(outcome, answer) =>
+                      onRespond={(outcome, answer, share) =>
                         act(async () => {
-                          await api("/requests/" + current.id + "/responses", {
-                            outcome,
-                            answer,
-                            version: current.version,
-                          });
-                          const next = open.find((r) => r.id !== current.id);
+                          await api(
+                            "/requests/" +
+                              current.id +
+                              (share ? "/answer-and-share" : "/responses"),
+                            {
+                              outcome,
+                              answer,
+                              version: current.version,
+                              ...(share
+                                ? {
+                                    audience: [
+                                      ...new Set(
+                                        matching.map((r) => r.requester_id),
+                                      ),
+                                    ],
+                                  }
+                                : {}),
+                            },
+                          );
+                          const next = open.find(
+                            (r) =>
+                              r.id !== current.id &&
+                              (!share || !matching.some((m) => m.id === r.id)),
+                          );
                           setSelected(next?.id ?? current.id);
                         }, "Response recorded")
                       }
@@ -825,13 +873,14 @@ export function App() {
                   conversation={conversation}
                   me={me}
                   name={name}
-                  onSend={(body) =>
+                  onSend={(body, key) =>
                     act(
                       () =>
-                        api("/messages", {
-                          conversation_id: conversation.id,
-                          body,
-                        }),
+                        api(
+                          "/messages",
+                          { conversation_id: conversation.id, body },
+                          { headers: { "Idempotency-Key": key } },
+                        ),
                       "Message sent",
                     )
                   }
@@ -1149,9 +1198,11 @@ export function App() {
                               : rule.target_kind}
                           </span>
                           <span className="rule-target">
-                            {rule.target_id === "*"
-                              ? "Any permitted target"
-                              : name(rule.target_id)}
+                            {rule.target_id === "$self"
+                              ? "Their own identity"
+                              : rule.target_id === "*"
+                                ? "Any permitted target"
+                                : name(rule.target_id)}
                           </span>
                           {rule.action_name && <code>{rule.action_name}</code>}
                         </div>
@@ -1368,7 +1419,11 @@ function RequestDetail({
   onEnd,
   onPublish,
   onChanged,
+  matchingCount,
+  matchingNames,
 }: {
+  matchingCount: number;
+  matchingNames: string[];
   request: RequestItem;
   sender?: Entity;
   me: Me;
@@ -1376,17 +1431,25 @@ function RequestDetail({
   total: number;
   onClose: () => void;
   onConversation: () => void;
-  onRespond: (outcome: string, answer?: unknown) => Promise<boolean>;
+  onRespond: (
+    outcome: string,
+    answer?: unknown,
+    share?: boolean,
+  ) => Promise<boolean>;
   onEnd: (state: string) => Promise<boolean>;
   onPublish: () => void;
   onChanged: () => void;
 }) {
   const [answer, setAnswer] = useState(""),
-    [busy, setBusy] = useState(false);
-  useEffect(() => setAnswer(""), [r.id]);
+    [busy, setBusy] = useState(false),
+    [share, setShare] = useState(false);
+  useEffect(() => {
+    setAnswer("");
+    setShare(false);
+  }, [r.id]);
   async function respond(outcome: string, value?: unknown) {
     setBusy(true);
-    await onRespond(outcome, value);
+    await onRespond(outcome, value, share);
     setBusy(false);
   }
   return (
@@ -1412,6 +1475,11 @@ function RequestDetail({
         </span>
       </div>
       <h2>{r.title}</h2>
+      {r.requester_instance_id && (
+        <p className="small muted">
+          Worker <code>{r.requester_instance_id}</code>
+        </p>
+      )}
       {r.response?.source_invalidated && (
         <p role="status" className="error">
           The shared answer used here was invalidated. Review before relying on
@@ -1440,6 +1508,27 @@ function RequestDetail({
       </button>
       {r.state === "open" ? (
         <div className="answer-area">
+          {matchingCount > 1 && (
+            <div className="small muted">
+              <p>Matching requesters: {matchingNames.join(", ")}</p>
+              <p>
+                Scope key: <code>{r.shared_key}</code>
+              </p>
+            </div>
+          )}
+          {(me.can_publish_answers ?? me.admin) &&
+            matchingCount > 1 &&
+            r.kind === "question" && (
+              <label className="check-row shared-question-choice">
+                <input
+                  type="checkbox"
+                  checked={share}
+                  onChange={(e) => setShare(e.target.checked)}
+                />
+                Answer all {matchingCount} matching questions and share with
+                these requesters for 24 hours.
+              </label>
+            )}
           {r.kind === "question" && (
             <AnswerSuggestions request={r} onChanged={onChanged} />
           )}{" "}
@@ -1547,8 +1636,9 @@ function Chat({
   conversation: Conversation;
   me: Me;
   name: (id: string) => string;
-  onSend: (body: string) => Promise<boolean>;
+  onSend: (body: string, key: string) => Promise<boolean>;
 }) {
+  const sendAttempt = useRef({ body: "", key: "" });
   const draftKey = "notif-draft/" + me.person.id + "/" + c.id;
   const [body, setBody] = useState(
       () => sessionStorage.getItem(draftKey) ?? "",
@@ -1601,7 +1691,10 @@ function Chat({
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
-          if (await onSend(body)) {
+          if (sendAttempt.current.body !== body || !sendAttempt.current.key)
+            sendAttempt.current = { body, key: crypto.randomUUID() };
+          if (await onSend(body, sendAttempt.current.key)) {
+            sendAttempt.current = { body: "", key: "" };
             setBody("");
             sessionStorage.removeItem(draftKey);
           }
@@ -2033,6 +2126,7 @@ function Forms({
                   }
                 >
                   <option value="*">Any target</option>
+                  <option value="$self">Their own identity (self)</option>
                   {targetOptions
                     .filter(
                       (t) => t.kind === r.target_kind || r.target_kind === "*",

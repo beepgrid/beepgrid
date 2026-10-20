@@ -16,7 +16,7 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-const SchemaVersion = 8
+const SchemaVersion = 9
 
 func pool(ctx context.Context, url, name string) (*pgxpool.Pool, error) {
 	if !regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`).MatchString(name) {
@@ -110,7 +110,9 @@ func OpenExisting(ctx context.Context, url, name string, key []byte) (*Store, er
 		p.Close()
 		return nil, fmt.Errorf("schema must be migrated to version %s before serving", strconv.Itoa(SchemaVersion))
 	}
-	return &Store{Pool: p, SecretKey: key}, nil
+	s := &Store{Pool: p, SecretKey: key}
+	s.startWakeups()
+	return s, nil
 }
 func SchemaName(raw string) bool {
 	return regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`).MatchString(strings.TrimSpace(raw))

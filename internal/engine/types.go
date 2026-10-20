@@ -193,26 +193,28 @@ type AskInput struct {
 	SharedKey      string    `json:"shared_key"`
 }
 type Request struct {
-	ID             string     `json:"id"`
-	RequesterID    string     `json:"requester_id"`
-	ConversationID string     `json:"conversation_id"`
-	Kind           string     `json:"kind"`
-	Title          string     `json:"title"`
-	Body           string     `json:"body"`
-	Choices        []string   `json:"choices"`
-	Action         *Action    `json:"action,omitempty"`
-	State          string     `json:"state"`
-	Version        int        `json:"version"`
-	Response       *Response  `json:"response,omitempty"`
-	ResolvedBy     *string    `json:"resolved_by,omitempty"`
-	ResolvedAt     *time.Time `json:"resolved_at,omitempty"`
-	ExpiresAt      time.Time  `json:"expires_at"`
-	CreatedAt      time.Time  `json:"created_at"`
-	SharedKey      string     `json:"shared_key"`
+	RequesterInstanceID string     `json:"requester_instance_id,omitempty"`
+	ID                  string     `json:"id"`
+	RequesterID         string     `json:"requester_id"`
+	ConversationID      string     `json:"conversation_id"`
+	Kind                string     `json:"kind"`
+	Title               string     `json:"title"`
+	Body                string     `json:"body"`
+	Choices             []string   `json:"choices"`
+	Action              *Action    `json:"action,omitempty"`
+	State               string     `json:"state"`
+	Version             int        `json:"version"`
+	Response            *Response  `json:"response,omitempty"`
+	ResolvedBy          *string    `json:"resolved_by,omitempty"`
+	ResolvedAt          *time.Time `json:"resolved_at,omitempty"`
+	ExpiresAt           time.Time  `json:"expires_at"`
+	CreatedAt           time.Time  `json:"created_at"`
+	SharedKey           string     `json:"shared_key"`
 }
 type Response struct {
-	SourceAnswerID    string `json:"source_answer_id,omitempty"`
-	SourceInvalidated bool   `json:"source_invalidated,omitempty"`
+	ResponderInstanceID string `json:"responder_instance_id,omitempty"`
+	SourceAnswerID      string `json:"source_answer_id,omitempty"`
+	SourceInvalidated   bool   `json:"source_invalidated,omitempty"`
 
 	Outcome string `json:"outcome"`
 	Answer  any    `json:"answer,omitempty"`
