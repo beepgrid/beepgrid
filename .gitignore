@@ -13,3 +13,5 @@ __pycache__/
 test-results/
 playwright-report/
 .DS_Store
+
+sdk/typescript/dist/
