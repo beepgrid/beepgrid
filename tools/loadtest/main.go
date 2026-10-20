@@ -9,15 +9,18 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/notif-dev/notif/internal/engine"
 	"io"
 	"math"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
@@ -28,6 +31,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -51,6 +55,7 @@ type observation struct {
 type transport struct {
 	base    http.RoundTripper
 	half    time.Duration
+	jitter  time.Duration
 	drop    bool
 	dropped bool
 	mu      sync.Mutex
@@ -71,9 +76,18 @@ func (b countedBody) Read(p []byte) (int, error) {
 	return n, e
 }
 func (t *transport) RoundTrip(r *http.Request) (*http.Response, error) {
-	if t.half > 0 {
+	t.mu.Lock()
+	delay := t.half
+	if t.jitter > 0 {
+		delay += time.Duration((t.calls*37)%41-20) * t.jitter / 80
+	}
+	t.mu.Unlock()
+	if delay < 0 {
+		delay = 0
+	}
+	if delay > 0 {
 		select {
-		case <-time.After(t.half):
+		case <-time.After(delay):
 		case <-r.Context().Done():
 			return nil, r.Context().Err()
 		}
@@ -84,16 +98,16 @@ func (t *transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	res, e := t.base.RoundTrip(r)
 	t.mu.Lock()
 	t.calls++
-	if e != nil {
+	if e != nil && r.Context().Err() == nil {
 		t.errors++
 	}
 	t.mu.Unlock()
 	if e != nil {
 		return nil, e
 	}
-	if t.half > 0 {
+	if delay > 0 {
 		select {
-		case <-time.After(t.half):
+		case <-time.After(delay):
 		case <-r.Context().Done():
 			res.Body.Close()
 			return nil, r.Context().Err()
@@ -173,7 +187,8 @@ func worker() error {
 	defer stop()
 	half, _ := strconv.Atoi(os.Getenv("LOAD_RTT_MS"))
 	think, _ := strconv.Atoi(os.Getenv("LOAD_THINK_MS"))
-	tr := &transport{base: baseTransport(), half: time.Duration(half) * time.Millisecond / 2, drop: os.Getenv("LOAD_DROP") == "1"}
+	jitter, _ := strconv.Atoi(os.Getenv("LOAD_JITTER_MS"))
+	tr := &transport{base: baseTransport(), half: time.Duration(half) * time.Millisecond / 2, jitter: time.Duration(jitter) * time.Millisecond, drop: os.Getenv("LOAD_DROP") == "1"}
 	c := notif.New(os.Getenv("NOTIF_URL"), os.Getenv("NOTIF_TOKEN"))
 	c.HTTP.Transport = tr
 	path := os.Getenv("LOAD_REPORT")
@@ -196,6 +211,16 @@ func worker() error {
 		sum := sha256.Sum256([]byte(j.Padding))
 		if hex.EncodeToString(sum[:]) != j.Digest {
 			return fmt.Errorf("payload hash mismatch")
+		}
+		if os.Getenv("LOAD_CRASH_CLAIM") == "1" {
+			raw, _ := json.Marshal(map[string]any{"crash_claim": d.ID, "generation": d.Generation})
+			if _, e := out.Write(append(raw, '\n')); e != nil {
+				return e
+			}
+			if e := out.Sync(); e != nil {
+				return e
+			}
+			os.Exit(17)
 		}
 		received := float64(time.Now().UnixNano()-j.Sent) / 1e6
 		if think > 0 {
@@ -232,9 +257,9 @@ func worker() error {
 }
 
 type config struct {
-	server, label, out, mode                             string
-	agents, rounds, payload, backlog, idle, rtt, readers int
-	think, drop, profile                                 bool
+	server, label, out, mode                                     string
+	agents, rounds, payload, backlog, idle, rtt, readers, jitter int
+	think, drop, profile, entropy, crash, provider               bool
 }
 
 func call(c *notif.Client, method, path string, in, out any) error {
@@ -262,7 +287,7 @@ func stats(v []float64) map[string]float64 {
 	return map[string]float64{"p50": quantile(v, .5), "p95": quantile(v, .95), "p99": quantile(v, .99), "max": quantile(v, 1)}
 }
 func cgroup() map[string]int64 {
-	out, e := exec.Command("docker", "exec", "notif-postgres-1", "sh", "-c", "cat /sys/fs/cgroup/cpu.stat /sys/fs/cgroup/memory.current /sys/fs/cgroup/memory.stat").Output()
+	out, e := exec.Command("docker", "exec", benchmarkPostgres(), "sh", "-c", "cat /sys/fs/cgroup/cpu.stat /sys/fs/cgroup/memory.current /sys/fs/cgroup/memory.stat").Output()
 	if e != nil {
 		return nil
 	}
@@ -300,6 +325,10 @@ func run() (err error) {
 	flag.IntVar(&cfg.rtt, "rtt-ms", 0, "simulated application RTT per worker call")
 	flag.BoolVar(&cfg.think, "think", false, "varied 0 to 200 ms worker delay")
 	flag.BoolVar(&cfg.drop, "drop", false, "lose the first committed reply response per worker")
+	flag.IntVar(&cfg.jitter, "jitter-ms", 0, "deterministic peak-to-peak application RTT jitter")
+	flag.BoolVar(&cfg.entropy, "entropy", false, "deterministic high-entropy payload control")
+	flag.BoolVar(&cfg.provider, "provider", false, "signed HTTP provider with slow/429/definite/ambiguous outcomes")
+	flag.BoolVar(&cfg.crash, "crash", false, "crash worker zero after claiming and recover on the real lease")
 	flag.BoolVar(&cfg.profile, "profile", false, "capture CPU/heap profiles")
 	flag.Parse()
 	if cfg.readers < 0 || cfg.readers > 5 {
@@ -307,6 +336,12 @@ func run() (err error) {
 	}
 	if cfg.agents < 1 || cfg.agents > 25 || cfg.rounds < 1 || cfg.rounds > 100 || cfg.payload < 0 || cfg.payload > 28000 || cfg.backlog < 0 || cfg.backlog > 10000 || cfg.idle < 0 || cfg.idle > 60 {
 		return fmt.Errorf("load bounds exceeded")
+	}
+	if cfg.jitter < 0 || cfg.jitter > 1000 || cfg.rtt < 0 || cfg.rtt > 1000 {
+		return fmt.Errorf("network fault bounds exceeded")
+	}
+	if cfg.crash && cfg.mode == "idle" {
+		return fmt.Errorf("crash requires work")
 	}
 	if cfg.mode != "burst" && cfg.mode != "idle" {
 		return fmt.Errorf("unknown mode")
@@ -332,7 +367,7 @@ func run() (err error) {
 		}
 		l.Close()
 	}
-	report := map[string]any{"result": "running", "mode": cfg.mode, "idle_seconds": cfg.idle, "variant": cfg.label, "go": runtime.Version(), "agents": cfg.agents, "rounds": cfg.rounds, "payload_padding_bytes": cfg.payload, "completed_history_rows": cfg.agents * cfg.backlog, "readers": cfg.readers, "rtt_ms": cfg.rtt, "think": cfg.think, "lost_responses": cfg.drop}
+	report := map[string]any{"result": "running", "mode": cfg.mode, "idle_seconds": cfg.idle, "variant": cfg.label, "go": runtime.Version(), "agents": cfg.agents, "rounds": cfg.rounds, "payload_padding_bytes": cfg.payload, "completed_history_rows": cfg.agents * cfg.backlog, "readers": cfg.readers, "rtt_ms": cfg.rtt, "think": cfg.think, "lost_responses": cfg.drop, "high_entropy": cfg.entropy, "jitter_ms": cfg.jitter, "worker_crash": cfg.crash, "provider_fixture": cfg.provider}
 	defer func() {
 		if err != nil {
 			report["result"] = "failed"
@@ -413,6 +448,23 @@ func run() (err error) {
 	if e = call(c, "GET", "/api/v1/me", nil, &me); e != nil {
 		return e
 	}
+
+	var fixture *providerFixture
+	var providerID string
+	if cfg.provider {
+		fixture = newProviderFixture()
+		defer fixture.server.Close()
+		var connection struct {
+			ID string `json:"id"`
+		}
+		if e = call(c, "POST", "/api/v1/connections", map[string]any{"name": "Load provider", "kind": "webhook", "enabled": true, "config": map[string]string{"url": fixture.server.URL}, "secret": fixture.secret}, &connection); e != nil {
+			return e
+		}
+		providerID = connection.ID
+		if e = call(c, "POST", "/api/v1/destinations", map[string]any{"connection_id": providerID, "principal_id": me.Person.ID, "address": "fixture"}, nil); e != nil {
+			return e
+		}
+	}
 	var role struct {
 		ID string `json:"id"`
 	}
@@ -425,6 +477,21 @@ func run() (err error) {
 	}
 	members := []string{}
 	workers := []*exec.Cmd{}
+	workerCPU := 0.0
+	workerPeakSum := int64(0)
+	waitWorker := func(w *exec.Cmd) {
+		_ = w.Wait()
+		if w.ProcessState != nil {
+			if u, ok := w.ProcessState.SysUsage().(*syscall.Rusage); ok {
+				workerCPU += usageCPU(u)
+				rss := u.Maxrss
+				if runtime.GOOS != "darwin" {
+					rss *= 1024
+				}
+				workerPeakSum += rss
+			}
+		}
+	}
 	files := []string{}
 	sessions := []notif.Session{}
 	executable, _ := os.Executable()
@@ -433,7 +500,7 @@ func run() (err error) {
 			w.Process.Signal(syscall.SIGTERM)
 		}
 		for _, w := range workers {
-			w.Wait()
+			waitWorker(w)
 		}
 	}()
 	for i := 0; i < cfg.agents; i++ {
@@ -453,7 +520,7 @@ func run() (err error) {
 			think = []int{0, 10, 40, 100, 200}[i%5]
 		}
 		w := exec.Command(executable, "worker")
-		w.Env = append(os.Environ(), "NOTIF_URL=http://localhost:4014", "NOTIF_TOKEN="+session.Token, "LOAD_REPORT="+file, "LOAD_RTT_MS="+strconv.Itoa(cfg.rtt), "LOAD_THINK_MS="+strconv.Itoa(think), "LOAD_DROP="+map[bool]string{true: "1", false: "0"}[cfg.drop])
+		w.Env = append(os.Environ(), "NOTIF_URL=http://localhost:4014", "NOTIF_TOKEN="+session.Token, "LOAD_REPORT="+file, "LOAD_RTT_MS="+strconv.Itoa(cfg.rtt), "LOAD_THINK_MS="+strconv.Itoa(think), "LOAD_JITTER_MS="+strconv.Itoa(cfg.jitter), "LOAD_CRASH_CLAIM="+map[bool]string{true: "1", false: "0"}[cfg.crash && i == 0], "LOAD_DROP="+map[bool]string{true: "1", false: "0"}[cfg.drop])
 		w.Stderr = log
 		if e = w.Start(); e != nil {
 			return e
@@ -483,6 +550,8 @@ func run() (err error) {
 		return e
 	}
 	pgBefore := cgroup()
+	var driverBefore syscall.Rusage
+	_ = syscall.Getrusage(syscall.RUSAGE_SELF, &driverBefore)
 	dbBefore, e := databaseStats(ctx, db)
 	if e != nil {
 		return e
@@ -499,8 +568,9 @@ func run() (err error) {
 		tr := &transport{base: baseTransport()}
 		browserTransports = append(browserTransports, tr)
 		browserWG.Add(2)
-		go func() { defer browserWG.Done(); browserPoll(browserCtx, c.BaseURL, ownerToken, tr) }()
-		go func() { defer browserWG.Done(); browserStream(browserCtx, c.BaseURL, ownerToken, tr) }()
+		updates := make(chan struct{}, 1)
+		go func() { defer browserWG.Done(); browserPoll(browserCtx, c.BaseURL, ownerToken, tr, updates) }()
+		go func() { defer browserWG.Done(); browserStream(browserCtx, c.BaseURL, ownerToken, tr, updates) }()
 	}
 	phaseStart := time.Now()
 	metrics := []map[string]float64{}
@@ -548,6 +618,9 @@ func run() (err error) {
 	} else {
 		for round := 0; round < cfg.rounds; round++ {
 			padding := strings.Repeat("x", cfg.payload)
+			if cfg.entropy {
+				padding = entropyPadding(round, cfg.payload)
+			}
 			sum := sha256.Sum256([]byte(padding))
 			body, _ := json.Marshal(job{round, time.Now().UnixNano(), padding, hex.EncodeToString(sum[:])})
 			started := time.Now()
@@ -561,7 +634,39 @@ func run() (err error) {
 			latencies = append(latencies, float64(time.Since(started))/float64(time.Millisecond))
 		}
 		deadline := time.Now().Add(90 * time.Second)
+		replaced := false
+		var stale notif.Delivery
+		var oldSession notif.Session
 		for {
+			if cfg.crash && !replaced {
+				raw, _ := os.ReadFile(files[0])
+				for _, line := range bytes.Split(raw, []byte{'\n'}) {
+					var claim struct {
+						ID         string `json:"crash_claim"`
+						Generation int64  `json:"generation"`
+					}
+					if json.Unmarshal(line, &claim) == nil && claim.ID != "" {
+						stale = notif.Delivery{ID: claim.ID, Generation: claim.Generation}
+						oldSession = sessions[0]
+						waitWorker(workers[0])
+						_, replacement, e := c.Enroll(ctx, notif.EnrollInput{Agent: "load/0", Name: "Load worker 0", Capabilities: []string{"message", "request"}})
+						if e != nil {
+							return e
+						}
+						w := exec.Command(executable, "worker")
+						w.Env = append(os.Environ(), "NOTIF_URL=http://localhost:4014", "NOTIF_TOKEN="+replacement.Token, "LOAD_REPORT="+files[0], "LOAD_RTT_MS="+strconv.Itoa(cfg.rtt), "LOAD_JITTER_MS="+strconv.Itoa(cfg.jitter), "LOAD_DROP="+map[bool]string{true: "1", false: "0"}[cfg.drop])
+						w.Stderr = log
+						if e = w.Start(); e != nil {
+							return e
+						}
+						workers[0] = w
+						sessions[0] = replacement
+						replaced = true
+						break
+					}
+				}
+			}
+
 			count := 0
 			for _, file := range files {
 				obs, _ := observations(file)
@@ -571,7 +676,27 @@ func run() (err error) {
 			if e = db.QueryRow(ctx, `SELECT count(*) FROM notif.deliveries WHERE state='received' AND operation_id NOT LIKE 'old_%' AND recipient_id=ANY($1::text[])`, members).Scan(&acknowledged); e != nil {
 				return e
 			}
-			if count == cfg.agents*cfg.rounds && acknowledged == count {
+			providerDrained := true
+			if cfg.provider {
+				var terminal int
+				if e = db.QueryRow(ctx, `SELECT count(*) FROM notif.deliveries WHERE connection_id=$1 AND state IN('provider_accepted','failed','unknown')`, providerID).Scan(&terminal); e != nil {
+					return e
+				}
+				providerDrained = terminal == cfg.agents*cfg.rounds
+			}
+			if count == cfg.agents*cfg.rounds && acknowledged == count && providerDrained {
+				if cfg.crash {
+					if !replaced {
+						return fmt.Errorf("crash was not exercised")
+					}
+					old := notif.New(c.BaseURL, oldSession.Token)
+					e := old.Ack(ctx, stale)
+					var apiErr *notif.APIError
+					if !errors.As(e, &apiErr) || apiErr.Status != 409 {
+						return fmt.Errorf("stale generation was not rejected: %v", e)
+					}
+					report["stale_generation_rejected"] = true
+				}
 				break
 			}
 			if time.Now().After(deadline) {
@@ -590,6 +715,8 @@ func run() (err error) {
 		return e
 	}
 	pgAfter := cgroup()
+	var driverAfter syscall.Rusage
+	_ = syscall.Getrusage(syscall.RUSAGE_SELF, &driverAfter)
 	dbAfter, e := databaseStats(ctx, db)
 	if e != nil {
 		return e
@@ -599,7 +726,7 @@ func run() (err error) {
 		w.Process.Signal(syscall.SIGTERM)
 	}
 	for _, w := range workers {
-		w.Wait()
+		waitWorker(w)
 	}
 	workers = nil
 	receipt, completion := []float64{}, []float64{}
@@ -618,8 +745,18 @@ func run() (err error) {
 			receipt = append(receipt, v.ReceiptMS)
 			completion = append(completion, v.CompletionMS)
 		}
+		if cfg.drop && summary["injected_lost_response"] != 1 {
+			return fmt.Errorf("worker %d did not exercise a lost response", i)
+		}
 		wire += int64(summary["wire_bytes"])
 		calls += int(summary["calls"])
+	}
+	var privacyErrors int
+	if e = db.QueryRow(ctx, `SELECT count(*) FROM notif.conversations c WHERE (SELECT count(*) FROM notif.participants p WHERE p.conversation_id=c.id AND p.scope=c.scope)<>2 OR NOT EXISTS(SELECT 1 FROM notif.participants p WHERE p.conversation_id=c.id AND p.scope=c.scope AND p.principal_id=$1) OR EXISTS(SELECT 1 FROM notif.messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM notif.participants p WHERE p.scope=m.scope AND p.conversation_id=m.conversation_id AND p.principal_id=m.sender_id))`, me.Person.ID).Scan(&privacyErrors); e != nil {
+		return e
+	}
+	if privacyErrors != 0 {
+		return fmt.Errorf("private conversation or attribution violation")
 	}
 	var messages, replies, acked int
 	if e = db.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE body LIKE 'completed/%') FROM notif.messages`).Scan(&messages, &replies); e != nil {
@@ -631,6 +768,11 @@ func run() (err error) {
 	expected := 0
 	if cfg.mode != "idle" {
 		expected = cfg.agents * cfg.rounds
+	}
+	if cfg.provider {
+		if e = fixture.verify(ctx, db, providerID, expected, report); e != nil {
+			return e
+		}
 	}
 	if messages != expected*2 || replies != expected || acked != expected {
 		return fmt.Errorf("canonical mismatch: messages=%d replies=%d receipts=%d expected=%d", messages, replies, acked, expected)
@@ -658,6 +800,10 @@ func run() (err error) {
 		}
 		tr.mu.Unlock()
 	}
+	report["worker_lifetime_cpu_seconds"] = workerCPU
+	report["worker_lifetime_peak_rss_sum_bytes"] = workerPeakSum
+	report["driver_phase_cpu_seconds"] = usageCPU(&driverAfter) - usageCPU(&driverBefore)
+	report["postgres_container"] = benchmarkPostgres()
 	report["browser_response_body_bytes"] = browserBytes
 	report["browser_http_calls"] = browserCalls
 	report["result"] = "passed"
@@ -700,7 +846,10 @@ func observations(path string) ([]observation, map[string]float64) {
 			}
 		}
 		if v["wire_bytes"] != nil {
-			json.Unmarshal(line, &summary)
+			_ = json.Unmarshal(line, &summary)
+			if string(v["injected_lost_response"]) == "true" {
+				summary["injected_lost_response"] = 1
+			}
 		}
 	}
 	return out, summary
@@ -723,7 +872,7 @@ func urlParse(raw, name string) (string, error) {
 	return u.String(), nil
 }
 
-func browserPoll(ctx context.Context, base, token string, tr *transport) {
+func browserPoll(ctx context.Context, base, token string, tr *transport, updates <-chan struct{}) {
 	c := notif.New(base, token)
 	c.HTTP.Transport = tr
 	paths := []string{"me", "people", "agents", "services", "requests", "conversations", "groups", "activity", "roles", "connections", "role-bindings", "destinations"}
@@ -745,15 +894,25 @@ func browserPoll(ctx context.Context, base, token string, tr *transport) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(2 * time.Second):
+		case <-time.After(15 * time.Second):
+		case <-updates:
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+			select {
+			case <-updates:
+			default:
+			}
 		}
 	}
 }
-func browserStream(ctx context.Context, base, token string, tr *transport) {
+func browserStream(ctx context.Context, base, token string, tr *transport, updates chan<- struct{}) {
 	client := &http.Client{Transport: tr}
 	cursor := ""
 	for ctx.Err() == nil {
-		req, e := http.NewRequestWithContext(ctx, "GET", base+"/api/v1/events?stream=1", nil)
+		req, e := http.NewRequestWithContext(ctx, "GET", base+"/api/v1/events?stream=1&summary=1", nil)
 		if e != nil {
 			return
 		}
@@ -772,6 +931,12 @@ func browserStream(ctx context.Context, base, token string, tr *transport) {
 			scanner.Buffer(make([]byte, 4096), 262144)
 			for scanner.Scan() {
 				line := scanner.Text()
+				if strings.HasPrefix(line, "data: ") {
+					select {
+					case updates <- struct{}{}:
+					default:
+					}
+				}
 				if strings.HasPrefix(line, "id: ") {
 					cursor = strings.TrimPrefix(line, "id: ")
 				}
@@ -789,4 +954,134 @@ func browserStream(ctx context.Context, base, token string, tr *transport) {
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
+}
+
+// Fixed seed and block counter make the less-compressible control reproducible.
+func entropyPadding(round, size int) string {
+	var b strings.Builder
+	for block := 0; b.Len() < size; block++ {
+		sum := sha256.Sum256([]byte(fmt.Sprintf("notif-load/%d/%d", round, block)))
+		b.WriteString(base64.RawStdEncoding.EncodeToString(sum[:]))
+	}
+	return b.String()[:size]
+}
+
+type providerFixture struct {
+	server      *httptest.Server
+	secret      string
+	connections atomic.Int32
+	mu          sync.Mutex
+	attempts    map[string]int
+	order       map[string]int
+	failed      bool
+	latency     []float64
+}
+
+func newProviderFixture() *providerFixture {
+	p := &providerFixture{secret: token(), attempts: map[string]int{}, order: map[string]int{}}
+	p.server = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, e := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		id := r.Header.Get("X-Notif-Event-ID")
+		p.mu.Lock()
+		if e != nil || id == "" || !engine.VerifySignature(p.secret, r.Header.Get("X-Notif-Timestamp"), r.Header.Get("X-Notif-Signature"), raw, time.Now()) || bytes.Contains(raw, []byte("_policy")) {
+			p.failed = true
+		}
+		if p.attempts[id] == 0 {
+			p.order[id] = len(p.order)
+		}
+		p.attempts[id]++
+		attempt, index := p.attempts[id], p.order[id]
+		p.mu.Unlock()
+		time.Sleep(25 * time.Millisecond)
+		if attempt == 1 {
+			switch index % 10 {
+			case 0:
+				w.Header().Set("Retry-After", "1")
+				w.WriteHeader(429)
+				return
+			case 1:
+				w.WriteHeader(400)
+				return
+			case 2:
+				conn, _, _ := w.(http.Hijacker).Hijack()
+				conn.Close()
+				return
+			}
+		}
+		var event struct {
+			Message struct {
+				Created time.Time `json:"created_at"`
+			} `json:"message"`
+		}
+		if json.Unmarshal(raw, &event) == nil && !event.Message.Created.IsZero() {
+			p.mu.Lock()
+			p.latency = append(p.latency, float64(time.Since(event.Message.Created))/float64(time.Millisecond))
+			p.mu.Unlock()
+		}
+		w.WriteHeader(202)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	p.server.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+		if s == http.StateNew {
+			p.connections.Add(1)
+		}
+	}
+	p.server.Start()
+	return p
+}
+func (p *providerFixture) verify(ctx context.Context, db *pgx.Conn, id string, expected int, report map[string]any) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.failed || len(p.order) != expected {
+		return fmt.Errorf("provider signature/payload/count mismatch")
+	}
+	counts := map[string]int{"provider_accepted": 0, "unknown": 0, "failed": 0}
+	attempts := 0
+	for id, index := range p.order {
+		want := 1
+		state := "provider_accepted"
+		switch index % 10 {
+		case 0:
+			want = 2
+		case 1:
+			state = "failed"
+		case 2:
+			state = "unknown"
+		}
+		counts[state]++
+		if p.attempts[id] != want {
+			return fmt.Errorf("provider duplicate/missing attempt: %d instead of %d", p.attempts[id], want)
+		}
+		attempts += want
+	}
+	for state, want := range counts {
+		var got int
+		if e := db.QueryRow(ctx, `SELECT count(*) FROM notif.deliveries WHERE connection_id=$1 AND state=$2`, id, state).Scan(&got); e != nil {
+			return e
+		} else if got != want {
+			return fmt.Errorf("provider %s count %d instead of %d", state, got, want)
+		}
+	}
+	var recorded int
+	if e := db.QueryRow(ctx, `SELECT count(*) FROM notif.delivery_attempts WHERE delivery_id IN(SELECT id FROM notif.deliveries WHERE connection_id=$1)`, id).Scan(&recorded); e != nil {
+		return e
+	}
+	if recorded != attempts {
+		return fmt.Errorf("missing provider attempt audit")
+	}
+	report["provider_connections"] = p.connections.Load()
+	report["provider_attempts"] = attempts
+	report["provider_outcomes"] = counts
+	report["provider_accepted_latency_ms"] = stats(p.latency)
+	return nil
+}
+
+func usageCPU(u *syscall.Rusage) float64 {
+	return float64(u.Utime.Sec+u.Stime.Sec) + float64(u.Utime.Usec+u.Stime.Usec)/1e6
+}
+func benchmarkPostgres() string {
+	if name := os.Getenv("NOTIF_BENCHMARK_POSTGRES_CONTAINER"); name != "" {
+		return name
+	}
+	return "notif-postgres-1"
 }
