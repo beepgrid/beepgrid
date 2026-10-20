@@ -64,6 +64,12 @@ func (s *Store) WatchEvents(a Actor) (<-chan struct{}, func()) {
 	return s.eventWakes.watch(a.Scope)
 }
 
+// WatchProviders is a process-wide, coalesced hint for the bounded dispatcher.
+// Retry deadlines, recovery and missed notifications still use periodic scans.
+func (s *Store) WatchProviders() (<-chan struct{}, func()) {
+	return s.providerWakes.watch("")
+}
+
 // Notifications are a wakeup hint only. PostgreSQL inbox rows remain authoritative and periodic reads recover missed hints.
 func (s *Store) startWakeups() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -75,7 +81,7 @@ func (s *Store) startWakeups() {
 		for ctx.Err() == nil {
 			conn, e := pgx.ConnectConfig(ctx, config)
 			if e == nil {
-				_, e = conn.Exec(ctx, `LISTEN notif_work; LISTEN notif_events`)
+				_, e = conn.Exec(ctx, `LISTEN notif_work; LISTEN notif_events; LISTEN notif_provider`)
 			}
 			if e == nil {
 				for ctx.Err() == nil {
@@ -85,6 +91,10 @@ func (s *Store) startWakeups() {
 					}
 					if message.Channel == "notif_events" {
 						s.eventWakes.signal(message.Payload)
+						continue
+					}
+					if message.Channel == "notif_provider" {
+						s.providerWakes.signal("")
 						continue
 					}
 					var target []string

@@ -20,6 +20,7 @@ type DB interface {
 type Store struct {
 	wakes             wakeHub
 	eventWakes        wakeHub
+	providerWakes     wakeHub
 	stopWakeups       context.CancelFunc
 	wakeupDone        chan struct{}
 	providerTransport http.RoundTripper

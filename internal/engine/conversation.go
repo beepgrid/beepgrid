@@ -317,7 +317,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName, descriptor) {
 			continue
 		}
-		if _, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at,state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry, externalState); e != nil {
+		if _, e = db.Exec(ctx, `WITH queued AS (INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at,state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING RETURNING state) SELECT pg_notify('notif_provider','') FROM queued WHERE state='queued'`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry, externalState); e != nil {
 			return e
 		}
 		queued++

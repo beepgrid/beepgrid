@@ -82,6 +82,87 @@ wait:
 	}
 }
 
+func TestProviderWakeHintsExcludeNativeTrafficAndFollowCommit(t *testing.T) {
+	s, a := testStore(t)
+	s.AllowLocal = true
+	ctx := context.Background()
+	ready, release := s.WatchProviders()
+	defer release()
+	deadline := time.After(2 * time.Second)
+	tick := time.NewTicker(20 * time.Millisecond)
+	defer tick.Stop()
+wait:
+	for {
+		if _, err := s.Pool.Exec(ctx, `SELECT pg_notify('notif_provider','')`); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-ready:
+			break wait
+		case <-tick.C:
+		case <-deadline:
+			t.Fatal("provider listener did not start")
+		}
+	}
+	next, drop := s.WatchProviders()
+	defer drop()
+	if _, err := s.Send(ctx, a, SendInput{Target: Target{"person", a.ID}, Body: "native only"}, "native-no-provider-wake"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-next:
+		t.Fatal("native traffic woke provider scanner")
+	case <-time.After(40 * time.Millisecond):
+	}
+	c, err := s.SaveConnection(ctx, a, Connection{Name: "provider hint", Kind: "webhook", Enabled: true, Secret: "provider-hint-secret", Config: map[string]string{"url": "http://127.0.0.1:9"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SaveDestination(ctx, a, Destination{ConnectionID: c.ID, PrincipalID: a.ID, Address: "fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result SendResult
+	if err = s.sendTx(ctx, tx, a, SendInput{Target: Target{"person", a.ID}, Body: "rolled back"}, "rollback-provider-hint", &result); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-next:
+		t.Fatal("uncommitted queue woke dispatcher")
+	case <-time.After(40 * time.Millisecond):
+	}
+	if _, err = s.Send(ctx, a, SendInput{Target: Target{"person", a.ID}, Body: "committed provider"}, "provider-hint"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-next:
+	case <-time.After(2 * time.Second):
+		t.Fatal("committed provider queue did not wake")
+	}
+	// Group queueing uses a separate SQL path and must emit the same hint.
+	other := testPerson(t, s, a, "provider-hint-group")
+	g, err := s.SaveGroup(ctx, a, Group{Name: "hint group", Members: []string{a.ID, other.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	groupHint, stop := s.WatchProviders()
+	defer stop()
+	if _, err = s.Send(ctx, a, SendInput{Target: Target{"group", g.ID}, Body: "group provider"}, "provider-group-hint"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-groupHint:
+	case <-time.After(2 * time.Second):
+		t.Fatal("batched provider queue did not wake")
+	}
+}
+
 func TestWakeupHintsPreserveInboxAuthority(t *testing.T) {
 	s, a := testStore(t)
 	ctx := context.Background()

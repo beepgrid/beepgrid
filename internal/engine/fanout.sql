@@ -39,5 +39,6 @@ WITH input AS MATERIALIZED (
  FROM payloads i CROSS JOIN LATERAL jsonb_array_elements(COALESCE(NULLIF(i.providers,'null'::jsonb),'[]'::jsonb)) d
  ON CONFLICT DO NOTHING RETURNING id
 )
-SELECT pg_notify('notif_work',json_build_array($1::text,i.recipient_id)::text), pg_notify('notif_events',$1)
+SELECT pg_notify('notif_work',json_build_array($1::text,i.recipient_id)::text), pg_notify('notif_events',$1),
+       (SELECT pg_notify('notif_provider','') FROM external LIMIT 1)
 FROM payloads i

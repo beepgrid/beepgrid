@@ -159,3 +159,67 @@ func TestProviderLaneRechecksConnectionAfterInFlightSend(t *testing.T) {
 		t.Fatal(calls.Load(), cancelled, err)
 	}
 }
+
+func TestProviderPoolAcceptsLateProducersWhileSlowSendIsInFlight(t *testing.T) {
+	s, owner := testStore(t)
+	s.AllowLocal = true
+	ctx := context.Background()
+	started, release, progress := make(chan struct{}), make(chan struct{}), make(chan struct{}, 25)
+	var calls, active, peak atomic.Int32
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		n := active.Add(1)
+		for p := peak.Load(); n > p && !peak.CompareAndSwap(p, n); p = peak.Load() {
+		}
+		if calls.Add(1) == 1 {
+			close(started)
+			<-release
+		} else {
+			time.Sleep(15 * time.Millisecond)
+			progress <- struct{}{}
+		}
+		active.Add(-1)
+		w.WriteHeader(202)
+	}))
+	defer receiver.Close()
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	c, err := s.SaveConnection(ctx, owner, Connection{Name: "late producers", Kind: "webhook", Enabled: true, Secret: "test-provider-secret", Config: map[string]string{"url": receiver.URL}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SaveDestination(ctx, owner, Destination{ConnectionID: c.ID, PrincipalID: owner.ID, Address: "blocked"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Send(ctx, owner, SendInput{Target: Target{"person", owner.ID}, Body: "blocked"}, "late-first"); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := s.DispatchBatch(ctx, "http://localhost", 64); done <- err }()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first send did not start")
+	}
+	for i := range 25 {
+		p := testPerson(t, s, owner, fmt.Sprint("late-", i))
+		if _, err = s.SaveDestination(ctx, owner, Destination{ConnectionID: c.ID, PrincipalID: p.ID, Address: p.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = s.Send(ctx, owner, SendInput{Target: Target{"person", p.ID}, Body: "later independent send"}, fmt.Sprint("later-", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	select {
+	case <-progress:
+	case <-time.After(2 * time.Second):
+		t.Fatal("late producers blocked behind unrelated slow destination")
+	}
+	unblock()
+	if err = <-done; err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 26 || peak.Load() < 2 || peak.Load() > 16 {
+		t.Fatal("pool loss, duplication or bound violation", calls.Load(), peak.Load())
+	}
+}

@@ -282,7 +282,29 @@ func (s *Store) dial(ctx context.Context, network, address string) (net.Conn, er
 	if len(ips) == 0 {
 		return nil, fmt.Errorf("no provider address")
 	}
-	return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+	return dialProviderIPs(ctx, network, port, ips)
+}
+
+// All addresses must be validated before calling this helper. Keep the checked
+// addresses pinned during failover, rather than resolving the hostname again.
+// A refused/unroutable first A/AAAA record must not discard a reachable peer.
+func dialProviderIPs(ctx context.Context, network, port string, ips []net.IPAddr) (net.Conn, error) {
+	var err error
+	for _, ip := range ips {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		var conn net.Conn
+		host := ip.String()
+		conn, err = (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, network, net.JoinHostPort(host, port))
+		if err == nil {
+			return conn, nil
+		}
+	}
+	if err == nil {
+		err = fmt.Errorf("no provider address")
+	}
+	return nil, err
 }
 func Signature(secret, timestamp string, body []byte) string {
 	h := hmac.New(sha256.New, []byte(secret))
@@ -343,56 +365,76 @@ func (s *Store) DispatchBatch(ctx context.Context, publicURL string, limit int) 
 	if err := s.prepareDispatch(ctx); err != nil {
 		return 0, err
 	}
+	ready, release := s.WatchProviders()
+	defer func() { release() }()
 	// Keep the idle path to one claim, without launching a worker pool.
 	first, worked, err := s.claimProvider(ctx)
 	if err != nil || !worked {
 		return 0, err
 	}
-	n := 1
-	var mu sync.Mutex
+	parallel := min(16, limit)
+	jobs := make(chan *providerJob, parallel)
+	finished := make(chan error, parallel)
 	var wg sync.WaitGroup
-	firstErr := error(nil)
-	run := func(job *providerJob) {
-		defer wg.Done()
-		for {
-			if job != nil {
-				if err := s.finishProvider(ctx, publicURL, job); err != nil {
-					mu.Lock()
-					if firstErr == nil {
-						firstErr = err
-					}
-					mu.Unlock()
-				}
+	for range parallel {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				finished <- s.finishProvider(ctx, publicURL, job)
 			}
-			mu.Lock()
-			if firstErr != nil || n >= limit {
-				mu.Unlock()
-				return
-			}
+		}()
+	}
+	defer func() { close(jobs); wg.Wait() }()
+	n, active := 1, 0
+	if first != nil {
+		jobs <- first
+		active++
+	}
+	var firstErr error
+	tick := time.NewTicker(300 * time.Millisecond)
+	defer tick.Stop()
+	complete := func(err error) {
+		active--
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	for {
+		// One scheduler claims work, so idle lanes do not create a query storm.
+		// Workers remain available while sends are in flight: a transient workspace
+		// lock or a late producer cannot collapse the pool down to one slow sender.
+		for firstErr == nil && n < limit && active < parallel {
 			next, worked, err := s.claimProvider(ctx)
 			if err != nil {
 				firstErr = err
+				break
 			}
-			if worked {
-				n++
+			if !worked {
+				break
 			}
-			mu.Unlock()
-			if err != nil || !worked {
-				return
+			n++
+			if next != nil {
+				jobs <- next
+				active++
 			}
-			job = next
+		}
+		if active == 0 {
+			return n, firstErr
+		}
+		if firstErr != nil || n == limit || active == parallel {
+			complete(<-finished)
+			continue
+		}
+		select {
+		case err := <-finished:
+			complete(err)
+		case <-ready:
+			release()
+			ready, release = s.WatchProviders()
+		case <-tick.C: // Recover a missed hint or a temporarily locked workspace.
 		}
 	}
-	// The claim mutex reserves the finite budget without pre-leasing a backlog
-	// behind slow I/O. Network calls hold neither this mutex nor a database lock.
-	wg.Add(1)
-	go run(first)
-	for range min(16, limit) - 1 {
-		wg.Add(1)
-		go run(nil)
-	}
-	wg.Wait()
-	return n, firstErr
 }
 
 type providerJob struct {
@@ -733,7 +775,7 @@ func (s *Store) queueFallback(ctx context.Context, db DB, scope string, previous
 		if !s.currentDeliveryPolicy(ctx, db, scope, d) {
 			continue
 		}
-		_, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`, ID("del"), scope, d.OperationID, d.RecipientID, r.id, r.address, JSON(d.Payload), d.ExpiresAt)
+		_, e = db.Exec(ctx, `WITH queued AS (INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id) SELECT pg_notify('notif_provider','') FROM queued`, ID("del"), scope, d.OperationID, d.RecipientID, r.id, r.address, JSON(d.Payload), d.ExpiresAt)
 		return e
 	}
 	return nil

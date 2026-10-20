@@ -231,14 +231,23 @@ func serve(ctx context.Context, args []string) error {
 		ticker := time.NewTicker(300 * time.Millisecond)
 		defer ticker.Stop()
 		for {
-			if _, e := store.DispatchBatch(workerCtx, public, 32); e != nil && workerCtx.Err() == nil {
+			ready, release := store.WatchProviders()
+			n, e := store.DispatchBatch(workerCtx, public, 32)
+			if e != nil && workerCtx.Err() == nil {
 				slog.Error("dispatch failed", "error", e)
+			}
+			if e == nil && n == 32 {
+				release()
+				continue
 			}
 			select {
 			case <-workerCtx.Done():
+				release()
 				return
 			case <-ticker.C:
+			case <-ready:
 			}
+			release()
 		}
 	}()
 	failures := make(chan error, 1)
