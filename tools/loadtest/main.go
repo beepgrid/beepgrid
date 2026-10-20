@@ -257,9 +257,9 @@ func worker() error {
 }
 
 type config struct {
-	server, label, out, mode                                     string
-	agents, rounds, payload, backlog, idle, rtt, readers, jitter int
-	think, drop, profile, entropy, crash, provider               bool
+	server, label, out, mode                                                    string
+	agents, rounds, payload, backlog, idle, rtt, readers, jitter, providerDelay int
+	think, drop, profile, entropy, crash, provider, plans                       bool
 }
 
 func call(c *notif.Client, method, path string, in, out any) error {
@@ -325,6 +325,8 @@ func run() (err error) {
 	flag.IntVar(&cfg.rtt, "rtt-ms", 0, "simulated application RTT per worker call")
 	flag.BoolVar(&cfg.think, "think", false, "varied 0 to 200 ms worker delay")
 	flag.BoolVar(&cfg.drop, "drop", false, "lose the first committed reply response per worker")
+	flag.IntVar(&cfg.providerDelay, "provider-delay-ms", 25, "HTTP provider response delay, 0 to 1000 ms")
+	flag.BoolVar(&cfg.plans, "query-plans", false, "capture claim/read-only SQL plans outside measurement")
 	flag.IntVar(&cfg.jitter, "jitter-ms", 0, "deterministic peak-to-peak application RTT jitter")
 	flag.BoolVar(&cfg.entropy, "entropy", false, "deterministic high-entropy payload control")
 	flag.BoolVar(&cfg.provider, "provider", false, "signed HTTP provider with slow/429/definite/ambiguous outcomes")
@@ -336,6 +338,9 @@ func run() (err error) {
 	}
 	if cfg.agents < 1 || cfg.agents > 25 || cfg.rounds < 1 || cfg.rounds > 100 || cfg.payload < 0 || cfg.payload > 28000 || cfg.backlog < 0 || cfg.backlog > 10000 || cfg.idle < 0 || cfg.idle > 60 {
 		return fmt.Errorf("load bounds exceeded")
+	}
+	if cfg.providerDelay < 0 || cfg.providerDelay > 1000 {
+		return fmt.Errorf("provider delay bound exceeded")
 	}
 	if cfg.jitter < 0 || cfg.jitter > 1000 || cfg.rtt < 0 || cfg.rtt > 1000 {
 		return fmt.Errorf("network fault bounds exceeded")
@@ -367,7 +372,7 @@ func run() (err error) {
 		}
 		l.Close()
 	}
-	report := map[string]any{"result": "running", "mode": cfg.mode, "idle_seconds": cfg.idle, "variant": cfg.label, "go": runtime.Version(), "agents": cfg.agents, "rounds": cfg.rounds, "payload_padding_bytes": cfg.payload, "completed_history_rows": cfg.agents * cfg.backlog, "readers": cfg.readers, "rtt_ms": cfg.rtt, "think": cfg.think, "lost_responses": cfg.drop, "high_entropy": cfg.entropy, "jitter_ms": cfg.jitter, "worker_crash": cfg.crash, "provider_fixture": cfg.provider}
+	report := map[string]any{"result": "running", "mode": cfg.mode, "idle_seconds": cfg.idle, "variant": cfg.label, "go": runtime.Version(), "agents": cfg.agents, "rounds": cfg.rounds, "payload_padding_bytes": cfg.payload, "completed_history_rows": cfg.agents * cfg.backlog, "readers": cfg.readers, "rtt_ms": cfg.rtt, "think": cfg.think, "lost_responses": cfg.drop, "high_entropy": cfg.entropy, "jitter_ms": cfg.jitter, "worker_crash": cfg.crash, "provider_fixture": cfg.provider, "provider_delay_ms": cfg.providerDelay}
 	defer func() {
 		if err != nil {
 			report["result"] = "failed"
@@ -452,7 +457,7 @@ func run() (err error) {
 	var fixture *providerFixture
 	var providerID string
 	if cfg.provider {
-		fixture = newProviderFixture()
+		fixture = newProviderFixture(time.Duration(cfg.providerDelay) * time.Millisecond)
 		defer fixture.server.Close()
 		var connection struct {
 			ID string `json:"id"`
@@ -542,6 +547,25 @@ func run() (err error) {
 		if _, e = db.Exec(ctx, `ANALYZE notif.deliveries`); e != nil {
 			return e
 		}
+	}
+	if cfg.plans {
+		plans := map[string]json.RawMessage{}
+		queries := map[string]string{
+			"claim":    `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT id FROM notif.deliveries WHERE scope=$1 AND recipient_id=$2 AND connection_id='' AND expires_at>now() AND (exact_instance='' OR exact_instance=$3) AND ((state='queued' AND next_at<=now()) OR (state='leased' AND (lease_until<now() OR owner_instance=$3))) ORDER BY created_at,id LIMIT 1`,
+			"provider": `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT id FROM notif.deliveries WHERE scope=$1 AND connection_id<>'' AND state='queued' AND next_at<=now() ORDER BY next_at,id LIMIT 1`,
+		}
+		for name, query := range queries {
+			var raw []byte
+			args := []any{"load/development"}
+			if name == "claim" {
+				args = append(args, members[0], sessions[0].InstanceID)
+			}
+			if e = db.QueryRow(ctx, query, args...).Scan(&raw); e != nil {
+				return e
+			}
+			plans[name] = raw
+		}
+		writeJSON(filepath.Join(cfg.out, "query-plans.json"), plans)
 	}
 	// Warm up idle long polls and keep enrollment/fixture construction separate.
 	time.Sleep(time.Second)
@@ -737,11 +761,13 @@ func run() (err error) {
 			return fmt.Errorf("worker %d result count %d", i, len(obs))
 		}
 		seen := map[string]bool{}
+		seenSequences := map[int]bool{}
 		for _, v := range obs {
-			if seen[v.MessageID] || v.Instance != sessions[i].InstanceID {
+			if seen[v.MessageID] || seenSequences[v.Sequence] || v.Sequence < 0 || v.Sequence >= cfg.rounds || v.Instance != sessions[i].InstanceID {
 				return fmt.Errorf("duplicate result or false instance")
 			}
 			seen[v.MessageID] = true
+			seenSequences[v.Sequence] = true
 			receipt = append(receipt, v.ReceiptMS)
 			completion = append(completion, v.CompletionMS)
 		}
@@ -977,7 +1003,7 @@ type providerFixture struct {
 	latency     []float64
 }
 
-func newProviderFixture() *providerFixture {
+func newProviderFixture(delay time.Duration) *providerFixture {
 	p := &providerFixture{secret: token(), attempts: map[string]int{}, order: map[string]int{}}
 	p.server = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, e := io.ReadAll(io.LimitReader(r.Body, 1<<20))
@@ -992,7 +1018,7 @@ func newProviderFixture() *providerFixture {
 		p.attempts[id]++
 		attempt, index := p.attempts[id], p.order[id]
 		p.mu.Unlock()
-		time.Sleep(25 * time.Millisecond)
+		time.Sleep(delay)
 		if attempt == 1 {
 			switch index % 10 {
 			case 0:
