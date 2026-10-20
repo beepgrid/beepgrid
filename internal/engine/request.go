@@ -142,7 +142,7 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 						return e
 					}
 				}
-				if _, e = tx.Exec(ctx, `INSERT INTO request_audience(scope,request_id,principal_id,conversation_id) VALUES($1,$2,$3,$4)`, a.Scope, out.ID, r.ID, projection); e != nil {
+				if _, e = tx.Exec(ctx, `INSERT INTO request_audience(scope,request_id,principal_id,conversation_id,policy_target) VALUES($1,$2,$3,$4,$5)`, a.Scope, out.ID, r.ID, projection, JSON(r.PolicyTarget)); e != nil {
 					return e
 				}
 				view := out
@@ -188,6 +188,21 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	var eligible bool
 	if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3)`, a.Scope, id, a.ID).Scan(&eligible); e != nil {
 		return e
+	}
+	if eligible && !a.Admin {
+		var target Target
+		var raw []byte
+		if e = tx.QueryRow(ctx, `SELECT policy_target FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, a.ID).Scan(&raw); e != nil {
+			return e
+		}
+		_ = json.Unmarshal(raw, &target)
+		if target.Kind == "group" {
+			var member bool
+			_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND group_id=$2 AND principal_id=$3)`, a.Scope, target.ID, a.ID).Scan(&member)
+			if !member {
+				return Denied()
+			}
+		}
 	}
 	if !eligible && !a.Admin {
 		return Denied()
@@ -238,7 +253,7 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	if len(JSON(in)) > 32768 {
 		return Bad("Response too large.")
 	}
-	if _, e = tx.Exec(ctx, `UPDATE requests SET state='resolved',response=$3,resolved_by=$4,resolved_at=now() WHERE scope=$1 AND id=$2 AND state='open'`, a.Scope, id, JSON(in), a.ID); e != nil {
+	if _, e = tx.Exec(ctx, `UPDATE requests SET state='resolved',response=$3,resolved_by=$4,resolved_at=now(),decision_connection=$5 WHERE scope=$1 AND id=$2 AND state='open'`, a.Scope, id, JSON(in), a.ID, a.ProviderConnection); e != nil {
 		return e
 	}
 	*out, e = s.request(ctx, tx, a, id)
@@ -345,7 +360,9 @@ func (s *Store) Redeem(ctx context.Context, a Actor, id string, action Action) (
 		}
 		decider := Actor{Principal: approver, Scope: a.Scope}
 		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked)`, a.Scope, approver.ID).Scan(&decider.Admin)
-		if !s.allowed(ctx, tx, decider, "decide", Target{requester.Kind, requester.ID}, "", action.Name) {
+		var decisionConnection string
+		_ = tx.QueryRow(ctx, `SELECT decision_connection FROM requests WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&decisionConnection)
+		if !s.allowed(ctx, tx, decider, "decide", Target{requester.Kind, requester.ID}, decisionConnection, action.Name) {
 			return Denied()
 		}
 		var raw, result []byte

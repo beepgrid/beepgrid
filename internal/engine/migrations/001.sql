@@ -115,26 +115,3 @@ CREATE TABLE IF NOT EXISTS shared_answers (
   valid_until timestamptz NOT NULL, invalidated boolean NOT NULL DEFAULT false, source_request text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(scope,id)
 );
-INSERT INTO schema_migrations(version) VALUES(1) ON CONFLICT DO NOTHING;
-ALTER TABLE shared_answers ADD COLUMN IF NOT EXISTS publisher_id text NOT NULL DEFAULT '';
-CREATE TABLE IF NOT EXISTS answer_proposals (
- id text PRIMARY KEY, scope text NOT NULL, request_id text NOT NULL, answer_id text NOT NULL, reviewer_id text NOT NULL,
- reason text NOT NULL, state text NOT NULL DEFAULT 'proposed', created_at timestamptz NOT NULL DEFAULT now(),
- FOREIGN KEY(scope,request_id) REFERENCES requests(scope,id), FOREIGN KEY(scope,answer_id) REFERENCES shared_answers(scope,id)
-);
-INSERT INTO schema_migrations(version) VALUES(2) ON CONFLICT DO NOTHING;
-CREATE TABLE IF NOT EXISTS attachments (
- id text PRIMARY KEY, scope text NOT NULL, conversation_id text NOT NULL, owner_id text NOT NULL,
- file_name text NOT NULL, media_type text NOT NULL, size bigint NOT NULL, sha256 text NOT NULL,
- created_at timestamptz NOT NULL DEFAULT now(), FOREIGN KEY(scope,conversation_id) REFERENCES conversations(scope,id)
-);
-INSERT INTO schema_migrations(version) VALUES(3) ON CONFLICT DO NOTHING;
-ALTER TABLE destinations ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'fallback';
-ALTER TABLE destinations ADD COLUMN IF NOT EXISTS priority integer NOT NULL DEFAULT 0;
-DO $$ BEGIN
- IF NOT EXISTS(SELECT 1 FROM schema_migrations WHERE version=4) THEN
- UPDATE destinations d SET mode='primary' WHERE d.id IN (SELECT DISTINCT ON(scope,principal_id) id FROM destinations ORDER BY scope,principal_id,id);
- END IF;
-END $$;
-CREATE UNIQUE INDEX IF NOT EXISTS destinations_primary ON destinations(scope,principal_id) WHERE mode='primary';
-INSERT INTO schema_migrations(version) VALUES(4) ON CONFLICT DO NOTHING;

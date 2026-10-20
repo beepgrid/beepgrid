@@ -309,7 +309,7 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 		return e
 	}
 	defer tx.Rollback(ctx)
-	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE connection_id<>'' AND state='queued' AND next_at<=now() ORDER BY next_at LIMIT 1 FOR UPDATE SKIP LOCKED`))
+	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE connection_id<>'' AND state='queued' AND next_at<=now() AND scope IN(SELECT id FROM scopes WHERE NOT recovery_hold) ORDER BY next_at LIMIT 1 FOR UPDATE SKIP LOCKED`))
 	if e == Missing() || ErrorStatus(e) == 404 {
 		return nil
 	}

@@ -2,20 +2,14 @@ package engine
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-//go:embed schema.sql
-var schema string
 
 type DB interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
@@ -33,49 +27,6 @@ type Store struct {
 	SecretKey []byte
 }
 
-func Open(ctx context.Context, url, schemaName string, key []byte) (*Store, error) {
-	if !regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`).MatchString(schemaName) {
-		return nil, Bad("Invalid database schema")
-	}
-	cfg, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return nil, err
-	}
-	cfg.MaxConns = 12
-	p, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	if _, err = p.Exec(ctx, `CREATE SCHEMA IF NOT EXISTS `+schemaName); err != nil {
-		p.Close()
-		return nil, err
-	}
-	p.Close()
-	cfg.ConnConfig.RuntimeParams["search_path"] = schemaName + ",public"
-	p, err = pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	s := &Store{Pool: p, SecretKey: key}
-	tx, err := p.Begin(ctx)
-	if err != nil {
-		p.Close()
-		return nil, err
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, schemaName); err == nil {
-		_, err = tx.Exec(ctx, schema)
-	}
-	if err != nil {
-		p.Close()
-		return nil, fmt.Errorf("migration: %w", err)
-	}
-	if err = tx.Commit(ctx); err != nil {
-		p.Close()
-		return nil, err
-	}
-	return s, nil
-}
 func (s *Store) Close() { s.Pool.Close() }
 func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 	tx, err := s.Pool.Begin(ctx)
@@ -84,8 +35,12 @@ func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 	}
 	defer tx.Rollback(ctx)
 	// One short workspace lock makes commit order and event cursors agree. Network calls never hold it.
-	if _, err = tx.Exec(ctx, `SELECT id FROM scopes WHERE id=$1 FOR UPDATE`, a.Scope); err != nil {
+	var held bool
+	if err = tx.QueryRow(ctx, `SELECT recovery_hold FROM scopes WHERE id=$1 FOR UPDATE`, a.Scope).Scan(&held); err != nil {
 		return err
+	}
+	if held {
+		return &Error{"RECOVERY_HOLD", "This workspace is paused for restore reconciliation.", 503}
 	}
 	if a.CredentialID != "" {
 		var valid bool

@@ -44,6 +44,49 @@ func run() error {
 		command = os.Args[1]
 	}
 	switch command {
+	case "reconcile":
+		f := flag.NewFlagSet("reconcile", flag.ContinueOnError)
+		restored := f.Bool("restored", false, "Freeze effects and rotate all credentials after database restore")
+		resume := f.Bool("resume", false, "Resume after external reconciliation; does not replay unknown work")
+		if e := f.Parse(os.Args[2:]); e != nil {
+			return e
+		}
+		if *restored == *resume {
+			return fmt.Errorf("choose exactly one of --restored or --resume")
+		}
+		s, e := engine.OpenExisting(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"), nil)
+		if e != nil {
+			return e
+		}
+		defer s.Close()
+		scope := env("NOTIF_WORKSPACE", "local") + "/" + env("NOTIF_ENVIRONMENT", "development")
+		if *resume {
+			return s.ResumeAfterReconciliation(ctx, scope)
+		}
+		token := engine.Secret()
+		path := env("NOTIF_RECOVERY_TOKEN_FILE", ".local/recovery-owner-token")
+		if e = os.MkdirAll(filepath.Dir(path), 0700); e != nil {
+			return e
+		}
+		file, e := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if e != nil {
+			return e
+		}
+		if _, e = file.WriteString(token + "\n"); e != nil {
+			file.Close()
+			return e
+		}
+		if e = file.Close(); e != nil {
+			return e
+		}
+		if e = s.ReconcileRestored(ctx, scope, token); e != nil {
+			_ = os.Remove(path)
+			return e
+		}
+		fmt.Println("Recovery hold set. New owner credential file:", path)
+		return nil
+	case "migrate":
+		return engine.Migrate(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"))
 	case "serve":
 		return serve(ctx, os.Args[2:])
 	case "mcp":
@@ -137,7 +180,11 @@ func serve(ctx context.Context, args []string) error {
 	if e != nil || len(decoded) != 32 {
 		return fmt.Errorf("NOTIF_SECRET_KEY must contain 64 hexadecimal characters")
 	}
-	store, e := engine.Open(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"), decoded)
+	openStore := engine.OpenExisting
+	if *dev {
+		openStore = engine.Open
+	}
+	store, e := openStore(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"), decoded)
 	if e != nil {
 		return e
 	}
