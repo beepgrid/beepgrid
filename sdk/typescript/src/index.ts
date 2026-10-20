@@ -1,3 +1,5 @@
+import { readEvents, type EventOptions } from "./events.js";
+export { type NotifEvent, type EventOptions } from "./events.js";
 export type Target = {
   kind: "person" | "agent" | "service" | "group" | "instance";
   id: string;
@@ -241,6 +243,11 @@ export class Client {
       { state, result },
       { key: crypto.randomUUID() },
     );
+  }
+  // Full, durable events contain canonical message data. Consumers can append
+  // message.created directly instead of downloading a growing history again.
+  events(options: EventOptions = {}) {
+    return readEvents(this.baseURL, this.token, this.transport, options);
   }
   async wait(id: string, signal?: AbortSignal): Promise<RequestItem> {
     for (;;) {
