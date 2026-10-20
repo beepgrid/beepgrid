@@ -100,6 +100,7 @@ type FleetStatus struct {
 }
 
 func (s *Store) FleetStatus(ctx context.Context, a Actor, target *Target) (map[string]any, error) {
+	ctx = withPolicySnapshot(ctx)
 	agents, e := s.ListPrincipals(ctx, a, "agent")
 	if e != nil {
 		return nil, e
@@ -126,16 +127,23 @@ func (s *Store) FleetStatus(ctx context.Context, a Actor, target *Target) (map[s
 	if len(allowed) > 100 {
 		return nil, Bad("Select at most 100 agents for one status query.")
 	}
+	ids := []string{}
+	for _, p := range agents {
+		if allowed[p.ID] {
+			ids = append(ids, p.ID)
+		}
+	}
+	byAgent, e := s.instancesForAgents(ctx, a.Scope, ids)
+	if e != nil {
+		return nil, e
+	}
 	out := []FleetStatus{}
 	fresh := 0
 	for _, p := range agents {
 		if !allowed[p.ID] {
 			continue
 		}
-		instances, e := s.Instances(ctx, a, p.ID)
-		if e != nil {
-			return nil, e
-		}
+		instances := byAgent[p.ID]
 		isFresh := false
 		for _, i := range instances {
 			if i.Presence == "connected" {

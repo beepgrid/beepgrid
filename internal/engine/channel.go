@@ -328,15 +328,23 @@ func (s *Store) DispatchOnce(ctx context.Context, publicURL string) error {
 		return e
 	}
 	defer tx.Rollback(ctx)
-	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE connection_id<>'' AND state='queued' AND next_at<=now() AND scope IN(SELECT id FROM scopes WHERE NOT recovery_hold) ORDER BY (SELECT last_dispatch_at FROM scopes WHERE id=deliveries.scope),next_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`))
-	if e == Missing() || ErrorStatus(e) == 404 {
+	// Match mutation lock order: workspace first, then delivery. Skip busy
+	// workspaces so cancellation cannot deadlock and other tenants can progress.
+	var scope string
+	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND EXISTS(SELECT 1 FROM deliveries d WHERE d.scope=s.id AND d.connection_id<>'' AND d.state='queued' AND d.next_at<=now()) ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
+	if e == pgx.ErrNoRows {
 		return nil
 	}
 	if e != nil {
 		return e
 	}
-	var scope string
-	_ = tx.QueryRow(ctx, `SELECT scope FROM deliveries WHERE id=$1`, d.ID).Scan(&scope)
+	d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND connection_id<>'' AND state='queued' AND next_at<=now() ORDER BY next_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`, scope))
+	if ErrorStatus(e) == 404 {
+		return nil
+	}
+	if e != nil {
+		return e
+	}
 	if d.ExpiresAt.Before(time.Now()) || !s.currentDeliveryPolicy(ctx, tx, scope, d) {
 		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Expired or permission revoked' WHERE id=$1`, d.ID)
 		if e == nil {

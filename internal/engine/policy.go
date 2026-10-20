@@ -16,37 +16,18 @@ func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, targ
 	if a.Admin {
 		return true
 	}
-	rows, e := db.Query(ctx, `SELECT r.rules FROM roles r JOIN role_bindings b ON b.role_id=r.id AND b.scope=r.scope WHERE r.scope=$1 AND ((b.subject_kind='principal' AND b.subject_id=$2) OR (b.subject_kind='group' AND EXISTS(SELECT 1 FROM memberships m WHERE m.scope=b.scope AND m.group_id=b.subject_id AND m.principal_id=$2)))`, a.Scope, a.ID)
+	all, e := roleRules(ctx, db, a)
 	if e != nil {
 		return false
 	}
 
-	all := []Rule{}
-	for rows.Next() {
-		var raw []byte
-		if rows.Scan(&raw) != nil {
-			rows.Close()
-			return false
-		}
-		var rules []Rule
-		if json.Unmarshal(raw, &rules) != nil {
-			rows.Close()
-			return false
-		}
-		all = append(all, rules...)
-	}
-	err := rows.Err()
-	rows.Close()
-	if err != nil {
-		return false
-	}
 	for _, r := range all {
 		if r.Action != action && r.Action != "*" {
 			continue
 		}
 		groupMember := false
 		if r.TargetKind == "group" && (target.Kind == "person" || target.Kind == "agent" || target.Kind == "service") && target.ID != "*" {
-			_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND principal_id=$2 AND (group_id=$3 OR $3='*'))`, a.Scope, target.ID, r.TargetID).Scan(&groupMember)
+			groupMember = targetGroupMember(ctx, db, a.Scope, r.TargetID, target.ID)
 		}
 		if !groupMember && r.TargetKind != "*" && r.TargetKind != target.Kind {
 			continue
@@ -196,6 +177,7 @@ func (s *Store) Bindings(ctx context.Context, a Actor) ([]Binding, error) {
 	return out, rows.Err()
 }
 func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
+	ctx = withPolicySnapshot(ctx)
 	rows, e := s.Pool.Query(ctx, `SELECT g.id,g.name,COALESCE(jsonb_agg(m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]') FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 GROUP BY g.id ORDER BY g.name`, a.Scope)
 	if e != nil {
 		return nil, e

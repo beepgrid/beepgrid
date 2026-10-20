@@ -4,15 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/jackc/pgx/v5"
+	"strings"
 	"time"
 )
 
 const requestFields = `r.id,r.requester_id,COALESCE(r.requester_instance,''),r.conversation_id,r.kind,r.title,r.body,r.choices,r.action,CASE WHEN r.state='open' AND r.expires_at<=now() THEN 'expired' ELSE r.state END,r.version,r.response,r.resolved_by,r.resolved_at,r.expires_at,r.created_at,r.shared_key`
 
-func scanRequest(row pgx.Row) (Request, error) {
+func scanRequest(row pgx.Row, extra ...any) (Request, error) {
 	var r Request
 	var choices, action, response []byte
-	e := row.Scan(&r.ID, &r.RequesterID, &r.RequesterInstanceID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey)
+	targets := []any{&r.ID, &r.RequesterID, &r.RequesterInstanceID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey}
+	e := row.Scan(append(targets, extra...)...)
 	_ = json.Unmarshal(choices, &r.Choices)
 	if len(action) > 0 && string(action) != "null" {
 		_ = json.Unmarshal(action, &r.Action)
@@ -47,18 +49,25 @@ func (s *Store) Request(ctx context.Context, a Actor, id string) (Request, error
 	return s.request(ctx, s.Pool, a, id)
 }
 func (s *Store) Requests(ctx context.Context, a Actor) ([]Request, error) {
-	rows, e := s.Pool.Query(ctx, `SELECT r.id FROM requests r WHERE r.scope=$1 AND ($2 OR r.requester_id=$3 OR EXISTS(SELECT 1 FROM request_audience ra WHERE ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$3)) ORDER BY r.created_at DESC LIMIT 200`, a.Scope, a.Admin, a.ID)
+	ctx = withPolicySnapshot(ctx)
+	fields := strings.Replace(requestFields, "r.conversation_id", "CASE WHEN $2 OR r.requester_id=$3 THEN r.conversation_id ELSE ra.conversation_id END", 1)
+	rows, e := s.Pool.Query(ctx, `SELECT `+fields+`,p.kind FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope LEFT JOIN request_audience ra ON ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$3 WHERE r.scope=$1 AND ($2 OR r.requester_id=$3 OR ra.principal_id IS NOT NULL) ORDER BY r.created_at DESC,r.id DESC LIMIT 200`, a.Scope, a.Admin, a.ID)
 	if e != nil {
 		return nil, e
 	}
-	ids := []string{}
+	type item struct {
+		request Request
+		kind    string
+	}
+	all := []item{}
 	for rows.Next() {
-		var id string
-		if e = rows.Scan(&id); e != nil {
+		var kind string
+		r, e := scanRequest(rows, &kind)
+		if e != nil {
 			rows.Close()
 			return nil, e
 		}
-		ids = append(ids, id)
+		all = append(all, item{r, kind})
 	}
 	e = rows.Err()
 	rows.Close()
@@ -66,18 +75,20 @@ func (s *Store) Requests(ctx context.Context, a Actor) ([]Request, error) {
 		return nil, e
 	}
 	out := []Request{}
-	for _, id := range ids {
-		r, e := s.request(ctx, s.Pool, a, id)
-		if e != nil {
-			if ErrorStatus(e) == 404 {
-				continue
-			}
-			return nil, e
+	for _, x := range all {
+		r := x.request
+		if !a.Admin && a.ID != r.RequesterID && !s.allowed(ctx, s.Pool, a, "view", Target{x.kind, r.RequesterID}, "", "") {
+			continue
+		}
+		if r.Response != nil && r.Response.SourceAnswerID != "" {
+			answer, e := scanAnswer(s.Pool.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2`, a.Scope, r.Response.SourceAnswerID))
+			r.Response.SourceInvalidated = e != nil || answer.Invalidated || answer.ValidUntil.Before(time.Now()) || !s.publisherCurrent(ctx, s.Pool, a.Scope, answer)
 		}
 		out = append(out, r)
 	}
 	return out, nil
 }
+
 func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Request, error) {
 	var out Request
 	stable := in

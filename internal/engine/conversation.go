@@ -108,32 +108,55 @@ func newConversation(ctx context.Context, db DB, a Actor, title string, ids ...s
 	return id, nil
 }
 func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, error) {
-	rows, e := s.Pool.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at FROM conversations c WHERE c.scope=$1 AND ($2 OR EXISTS(SELECT 1 FROM participants p WHERE p.scope=c.scope AND p.conversation_id=c.id AND p.principal_id=$3)) ORDER BY c.created_at DESC LIMIT 200`, a.Scope, a.Admin, a.ID)
+	ctx = withPolicySnapshot(ctx)
+	rows, e := s.Pool.Query(ctx, `WITH candidates AS (
+ SELECT c.id,c.title,c.created_by,c.created_at FROM conversations c WHERE c.scope=$1 AND ($2 OR EXISTS(SELECT 1 FROM participants p WHERE p.scope=c.scope AND p.conversation_id=c.id AND p.principal_id=$3)) ORDER BY c.created_at DESC,c.id DESC LIMIT 200
+ ) SELECT c.id,c.title,c.created_by,c.created_at,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind)) FILTER(WHERE p.id<>$3),'[]') FROM candidates c LEFT JOIN participants cp ON cp.scope=$1 AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id GROUP BY c.id,c.title,c.created_by,c.created_at ORDER BY c.created_at DESC,c.id DESC`, a.Scope, a.Admin, a.ID)
 	if e != nil {
 		return nil, e
 	}
-	defer rows.Close()
-	out := []Conversation{}
+	type entry struct {
+		conv   Conversation
+		others []Target
+	}
+	all := []entry{}
 	for rows.Next() {
 		var c Conversation
-		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt); e != nil {
+		var raw []byte
+		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &raw); e != nil {
+			rows.Close()
 			return nil, e
 		}
-		out = append(out, c)
+		var others []Target
+		if e = json.Unmarshal(raw, &others); e != nil {
+			rows.Close()
+			return nil, e
+		}
+		all = append(all, entry{c, others})
 	}
 	e = rows.Err()
 	rows.Close()
 	if e != nil {
 		return nil, e
 	}
-	visible := []Conversation{}
-	for _, c := range out {
-		if s.canRead(ctx, s.Pool, a, c.ID) {
-			visible = append(visible, c)
+	out := []Conversation{}
+	for _, x := range all {
+		visible := a.Admin || len(x.others) > 0
+		if !a.Admin {
+			for _, p := range x.others {
+				if !s.allowed(ctx, s.Pool, a, "view", p, "", "") {
+					visible = false
+					break
+				}
+			}
+		}
+		if visible {
+			out = append(out, x.conv)
 		}
 	}
-	return visible, nil
+	return out, nil
 }
+
 func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversation, error) {
 	var c Conversation
 	if !s.canRead(ctx, s.Pool, a, id) {
@@ -372,6 +395,7 @@ func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, erro
 
 // EventPage returns the scanned cursor even when current permissions hide a whole page.
 func (s *Store) EventPage(ctx context.Context, a Actor, after int64, recent bool) ([]Event, int64, error) {
+	ctx = withPolicySnapshot(ctx)
 	order := "ASC"
 	if recent {
 		order = "DESC"
@@ -398,11 +422,17 @@ func (s *Store) EventPage(ctx context.Context, a Actor, after int64, recent bool
 		return nil, after, e
 	}
 	visible := []Event{}
+	readable := map[string]bool{}
+	checked := map[string]bool{}
 	for _, x := range out {
 		if x.Sequence > after {
 			after = x.Sequence
 		}
-		if x.ConversationID == "" || s.canRead(ctx, s.Pool, a, x.ConversationID) {
+		if x.ConversationID != "" && !checked[x.ConversationID] {
+			readable[x.ConversationID] = s.canRead(ctx, s.Pool, a, x.ConversationID)
+			checked[x.ConversationID] = true
+		}
+		if x.ConversationID == "" || readable[x.ConversationID] {
 			visible = append(visible, x)
 		}
 	}

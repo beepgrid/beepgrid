@@ -51,6 +51,7 @@ func (s *Store) CreatePerson(ctx context.Context, a Actor, in CreatePerson) (Pri
 	return p, err
 }
 func (s *Store) ListPrincipals(ctx context.Context, a Actor, kind string) ([]Principal, error) {
+	ctx = withPolicySnapshot(ctx)
 	if kind != "person" && kind != "agent" && kind != "service" {
 		return nil, Bad("Invalid collection.")
 	}
@@ -289,14 +290,19 @@ func (s *Store) Agents(ctx context.Context, a Actor) ([]Agent, error) {
 	if e != nil {
 		return nil, e
 	}
-	out := []Agent{}
+	ids := make([]string, 0, len(principals))
 	for _, p := range principals {
-		instances, e := s.Instances(ctx, a, p.ID)
-		if e != nil {
-			return nil, e
-		}
-		out = append(out, Agent{p, instances})
+		ids = append(ids, p.ID)
 	}
+	byAgent, e := s.instancesForAgents(ctx, a.Scope, ids)
+	if e != nil {
+		return nil, e
+	}
+	out := make([]Agent, 0, len(principals))
+	for _, p := range principals {
+		out = append(out, Agent{p, byAgent[p.ID]})
+	}
+
 	return out, nil
 }
 
