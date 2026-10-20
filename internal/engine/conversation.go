@@ -305,9 +305,20 @@ func (s *Store) Send(ctx context.Context, a Actor, in SendInput, key string) (Se
 	return out, err
 }
 func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, error) {
-	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,e.data,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND ($3 OR (e.conversation_id<>'' AND EXISTS(SELECT 1 FROM participants p WHERE p.scope=e.scope AND p.conversation_id=e.conversation_id AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence LIMIT 200`, a.Scope, after, a.Admin, a.ID)
+	events, _, err := s.EventPage(ctx, a, after, false)
+	return events, err
+}
+
+// EventPage returns the scanned cursor even when current permissions hide a whole page.
+func (s *Store) EventPage(ctx context.Context, a Actor, after int64, recent bool) ([]Event, int64, error) {
+	order := "ASC"
+	if recent {
+		order = "DESC"
+	}
+
+	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,e.data,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND ($3 OR (e.conversation_id<>'' AND EXISTS(SELECT 1 FROM participants p WHERE p.scope=e.scope AND p.conversation_id=e.conversation_id AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence `+order+` LIMIT 200`, a.Scope, after, a.Admin, a.ID)
 	if e != nil {
-		return nil, e
+		return nil, after, e
 	}
 	defer rows.Close()
 	out := []Event{}
@@ -315,7 +326,7 @@ func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, erro
 		var x Event
 		var raw []byte
 		if e = rows.Scan(&x.Sequence, &x.Kind, &x.ActorID, &x.ConversationID, &x.RecipientID, &raw, &x.CreatedAt); e != nil {
-			return nil, e
+			return nil, after, e
 		}
 		_ = json.Unmarshal(raw, &x.Data)
 		out = append(out, x)
@@ -323,15 +334,18 @@ func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, erro
 	e = rows.Err()
 	rows.Close()
 	if e != nil {
-		return nil, e
+		return nil, after, e
 	}
 	visible := []Event{}
 	for _, x := range out {
+		if x.Sequence > after {
+			after = x.Sequence
+		}
 		if x.ConversationID == "" || s.canRead(ctx, s.Pool, a, x.ConversationID) {
 			visible = append(visible, x)
 		}
 	}
-	return visible, nil
+	return visible, after, nil
 }
 func (s *Store) Preview(ctx context.Context, a Actor, target Target, action string) (map[string]any, error) {
 	rs, e := s.resolve(ctx, s.Pool, a, target, action, "")

@@ -164,92 +164,93 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 }
 func (s *Store) Respond(ctx context.Context, a Actor, id string, in Response) (Request, error) {
 	var out Request
-	if in.SourceAnswerID != "" {
+	if in.SourceAnswerID != "" || in.SourceInvalidated {
 		return out, Bad("Answer provenance is assigned by the server.")
 	}
-	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		r, e := s.request(ctx, tx, a, id)
-		if e != nil {
-			return e
-		}
-		if in.Version != r.Version {
-			return Conflict("The request version changed.")
-		}
-		if r.State != "open" {
-			if r.State == "resolved" && r.ResolvedBy != nil && *r.ResolvedBy == a.ID && r.Response != nil && string(JSON(*r.Response)) == string(JSON(in)) {
-				out = r
-				return nil
-			}
-			return Conflict("The request is already " + r.State + ".")
-		}
-		var eligible bool
-		if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3)`, a.Scope, id, a.ID).Scan(&eligible); e != nil {
-			return e
-		}
-		if !eligible && !a.Admin {
-			return Denied()
-		}
-		requester, e := principal(ctx, tx, a.Scope, r.RequesterID)
-		if e != nil {
-			return e
-		}
-		actionName := ""
-		if r.Action != nil {
-			actionName = r.Action.Name
-		}
-		permission := "message"
-		if r.Kind == "approval" {
-			permission = "decide"
-		}
-		if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, "", actionName) {
-			return Denied()
-		}
-		switch r.Kind {
-		case "approval":
-			if in.Outcome != "approved" && in.Outcome != "denied" {
-				return Bad("Approval outcome must be approved or denied.")
-			}
-		case "question":
-			if in.Outcome != "answered" {
-				return Bad("Question outcome must be answered.")
-			}
-			if in.Answer == nil {
-				return Bad("An answer is required.")
-			}
-			if len(r.Choices) > 0 {
-				match := false
-				for _, c := range r.Choices {
-					if c == in.Answer {
-						match = true
-					}
-				}
-				if !match {
-					return Bad("Answer must match a declared choice.")
-				}
-			}
-		case "task":
-			if in.Outcome != "completed" && in.Outcome != "failed" && in.Outcome != "rejected" {
-				return Bad("Task outcome must be completed, failed or rejected.")
-			}
-		}
-		if len(JSON(in)) > 32768 {
-			return Bad("Response too large.")
-		}
-		if _, e = tx.Exec(ctx, `UPDATE requests SET state='resolved',response=$3,resolved_by=$4,resolved_at=now() WHERE scope=$1 AND id=$2 AND state='open'`, a.Scope, id, JSON(in), a.ID); e != nil {
-			return e
-		}
-		out, e = s.request(ctx, tx, a, id)
-		if e != nil {
-			return e
-		}
-		if e = s.requestEvent(ctx, tx, a, out, "request.resolved"); e != nil {
-			return e
-		}
-		// Result delivery goes back to the original requester and is independent of the responder's provider.
-		rr := recipient{Principal: requester, PolicyTarget: Target{requester.Kind, requester.ID}}
-		return s.enqueue(ctx, tx, a, rr, id+"/result", out.ConversationID, permission, map[string]any{"type": "request.resolved", "request": out}, time.Now().Add(30*24*time.Hour))
-	})
+	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.respondTx(ctx, tx, a, id, in, &out) })
 	return out, err
+}
+func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in Response, out *Request) error {
+	r, e := s.request(ctx, tx, a, id)
+	if e != nil {
+		return e
+	}
+	if in.Version != r.Version {
+		return Conflict("The request version changed.")
+	}
+	if r.State != "open" {
+		if r.State == "resolved" && r.ResolvedBy != nil && *r.ResolvedBy == a.ID && r.Response != nil && string(JSON(*r.Response)) == string(JSON(in)) {
+			*out = r
+			return nil
+		}
+		return Conflict("The request is already " + r.State + ".")
+	}
+	var eligible bool
+	if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3)`, a.Scope, id, a.ID).Scan(&eligible); e != nil {
+		return e
+	}
+	if !eligible && !a.Admin {
+		return Denied()
+	}
+	requester, e := principal(ctx, tx, a.Scope, r.RequesterID)
+	if e != nil {
+		return e
+	}
+	actionName := ""
+	if r.Action != nil {
+		actionName = r.Action.Name
+	}
+	permission := "message"
+	if r.Kind == "approval" {
+		permission = "decide"
+	}
+	if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, "", actionName) {
+		return Denied()
+	}
+	switch r.Kind {
+	case "approval":
+		if in.Outcome != "approved" && in.Outcome != "denied" {
+			return Bad("Approval outcome must be approved or denied.")
+		}
+	case "question":
+		if in.Outcome != "answered" {
+			return Bad("Question outcome must be answered.")
+		}
+		if in.Answer == nil {
+			return Bad("An answer is required.")
+		}
+		if len(r.Choices) > 0 {
+			match := false
+			for _, c := range r.Choices {
+				if c == in.Answer {
+					match = true
+				}
+			}
+			if !match {
+				return Bad("Answer must match a declared choice.")
+			}
+		}
+	case "task":
+		if in.Outcome != "completed" && in.Outcome != "failed" && in.Outcome != "rejected" {
+			return Bad("Task outcome must be completed, failed or rejected.")
+		}
+	}
+	if len(JSON(in)) > 32768 {
+		return Bad("Response too large.")
+	}
+	if _, e = tx.Exec(ctx, `UPDATE requests SET state='resolved',response=$3,resolved_by=$4,resolved_at=now() WHERE scope=$1 AND id=$2 AND state='open'`, a.Scope, id, JSON(in), a.ID); e != nil {
+		return e
+	}
+	*out, e = s.request(ctx, tx, a, id)
+	if e != nil {
+		return e
+	}
+	if e = s.requestEvent(ctx, tx, a, *out, "request.resolved"); e != nil {
+		return e
+	}
+	// Result delivery goes back to the original requester and is independent of the responder's provider.
+	rr := recipient{Principal: requester, PolicyTarget: Target{requester.Kind, requester.ID}}
+	return s.enqueue(ctx, tx, a, rr, id+"/result", out.ConversationID, permission, map[string]any{"type": "request.resolved", "request": out}, time.Now().Add(30*24*time.Hour))
 }
 func (s *Store) requestEvent(ctx context.Context, db DB, a Actor, r Request, kind string) error {
 	if e := event(ctx, db, a, kind, r.ConversationID, r.RequesterID, r); e != nil {

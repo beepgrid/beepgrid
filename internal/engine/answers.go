@@ -259,6 +259,10 @@ func (s *Store) InvalidateAnswer(ctx context.Context, a Actor, id string) error 
 			return e
 		}
 		for _, r := range affected {
+			r.Response.SourceInvalidated = true
+			if _, e = tx.Exec(ctx, `UPDATE requests SET response=$3 WHERE scope=$1 AND id=$2`, a.Scope, r.ID, JSON(r.Response)); e != nil {
+				return e
+			}
 			if e = s.requestEvent(ctx, tx, a, r, "answer.invalidated"); e != nil {
 				return e
 			}
@@ -301,12 +305,23 @@ func (s *Store) SuggestAnswers(ctx context.Context, a Actor, id string) ([]Propo
 	}
 	out := []Proposal{}
 	e = s.tx(ctx, a, func(tx pgx.Tx) error {
+		current, e := s.request(ctx, tx, a, id)
+		if e != nil {
+			return e
+		}
+		if current.State != "open" {
+			return Conflict("Question is no longer open.")
+		}
 		for _, v := range suggestions {
 			if len(out) >= 5 {
 				break
 			}
 			for _, candidate := range candidates {
 				if candidate.ID != v.AnswerID || !ValidText(v.Reason, 1000) {
+					continue
+				}
+				fresh, err := scanAnswer(tx.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2 AND NOT invalidated AND valid_until>now()`, a.Scope, candidate.ID))
+				if err != nil || !contains(fresh.Audience, current.RequesterID) || !s.publisherCurrent(ctx, tx, a.Scope, fresh) {
 					continue
 				}
 				p := Proposal{ID: ID("match"), RequestID: id, Answer: candidate, Reason: v.Reason, State: "proposed"}
@@ -321,44 +336,36 @@ func (s *Store) SuggestAnswers(ctx context.Context, a Actor, id string) ([]Propo
 	return out, e
 }
 func (s *Store) DecideProposal(ctx context.Context, a Actor, id string, accept bool) (Request, error) {
-	var r Request
-	var answerID, requestID, reviewer, state string
-	e := s.Pool.QueryRow(ctx, `SELECT request_id,answer_id,reviewer_id,state FROM answer_proposals WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&requestID, &answerID, &reviewer, &state)
-	if e != nil {
-		return r, Missing()
-	}
-	if reviewer != a.ID || state != "proposed" {
-		return r, Denied()
-	}
-	r, e = s.Request(ctx, a, requestID)
-	if e != nil {
-		return r, e
-	}
-	if !accept {
-		_, e = s.Pool.Exec(ctx, `UPDATE answer_proposals SET state='rejected' WHERE scope=$1 AND id=$2`, a.Scope, id)
-		return r, e
-	}
-	answers, e := s.Answers(ctx, a)
-	if e != nil {
-		return r, e
-	}
-	var selected *SharedAnswer
-	for _, v := range answers {
-		if v.ID == answerID && contains(v.Audience, r.RequesterID) {
-			v := v
-			selected = &v
+	var out Request
+	err := s.tx(ctx, a, func(tx pgx.Tx) error {
+		var answerID, requestID, reviewer, state string
+		if e := tx.QueryRow(ctx, `SELECT request_id,answer_id,reviewer_id,state FROM answer_proposals WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&requestID, &answerID, &reviewer, &state); e != nil {
+			return Missing()
 		}
-	}
-	if selected == nil {
-		return r, Denied()
-	}
-	if r.Kind != "question" {
-		return r, Denied()
-	}
-	r, e = s.Respond(ctx, a, requestID, Response{Outcome: "answered", Answer: selected.Answer, Version: r.Version})
-	if e != nil {
-		return r, e
-	}
-	_, e = s.Pool.Exec(ctx, `UPDATE answer_proposals SET state='accepted' WHERE scope=$1 AND id=$2`, a.Scope, id)
-	return r, e
+		if reviewer != a.ID || state != "proposed" {
+			return Denied()
+		}
+		r, e := s.request(ctx, tx, a, requestID)
+		if e != nil {
+			return e
+		}
+		out = r
+		next := "rejected"
+		if accept {
+			answer, e := scanAnswer(tx.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2 AND NOT invalidated AND valid_until>now()`, a.Scope, answerID))
+			if e != nil || !contains(answer.Audience, r.RequesterID) || !(a.Admin || a.ID == answer.PublisherID || contains(answer.Audience, a.ID)) || !s.publisherCurrent(ctx, tx, a.Scope, answer) {
+				return Denied()
+			}
+			if r.Kind != "question" {
+				return Denied()
+			}
+			if e = s.respondTx(ctx, tx, a, requestID, Response{Outcome: "answered", Answer: answer.Answer, Version: r.Version, SourceAnswerID: answer.ID}, &out); e != nil {
+				return e
+			}
+			next = "accepted"
+		}
+		_, e = tx.Exec(ctx, `UPDATE answer_proposals SET state=$3 WHERE scope=$1 AND id=$2`, a.Scope, id, next)
+		return e
+	})
+	return out, err
 }

@@ -376,10 +376,15 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/v1/deliveries/{id}/retry", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		return ok(w, map[string]bool{"queued": true}, s.Store.RetryDelivery(r.Context(), actor(r), r.PathValue("id")))
 	}))
+	m.HandleFunc("GET /api/v1/activity", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, _, e := s.Store.EventPage(r.Context(), actor(r), 0, true)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("GET /api/v1/events", s.protect(s.events))
 	s.channelRoutes()
 	s.oidcRoutes()
 	s.assistanceRoutes()
+	s.attachmentRoutes()
 	if s.UI != nil {
 		m.Handle("/", s.UI)
 	}
@@ -427,13 +432,17 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 		if e := s.Store.Pool.QueryRow(r.Context(), `SELECT c.revoked OR p.disabled OR (c.expires_at IS NOT NULL AND c.expires_at<=now()) FROM credentials c JOIN principals p ON p.id=c.principal_id WHERE c.scope=$1 AND c.id=$2`, a.Scope, a.CredentialID).Scan(&revoked); e != nil || revoked {
 			return nil
 		}
-		events, e := s.Store.Events(r.Context(), a, after)
+		events, scanned, e := s.Store.EventPage(r.Context(), a, after, false)
 		if e != nil {
 			return nil
 		}
 		for _, ev := range events {
 			fmt.Fprintf(w, "id: %d\ndata: %s\n\n", ev.Sequence, engine.JSON(ev))
 			after = ev.Sequence
+		}
+		if scanned > after {
+			fmt.Fprintf(w, "id: %d\nevent: cursor\ndata: {}\n\n", scanned)
+			after = scanned
 		}
 		fmt.Fprint(w, ": keepalive\n\n")
 		f.Flush()

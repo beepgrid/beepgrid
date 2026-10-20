@@ -202,7 +202,8 @@ type Request struct {
 	SharedKey      string     `json:"shared_key"`
 }
 type Response struct {
-	SourceAnswerID string `json:"source_answer_id,omitempty"`
+	SourceAnswerID    string `json:"source_answer_id,omitempty"`
+	SourceInvalidated bool   `json:"source_invalidated,omitempty"`
 
 	Outcome string `json:"outcome"`
 	Answer  any    `json:"answer,omitempty"`

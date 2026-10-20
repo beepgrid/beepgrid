@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -65,5 +66,34 @@ func TestOIDCUsesVerifiedSubjectNotMatchingEmail(t *testing.T) {
 	}
 	if _, e = s.LoginOIDC(ctx, a.Scope, "https://issuer.test", "subject-1", "SSO person", "same@example.test"); ErrorStatus(e) != 403 {
 		t.Fatal("disabled SSO person logged in", e)
+	}
+}
+
+func TestReplayCursorAdvancesAcrossHiddenPage(t *testing.T) {
+	s, a := testStore(t)
+	ctx := context.Background()
+	w := testWorker(t, s, a, "cursor-worker")
+	p := testPerson(t, s, a, "cursor-person")
+	role := grant(t, s, a, p, []Rule{{"view", "agent", w.ID, "", ""}, {"message", "agent", w.ID, "", ""}})
+	for i := 0; i < 205; i++ {
+		if _, e := s.Send(ctx, w, SendInput{Target: Target{"person", p.ID}, Body: "private"}, fmt.Sprint("cursor-", i)); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e := s.BindRole(ctx, a, Binding{role.ID, "principal", p.ID}, true); e != nil {
+		t.Fatal(e)
+	}
+	events, cursor, e := s.EventPage(ctx, p, 0, false)
+	if e != nil || cursor < 200 {
+		t.Fatal(len(events), cursor, e)
+	}
+	for _, ev := range events {
+		if ev.ConversationID != "" {
+			t.Fatal("revoked conversation leaked", ev.Kind)
+		}
+	}
+	recent, _, e := s.EventPage(ctx, a, 0, true)
+	if e != nil || len(recent) != 200 || recent[0].Sequence <= recent[1].Sequence {
+		t.Fatal("recent activity order", e)
 	}
 }

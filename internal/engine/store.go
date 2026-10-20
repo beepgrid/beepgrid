@@ -23,6 +23,8 @@ type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Store struct {
+	AttachmentsRoot string
+
 	Matcher Matcher
 
 	AllowLocal bool
@@ -89,6 +91,12 @@ func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 		var valid bool
 		err = tx.QueryRow(ctx, `SELECT NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now()) FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope WHERE c.id=$1 AND c.scope=$2`, a.CredentialID, a.Scope).Scan(&valid)
 		if err != nil || !valid {
+			return Denied()
+		}
+	}
+	if a.Admin && a.CredentialKind == "browser" {
+		var admin bool
+		if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, a.ID).Scan(&admin); e != nil || !admin {
 			return Denied()
 		}
 	}
