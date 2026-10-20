@@ -1,1 +1,40 @@
-{"name":"@notif/react","version":"0.1.0-dev","description":"Authenticated request and conversation components for Notif","license":"Apache-2.0","type":"module","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"},"./styles.css":"./src/styles.css"},"files":["dist","src/styles.css"],"scripts":{"build":"tsc","test":"vitest run","prepack":"npm run build"},"peerDependencies":{"react":">=19","@notif/client":">=0.1.0-dev"},"devDependencies":{"@notif/client":"file:../typescript","react":"19.3.1","react-dom":"19.3.1","@types/react":"^19.0.0","@types/react-dom":"^19.0.0","typescript":"5.9.3","vitest":"5.0.5","@testing-library/react":"16.3.3","@testing-library/jest-dom":"^6.0.0","jsdom":"^27.0.0"}}
+{
+  "name": "@notif/react",
+  "version": "0.1.0-dev",
+  "description": "Authenticated request and conversation components for Notif",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./src/styles.css"
+  },
+  "files": [
+    "dist",
+    "src/styles.css"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@notif/client": ">=0.1.0-dev",
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@notif/client": "file:../typescript",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "16.3.3",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jsdom": "^27.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

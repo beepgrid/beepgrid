@@ -29,6 +29,8 @@ func Tools() any {
 		{"ask", "Create a durable question or approval and return its handle. The caller may continue working.", schema([]string{"target", "title"}, map[string]any{"target": map[string]any{"type": "object"}, "title": textType(), "body": textType(), "kind": textType(), "choices": map[string]any{"type": "array", "items": textType()}, "action": map[string]any{"type": "object"}, "shared_key": textType(), "idempotency_key": textType()})},
 		{"get_request", "Read the current result of a request without cancelling it.", schema([]string{"id"}, map[string]any{"id": textType()})},
 		{"reply", "Respond to an eligible question, approval or task. Current permissions are enforced.", schema([]string{"id", "outcome", "version"}, map[string]any{"id": textType(), "outcome": textType(), "version": map[string]string{"type": "integer"}, "answer": map[string]any{}})},
+		{"redeem_approval", "Recheck an exact approved action and obtain its durable execution intent. This does not execute the action; the business tool must enforce operation and resource-version fences.", schema([]string{"id", "action"}, map[string]any{"id": textType(), "action": map[string]string{"type": "object"}})},
+		{"report_execution", "Report an execution observation. Approval and transport receipt alone are not execution evidence.", schema([]string{"id", "state"}, map[string]any{"id": textType(), "state": textType(), "result": map[string]any{}})},
 		{"request_status", "List requests visible to this caller.", schema(nil, map[string]any{})},
 	}
 }
@@ -160,6 +162,25 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 			return nil, e
 		}
 		return c.Ask(ctx, in.AskInput, in.IdempotencyKey)
+	case "redeem_approval":
+		var in struct {
+			ID     string       `json:"id"`
+			Action notif.Action `json:"action"`
+		}
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		return c.Redeem(ctx, in.ID, in.Action)
+	case "report_execution":
+		var in struct {
+			ID     string `json:"id"`
+			State  string `json:"state"`
+			Result any    `json:"result"`
+		}
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		return c.ReportExecution(ctx, in.ID, in.State, in.Result)
 	case "get_request":
 		var in struct {
 			ID string `json:"id"`

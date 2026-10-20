@@ -174,3 +174,49 @@ func TestSDKRetriesLostResponseAfterCommitWithoutDuplicate(t *testing.T) {
 		t.Fatal("network replay duplicated accepted work", count)
 	}
 }
+
+func TestGoSDKApprovalExecutionLifecycle(t *testing.T) {
+	_, admin, _ := setup(t)
+	ctx := context.Background()
+	var me struct {
+		Person notif.Person `json:"person"`
+	}
+	if e := admin.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
+		t.Fatal(e)
+	}
+	worker, session, e := admin.Enroll(ctx, notif.EnrollInput{Agent: "release/test", Name: "Executor"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	action := notif.Action{Name: "local_test", ExecutorID: session.Agent.ID, Resource: "fixture", ResourceVersion: "1", OperationKey: "fixture/1", Arguments: map[string]any{"text": "ok"}}
+	q, e := admin.Ask(ctx, notif.AskInput{Kind: "approval", Title: "Fixture?", Target: notif.Target{Kind: "person", ID: me.Person.ID}, Action: &action}, "approval")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = worker.Redeem(ctx, q.ID, action); e == nil {
+		t.Fatal("unapproved action redeemed")
+	}
+	if _, e = admin.Respond(ctx, q.ID, notif.Response{Outcome: "approved", Version: q.Version}); e != nil {
+		t.Fatal(e)
+	}
+	execution, e := worker.Redeem(ctx, q.ID, action)
+	if e != nil {
+		t.Fatal(e)
+	}
+	again, e := worker.Redeem(ctx, q.ID, action)
+	if e != nil || again.ID != execution.ID {
+		t.Fatal("duplicate intent", again, e)
+	}
+	altered := action
+	altered.ResourceVersion = "2"
+	if _, e = worker.Redeem(ctx, q.ID, altered); e == nil {
+		t.Fatal("altered action accepted")
+	}
+	result, e := worker.ReportExecution(ctx, execution.ID, "succeeded", map[string]any{"effect": "test-reported"})
+	if e != nil || result.State != "succeeded" {
+		t.Fatal(result, e)
+	}
+	if _, e = worker.ReportExecution(ctx, execution.ID, "failed", nil); e == nil {
+		t.Fatal("terminal report overwritten")
+	}
+}

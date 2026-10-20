@@ -1,6 +1,7 @@
 """Notif's dependency-free synchronous application and worker client."""
 from __future__ import annotations
 import json
+import http.client
 import time
 import uuid
 import urllib.error
@@ -36,11 +37,12 @@ class Client:
                     return json.load(response)
             except urllib.error.HTTPError as error:
                 try:
-                    detail = json.load(error).get("error", {})
+                    with error:
+                        detail = json.load(error).get("error", {})
                 except (ValueError, AttributeError):
                     detail = {}
                 raise NotifError(detail.get("code", "HTTP_ERROR"), detail.get("message", "Request failed"), error.code) from error
-            except (urllib.error.URLError, TimeoutError):
+            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead):
                 if attempt == 2 or (method != "GET" and not key):
                     raise
                 time.sleep(.2 * (attempt + 1))
@@ -68,6 +70,16 @@ class Client:
     def respond(self, request_id: str, outcome: str, *, version: int, answer: Any = None) -> dict[str, Any]:
         return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/responses",
                          {"outcome": outcome, "version": version, "answer": answer})
+
+    def redeem(self, request_id: str, action: dict[str, Any]) -> dict[str, Any]:
+        """Recheck authorization; the business tool must enforce operation/version fences."""
+        return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/redeem",
+                         action, key=str(uuid.uuid4()))
+
+    def report_execution(self, execution_id: str, state: str, result: Any = None) -> dict[str, Any]:
+        """Report observed state without equating delivery or approval with execution."""
+        return self.call("POST", "/api/v1/executions/" + urllib.parse.quote(execution_id, safe=""),
+                         {"state": state, "result": result}, key=str(uuid.uuid4()))
 
     def wait(self, request_id: str, timeout: float | None = None, interval: float = 1) -> dict[str, Any]:
         deadline = None if timeout is None else time.monotonic() + timeout
@@ -99,7 +111,7 @@ class Client:
                     raise
                 time.sleep(2)
                 continue
-            except (urllib.error.URLError, TimeoutError):
+            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead):
                 time.sleep(2)
                 continue
             for delivery in deliveries:

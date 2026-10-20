@@ -117,6 +117,17 @@ type SendResult struct {
 	ConversationID string    `json:"conversation_id"`
 	Messages       []Message `json:"messages"`
 }
+
+// Execution is an authorization intent and worker report, not proof of an external effect.
+type Execution struct {
+	ID           string `json:"id"`
+	RequestID    string `json:"request_id"`
+	ExecutorID   string `json:"executor_id"`
+	OperationKey string `json:"operation_key"`
+	Action       Action `json:"action"`
+	State        string `json:"state"`
+	Result       any    `json:"result"`
+}
 type Delivery struct {
 	ID         string `json:"id"`
 	Generation int64  `json:"generation"`
@@ -298,4 +309,17 @@ func (c *Client) Run(ctx context.Context, handler func(context.Context, Delivery
 		case <-tick.C:
 		}
 	}
+}
+
+// Redeem rechecks current authority and returns the same intent for repeated calls.
+// A protected business tool must still enforce OperationKey and ResourceVersion.
+func (c *Client) Redeem(ctx context.Context, id string, action Action) (Execution, error) {
+	var out Execution
+	err := c.Do(ctx, "POST", "/api/v1/requests/"+url.PathEscape(id)+"/redeem", action, &out, Key())
+	return out, err
+}
+func (c *Client) ReportExecution(ctx context.Context, id, state string, result any) (Execution, error) {
+	var out Execution
+	err := c.Do(ctx, "POST", "/api/v1/executions/"+url.PathEscape(id), map[string]any{"state": state, "result": result}, &out, Key())
+	return out, err
 }

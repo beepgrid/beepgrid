@@ -56,7 +56,7 @@ func TestStableToolRetryKeyAndInvalidRequest(t *testing.T) {
 			t.Error("MCP-only field leaked into strict REST body")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"message-1"}`))
+		_, _ = w.Write([]byte(`{"conversation_id":"conversation-1","messages":[{"id":"message-1","body":"Hello"}]}`))
 	}))
 	defer backend.Close()
 	input := `{ "jsonrpc":"1.0", "id":1,"method":"ping" }
@@ -67,5 +67,38 @@ func TestStableToolRetryKeyAndInvalidRequest(t *testing.T) {
 	}
 	if calls != 1 || !strings.Contains(out.String(), "-32600") || !strings.Contains(out.String(), "message-1") {
 		t.Fatal(calls, out.String())
+	}
+}
+
+func TestExecutionToolsPreserveScopeAndExactAction(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer worker" {
+			t.Error("wrong identity")
+		}
+		var body map[string]any
+		if e := json.NewDecoder(r.Body).Decode(&body); e != nil {
+			t.Error(e)
+		}
+		switch r.URL.Path {
+		case "/api/v1/requests/request-1/redeem":
+			if body["resource_version"] != "v1" || body["operation_key"] != "once" {
+				t.Error("changed exact action", body)
+			}
+		case "/api/v1/executions/execution-1":
+			if body["state"] != "succeeded" {
+				t.Error(body)
+			}
+		default:
+			t.Error(r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"id":"execution-1","state":"authorized"}`))
+	}))
+	defer backend.Close()
+	c := notif.New(backend.URL, "worker")
+	if _, e := call(context.Background(), c, "redeem_approval", json.RawMessage(`{"id":"request-1","action":{"name":"fixture","executor_id":"worker","resource":"fixture","resource_version":"v1","operation_key":"once","arguments":{}}}`)); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := call(context.Background(), c, "report_execution", json.RawMessage(`{"id":"execution-1","state":"succeeded","result":{"reported":true}}`)); e != nil {
+		t.Fatal(e)
 	}
 }

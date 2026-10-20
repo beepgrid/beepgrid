@@ -52,6 +52,16 @@ export type RequestItem = {
   };
   expires_at: string;
 };
+/** An authorized intent and worker-reported state, not proof of an external effect. */
+export type Execution = {
+  id: string;
+  request_id: string;
+  executor_id: string;
+  operation_key: string;
+  action: Action;
+  state: "authorized" | "running" | "succeeded" | "failed" | "unknown";
+  result: unknown;
+};
 export type AskInput = {
   target: Target;
   title: string;
@@ -146,7 +156,19 @@ export class Client {
         await delay(200 * (attempt + 1), options.signal);
         continue;
       }
-      const value = await response.json();
+      let value: any;
+      try {
+        value = await response.json();
+      } catch (error) {
+        if (
+          attempt === 2 ||
+          options.signal?.aborted ||
+          (method !== "GET" && !options.key)
+        )
+          throw error;
+        await delay(200 * (attempt + 1), options.signal);
+        continue;
+      }
       if (!response.ok)
         throw new NotifError(
           value.error?.code ?? "HTTP_ERROR",
@@ -198,6 +220,26 @@ export class Client {
       "POST",
       `/api/v1/requests/${encodeURIComponent(id)}/responses`,
       response,
+    );
+  }
+  redeem(id: string, action: Action) {
+    return this.call<Execution>(
+      "POST",
+      `/api/v1/requests/${encodeURIComponent(id)}/redeem`,
+      action,
+      { key: crypto.randomUUID() },
+    );
+  }
+  reportExecution(
+    id: string,
+    state: "running" | "succeeded" | "failed" | "unknown",
+    result: unknown = null,
+  ) {
+    return this.call<Execution>(
+      "POST",
+      `/api/v1/executions/${encodeURIComponent(id)}`,
+      { state, result },
+      { key: crypto.randomUUID() },
     );
   }
   async wait(id: string, signal?: AbortSignal): Promise<RequestItem> {
