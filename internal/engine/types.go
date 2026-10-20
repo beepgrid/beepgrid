@@ -202,6 +202,8 @@ type Request struct {
 	SharedKey      string     `json:"shared_key"`
 }
 type Response struct {
+	SourceAnswerID string `json:"source_answer_id,omitempty"`
+
 	Outcome string `json:"outcome"`
 	Answer  any    `json:"answer,omitempty"`
 	Version int    `json:"version"`

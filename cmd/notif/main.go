@@ -143,12 +143,19 @@ func serve(ctx context.Context, args []string) error {
 	}
 	defer store.Close()
 	store.AllowLocal = *dev
+	if e = store.ConfigureMatcher(ctx, os.Getenv("NOTIF_MATCHER_URL"), os.Getenv("NOTIF_MATCHER_TOKEN")); e != nil {
+		return e
+	}
 	owner, e := store.Bootstrap(ctx, env("NOTIF_WORKSPACE", "local")+"/"+env("NOTIF_ENVIRONMENT", "development"), env("NOTIF_COMPANY", "Local workspace"), env("NOTIF_ENVIRONMENT", "development"), token)
 	if e != nil {
 		return e
 	}
 	_ = owner
-	server := &http.Server{Addr: addr, Handler: httpapi.New(store, public, web.Handler()), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
+	handler := httpapi.New(store, public, web.Handler())
+	if e = handler.ConfigureOIDC(ctx, owner.Scope, os.Getenv("NOTIF_OIDC_ISSUER"), os.Getenv("NOTIF_OIDC_CLIENT_ID"), os.Getenv("NOTIF_OIDC_CLIENT_SECRET")); e != nil {
+		return e
+	}
+	server := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	defer stopWorker()
 	go func() {

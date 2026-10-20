@@ -23,6 +23,8 @@ type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Store struct {
+	Matcher Matcher
+
 	AllowLocal bool
 
 	Pool      *pgxpool.Pool

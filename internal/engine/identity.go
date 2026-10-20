@@ -63,11 +63,20 @@ func (s *Store) ListPrincipals(ctx context.Context, a Actor, kind string) ([]Pri
 		if e != nil {
 			return nil, e
 		}
+		all = append(all, p)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	visible := []Principal{}
+	for _, p := range all {
 		if p.ID == a.ID || s.allowed(ctx, s.Pool, a, "view", Target{p.Kind, p.ID}, "", "") {
-			all = append(all, p)
+			visible = append(visible, p)
 		}
 	}
-	return all, rows.Err()
+	return visible, nil
 }
 func (s *Store) SetDisabled(ctx context.Context, a Actor, id string, disabled bool) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
@@ -253,4 +262,20 @@ func (s *Store) Heartbeat(ctx context.Context, a Actor, progress map[string]any)
 	}
 	_, e := s.Pool.Exec(ctx, `UPDATE instances SET last_seen=now(),progress=$3 WHERE scope=$1 AND id=$2`, a.Scope, a.InstanceID, JSON(progress))
 	return e
+}
+
+func (s *Store) Agents(ctx context.Context, a Actor) ([]Agent, error) {
+	principals, e := s.ListPrincipals(ctx, a, "agent")
+	if e != nil {
+		return nil, e
+	}
+	out := []Agent{}
+	for _, p := range principals {
+		instances, e := s.Instances(ctx, a, p.ID)
+		if e != nil {
+			return nil, e
+		}
+		out = append(out, Agent{p, instances})
+	}
+	return out, nil
 }

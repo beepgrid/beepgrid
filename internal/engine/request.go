@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/jackc/pgx/v5"
 	"time"
 )
@@ -155,13 +154,19 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 					return e
 				}
 			}
-			return event(ctx, tx, a, "request.created", conv, a.ID, out)
+			if e = event(ctx, tx, a, "request.created", conv, a.ID, out); e != nil {
+				return e
+			}
+			return s.reuseExact(ctx, tx, a, &out)
 		})
 	})
 	return out, err
 }
 func (s *Store) Respond(ctx context.Context, a Actor, id string, in Response) (Request, error) {
 	var out Request
+	if in.SourceAnswerID != "" {
+		return out, Bad("Answer provenance is assigned by the server.")
+	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
 		r, e := s.request(ctx, tx, a, id)
 		if e != nil {
@@ -412,5 +417,3 @@ func (s *Store) Executions(ctx context.Context, a Actor) ([]Execution, error) {
 	}
 	return out, rows.Err()
 }
-
-var _ = fmt.Sprint

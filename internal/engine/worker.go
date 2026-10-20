@@ -19,6 +19,15 @@ const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,at
 
 // currentDeliveryPolicy rechecks the originating credential, group membership and route grants before exposing content.
 func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, d Delivery) bool {
+	var internal struct {
+		RequestID string `json:"engine_result"`
+	}
+	_ = json.Unmarshal(JSON(d.Payload["_policy"]), &internal)
+	if internal.RequestID != "" {
+		var valid bool
+		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope WHERE r.scope=$1 AND r.id=$2 AND r.requester_id=$3 AND NOT p.disabled)`, scope, internal.RequestID, d.RecipientID).Scan(&valid)
+		return valid
+	}
 	var policy struct {
 		CredentialID       string `json:"credential_id"`
 		ProviderConnection string `json:"provider_connection"`

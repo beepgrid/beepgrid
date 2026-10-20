@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5"
 	"time"
 )
@@ -117,11 +116,20 @@ func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, err
 		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt); e != nil {
 			return nil, e
 		}
+		out = append(out, c)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Conversation{}
+	for _, c := range out {
 		if s.canRead(ctx, s.Pool, a, c.ID) {
-			out = append(out, c)
+			visible = append(visible, c)
 		}
 	}
-	return out, rows.Err()
+	return visible, nil
 }
 func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversation, error) {
 	var c Conversation
@@ -310,11 +318,20 @@ func (s *Store) Events(ctx context.Context, a Actor, after int64) ([]Event, erro
 			return nil, e
 		}
 		_ = json.Unmarshal(raw, &x.Data)
+		out = append(out, x)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Event{}
+	for _, x := range out {
 		if x.ConversationID == "" || s.canRead(ctx, s.Pool, a, x.ConversationID) {
-			out = append(out, x)
+			visible = append(visible, x)
 		}
 	}
-	return out, rows.Err()
+	return visible, nil
 }
 func (s *Store) Preview(ctx context.Context, a Actor, target Target, action string) (map[string]any, error) {
 	rs, e := s.resolve(ctx, s.Pool, a, target, action, "")
@@ -327,5 +344,3 @@ func (s *Store) Preview(ctx context.Context, a Actor, target Target, action stri
 	}
 	return map[string]any{"recipients": list, "count": len(list), "mode": "private_per_recipient", "sends": false}, nil
 }
-
-var _ = errors.Is

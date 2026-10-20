@@ -175,11 +175,20 @@ func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 			return nil, e
 		}
 		_ = json.Unmarshal(raw, &g.Members)
+		all = append(all, g)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Group{}
+	for _, g := range all {
 		if a.Admin || s.allowed(ctx, s.Pool, a, "view", Target{"group", g.ID}, "", "") {
-			all = append(all, g)
+			visible = append(visible, g)
 		}
 	}
-	return all, rows.Err()
+	return visible, nil
 }
 func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) {
 	if !ValidText(g.Name, 100) || len(g.Members) > 1000 {

@@ -18,6 +18,8 @@ import (
 
 type actorKey struct{}
 type Server struct {
+	oidc *oidcConfig
+
 	Store     *engine.Store
 	PublicURL string
 	UI        http.Handler
@@ -160,6 +162,10 @@ func (s *Server) routes() {
 	for _, resource := range []struct{ path, kind string }{{"people", "person"}, {"agents", "agent"}, {"services", "service"}} {
 		kind := resource.kind
 		m.HandleFunc("GET /api/v1/"+resource.path, s.protect(func(w http.ResponseWriter, r *http.Request) error {
+			if kind == "agent" {
+				x, e := s.Store.Agents(r.Context(), actor(r))
+				return ok(w, x, e)
+			}
 			x, e := s.Store.ListPrincipals(r.Context(), actor(r), kind)
 			return ok(w, x, e)
 		}))
@@ -372,6 +378,8 @@ func (s *Server) routes() {
 	}))
 	m.HandleFunc("GET /api/v1/events", s.protect(s.events))
 	s.channelRoutes()
+	s.oidcRoutes()
+	s.assistanceRoutes()
 	if s.UI != nil {
 		m.Handle("/", s.UI)
 	}
