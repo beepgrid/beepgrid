@@ -303,8 +303,6 @@ func (c *Client) Heartbeat(ctx context.Context, progress map[string]any) error {
 	return c.Do(ctx, "POST", "/api/v1/worker/heartbeat", progress, nil, "")
 }
 func (c *Client) Run(ctx context.Context, handler func(context.Context, Delivery) error) error {
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
 	for {
 		var jobs []Delivery
 		e := c.Do(ctx, "GET", "/api/v1/worker/inbox?wait_ms=15000", nil, &jobs, "")
@@ -328,10 +326,12 @@ func (c *Client) Run(ctx context.Context, handler func(context.Context, Delivery
 				return e
 			}
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-tick.C:
+		if len(jobs) == 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+			}
 		}
 	}
 }

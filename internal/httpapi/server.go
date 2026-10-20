@@ -471,10 +471,12 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
-	f, ok := w.(http.Flusher)
+	_, ok := w.(http.Flusher)
 	if !ok {
 		return errors.New("streaming unavailable")
 	}
+	controller := http.NewResponseController(w)
+	defer controller.SetWriteDeadline(time.Time{})
 	timer := time.NewTimer(25 * time.Second)
 	defer timer.Stop()
 	tick := time.NewTicker(time.Second)
@@ -485,24 +487,31 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 		if authErr != nil {
 			return nil
 		}
-		var revoked bool
-		if e := s.Store.Pool.QueryRow(r.Context(), `SELECT c.revoked OR p.disabled OR (c.expires_at IS NOT NULL AND c.expires_at<=now()) FROM credentials c JOIN principals p ON p.id=c.principal_id WHERE c.scope=$1 AND c.id=$2`, a.Scope, a.CredentialID).Scan(&revoked); e != nil || revoked {
-			return nil
-		}
 		events, scanned, e := s.Store.EventPage(r.Context(), a, after, false)
 		if e != nil {
 			return nil
 		}
+		// A disconnected or non-reading client must not retain a handler and an
+		// event page indefinitely. Each finite write batch gets its own deadline.
+		_ = controller.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		for _, ev := range events {
-			fmt.Fprintf(w, "id: %d\ndata: %s\n\n", ev.Sequence, engine.JSON(ev))
+			if _, e := fmt.Fprintf(w, "id: %d\ndata: %s\n\n", ev.Sequence, engine.JSON(ev)); e != nil {
+				return nil
+			}
 			after = ev.Sequence
 		}
 		if scanned > after {
-			fmt.Fprintf(w, "id: %d\nevent: cursor\ndata: {}\n\n", scanned)
+			if _, e := fmt.Fprintf(w, "id: %d\nevent: cursor\ndata: {}\n\n", scanned); e != nil {
+				return nil
+			}
 			after = scanned
 		}
-		fmt.Fprint(w, ": keepalive\n\n")
-		f.Flush()
+		if _, e := fmt.Fprint(w, ": keepalive\n\n"); e != nil {
+			return nil
+		}
+		if e := controller.Flush(); e != nil {
+			return nil
+		}
 		select {
 		case <-r.Context().Done():
 			return nil

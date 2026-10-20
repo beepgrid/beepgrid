@@ -245,15 +245,10 @@ func insertMessage(ctx context.Context, db DB, a Actor, conv, body string) (Mess
 	return m, event(ctx, db, a, "message.created", conv, "", m)
 }
 func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, conv, action string, payload map[string]any, expiry time.Time) error {
-	var info struct {
-		Request struct {
-			Action *Action `json:"action"`
-		} `json:"request"`
-	}
-	_ = json.Unmarshal(JSON(payload), &info)
+	descriptor := payloadAction(payload)
 	actionName := ""
-	if info.Request.Action != nil {
-		actionName = info.Request.Action.Name
+	if descriptor != nil {
+		actionName = descriptor.Name
 	}
 	payload["_policy"] = map[string]any{"action_name": actionName, "credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
 	payload["conversation_id"] = conv
@@ -274,7 +269,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 		}
 	}
 	queued := 0
-	if s.allowed(ctx, db, a, action, r.PolicyTarget, "", actionName, info.Request.Action) {
+	if s.allowed(ctx, db, a, action, r.PolicyTarget, "", actionName, descriptor) {
 		if _, e := db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,exact_instance,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, r.ExactInstance, JSON(payload), expiry); e != nil {
 			return e
 		}
@@ -319,7 +314,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 		return e
 	}
 	for _, d := range dests {
-		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName, info.Request.Action) {
+		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName, descriptor) {
 			continue
 		}
 		if _, e = db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at,state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry, externalState); e != nil {
@@ -426,16 +421,22 @@ func (s *Store) EventPage(ctx context.Context, a Actor, after int64, recent bool
 	if e != nil {
 		return nil, after, e
 	}
+	ids := []string{}
+	seen := map[string]bool{}
+	for _, x := range out {
+		if x.ConversationID != "" && !seen[x.ConversationID] {
+			ids = append(ids, x.ConversationID)
+			seen[x.ConversationID] = true
+		}
+	}
+	readable, e := s.readableEventConversations(ctx, a, ids)
+	if e != nil {
+		return nil, after, e
+	}
 	visible := []Event{}
-	readable := map[string]bool{}
-	checked := map[string]bool{}
 	for _, x := range out {
 		if x.Sequence > after {
 			after = x.Sequence
-		}
-		if x.ConversationID != "" && !checked[x.ConversationID] {
-			readable[x.ConversationID] = s.canRead(ctx, s.Pool, a, x.ConversationID)
-			checked[x.ConversationID] = true
 		}
 		if x.ConversationID == "" || readable[x.ConversationID] {
 			visible = append(visible, x)

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	_ "embed"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -46,30 +47,14 @@ func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInp
 		out.Messages = append(out.Messages, m)
 	}
 	raw := JSON(items)
-	// The workspace lock is held, so the reserved range is committed in the same
-	// order as all other events and is rolled back together with these writes.
-	var end int64
-	if e := tx.QueryRow(ctx, `UPDATE scopes SET sequence=sequence+$2 WHERE id=$1 RETURNING sequence`, a.Scope, len(items)).Scan(&end); e != nil {
-		return true, e
-	}
-	if _, e := tx.Exec(ctx, `INSERT INTO conversations(id,scope,title,created_by) SELECT x.conversation_id,$1,$2,$3 FROM jsonb_to_recordset($4::jsonb) AS x(conversation_id text)`, a.Scope, title, a.ID, raw); e != nil {
-		return true, e
-	}
-	if _, e := tx.Exec(ctx, `INSERT INTO participants(scope,conversation_id,principal_id) SELECT $1,x.conversation_id,x.recipient_id FROM jsonb_to_recordset($3::jsonb) AS x(conversation_id text,recipient_id text) UNION SELECT $1,x.conversation_id,$2 FROM jsonb_to_recordset($3::jsonb) AS x(conversation_id text)`, a.Scope, a.ID, raw); e != nil {
-		return true, e
-	}
-	if _, e := tx.Exec(ctx, `INSERT INTO messages(id,scope,conversation_id,sender_id,instance_id,body,created_at) SELECT x.message->>'id',$1,x.conversation_id,$2,NULLIF($3,''),x.message->>'body',(x.message->>'created_at')::timestamptz FROM jsonb_to_recordset($4::jsonb) AS x(conversation_id text,message jsonb)`, a.Scope, a.ID, a.InstanceID, raw); e != nil {
-		return true, e
-	}
-	if _, e := tx.Exec(ctx, `INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data) SELECT $1,$2+x.ordinality,'message.created',$3,x.value->>'conversation_id','',x.value->'message' FROM jsonb_array_elements($4::jsonb) WITH ORDINALITY x`, a.Scope, end-int64(len(items)), a.ID, raw); e != nil {
-		return true, e
-	}
-	if _, e := tx.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,payload,expires_at) SELECT x.delivery_id,$1,x.message->>'id',x.recipient_id,jsonb_build_object('type','message','message',x.message,'conversation_id',x.conversation_id,'_policy',jsonb_build_object('action_name','','credential_id',$4::text,'provider_connection',$5::text,'sender_id',$6::text,'target',x.policy_target,'action','message')),$3 FROM jsonb_to_recordset($2::jsonb) AS x(delivery_id text,recipient_id text,conversation_id text,message jsonb,policy_target jsonb)`, a.Scope, raw, time.Now().Add(7*24*time.Hour), a.CredentialID, a.ProviderConnection, a.ID); e != nil {
-		return true, e
-	}
-	if _, e := tx.Exec(ctx, `SELECT pg_notify('notif_work',json_build_array($1::text,x)::text) FROM unnest($2::text[]) x`, a.Scope, ids); e != nil {
+	// All inserts and the event range remain one atomic workspace transaction.
+	// PostgreSQL parses the batch once, rather than receiving seven copies.
+	if _, e := tx.Exec(ctx, nativeFanoutSQL, a.Scope, raw, title, a.ID, a.InstanceID, a.CredentialID, a.ProviderConnection, time.Now().Add(7*24*time.Hour)); e != nil {
 		return true, e
 	}
 	out.ConversationID = out.Messages[0].ConversationID
 	return true, nil
 }
+
+//go:embed fanout.sql
+var nativeFanoutSQL string

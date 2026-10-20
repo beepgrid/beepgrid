@@ -117,7 +117,8 @@ class Client:
             for delivery in deliveries:
                 handler(delivery)
                 self.ack(delivery)
-            time.sleep(1)
+            if not deliveries:
+                time.sleep(.1)
 
 
 __all__ = ["Client", "NotifError"]

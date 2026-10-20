@@ -77,19 +77,32 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 			return false
 		}
 	}
-	var detail struct {
-		Request struct {
-			Action *Action `json:"action"`
-		} `json:"request"`
-	}
-	_ = json.Unmarshal(JSON(d.Payload), &detail)
-	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName, detail.Request.Action)
+	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName, payloadAction(d.Payload))
 }
 func (s *Store) Inbox(ctx context.Context, a Actor) ([]Delivery, error) {
 	if a.InstanceID == "" {
 		return nil, Denied()
 	}
 	out := []Delivery{}
+	// Idle polls are read-only. Claims and due presence refreshes still take the
+	// workspace lock and revalidate authority before mutating anything.
+	var held, valid, mutate bool
+	e := s.Pool.QueryRow(ctx, `SELECT s.recovery_hold,NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now()),i.last_seen<now()-interval '10 seconds' OR EXISTS(SELECT 1 FROM deliveries d WHERE d.scope=s.id AND d.recipient_id=p.id AND d.connection_id='' AND d.expires_at>now() AND (d.exact_instance='' OR d.exact_instance=i.id) AND ((d.state='queued' AND d.next_at<=now()) OR (d.state='leased' AND (d.lease_until<now() OR d.owner_instance=i.id)))) FROM scopes s JOIN credentials c ON c.scope=s.id JOIN principals p ON p.scope=c.scope AND p.id=c.principal_id JOIN instances i ON i.scope=c.scope AND i.credential_id=c.id AND i.agent_id=p.id WHERE s.id=$1 AND c.id=$2 AND p.id=$3 AND i.id=$4`, a.Scope, a.CredentialID, a.ID, a.InstanceID).Scan(&held, &valid, &mutate)
+	if e != nil {
+		if e == pgx.ErrNoRows {
+			return nil, Denied()
+		}
+		return nil, e
+	}
+	if held {
+		return nil, &Error{"RECOVERY_HOLD", "This workspace is paused for restore reconciliation.", 503}
+	}
+	if !valid {
+		return nil, Denied()
+	}
+	if !mutate {
+		return out, nil
+	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
 		if _, e := tx.Exec(ctx, `UPDATE instances SET last_seen=now() WHERE scope=$1 AND id=$2 AND last_seen<now()-interval '10 seconds'`, a.Scope, a.InstanceID); e != nil {
 			return e
@@ -198,4 +211,25 @@ func (s *Store) RetryDelivery(ctx context.Context, a Actor, id string) error {
 		}
 		return event(ctx, tx, a, "delivery.retried", "", a.ID, map[string]any{"id": id, "duplicate_risk": d.State == "unknown"})
 	})
+}
+
+// Inspect only the action descriptor. Messages contain no request, and copying
+// their body through JSON to discover that is unnecessary and expensive.
+func payloadAction(payload map[string]any) *Action {
+	switch r := payload["request"].(type) {
+	case Request:
+		return r.Action
+	case *Request:
+		if r != nil {
+			return r.Action
+		}
+	case map[string]any:
+		if value := r["action"]; value != nil {
+			var action *Action
+			if json.Unmarshal(JSON(value), &action) == nil {
+				return action
+			}
+		}
+	}
+	return nil
 }

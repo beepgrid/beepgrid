@@ -295,7 +295,7 @@ export class Client {
         await handler(job);
         await this.ack(job);
       }
-      await delay(1000, signal);
+      if (!jobs.length) await delay(100, signal);
     }
   }
 }
