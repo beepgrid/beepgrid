@@ -130,7 +130,7 @@ export class Client {
     method: string,
     path: string,
     body?: unknown,
-    options: { key?: string; signal?: AbortSignal } = {},
+    options: { key?: string; signal?: AbortSignal; minimal?: boolean } = {},
   ): Promise<T> {
     if (!path.startsWith("/api/v1/")) throw new Error("Invalid API path");
     const headers: Record<string, string> = {
@@ -138,6 +138,7 @@ export class Client {
       Authorization: `Bearer ${this.token}`,
     };
     if (options.key) headers["Idempotency-Key"] = options.key;
+    if (options.minimal) headers["Prefer"] = "return=minimal";
     const raw = body === undefined ? undefined : JSON.stringify(body);
     for (let attempt = 0; attempt < 3; attempt++) {
       let response: globalThis.Response;
@@ -204,6 +205,13 @@ export class Client {
       "/api/v1/messages",
       input,
       { key },
+    );
+  }
+  // Confirms durable acceptance only, never provider delivery or execution.
+  // send(input, sameKey) can recover the complete canonical receipt later.
+  notify(input: SendInput, key: string = crypto.randomUUID()) {
+    return this.call<{ conversation_id: string; message_count: number }>(
+      "POST", "/api/v1/messages", input, { key, minimal: true },
     );
   }
   ask(input: AskInput, key: string = crypto.randomUUID()) {

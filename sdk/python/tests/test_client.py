@@ -42,6 +42,18 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(calls,["saved-key","saved-key"])
 
     @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
+    def test_real_compact_receipt_and_full_replay(self):
+        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        _, session = owner.connect("sdk/python-receipt-" + str(uuid.uuid4()), "Receipt worker")
+        options = dict(body="Receipt body", target={"kind": "agent", "id": session["agent"]["id"]}, key=str(uuid.uuid4()))
+        receipt = owner.notify(**options)
+        self.assertEqual(receipt["message_count"], 1)
+        self.assertNotIn("messages", receipt)
+        full = owner.send(**options)
+        self.assertEqual(full["conversation_id"], receipt["conversation_id"])
+        self.assertEqual(full["messages"][0]["body"], "Receipt body")
+
+    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
     def test_real_worker_transport(self):
         owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
         worker, session = owner.connect("sdk/python-" + str(uuid.uuid4()), "Python worker", ["message"])

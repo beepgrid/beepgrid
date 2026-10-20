@@ -62,3 +62,16 @@ test('real HTTP full stream preserves private canonical messages without history
  }
  assert.equal(matched,true);
 });
+test('compact notify retries with the same preference/key and recovers the full receipt',async()=>{
+ const requests=[];let count=0;
+ const client=new Client('http://localhost','',async(_,options)=>{
+  requests.push(options);
+  if(++count===1)throw new TypeError('lost connection');
+  return new Response(JSON.stringify(options.headers.Prefer?{conversation_id:'con',message_count:2}:{conversation_id:'con',messages:[{id:'a'},{id:'b'}]}));
+ });
+ const input={target:{kind:'group',id:'g'},body:'hello'};
+ assert.equal((await client.notify(input,'stable')).message_count,2);
+ assert.equal((await client.send(input,'stable')).messages.length,2);
+ assert.deepEqual(requests.map(r=>r.headers['Idempotency-Key']),['stable','stable','stable']);
+ assert.deepEqual(requests.map(r=>r.headers.Prefer),['return=minimal','return=minimal',undefined]);
+});

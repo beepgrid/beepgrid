@@ -23,11 +23,13 @@ class Client:
             raise ValueError("Invalid Notif server URL")
         self.base_url, self._token, self.timeout = base_url.rstrip("/"), token, timeout
 
-    def call(self, method: str, path: str, data: Any = None, *, key: str | None = None) -> Any:
+    def call(self, method: str, path: str, data: Any = None, *, key: str | None = None, minimal: bool = False) -> Any:
         if not path.startswith("/api/v1/"):
             raise ValueError("Invalid API path")
         raw = json.dumps(data).encode() if data is not None else None
         headers = {"Content-Type": "application/json", "Authorization": "Bearer " + self._token}
+        if minimal:
+            headers["Prefer"] = "return=minimal"
         if key:
             headers["Idempotency-Key"] = key
         for attempt in range(3):
@@ -55,11 +57,15 @@ class Client:
         return Client(self.base_url, session["token"], self.timeout), session
 
     def send(self, *, body: str, target: dict[str, str] | None = None, conversation_id: str = "",
-             title: str = "", key: str | None = None) -> dict[str, Any]:
+             title: str = "", key: str | None = None, minimal: bool = False) -> dict[str, Any]:
         data: dict[str, Any] = {"body": body, "conversation_id": conversation_id, "title": title}
         if target:
             data["target"] = target
-        return self.call("POST", "/api/v1/messages", data, key=key or str(uuid.uuid4()))
+        return self.call("POST", "/api/v1/messages", data, key=key or str(uuid.uuid4()), minimal=minimal)
+
+    def notify(self, **options: Any) -> dict[str, Any]:
+        """Durable acceptance only. send with the same input/key recovers the full receipt."""
+        return self.send(**{**options, "minimal": True})
 
     def ask(self, *, target: dict[str, str], title: str, key: str | None = None, **options: Any) -> dict[str, Any]:
         return self.call("POST", "/api/v1/requests", {"target": target, "title": title, **options}, key=key or str(uuid.uuid4()))

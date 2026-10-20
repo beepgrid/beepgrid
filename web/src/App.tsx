@@ -889,7 +889,7 @@ export function App() {
                         api(
                           "/messages",
                           { conversation_id: conversation.id, body },
-                          { headers: { "Idempotency-Key": key } },
+                          { headers: { "Idempotency-Key": key, Prefer: "return=minimal" } },
                         ),
                       "Message sent",
                     )
@@ -1943,7 +1943,7 @@ function Forms({
               target: t,
               body,
               title: name,
-            });
+            }, { headers: { Prefer: "return=minimal" } });
             openConversation(result.conversation_id);
           }
         }

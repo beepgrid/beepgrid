@@ -64,6 +64,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func output(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
+	if result, ok := value.(engine.SendResult); ok && len(result.Messages) > 1 {
+		var bytes int
+		for _, message := range result.Messages {
+			bytes += len(message.Body)
+		}
+		if bytes >= 1<<20 {
+			_ = writeSendResult(w, result)
+			return
+		}
+	}
 	_ = json.NewEncoder(w).Encode(value)
 }
 func writeError(w http.ResponseWriter, err error) {
@@ -357,7 +367,16 @@ func (s *Server) routes() {
 			return e
 		}
 		x, e := s.Store.Send(r.Context(), actor(r), in, r.Header.Get("Idempotency-Key"))
-		return ok(w, x, e)
+		if e != nil {
+			return e
+		}
+		for _, preference := range strings.Split(r.Header.Get("Prefer"), ",") {
+			if strings.EqualFold(strings.TrimSpace(preference), "return=minimal") {
+				w.Header().Set("Preference-Applied", "return=minimal")
+				return ok(w, map[string]any{"conversation_id": x.ConversationID, "message_count": len(x.Messages)}, nil)
+			}
+		}
+		return ok(w, x, nil)
 	}))
 	m.HandleFunc("GET /api/v1/requests", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.Requests(r.Context(), actor(r))

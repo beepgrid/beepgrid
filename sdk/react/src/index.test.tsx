@@ -97,7 +97,7 @@ it("ignores an old response that completes after switching requests", async () =
 it("uses a new operation key after switching conversations with an unfinished send", async () => {
   let finish!: ()=>void;
   const send=vi.fn().mockImplementationOnce(()=>new Promise<void>(resolve=>{finish=resolve;})).mockResolvedValue({});
-  const client={call:async(_method:string,path:string)=>({id:path.split('/').at(-1),title:path.endsWith('first')?'First chat':'Second chat',messages:[]}),send} as unknown as Client;
+  const client={call:async(_method:string,path:string)=>({id:path.split('/').at(-1),title:path.endsWith('first')?'First chat':'Second chat',messages:[]}),notify:send} as unknown as Client;
   const view=render(<NotifConversation client={client} id="first"/>);
   await screen.findByText("First chat");
   fireEvent.change(screen.getByRole("textbox"),{target:{value:"same body"}});

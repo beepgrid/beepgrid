@@ -153,6 +153,9 @@ func New(baseURL, token string) *Client {
 	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), Token: token, HTTP: &http.Client{Timeout: 20 * time.Second}}
 }
 func (c *Client) Do(ctx context.Context, method, path string, in, out any, key string) error {
+	return c.do(ctx, method, path, in, out, key, false)
+}
+func (c *Client) do(ctx context.Context, method, path string, in, out any, key string, minimal bool) error {
 	base, e := url.Parse(c.BaseURL)
 	if e != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") {
 		return fmt.Errorf("invalid Notif server URL")
@@ -174,6 +177,9 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, key s
 		}
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 		req.Header.Set("Content-Type", "application/json")
+		if minimal {
+			req.Header.Set("Prefer", "return=minimal")
+		}
 		if key != "" {
 			req.Header.Set("Idempotency-Key", key)
 		}
@@ -259,6 +265,23 @@ func (c *Client) Send(ctx context.Context, in SendInput, key string) (SendResult
 	}
 	e := c.Do(ctx, "POST", "/api/v1/messages", in, &r, key)
 	return r, e
+}
+
+// SendReceipt confirms durable acceptance, not delivery or execution.
+type SendReceipt struct {
+	ConversationID string `json:"conversation_id"`
+	MessageCount   int    `json:"message_count"`
+}
+
+// Notify avoids retransmitting canonical messages the caller already sent.
+// Send with the same input and key recovers the complete receipt without a resend.
+func (c *Client) Notify(ctx context.Context, in SendInput, key string) (SendReceipt, error) {
+	var r SendReceipt
+	if key == "" {
+		key = Key()
+	}
+	err := c.do(ctx, "POST", "/api/v1/messages", in, &r, key, true)
+	return r, err
 }
 func (c *Client) Ask(ctx context.Context, in AskInput, key string) (Request, error) {
 	var r Request

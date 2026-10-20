@@ -84,10 +84,24 @@ func TestFanoutTransfersSharedBodyOnceAndPreservesCanonicalContent(t *testing.T)
 			t.Fatal("event or delivery changed")
 		}
 	}
+	var storedBytes int
+	if err = s.Pool.QueryRow(ctx, `SELECT octet_length(output::text) FROM idempotency WHERE scope=$1 AND key='shared-body'`, owner.Scope).Scan(&storedBytes); err != nil || storedBytes > len(body)+32768 {
+		t.Fatal("receipt repeats shared body", storedBytes, err)
+	}
 	replay, err := s.Send(ctx, owner, input, "shared-body")
 	if err != nil || string(JSON(replay)) != string(JSON(sent)) || trace.calls != 1 {
 		t.Fatal("replay changed", err)
 	}
+	// Legacy full receipts stay readable after migration, including nanosecond
+	// timestamps and optional fields, without another event or delivery.
+	if _, err = s.Pool.Exec(ctx, `UPDATE idempotency SET output=$1 WHERE scope=$2 AND key='shared-body'`, JSON(sent), owner.Scope); err != nil {
+		t.Fatal(err)
+	}
+	replay, err = s.Send(ctx, owner, input, "shared-body")
+	if err != nil || string(JSON(replay)) != string(JSON(sent)) || trace.calls != 1 {
+		t.Fatal("legacy replay changed", err)
+	}
+
 }
 
 func TestLargeBodyFanoutRollsBackEveryChunkBeforeAcknowledgement(t *testing.T) {

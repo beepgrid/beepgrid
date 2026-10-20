@@ -248,7 +248,7 @@ export function NotifConversation({
     if (attempt.current.body !== draft || !attempt.current.key)
       attempt.current = { body: draft, key: crypto.randomUUID() };
     try {
-      await client.send(
+      await client.notify(
         { conversation_id: id, body: draft },
         attempt.current.key,
       );

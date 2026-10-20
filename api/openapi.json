@@ -2757,15 +2757,30 @@
     "/api/v1/messages": {
       "post": {
         "operationId": "post_api_v1_messages",
-        "description": "/api/v1/messages",
+        "description": "Durably store canonical messages and queue deliveries. Prefer: return=minimal returns a compact acceptance receipt; it is not delivery or execution confirmation. Replay the same input and idempotency key without Prefer to retrieve the full result without resending.",
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SendResult"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SendResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SendReceipt"
+                    }
+                  ]
                 }
+              }
+            },
+            "headers": {
+              "Preference-Applied": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "return=minimal when requested and applied."
               }
             }
           },
@@ -2840,6 +2855,14 @@
               "minLength": 1,
               "maxLength": 200
             }
+          },
+          {
+            "name": "Prefer",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional return=minimal; full SendResult remains the default."
           }
         ],
         "requestBody": {
@@ -7057,6 +7080,20 @@
             "items": {
               "$ref": "#/components/schemas/Message"
             }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "SendReceipt": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string"
+          },
+          "message_count": {
+            "type": "integer",
+            "minimum": 1
           }
         },
         "required": [],

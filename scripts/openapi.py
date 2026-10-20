@@ -23,6 +23,7 @@ schemas={
 'SendInput':obj({'target':ref('Target'),'conversation_id':S,'body':{'type':'string','maxLength':32768},'title':S},['body']),
 'Message':obj({'id':S,'conversation_id':S,'sender_id':S,'instance_id':S,'body':S,'created_at':S}),
 'SendResult':obj({'conversation_id':S,'messages':array(ref('Message'))}),
+'SendReceipt':obj({'conversation_id':S,'message_count':{'type':'integer','minimum':1}}),
 'Conversation':obj({'id':S,'title':S,'created_by':S,'created_at':S,'participants':array({'type':'object'}),'messages':array(ref('Message'))}),
 'AskInput':obj({'target':ref('Target'),'conversation_id':S,'kind':{'enum':['question','approval','task']},'title':S,'body':S,'choices':array(S),'action':ref('Action'),'expires_at':S,'shared_key':S},['title']),
 'ResponseInput':obj({'outcome':{'enum':['answered','approved','denied','completed','failed','rejected']},'answer':{},'version':{'type':'integer'}},['outcome','version']),
@@ -69,6 +70,12 @@ add('POST','/api/v1/route-preview',obj({'target':ref('Target'),'action':S},['tar
 add('GET','/api/v1/conversations',result=array(ref('Conversation')))
 add('GET','/api/v1/conversations/{id}',result=ref('Conversation'))
 add('POST','/api/v1/messages',ref('SendInput'),ref('SendResult'))
+message_op=paths['/api/v1/messages']['post']
+message_op['description']='Durably store canonical messages and queue deliveries. Prefer: return=minimal returns a compact acceptance receipt; it is not delivery or execution confirmation. Replay the same input and idempotency key without Prefer to retrieve the full result without resending.'
+message_op.setdefault('parameters',[]).append({'name':'Prefer','in':'header','schema':{'type':'string'},'description':'Optional return=minimal; full SendResult remains the default.'})
+message_op['responses']['200']['content']['application/json']['schema']={'oneOf':[ref('SendResult'),ref('SendReceipt')]}
+message_op['responses']['200']['headers']={'Preference-Applied':{'schema':{'type':'string'},'description':'return=minimal when requested and applied.'}}
+
 add('GET','/api/v1/requests',result=array(ref('Request')))
 add('POST','/api/v1/requests',ref('AskInput'),ref('Request'))
 add('GET','/api/v1/requests/{id}',result=ref('Request'))

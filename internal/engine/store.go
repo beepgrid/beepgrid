@@ -121,7 +121,7 @@ func idempotent(ctx context.Context, db DB, a Actor, op, key string, input, outp
 		if oldHash != h {
 			return Conflict("The idempotency key was already used with different input.")
 		}
-		return json.Unmarshal(old, output)
+		return decodeReceipt(op, old, output)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return err
@@ -129,7 +129,7 @@ func idempotent(ctx context.Context, db DB, a Actor, op, key string, input, outp
 	if err = fn(); err != nil {
 		return err
 	}
-	_, err = db.Exec(ctx, `INSERT INTO idempotency(scope,principal_id,operation,key,input_hash,output) VALUES($1,$2,$3,$4,$5,$6)`, a.Scope, a.ID, op, key, h, JSON(output))
+	_, err = db.Exec(ctx, `INSERT INTO idempotency(scope,principal_id,operation,key,input_hash,output) VALUES($1,$2,$3,$4,$5,$6)`, a.Scope, a.ID, op, key, h, encodeReceipt(op, output))
 	return err
 }
 func (s *Store) Bootstrap(ctx context.Context, scope, company, environment, token string) (Actor, error) {
