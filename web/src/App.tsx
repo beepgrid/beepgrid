@@ -2416,16 +2416,16 @@ function Forms({
               type === "slack"
                 ? "Bot token (server only)"
                 : type === "email"
-                  ? "SMTP password or local signing secret"
+                  ? "SMTP password (only for authenticated relays)"
                   : "Signing secret"
             }
           >
             <input
               type="password"
-              minLength={16}
+              minLength={type === "email" ? undefined : 16}
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
-              required={kind !== "edit-connection"}
+              required={type !== "email" && kind !== "edit-connection"}
               autoComplete="new-password"
               placeholder={
                 kind === "edit-connection"

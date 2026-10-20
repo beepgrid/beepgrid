@@ -97,8 +97,8 @@ func (s *Store) Connections(ctx context.Context, a Actor) ([]Connection, error) 
 	return out, rows.Err()
 }
 func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Connection, error) {
-	if len(c.Secret) > 8192 || (c.Secret != "" && len(c.Secret) < 16) {
-		return c, Bad("Provider credentials must contain 16 to 8192 characters.")
+	if len(c.Secret) > 8192 || (c.Kind != "email" && c.Secret != "" && len(c.Secret) < 16) {
+		return c, Bad("Provider credentials exceed bounds; signing secrets need at least 16 characters.")
 	}
 	if !ValidText(c.Name, 100) || len(JSON(c.Config)) > 8192 {
 		return c, Bad("A name and bounded configuration are required.")
@@ -127,8 +127,11 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 			return Denied()
 		}
 		if c.ID == "" {
-			if len(c.Secret) < 16 {
+			if c.Kind != "email" && len(c.Secret) < 16 {
 				return Bad("A provider token or signing secret of at least 16 characters is required.")
+			}
+			if c.Kind == "email" && c.Config["username"] != "" && c.Secret == "" {
+				return Bad("SMTP password is required when a username is configured.")
 			}
 			c.ID = ID("chn")
 		}
@@ -136,12 +139,21 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 		var e error
 		if c.Secret != "" {
 			encrypted, e = s.seal([]byte(c.Secret))
-			if e != nil {
-				return e
-			}
 		} else {
-			if e = tx.QueryRow(ctx, `SELECT secret FROM connections WHERE scope=$1 AND id=$2`, a.Scope, c.ID).Scan(&encrypted); e != nil {
-				return e
+			e = tx.QueryRow(ctx, `SELECT secret FROM connections WHERE scope=$1 AND id=$2`, a.Scope, c.ID).Scan(&encrypted)
+			if e == pgx.ErrNoRows && c.Kind == "email" && c.Config["username"] == "" {
+				// A relay without authentication has no password; encrypt the empty value consistently.
+				encrypted, e = s.seal(nil)
+			}
+		}
+		if e != nil {
+			return e
+		}
+
+		if c.Kind == "email" && c.Config["username"] != "" {
+			password, err := s.unseal(encrypted)
+			if err != nil || len(password) == 0 {
+				return Bad("SMTP password is required when a username is configured.")
 			}
 		}
 		tag, e := tx.Exec(ctx, `INSERT INTO connections(id,scope,name,kind,config,secret,enabled) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,config=EXCLUDED.config,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled WHERE connections.scope=EXCLUDED.scope AND connections.kind=EXCLUDED.kind`, c.ID, a.Scope, c.Name, c.Kind, JSON(c.Config), encrypted, c.Enabled)
