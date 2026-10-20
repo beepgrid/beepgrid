@@ -20,6 +20,9 @@ type Client struct {
 	BaseURL string
 	Token   string
 	HTTP    *http.Client
+	// MaxResponseBytes bounds decoded responses. Zero uses 256 MiB, covering the
+	// API's bounded 1000-recipient fan-out even with JSON escaping. Decoding streams.
+	MaxResponseBytes int64
 }
 type APIError struct {
 	Code    string `json:"code"`
@@ -147,7 +150,7 @@ func Key() string {
 	return hex.EncodeToString(b)
 }
 func New(baseURL, token string) *Client {
-	return &Client{strings.TrimRight(baseURL, "/"), token, &http.Client{Timeout: 20 * time.Second}}
+	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), Token: token, HTTP: &http.Client{Timeout: 20 * time.Second}}
 }
 func (c *Client) Do(ctx context.Context, method, path string, in, out any, key string) error {
 	base, e := url.Parse(c.BaseURL)
@@ -190,8 +193,45 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, key s
 			}
 			return e
 		}
-		raw, readErr := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+		limit := c.MaxResponseBytes
+		if limit <= 0 {
+			limit = 256 << 20
+		}
+		limited := &io.LimitedReader{R: res.Body, N: limit + 1}
+		decoder := json.NewDecoder(limited)
+		var envelope struct {
+			Error APIError `json:"error"`
+		}
+		var readErr error
+		if res.StatusCode >= 400 {
+			readErr = decoder.Decode(&envelope)
+		} else if out != nil {
+			readErr = decoder.Decode(out)
+		} else {
+			_, readErr = io.Copy(io.Discard, limited)
+		}
+		if readErr == nil && out != nil && res.StatusCode < 400 {
+			var trailing any
+			if e := decoder.Decode(&trailing); e != io.EOF {
+				if e == nil {
+					e = fmt.Errorf("multiple JSON response values")
+				}
+				readErr = e
+			}
+		}
 		res.Body.Close()
+		if limited.N <= 0 {
+			return fmt.Errorf("Notif response exceeds %d byte limit", limit)
+		}
+		// Error pages need not be JSON to preserve the useful HTTP status.
+		if res.StatusCode >= 400 {
+			envelope.Error.Status = res.StatusCode
+			if envelope.Error.Code == "" {
+				envelope.Error.Code = "HTTP_ERROR"
+				envelope.Error.Message = fmt.Sprintf("Server returned %d", res.StatusCode)
+			}
+			return &envelope.Error
+		}
 		if readErr != nil {
 			if attempt < 2 && (method == "GET" || key != "") && ctx.Err() == nil {
 				select {
@@ -202,21 +242,6 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, key s
 				}
 			}
 			return readErr
-		}
-		if res.StatusCode >= 400 {
-			var envelope struct {
-				Error APIError `json:"error"`
-			}
-			_ = json.Unmarshal(raw, &envelope)
-			envelope.Error.Status = res.StatusCode
-			if envelope.Error.Code == "" {
-				envelope.Error.Code = "HTTP_ERROR"
-				envelope.Error.Message = fmt.Sprintf("Server returned %d", res.StatusCode)
-			}
-			return &envelope.Error
-		}
-		if out != nil {
-			return json.Unmarshal(raw, out)
 		}
 		return nil
 	}

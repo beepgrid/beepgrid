@@ -354,6 +354,11 @@ func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, ke
 			return e
 		}
 		out.Messages = []Message{}
+		if in.ConversationID == "" && len(rs) > 1 {
+			if handled, e := s.nativeFanout(ctx, tx, a, in, rs, out); handled || e != nil {
+				return e
+			}
+		}
 		if in.ConversationID != "" {
 			m, e := insertMessage(ctx, tx, a, in.ConversationID, in.Body)
 			if e != nil {

@@ -249,3 +249,23 @@ it("stacks exact scoped questions and requires an explicit shared answer choice"
     ).toBe(true),
   );
 });
+
+it("removes an opened conversation after a live refresh loses read access", async () => {
+  history.replaceState(null,"","/conversations/con_1");
+  let source!: {onmessage?:()=>void};
+  vi.stubGlobal("EventSource",class {onmessage?:()=>void;constructor(){source=this;}close(){} });
+  const original=vi.mocked(fetch).getMockImplementation()!;
+  let denied=false;
+  vi.mocked(fetch).mockImplementation(async(input,init)=>{
+    if(String(input).endsWith("/conversations/con_1")) {
+      if(denied)return {ok:false,status:404,json:async()=>({error:{message:"Conversation unavailable"}})} as Response;
+      return {ok:true,status:200,json:async()=>({id:"con_1",title:"Which format?",participants:[person,agent],messages:[{id:"private",sender_id:agent.id,body:"Private revocable history",created_at:"2026-10-20T08:00:00Z"}]})} as Response;
+    }
+    return original(input,init);
+  });
+  render(<App/>);
+  expect(await screen.findByText("Private revocable history")).toBeVisible();
+  denied=true;source.onmessage?.();
+  await waitFor(()=>expect(screen.queryByText("Private revocable history")).toBeNull(),{timeout:4000});
+  expect(await screen.findByText("Conversation unavailable")).toBeVisible();
+});

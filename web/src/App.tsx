@@ -362,10 +362,11 @@ export function App() {
     [live, setLive] = useState("Connecting");
   const meRef = useRef(me);
   meRef.current = me;
+  const refreshGeneration = useRef(0);
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
     try {
       const current = await api<Me>("/me");
-      setMe(current);
       const entries: [keyof Data, string][] = [
         ["people", "/people"],
         ["agents", "/agents"],
@@ -385,13 +386,19 @@ export function App() {
       const values = await Promise.all(
         entries.map(async ([k, p]) => [k, await api(p)]),
       );
+      if (generation !== refreshGeneration.current) return;
+      setMe(current);
       setData({ ...emptyData, ...Object.fromEntries(values) });
       setError("");
     } catch (e) {
+      if (generation !== refreshGeneration.current) return;
+      setData(emptyData);
+      setConversation(null);
+      setInstances([]);
       if (e instanceof APIError && e.status === 401) setMe(null);
       else setError((e as Error).message);
     } finally {
-      setChecking(false);
+      if (generation === refreshGeneration.current) setChecking(false);
     }
   }, []);
   useEffect(() => {
@@ -441,13 +448,14 @@ export function App() {
   }, [page]);
   useEffect(() => {
     let active = true;
+    setConversation((old)=>old?.id === selected ? old : null);
     if (page === "conversations" && selected)
       api<Conversation>("/conversations/" + selected)
         .then((c) => {
           if (active) setConversation(c);
         })
         .catch((e) => {
-          if (active) setError(e.message);
+          if (active) {setConversation(null);setError(e.message);}
         });
     else setConversation(null);
     return () => {
@@ -455,11 +463,13 @@ export function App() {
     };
   }, [page, selected, data]);
   useEffect(() => {
+    let active = true;
+    setInstances([]);
     if (page === "agents" && selected)
       api<Instance[]>("/agents/" + selected + "/instances")
-        .then(setInstances)
-        .catch((e) => setError(e.message));
-    else setInstances([]);
+        .then((value)=>{if(active)setInstances(value);})
+        .catch((e) => {if(active){setInstances([]);setError(e.message);}});
+    return ()=>{active=false;};
   }, [page, selected, data]);
   const entities = [...data.people, ...data.agents, ...data.services];
   const who = (id?: string) => entities.find((p) => p.id === id);
