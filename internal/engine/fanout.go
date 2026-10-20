@@ -8,27 +8,39 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// New private native conversations have no provider-thread routes. Batch their
-// writes only when none of the audience has an enabled provider destination.
-// External routing and existing conversations keep the full enqueue path.
+// A new private conversation cannot have an incoming provider-thread route.
+// Resolve configured destinations once and batch canonical and provider writes
+// together. Existing conversations and requests retain the full enqueue path.
 func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, rs []recipient, out *SendResult) (bool, error) {
 	ids := make([]string, 0, len(rs))
 	for _, r := range rs {
 		ids = append(ids, r.ID)
 	}
-	var external bool
-	if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) AND c.enabled)`, a.Scope, ids).Scan(&external); e != nil {
-		return false, e
+	type route struct {
+		ConnectionID string `json:"connection_id"`
+		Address      string `json:"address"`
+		DeliveryID   string `json:"delivery_id"`
 	}
-	if external {
-		return false, nil
+	routes := map[string][]route{}
+	rows, err := tx.Query(ctx, `SELECT d.principal_id,d.connection_id,d.address FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) AND c.enabled AND d.mode IN ('primary','copy') ORDER BY d.priority,d.id`, a.Scope, ids)
+	if err != nil {
+		return true, err
+	}
+	for rows.Next() {
+		var pid string
+		var d route
+		if err = rows.Scan(&pid, &d.ConnectionID, &d.Address); err != nil {
+			rows.Close()
+			return true, err
+		}
+		routes[pid] = append(routes[pid], d)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return true, err
 	}
 	ctx = withPolicySnapshot(ctx)
-	for _, r := range rs {
-		if !s.allowed(ctx, tx, a, "message", r.PolicyTarget, "", "") {
-			return true, &Error{"NO_ELIGIBLE_ROUTE", "No permitted destination is configured for this recipient.", 403}
-		}
-	}
 	title := in.Title
 	if title == "" {
 		title = "Conversation"
@@ -39,11 +51,24 @@ func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInp
 		DeliveryID     string  `json:"delivery_id"`
 		Message        Message `json:"message"`
 		PolicyTarget   Target  `json:"policy_target"`
+		Native         bool    `json:"native"`
+		Providers      []route `json:"providers"`
 	}
 	items := make([]record, 0, len(rs))
 	for _, r := range rs {
 		m := Message{ID: ID("msg"), ConversationID: ID("con"), SenderID: a.ID, InstanceID: a.InstanceID, Body: in.Body, CreatedAt: time.Now()}
-		items = append(items, record{m.ConversationID, r.ID, ID("del"), m, r.PolicyTarget})
+		item := record{ConversationID: m.ConversationID, RecipientID: r.ID, DeliveryID: ID("del"), Message: m, PolicyTarget: r.PolicyTarget,
+			Native: s.allowed(ctx, tx, a, "message", r.PolicyTarget, "", "")}
+		for _, d := range routes[r.ID] {
+			if s.allowed(ctx, tx, a, "message", r.PolicyTarget, d.ConnectionID, "") {
+				d.DeliveryID = ID("del")
+				item.Providers = append(item.Providers, d)
+			}
+		}
+		if !item.Native && len(item.Providers) == 0 {
+			return true, &Error{"NO_ELIGIBLE_ROUTE", "No permitted destination is configured for this recipient.", 403}
+		}
+		items = append(items, item)
 		out.Messages = append(out.Messages, m)
 	}
 	raw := JSON(items)

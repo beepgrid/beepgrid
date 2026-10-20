@@ -154,3 +154,67 @@ func TestGroupFanoutWithProviderKeepsExternalAndPrivateNativeRoutes(t *testing.T
 		}
 	}
 }
+
+func TestBatchedProviderFanoutFiltersRoutesAndRollsBackAtomically(t *testing.T) {
+	s, owner := testStore(t)
+	s.AllowLocal = true
+	ctx := context.Background()
+	people := []Actor{testPerson(t, s, owner, "route-one"), testPerson(t, s, owner, "route-two")}
+	sender := testPerson(t, s, owner, "restricted-sender")
+	connections := []Connection{}
+	for i := range 3 {
+		c, err := s.SaveConnection(ctx, owner, Connection{Name: fmt.Sprint("route-", i), Kind: "webhook", Enabled: i != 2, Secret: "test-provider-secret", Config: map[string]string{"url": "http://127.0.0.1:9"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		connections = append(connections, c)
+		for _, p := range people {
+			mode := "primary"
+			if i == 1 {
+				mode = "copy"
+			}
+			if i == 2 {
+				mode = "fallback"
+			}
+			if _, err = s.SaveDestination(ctx, owner, Destination{ConnectionID: c.ID, PrincipalID: p.ID, Address: "fixture", Mode: mode}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	g, err := s.SaveGroup(ctx, owner, Group{Name: "restricted routes", Members: []string{people[0].ID, people[1].ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant(t, s, owner, sender, []Rule{{Action: "message", TargetKind: "group", TargetID: g.ID, ConnectionID: connections[0].ID}})
+	in := SendInput{Target: Target{"group", g.ID}, Body: "only permitted external routes"}
+	out, err := s.Send(ctx, sender, in, "provider-fanout")
+	if err != nil || len(out.Messages) != 2 {
+		t.Fatal(out, err)
+	}
+	again, err := s.Send(ctx, sender, in, "provider-fanout")
+	if err != nil || string(JSON(again)) != string(JSON(out)) {
+		t.Fatal("replay changed receipts", err)
+	}
+	var total, allowed int
+	if err = s.Pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE connection_id=$1) FROM deliveries`, connections[0].ID).Scan(&total, &allowed); err != nil || total != 2 || allowed != 2 {
+		t.Fatal("route authorization", total, allowed, err)
+	}
+	// One recipient with no permitted route must abort the complete send,
+	// including conversations, provider queue rows and event cursors.
+	if _, err = s.Pool.Exec(ctx, `DELETE FROM destinations WHERE principal_id=$1 AND connection_id=$2`, people[1].ID, connections[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	var before, after int64
+	if err = s.Pool.QueryRow(ctx, `SELECT sequence FROM scopes WHERE id=$1`, owner.Scope).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Send(ctx, sender, in, "provider-fanout-denied"); ErrorStatus(err) != 403 {
+		t.Fatal("partial route denial accepted", err)
+	}
+	if err = s.Pool.QueryRow(ctx, `SELECT sequence FROM scopes WHERE id=$1`, owner.Scope).Scan(&after); err != nil || before != after {
+		t.Fatal("partial event cursor", before, after, err)
+	}
+	if err = s.Pool.QueryRow(ctx, `SELECT count(*) FROM messages`).Scan(&total); err != nil || total != 2 {
+		t.Fatal("partial private messages", total, err)
+	}
+}

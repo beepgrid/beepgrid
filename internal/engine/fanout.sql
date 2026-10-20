@@ -3,7 +3,8 @@ WITH input AS MATERIALIZED (
         value->>'recipient_id' AS recipient_id,
         value->>'delivery_id' AS delivery_id,
         value->'message' AS message,
-        value->'policy_target' AS policy_target, ordinality
+        value->'policy_target' AS policy_target, (value->>'native')::boolean AS native,
+        value->'providers' AS providers, ordinality
  FROM jsonb_array_elements($2::jsonb) WITH ORDINALITY
 ), reservation AS (
  UPDATE scopes SET sequence=sequence+(SELECT count(*) FROM input)
@@ -24,12 +25,19 @@ WITH input AS MATERIALIZED (
  INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data)
  SELECT $1,r.sequence-(SELECT count(*) FROM input)+i.ordinality,'message.created',$4,i.conversation_id,'',i.message
  FROM input i JOIN written w ON w.id=i.message->>'id' CROSS JOIN reservation r RETURNING sequence
+), payloads AS MATERIALIZED (
+ SELECT i.*, jsonb_build_object('type','message','message',i.message,'conversation_id',i.conversation_id,
+          '_policy',jsonb_build_object('action_name','','credential_id',$6::text,'provider_connection',$7::text,'sender_id',$4::text,'target',i.policy_target,'action','message')) AS payload
+ FROM input i JOIN written w ON w.id=i.message->>'id'
 ), queued AS (
  INSERT INTO deliveries(id,scope,operation_id,recipient_id,payload,expires_at)
- SELECT i.delivery_id,$1,i.message->>'id',i.recipient_id,
-        jsonb_build_object('type','message','message',i.message,'conversation_id',i.conversation_id,
-          '_policy',jsonb_build_object('action_name','','credential_id',$6::text,'provider_connection',$7::text,'sender_id',$4::text,'target',i.policy_target,'action','message')),$8
- FROM input i JOIN written w ON w.id=i.message->>'id' RETURNING id
+ SELECT i.delivery_id,$1,i.message->>'id',i.recipient_id,i.payload,$8
+ FROM payloads i WHERE i.native RETURNING id
+), external AS (
+ INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at)
+ SELECT d->>'delivery_id',$1,i.message->>'id',i.recipient_id,d->>'connection_id',d->>'address',i.payload,$8
+ FROM payloads i CROSS JOIN LATERAL jsonb_array_elements(COALESCE(NULLIF(i.providers,'null'::jsonb),'[]'::jsonb)) d
+ ON CONFLICT DO NOTHING RETURNING id
 )
 SELECT pg_notify('notif_work',json_build_array($1::text,i.recipient_id)::text), pg_notify('notif_events',$1)
-FROM input i JOIN queued q ON q.id=i.delivery_id
+FROM payloads i

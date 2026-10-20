@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -26,6 +27,7 @@ func TestEmbeddedAssetsCompressionConditionalAndRange(t *testing.T) {
 		if path == "index.html" {
 			urlPath = "/"
 		}
+		urlPath = (&url.URL{Path: urlPath}).EscapedPath()
 		request := httptest.NewRequest("GET", urlPath, nil)
 		request.Header.Set("Accept-Encoding", "gzip")
 		rec := httptest.NewRecorder()
