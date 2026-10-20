@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import urllib.parse
+from codex_capacity import safe_capacity_retry
 
 root=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root/'sdk/python'))
@@ -49,7 +50,7 @@ def save_report():
 def step(name):
     report['steps'].append(name);save_report();print('PASS:',name,flush=True)
 
-def turn(name,session,prompt):
+def turn_once(name,session,prompt):
     # Secrets go only to the child environment; MCP config forwards variable names.
     child_env=dict(environment,NOTIF_URL=args.url,NOTIF_TOKEN=session['token'])
     with tempfile.TemporaryDirectory(prefix='notif-codex-turn-') as directory:
@@ -78,6 +79,22 @@ def turn(name,session,prompt):
         if not calls:raise RuntimeError('Codex produced text without exercising MCP: '+name)
         if any(c.get('status') != 'completed' or c.get('error') for c in calls):raise RuntimeError('A real MCP call failed: '+name)
         return calls
+
+def turn(name,session,prompt):
+    for attempt in range(3):
+        label=name if attempt==0 else name+'-capacity-retry-'+str(attempt)
+        try:
+            return turn_once(label,session,prompt)
+        except RuntimeError:
+            # Capacity rejection before any tool call has no application effect.
+            # Never switch model/billing, retry partial tool execution, or discard
+            # a failed transcript. Application errors still fail immediately.
+            path=local/(label+'.jsonl')
+            text=path.read_text() if path.exists() else ''
+            if not safe_capacity_retry(text) or attempt==2:
+                raise
+            print('RETRY: model capacity, same subscription/model, no tool calls',flush=True)
+            time.sleep(20)
 
 fleet=owner.call('POST','/api/v1/groups',{'name':'Codex audit fleet '+run,'members':[]})
 service=owner.call('POST','/api/v1/services',{'external_id':'audit-launcher/'+run,'name':'Codex audit launcher '+run})

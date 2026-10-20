@@ -14,6 +14,7 @@ npm --prefix web ci --no-fund
 npm --prefix web run build
 npm --prefix web test
 python3 scripts/sdk-integration.py
+python3 -m unittest discover -s scripts -p test_codex_capacity.py
 python3 scripts/release-audit.py
 GOFLAGS=-buildvcs=false go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 go build -buildvcs=false -trimpath -o .local/notif ./cmd/notif
