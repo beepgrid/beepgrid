@@ -8,28 +8,41 @@ import (
 // ApplyWorkspaceState fences delayed operator requests independently of customer
 // credentials. It must only be exposed behind authenticated management access.
 func (s *Store) ApplyWorkspaceState(ctx context.Context, scope string, version int64, suspended bool) error {
-	return s.applyWorkspaceControl(ctx, scope, version, suspended, nil)
+	return s.applyWorkspaceControl(ctx, scope, version, suspended, nil, false)
 }
 
 // ApplyWorkspaceAccess atomically fences security state and an optional access
 // deadline. Zero means unlimited. Expiry is enforced by the database even while
 // the management service is offline; it never deletes accepted work.
 func (s *Store) ApplyWorkspaceAccess(ctx context.Context, scope string, version int64, suspended bool, until time.Time) error {
-	return s.applyWorkspaceControl(ctx, scope, version, suspended, &until)
+	return s.applyWorkspaceControl(ctx, scope, version, suspended, &until, false)
 }
 
-func (s *Store) applyWorkspaceControl(ctx context.Context, scope string, version int64, suspended bool, deadline *time.Time) error {
+// ApplyRestoredWorkspaceAccess reconciles an authoritative registry snapshot
+// while the restored workspace is held. Equal versions may repair a snapshot's
+// access projection; lower versions and erasure tombstones remain forbidden.
+func (s *Store) ApplyRestoredWorkspaceAccess(ctx context.Context, scope string, version int64, suspended bool, until time.Time) error {
+	if version < 1 {
+		return Bad("An explicit registry version is required.")
+	}
+	return s.applyWorkspaceControl(ctx, scope, version, suspended, &until, true)
+}
+
+func (s *Store) applyWorkspaceControl(ctx context.Context, scope string, version int64, suspended bool, deadline *time.Time, restore bool) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 	var current int64
-	var old bool
+	var old, held bool
 	var oldDeadline *time.Time
 	var erasure string
-	if err = tx.QueryRow(ctx, `SELECT control_version,suspended,access_until,erasure_operation FROM scopes WHERE id=$1 FOR UPDATE`, scope).Scan(&current, &old, &oldDeadline, &erasure); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT control_version,suspended,access_until,erasure_operation,recovery_hold FROM scopes WHERE id=$1 FOR UPDATE`, scope).Scan(&current, &old, &oldDeadline, &erasure, &held); err != nil {
 		return normalize(err)
+	}
+	if restore && !held {
+		return Conflict("Restore reconciliation requires an active recovery hold.")
 	}
 	if erasure != "" {
 		return Conflict("This workspace is reserved for erasure and cannot be reactivated.")
@@ -46,10 +59,10 @@ func (s *Store) applyWorkspaceControl(ctx context.Context, scope string, version
 	if version == 0 {
 		version = current + 1
 	}
-	if version < current || (version == current && (suspended != old || !sameDeadline)) {
+	if version < current || (version == current && !restore && (suspended != old || !sameDeadline)) {
 		return Conflict("A newer workspace state is already applied.")
 	}
-	if version == current {
+	if version == current && (suspended == old && sameDeadline) {
 		return nil
 	}
 	if _, err = tx.Exec(ctx, `UPDATE scopes SET suspended=$2,control_version=$3,access_until=$4 WHERE id=$1`, scope, suspended, version, nextDeadline); err != nil {

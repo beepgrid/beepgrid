@@ -5,6 +5,56 @@ import (
 	"time"
 )
 
+type RestoredWorkspace struct {
+	Scope   string `json:"scope"`
+	Version int64  `json:"version"`
+}
+
+// HoldRestoredCell is an offline operator primitive. Commit the hold and revoke
+// every restored credential before consulting an external registry. Unknown
+// workspaces must remain inaccessible even when reconciliation cannot proceed.
+func (s *Store) HoldRestoredCell(ctx context.Context) ([]RestoredWorkspace, error) {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `SELECT id,control_version FROM scopes ORDER BY id FOR UPDATE`)
+	if err != nil {
+		return nil, err
+	}
+	out := []RestoredWorkspace{}
+	for rows.Next() {
+		var w RestoredWorkspace
+		if err = rows.Scan(&w.Scope, &w.Version); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, w)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	for _, q := range []string{
+		`UPDATE scopes SET recovery_hold=true,automatic_answers=false,overseer_enabled=false,assistance_version=assistance_version+1`,
+		`UPDATE credentials SET revoked=true WHERE NOT revoked`,
+		`UPDATE answer_match_jobs SET state='cancelled' WHERE state IN ('queued','leased')`,
+		`UPDATE deliveries SET state='unknown',last_error='Database restored; reconcile externally before replay' WHERE state IN ('queued','leased','waiting')`,
+		`UPDATE execution_intents SET state='unknown',updated_at=now() WHERE state IN ('authorized','running')`,
+		`UPDATE requests SET state='superseded',resolved_at=now() WHERE kind IN ('approval','task') AND state IN ('open','resolved')`,
+	} {
+		if _, err = tx.Exec(ctx, q); err != nil {
+			return nil, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReconcileRestored is an offline operator action before accepting traffic on a restored database.
 // It freezes uncertain work and rotates every credential, including admin credentials rolled back by a backup.
 func (s *Store) ReconcileRestored(ctx context.Context, scope, newOwnerToken string) error {
@@ -34,8 +84,14 @@ func (s *Store) ReconcileRestored(ctx context.Context, scope, newOwnerToken stri
 			return e
 		}
 	}
-	if _, e = tx.Exec(ctx, `INSERT INTO credentials(id,scope,principal_id,digest,kind) VALUES($1,$2,$3,$4,'admin')`, ID("key"), scope, owner, Digest(newOwnerToken)); e != nil {
+	// A lost acknowledgement must be replayable with the same privately saved
+	// recovery key. Never revive a matching digest owned by a different identity.
+	tag, e := tx.Exec(ctx, `INSERT INTO credentials(id,scope,principal_id,digest,kind) VALUES($1,$2,$3,$4,'admin') ON CONFLICT(digest) DO UPDATE SET revoked=false WHERE credentials.scope=excluded.scope AND credentials.principal_id=excluded.principal_id AND credentials.kind='admin'`, ID("key"), scope, owner, Digest(newOwnerToken))
+	if e != nil {
 		return e
+	}
+	if tag.RowsAffected() != 1 {
+		return Conflict("Recovery credential belongs to another identity.")
 	}
 	if e = event(ctx, tx, Actor{Principal: Principal{ID: owner}, Scope: scope}, "recovery.hold", "", owner, map[string]any{"at": time.Now(), "credentials_rotated": true, "effects_require_reconciliation": true}); e != nil {
 		return e
