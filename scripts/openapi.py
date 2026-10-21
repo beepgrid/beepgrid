@@ -27,7 +27,7 @@ schemas={
 'Conversation':obj({'id':S,'title':S,'created_by':S,'created_at':S,'participants':array({'type':'object'}),'messages':array(ref('Message'))}),
 'AskInput':obj({'target':ref('Target'),'conversation_id':S,'kind':{'enum':['question','approval','task']},'title':S,'body':S,'choices':array(S),'action':ref('Action'),'expires_at':S,'shared_key':S},['title']),
 'ResponseInput':obj({'outcome':{'enum':['answered','approved','denied','completed','failed','rejected']},'answer':{},'version':{'type':'integer'}},['outcome','version']),
-'Response':obj({'responder_instance_id':S,'outcome':S,'answer':{},'version':{'type':'integer'},'source_answer_id':S,'source_invalidated':{'type':'boolean'}}),
+'Response':obj({'responder_instance_id':S,'outcome':S,'answer':{},'version':{'type':'integer'},'source_answer_id':S,'source_invalidated':{'type':'boolean'},'reuse_method':S,'reuse_reason':S}),
 'Request':obj({'requester_instance_id':S,'id':S,'requester_id':S,'conversation_id':S,'kind':S,'title':S,'body':S,'choices':array(S),'action':ref('Action'),'state':{'enum':['open','resolved','cancelled','expired','superseded']},'version':{'type':'integer'},'response':ref('Response'),'resolved_by':S,'resolved_at':S,'expires_at':S,'created_at':S,'shared_key':S}),
 'Rule':obj({'action':{'enum':['view','message','ask','decide','manage','*']},'target_kind':S,'target_id':S,'connection_id':S,'action_name':S,'conditions':obj({'resource':S,'resource_version':S,'currency':S,'max_amount_minor':{'type':'integer','minimum':0},'before':S})},['action','target_kind','target_id']),
 'Role':obj({'id':S,'name':S,'rules':array(ref('Rule'))},['name','rules']),
@@ -40,6 +40,12 @@ schemas={
 'Attachment':obj({'id':S,'conversation_id':S,'file_name':S,'media_type':S,'size':{'type':'integer'},'sha256':S,'created_at':S}),
 'PublishAnswer':obj({'request_id':S,'key':S,'audience':array(S),'valid_until':S},['request_id','audience']),
 'SharedAnswer':{'type':'object','description':'Scoped publication with answer, author/publisher, audience, provenance, validity and invalidation.'},
+'AssistanceSettings':obj({'automatic_answers':{'type':'boolean'},'overseer':{'type':'boolean'},'version':{'type':'integer'},'matcher_configured':{'type':'boolean'},'overseer_configured':{'type':'boolean'}}),
+'AssistanceUpdate':obj({'automatic_answers':{'type':'boolean'},'overseer':{'type':'boolean'}}),
+'FleetAgent':obj({'agent':ref('Agent'),'instances':array(ref('Instance')),'fresh':{'type':'boolean'}}),
+'OverseerInput':obj({'prompt':{'type':'string','maxLength':4000},'target':ref('Target')},['prompt']),
+'OverseerDispatch':obj({'agent_id':S,'conversation_id':S,'request_id':S}),
+'OverseerPlan':obj({'id':S,'prompt':S,'context_agent_ids':array(S),'target':ref('Target'),'operation':{'enum':['status','message','question','task']},'summary':S,'body':S,'sources':array(ref('FleetAgent')),'requires_confirmation':{'type':'boolean'},'created_at':S,'expires_at':S,'dispatches':array(ref('OverseerDispatch')),'replies':array(ref('Request')),'reply_summary':S,'reply_digest':S}),
 'Event':obj({'sequence':{'type':'integer'},'kind':S,'actor_id':S,'conversation_id':S,'recipient_id':S,'data':{},'created_at':S}),
 'Error':obj({'error':obj({'code':S,'message':S},['code','message'])},['error'])}
 paths={}
@@ -100,7 +106,14 @@ add('POST','/api/v1/answers',ref('PublishAnswer'),ref('SharedAnswer'))
 add('POST','/api/v1/answers/{id}/invalidate',obj({}))
 add('POST','/api/v1/requests/{id}/suggestions',obj({}))
 add('POST','/api/v1/answer-proposals/{id}',obj({'accept':{'type':'boolean'}},['accept']),ref('Request'))
-for op in ('status','command'):add('POST','/api/v1/fleet/'+op,obj({'target':ref('Target')}),description='Read-only structured fleet status; command always returns CAPABILITY_UNSUPPORTED.')
+add('GET','/api/v1/assistance/settings',result=ref('AssistanceSettings'))
+add('POST','/api/v1/assistance/settings',ref('AssistanceUpdate'),ref('AssistanceSettings'),description='Owner-controlled optional assistance. Both features default off. Enabling requires a configured provider.')
+add('POST','/api/v1/fleet/status',obj({'target':ref('Target')}),description='Read-only structured fleet status filtered by current View permission.')
+add('POST','/api/v1/fleet/plan',ref('OverseerInput'),ref('OverseerPlan'),description='Optional overseer. Acts only as the caller. Outbound messages, questions and tasks require a saved preview and explicit confirmation.')
+add('GET','/api/v1/fleet/plans',result=array(ref('OverseerPlan')))
+add('GET','/api/v1/fleet/plans/{id}',result=ref('OverseerPlan'))
+add('POST','/api/v1/fleet/plans/{id}/summary',obj({}),ref('OverseerPlan'),description='Read-only summary of currently authorized replies; changed permissions or replies invalidate derived output.')
+add('POST','/api/v1/fleet/command',obj({'plan_id':S},['plan_id']),ref('OverseerPlan'),description='Atomically confirm a server-saved preview under current caller permissions. Idempotent per plan. No free-form targets or instructions accepted.')
 add('GET','/api/v1/conversations/{id}/attachments',result=array(ref('Attachment')))
 add('POST','/api/v1/conversations/{id}/attachments',result=ref('Attachment'))
 paths['/api/v1/conversations/{id}/attachments']['post']['requestBody']={'required':True,'content':{'multipart/form-data':{'schema':obj({'file':{'type':'string','format':'binary'}},['file'])}}}

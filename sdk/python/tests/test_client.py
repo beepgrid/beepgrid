@@ -14,6 +14,24 @@ class ClientTests(unittest.TestCase):
                 c.wait("req_1", timeout=.01, interval=.001)
             self.assertGreater(query.call_count, 0)
 
+    def test_assistance_helpers_preserve_authority_and_provider_deadline(self):
+        c = Client("http://localhost", "person-token")
+        with patch.object(c, "call", return_value={"id": "ovr_1"}) as call:
+            c.assistance()
+            call.assert_called_with("GET", "/api/v1/assistance/settings")
+            c.update_assistance(overseer=True)
+            call.assert_called_with("POST", "/api/v1/assistance/settings", {"overseer": True})
+            c.plan_overseer("Ask Scout")
+            call.assert_called_with("POST", "/api/v1/fleet/plan", {"prompt": "Ask Scout"}, timeout=40)
+            c.confirm_overseer("ovr_1")
+            call.assert_called_with("POST", "/api/v1/fleet/command", {"plan_id": "ovr_1"})
+            c.overseer_plan("a/b")
+            call.assert_called_with("GET", "/api/v1/fleet/plans/a%2Fb")
+            c.overseer_plans()
+            call.assert_called_with("GET", "/api/v1/fleet/plans")
+            c.summarize_overseer("a/b")
+            call.assert_called_with("POST", "/api/v1/fleet/plans/a%2Fb/summary", {}, timeout=40)
+
     def test_invalid_base_url(self):
         with self.assertRaises(ValueError):
             Client("file:///etc/passwd", "token")

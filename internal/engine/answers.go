@@ -45,10 +45,11 @@ func contextHash(key, title, body string, choices []string) string {
 
 const answerFields = `id,key,context_hash,question,answer,author_id,publisher_id,audience,valid_until,invalidated,source_request`
 
-func scanAnswer(row pgx.Row) (SharedAnswer, error) {
+func scanAnswer(row pgx.Row, extra ...any) (SharedAnswer, error) {
 	var a SharedAnswer
 	var value, audience []byte
-	e := row.Scan(&a.ID, &a.Key, &a.ContextHash, &a.Question, &value, &a.AuthorID, &a.PublisherID, &audience, &a.ValidUntil, &a.Invalidated, &a.SourceRequest)
+	targets := []any{&a.ID, &a.Key, &a.ContextHash, &a.Question, &value, &a.AuthorID, &a.PublisherID, &audience, &a.ValidUntil, &a.Invalidated, &a.SourceRequest}
+	e := row.Scan(append(targets, extra...)...)
 	_ = json.Unmarshal(value, &a.Answer)
 	_ = json.Unmarshal(audience, &a.Audience)
 	return a, normalize(e)
@@ -373,7 +374,7 @@ func (s *Store) DecideProposal(ctx context.Context, a Actor, id string, accept b
 
 func (s *Store) RespondAndShare(ctx context.Context, a Actor, id string, in Response, audience []string) (Request, error) {
 	var out Request
-	if in.SourceAnswerID != "" || in.SourceInvalidated || in.ResponderInstanceID != "" {
+	if in.SourceAnswerID != "" || in.SourceInvalidated || in.ResponderInstanceID != "" || in.ReuseMethod != "" || in.ReuseReason != "" {
 		return out, Bad("Answer provenance is assigned by the server.")
 	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {

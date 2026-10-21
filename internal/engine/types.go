@@ -214,6 +214,8 @@ type Request struct {
 type Response struct {
 	ResponderInstanceID string `json:"responder_instance_id,omitempty"`
 	SourceAnswerID      string `json:"source_answer_id,omitempty"`
+	ReuseMethod         string `json:"reuse_method,omitempty"`
+	ReuseReason         string `json:"reuse_reason,omitempty"`
 	SourceInvalidated   bool   `json:"source_invalidated,omitempty"`
 
 	Outcome string `json:"outcome"`

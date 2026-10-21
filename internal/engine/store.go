@@ -18,16 +18,20 @@ type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Store struct {
-	wakes             wakeHub
-	eventWakes        wakeHub
-	providerWakes     wakeHub
-	stopWakeups       context.CancelFunc
-	wakeupDone        chan struct{}
-	providerTransport http.RoundTripper
+	wakes                wakeHub
+	eventWakes           wakeHub
+	providerWakes        wakeHub
+	stopWakeups          context.CancelFunc
+	wakeupDone           chan struct{}
+	providerTransport    http.RoundTripper
+	assistanceTransports []*http.Transport
 
 	AttachmentsRoot string
 
-	Matcher Matcher
+	Matcher            Matcher
+	AutomaticMatcher   AutomaticMatcher
+	OverseerPlanner    OverseerPlanner
+	OverseerSummarizer OverseerSummarizer
 
 	AllowLocal bool
 
@@ -36,6 +40,9 @@ type Store struct {
 }
 
 func (s *Store) Close() {
+	for _, transport := range s.assistanceTransports {
+		transport.CloseIdleConnections()
+	}
 	if transport, ok := s.providerTransport.(interface{ CloseIdleConnections() }); ok {
 		transport.CloseIdleConnections()
 	}

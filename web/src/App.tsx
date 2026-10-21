@@ -1,4 +1,5 @@
 import { Attachments } from "./Attachments";
+import {AssistanceControls, OverseerPanel, disabledAssistance, type AssistanceSettings} from "./AssistanceControls";
 import { eventMessage, useLiveConversation } from "./live";
 import {
   AnswerSuggestions,
@@ -48,6 +49,7 @@ const nav = [
 ] as const;
 type Page = (typeof nav)[number][0];
 type Data = {
+  assistance: AssistanceSettings;
   people: Entity[];
   agents: Entity[];
   services: Entity[];
@@ -68,6 +70,7 @@ type Data = {
   bindings: { role_id: string; subject_kind: string; subject_id: string }[];
 };
 const emptyData: Data = {
+  assistance: disabledAssistance,
   people: [],
   agents: [],
   services: [],
@@ -378,6 +381,7 @@ export function App() {
     try {
       const current = await api<Me>("/me");
       const entries: [keyof Data, string][] = [
+        ["assistance", "/assistance/settings"],
         ["people", "/people"],
         ["agents", "/agents"],
         ["services", "/services"],
@@ -956,6 +960,7 @@ export function App() {
           )}
           {page === "agents" && (
             <>
+              {data.assistance.overseer && <OverseerPanel key={me.person.id} groups={data.groups} visibleAgentIDs={data.agents.map(a => a.id)} />}
               <FleetSummary />
               <Search
                 value={query}
@@ -1410,7 +1415,7 @@ export function App() {
             <Activity data={data} name={name} onRefresh={refresh} act={act} />
           )}
           {page === "settings" && (
-            <Settings me={me} people={entities} act={act} />
+            <Settings me={me} people={entities} act={act} assistance={data.assistance} />
           )}
         </div>
         <footer className="app-footer">
@@ -1673,6 +1678,11 @@ function RequestDetail({
         <div className="resolved-state">
           <Icon name="check" />
           <strong>{requestLabel(r)}</strong>
+          {r.response?.source_answer_id && <div className="small muted" role="status">
+            {r.response.reuse_method === "automatic" ? "Automatically answered from a published shared answer." : "Answered using a published shared answer."}
+            {r.response.reuse_reason && <p>{r.response.reuse_reason}</p>}
+            <code>{r.response.source_answer_id}</code>
+          </div>}
           {r.response?.answer !== undefined && (
             <p>
               {typeof r.response.answer === "string"
@@ -2714,10 +2724,12 @@ function Settings({
   me,
   people,
   act,
+  assistance,
 }: {
   me: Me;
   people: Entity[];
   act: FormsProps["act"];
+  assistance: AssistanceSettings;
 }) {
   const [credentials, setCredentials] = useState<Record<string, unknown>[]>([]),
     [principal, setPrincipal] = useState(me.person.id),
@@ -2732,6 +2744,7 @@ function Settings({
   }, []);
   return (
     <>
+      <AssistanceControls settings={assistance} act={act} />
       <SharedAnswers />
       <section className="settings-section">
         <h2>Software services</h2>

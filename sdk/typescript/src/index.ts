@@ -51,6 +51,8 @@ export type RequestItem = {
     responder_instance_id?: string;
     source_answer_id?: string;
     source_invalidated?: boolean;
+    reuse_method?: string;
+    reuse_reason?: string;
   };
   expires_at: string;
 };
@@ -103,6 +105,47 @@ export type Session = {
   agent: Agent;
   instance_id: string;
   expires_at: string;
+};
+export type AssistanceSettings = {
+  automatic_answers: boolean;
+  overseer: boolean;
+  version: number;
+  matcher_configured: boolean;
+  overseer_configured: boolean;
+};
+export type OverseerInput = { prompt: string; target?: Target };
+export type FleetAgent = {
+  agent: Agent;
+  fresh: boolean;
+  instances: {
+    id: string;
+    agent_id: string;
+    presence: string;
+    last_seen: string;
+    capabilities: string[];
+    progress: Record<string, unknown>;
+  }[];
+};
+export type OverseerPlan = {
+  id: string;
+  prompt: string;
+  context_agent_ids: string[];
+  target?: Target;
+  operation: "status" | "message" | "question" | "task";
+  summary: string;
+  body?: string;
+  sources: FleetAgent[];
+  requires_confirmation: boolean;
+  created_at: string;
+  expires_at: string;
+  dispatches: {
+    agent_id: string;
+    conversation_id: string;
+    request_id?: string;
+  }[];
+  replies: RequestItem[];
+  reply_summary?: string;
+  reply_digest?: string;
 };
 export class NotifError extends Error {
   constructor(
@@ -211,7 +254,10 @@ export class Client {
   // send(input, sameKey) can recover the complete canonical receipt later.
   notify(input: SendInput, key: string = crypto.randomUUID()) {
     return this.call<{ conversation_id: string; message_count: number }>(
-      "POST", "/api/v1/messages", input, { key, minimal: true },
+      "POST",
+      "/api/v1/messages",
+      input,
+      { key, minimal: true },
     );
   }
   ask(input: AskInput, key: string = crypto.randomUUID()) {
@@ -250,6 +296,56 @@ export class Client {
       `/api/v1/executions/${encodeURIComponent(id)}`,
       { state, result },
       { key: crypto.randomUUID() },
+    );
+  }
+  assistance(signal?: AbortSignal) {
+    return this.call<AssistanceSettings>(
+      "GET",
+      "/api/v1/assistance/settings",
+      undefined,
+      { signal },
+    );
+  }
+  updateAssistance(
+    settings: Partial<
+      Pick<AssistanceSettings, "automatic_answers" | "overseer">
+    >,
+  ) {
+    return this.call<AssistanceSettings>(
+      "POST",
+      "/api/v1/assistance/settings",
+      settings,
+    );
+  }
+  planOverseer(input: OverseerInput, signal?: AbortSignal) {
+    return this.call<OverseerPlan>("POST", "/api/v1/fleet/plan", input, {
+      signal,
+    });
+  }
+  overseerPlans(signal?: AbortSignal) {
+    return this.call<OverseerPlan[]>("GET", "/api/v1/fleet/plans", undefined, {
+      signal,
+    });
+  }
+  overseerPlan(id: string, signal?: AbortSignal) {
+    return this.call<OverseerPlan>(
+      "GET",
+      "/api/v1/fleet/plans/" + encodeURIComponent(id),
+      undefined,
+      { signal },
+    );
+  }
+  confirmOverseer(id: string) {
+    return this.call<OverseerPlan>("POST", "/api/v1/fleet/command", {
+      plan_id: id,
+    });
+  }
+  summarizeOverseer(id: string, signal?: AbortSignal) {
+    return this.call<OverseerPlan>(
+      "POST",
+      "/api/v1/fleet/plans/" + encodeURIComponent(id) + "/summary",
+      {},
+      { signal },
     );
   }
   // Full, durable events contain canonical message data. Consumers can append

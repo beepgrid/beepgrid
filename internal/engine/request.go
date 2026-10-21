@@ -91,104 +91,108 @@ func (s *Store) Requests(ctx context.Context, a Actor) ([]Request, error) {
 
 func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Request, error) {
 	var out Request
-	stable := in
-	if in.Kind == "" {
-		in.Kind = "question"
-	}
-	if in.Kind != "question" && in.Kind != "approval" && in.Kind != "task" {
-		return out, Bad("kind must be question, approval or task.")
-	}
-	if !ValidText(in.Title, 200) || len(in.Body) > 32768 || len(in.Choices) > 20 {
-		return out, Bad("A title and bounded body/choices are required.")
-	}
-	if in.ExpiresAt.IsZero() {
-		in.ExpiresAt = time.Now().UTC().Add(7 * 24 * time.Hour).Truncate(time.Second)
-	}
-	if in.ExpiresAt.Before(time.Now()) || in.ExpiresAt.After(time.Now().Add(90*24*time.Hour)) {
-		return out, Bad("Expiry must be within 90 days.")
-	}
-	if in.Kind == "approval" && (in.Action == nil || !ValidText(in.Action.Name, 120) || in.Action.ExecutorID == "" || in.Action.Resource == "" || in.Action.ResourceVersion == "" || in.Action.OperationKey == "") {
-		return out, Bad("An approval requires an exact action, executor, resource version and operation key.")
-	}
-	if in.Kind != "approval" && in.Action != nil {
-		return out, Bad("Only approvals may carry an execution descriptor.")
-	}
-	if len(in.SharedKey) > 200 {
-		return out, Bad("Shared key exceeds 200 characters.")
-	}
-	if in.Kind != "question" && in.SharedKey != "" {
-		return out, Bad("Only informational questions may use shared keys.")
-	}
-	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		return idempotent(ctx, tx, a, "ask", key, stable, &out, func() error {
-			var rs []recipient
-			var e error
-			if in.ConversationID != "" {
-				rs, e = s.conversationRecipients(ctx, tx, a, in.ConversationID, "ask", in.Action)
-			} else {
-				rs, e = s.resolve(ctx, tx, a, in.Target, "ask", "", in.Action)
-			}
-			if e != nil {
-				return e
-			}
-			if in.Action != nil {
-				executor, e := principal(ctx, tx, a.Scope, in.Action.ExecutorID)
-				if e != nil || executor.Disabled {
-					return Missing()
-				}
-				if !s.allowed(ctx, tx, a, "ask", Target{executor.Kind, executor.ID}, "*", in.Action.Name, in.Action) {
-					return Denied()
-				}
-			}
-			conv := in.ConversationID
-			if conv == "" {
-				if len(rs) == 1 {
-					conv, e = newConversation(ctx, tx, a, in.Title, rs[0].ID)
-				} else {
-					conv, e = newConversation(ctx, tx, a, in.Title)
-				}
-				if e != nil {
-					return e
-				}
-			}
-			out = Request{RequesterInstanceID: a.InstanceID, ID: ID("req"), RequesterID: a.ID, ConversationID: conv, Kind: in.Kind, Title: in.Title, Body: in.Body, Choices: in.Choices, Action: in.Action, State: "open", Version: 1, ExpiresAt: in.ExpiresAt, CreatedAt: time.Now(), SharedKey: in.SharedKey}
-			if _, e = tx.Exec(ctx, `INSERT INTO requests(id,scope,requester_id,requester_instance,conversation_id,kind,title,body,choices,action,expires_at,shared_key) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12)`, out.ID, a.Scope, a.ID, a.InstanceID, conv, in.Kind, in.Title, in.Body, JSON(in.Choices), JSON(in.Action), in.ExpiresAt, in.SharedKey); e != nil {
-				return e
-			}
-			for _, r := range rs {
-				projection := conv
-				if in.ConversationID == "" && len(rs) > 1 {
-					projection, e = newConversation(ctx, tx, a, in.Title, r.ID)
-					if e != nil {
-						return e
-					}
-				}
-				if _, e = tx.Exec(ctx, `INSERT INTO request_audience(scope,request_id,principal_id,conversation_id,policy_target) VALUES($1,$2,$3,$4,$5)`, a.Scope, out.ID, r.ID, projection, JSON(r.PolicyTarget)); e != nil {
-					return e
-				}
-				view := out
-				view.ConversationID = projection
-				if e = event(ctx, tx, a, "request.created", projection, r.ID, view); e != nil {
-					return e
-				}
-				if e = s.enqueue(ctx, tx, a, r, out.ID, projection, "ask", map[string]any{"type": "request", "request": view}, in.ExpiresAt); e != nil {
-					return e
-				}
-			}
-			if e = event(ctx, tx, a, "request.created", conv, a.ID, out); e != nil {
-				return e
-			}
-			return s.reuseExact(ctx, tx, a, &out)
-		})
-	})
+	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.askTx(ctx, tx, a, in, key, &out) })
 	if err == nil {
 		return s.Request(ctx, a, out.ID)
 	}
 	return out, err
 }
+func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key string, out *Request) error {
+	stable := in
+	if in.Kind == "" {
+		in.Kind = "question"
+	}
+	if in.Kind != "question" && in.Kind != "approval" && in.Kind != "task" {
+		return Bad("kind must be question, approval or task.")
+	}
+	if !ValidText(in.Title, 200) || len(in.Body) > 32768 || len(in.Choices) > 20 {
+		return Bad("A title and bounded body/choices are required.")
+	}
+	if in.ExpiresAt.IsZero() {
+		in.ExpiresAt = time.Now().UTC().Add(7 * 24 * time.Hour).Truncate(time.Second)
+	}
+	if in.ExpiresAt.Before(time.Now()) || in.ExpiresAt.After(time.Now().Add(90*24*time.Hour)) {
+		return Bad("Expiry must be within 90 days.")
+	}
+	if in.Kind == "approval" && (in.Action == nil || !ValidText(in.Action.Name, 120) || in.Action.ExecutorID == "" || in.Action.Resource == "" || in.Action.ResourceVersion == "" || in.Action.OperationKey == "") {
+		return Bad("An approval requires an exact action, executor, resource version and operation key.")
+	}
+	if in.Kind != "approval" && in.Action != nil {
+		return Bad("Only approvals may carry an execution descriptor.")
+	}
+	if len(in.SharedKey) > 200 {
+		return Bad("Shared key exceeds 200 characters.")
+	}
+	if in.Kind != "question" && in.SharedKey != "" {
+		return Bad("Only informational questions may use shared keys.")
+	}
+	return idempotent(ctx, tx, a, "ask", key, stable, out, func() error {
+		var rs []recipient
+		var e error
+		if in.ConversationID != "" {
+			rs, e = s.conversationRecipients(ctx, tx, a, in.ConversationID, "ask", in.Action)
+		} else {
+			rs, e = s.resolve(ctx, tx, a, in.Target, "ask", "", in.Action)
+		}
+		if e != nil {
+			return e
+		}
+		if in.Action != nil {
+			executor, e := principal(ctx, tx, a.Scope, in.Action.ExecutorID)
+			if e != nil || executor.Disabled {
+				return Missing()
+			}
+			if !s.allowed(ctx, tx, a, "ask", Target{executor.Kind, executor.ID}, "*", in.Action.Name, in.Action) {
+				return Denied()
+			}
+		}
+		conv := in.ConversationID
+		if conv == "" {
+			if len(rs) == 1 {
+				conv, e = newConversation(ctx, tx, a, in.Title, rs[0].ID)
+			} else {
+				conv, e = newConversation(ctx, tx, a, in.Title)
+			}
+			if e != nil {
+				return e
+			}
+		}
+		*out = Request{RequesterInstanceID: a.InstanceID, ID: ID("req"), RequesterID: a.ID, ConversationID: conv, Kind: in.Kind, Title: in.Title, Body: in.Body, Choices: in.Choices, Action: in.Action, State: "open", Version: 1, ExpiresAt: in.ExpiresAt, CreatedAt: time.Now(), SharedKey: in.SharedKey}
+		if _, e = tx.Exec(ctx, `INSERT INTO requests(id,scope,requester_id,requester_instance,conversation_id,kind,title,body,choices,action,expires_at,shared_key) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12)`, out.ID, a.Scope, a.ID, a.InstanceID, conv, in.Kind, in.Title, in.Body, JSON(in.Choices), JSON(in.Action), in.ExpiresAt, in.SharedKey); e != nil {
+			return e
+		}
+		for _, r := range rs {
+			projection := conv
+			if in.ConversationID == "" && len(rs) > 1 {
+				projection, e = newConversation(ctx, tx, a, in.Title, r.ID)
+				if e != nil {
+					return e
+				}
+			}
+			if _, e = tx.Exec(ctx, `INSERT INTO request_audience(scope,request_id,principal_id,conversation_id,policy_target) VALUES($1,$2,$3,$4,$5)`, a.Scope, out.ID, r.ID, projection, JSON(r.PolicyTarget)); e != nil {
+				return e
+			}
+			view := *out
+			view.ConversationID = projection
+			if e = event(ctx, tx, a, "request.created", projection, r.ID, view); e != nil {
+				return e
+			}
+			if e = s.enqueue(ctx, tx, a, r, out.ID, projection, "ask", map[string]any{"type": "request", "request": view}, in.ExpiresAt); e != nil {
+				return e
+			}
+		}
+		if e = event(ctx, tx, a, "request.created", conv, a.ID, out); e != nil {
+			return e
+		}
+		if e := s.reuseExact(ctx, tx, a, out); e != nil {
+			return e
+		}
+		return s.queueAutomaticAnswer(ctx, tx, a, *out)
+	})
+}
 func (s *Store) Respond(ctx context.Context, a Actor, id string, in Response) (Request, error) {
 	var out Request
-	if in.SourceAnswerID != "" || in.SourceInvalidated || in.ResponderInstanceID != "" {
+	if in.SourceAnswerID != "" || in.SourceInvalidated || in.ResponderInstanceID != "" || in.ReuseMethod != "" || in.ReuseReason != "" {
 		return out, Bad("Answer provenance is assigned by the server.")
 	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.respondTx(ctx, tx, a, id, in, &out) })

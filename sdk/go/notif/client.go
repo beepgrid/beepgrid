@@ -20,6 +20,9 @@ type Client struct {
 	BaseURL string
 	Token   string
 	HTTP    *http.Client
+	// AssistanceTimeout applies only to model-backed planning and summaries.
+	// Zero uses 40 seconds; a shorter caller context still takes precedence.
+	AssistanceTimeout time.Duration
 	// MaxResponseBytes bounds decoded responses. Zero uses 256 MiB, covering the
 	// API's bounded 1000-recipient fan-out even with JSON escaping. Decoding streams.
 	MaxResponseBytes int64
@@ -83,6 +86,8 @@ type AskInput struct {
 type Response struct {
 	ResponderInstanceID string `json:"responder_instance_id,omitempty"`
 	SourceAnswerID      string `json:"source_answer_id,omitempty"`
+	ReuseMethod         string `json:"reuse_method,omitempty"`
+	ReuseReason         string `json:"reuse_reason,omitempty"`
 	SourceInvalidated   bool   `json:"source_invalidated,omitempty"`
 	Outcome             string `json:"outcome"`
 	Answer              any    `json:"answer,omitempty"`

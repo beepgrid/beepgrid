@@ -23,7 +23,7 @@ class Client:
             raise ValueError("Invalid Notif server URL")
         self.base_url, self._token, self.timeout = base_url.rstrip("/"), token, timeout
 
-    def call(self, method: str, path: str, data: Any = None, *, key: str | None = None, minimal: bool = False) -> Any:
+    def call(self, method: str, path: str, data: Any = None, *, key: str | None = None, minimal: bool = False, timeout: float | None = None) -> Any:
         if not path.startswith("/api/v1/"):
             raise ValueError("Invalid API path")
         raw = json.dumps(data).encode() if data is not None else None
@@ -35,7 +35,7 @@ class Client:
         for attempt in range(3):
             req = urllib.request.Request(self.base_url + path, raw, headers, method=method)
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                with urllib.request.urlopen(req, timeout=self.timeout if timeout is None else timeout) as response:
                     return json.load(response)
             except urllib.error.HTTPError as error:
                 try:
@@ -76,6 +76,34 @@ class Client:
     def respond(self, request_id: str, outcome: str, *, version: int, answer: Any = None) -> dict[str, Any]:
         return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/responses",
                          {"outcome": outcome, "version": version, "answer": answer})
+
+    def assistance(self) -> dict[str, Any]:
+        return self.call("GET", "/api/v1/assistance/settings")
+
+    def update_assistance(self, *, automatic_answers: bool | None = None,
+                          overseer: bool | None = None) -> dict[str, Any]:
+        settings = {key: value for key, value in {"automatic_answers": automatic_answers,
+                    "overseer": overseer}.items() if value is not None}
+        return self.call("POST", "/api/v1/assistance/settings", settings)
+
+    def plan_overseer(self, prompt: str, target: dict[str, str] | None = None) -> dict[str, Any]:
+        data: dict[str, Any] = {"prompt": prompt}
+        if target is not None:
+            data["target"] = target
+        return self.call("POST", "/api/v1/fleet/plan", data, timeout=max(40, self.timeout))
+
+    def overseer_plans(self) -> list[dict[str, Any]]:
+        return self.call("GET", "/api/v1/fleet/plans")
+
+    def overseer_plan(self, plan_id: str) -> dict[str, Any]:
+        return self.call("GET", "/api/v1/fleet/plans/" + urllib.parse.quote(plan_id, safe=""))
+
+    def confirm_overseer(self, plan_id: str) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/fleet/command", {"plan_id": plan_id})
+
+    def summarize_overseer(self, plan_id: str) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/fleet/plans/" + urllib.parse.quote(plan_id, safe="") + "/summary",
+                         {}, timeout=max(40, self.timeout))
 
     def redeem(self, request_id: str, action: dict[str, Any]) -> dict[str, Any]:
         """Recheck authorization; the business tool must enforce operation/version fences."""

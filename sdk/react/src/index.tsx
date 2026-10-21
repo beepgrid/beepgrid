@@ -33,7 +33,10 @@ export function useNotifRequest(client: Client, id: string) {
           setError("");
         }
       } catch (e) {
-        if (!abort.signal.aborted) { setRequest(null); setError((e as Error).message); }
+        if (!abort.signal.aborted) {
+          setRequest(null);
+          setError((e as Error).message);
+        }
       } finally {
         pending = false;
       }
@@ -52,7 +55,11 @@ export function useNotifRequest(client: Client, id: string) {
     setBusy(true);
     setError("");
     try {
-      const result = await client.respond(id, { outcome, answer, version: request.version });
+      const result = await client.respond(id, {
+        outcome,
+        answer,
+        version: request.version,
+      });
       if (current === generation.current) setRequest(result);
     } catch (e) {
       if (current === generation.current) setError((e as Error).message);
@@ -95,6 +102,19 @@ export function NotifRequest({
         <>
           <h3>{r.title}</h3>
           <p>{r.body}</p>
+          {r.response?.source_answer_id && (
+            <p role="status">
+              {r.response.reuse_method === "automatic"
+                ? "Automatically answered from a shared answer."
+                : "Answered from a shared answer."}{" "}
+              {r.response.reuse_reason}
+            </p>
+          )}
+          {r.response?.source_invalidated && (
+            <p role="alert">
+              The source answer is no longer valid. Review before relying on it.
+            </p>
+          )}
           {r.state !== "open" ? (
             <p role="status">
               {r.response?.outcome ?? r.state}
@@ -114,15 +134,26 @@ export function NotifRequest({
               )}
               {r.kind === "approval" ? (
                 <div>
-                  {r.action && <dl aria-label="Exact action requiring approval">
-                    <dt>Action</dt><dd>{r.action.name}</dd>
-                    <dt>Executor</dt><dd>{r.action.executor_id}</dd>
-                    <dt>Resource</dt><dd>{r.action.resource}</dd>
-                    <dt>Resource version</dt><dd>{r.action.resource_version}</dd>
-                    <dt>Arguments</dt><dd><pre>{JSON.stringify(r.action.arguments, null, 2)}</pre></dd>
-                    <dt>Operation</dt><dd>{r.action.operation_key}</dd>
-                    <dt>Expires</dt><dd>{r.expires_at}</dd>
-                  </dl>}
+                  {r.action && (
+                    <dl aria-label="Exact action requiring approval">
+                      <dt>Action</dt>
+                      <dd>{r.action.name}</dd>
+                      <dt>Executor</dt>
+                      <dd>{r.action.executor_id}</dd>
+                      <dt>Resource</dt>
+                      <dd>{r.action.resource}</dd>
+                      <dt>Resource version</dt>
+                      <dd>{r.action.resource_version}</dd>
+                      <dt>Arguments</dt>
+                      <dd>
+                        <pre>{JSON.stringify(r.action.arguments, null, 2)}</pre>
+                      </dd>
+                      <dt>Operation</dt>
+                      <dd>{r.action.operation_key}</dd>
+                      <dt>Expires</dt>
+                      <dd>{r.expires_at}</dd>
+                    </dl>
+                  )}
                   <button
                     disabled={busy}
                     onClick={() => void respond("denied")}
@@ -225,9 +256,15 @@ export function NotifConversation({
           undefined,
           { signal: abort.signal },
         );
-        if (!abort.signal.aborted) { setC(next); setError(""); }
+        if (!abort.signal.aborted) {
+          setC(next);
+          setError("");
+        }
       } catch (e) {
-        if (!abort.signal.aborted) { setC(null); setError((e as Error).message); }
+        if (!abort.signal.aborted) {
+          setC(null);
+          setError((e as Error).message);
+        }
       } finally {
         pending = false;
       }

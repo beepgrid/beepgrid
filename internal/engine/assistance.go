@@ -100,8 +100,11 @@ type FleetStatus struct {
 }
 
 func (s *Store) FleetStatus(ctx context.Context, a Actor, target *Target) (map[string]any, error) {
+	return s.fleetStatus(ctx, s.Pool, a, target)
+}
+func (s *Store) fleetStatus(ctx context.Context, db DB, a Actor, target *Target) (map[string]any, error) {
 	ctx = withPolicySnapshot(ctx)
-	agents, e := s.ListPrincipals(ctx, a, "agent")
+	agents, e := s.listPrincipals(ctx, db, a, "agent")
 	if e != nil {
 		return nil, e
 	}
@@ -110,7 +113,7 @@ func (s *Store) FleetStatus(ctx context.Context, a Actor, target *Target) (map[s
 		if target.Kind != "group" && target.Kind != "agent" {
 			return nil, Bad("Status targets must be an agent or group.")
 		}
-		rs, e := s.resolve(ctx, s.Pool, a, *target, "view", "")
+		rs, e := s.resolve(ctx, db, a, *target, "view", "")
 		if e != nil {
 			return nil, e
 		}
@@ -133,7 +136,7 @@ func (s *Store) FleetStatus(ctx context.Context, a Actor, target *Target) (map[s
 			ids = append(ids, p.ID)
 		}
 	}
-	byAgent, e := s.instancesForAgents(ctx, a.Scope, ids)
+	byAgent, e := s.instancesForAgentsDB(ctx, db, a.Scope, ids)
 	if e != nil {
 		return nil, e
 	}

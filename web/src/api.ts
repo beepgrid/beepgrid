@@ -38,6 +38,9 @@ export type RequestItem = {
     outcome: string;
     answer?: unknown;
     source_invalidated?: boolean;
+    source_answer_id?: string;
+    reuse_method?: string;
+    reuse_reason?: string;
   };
   resolved_by?: string;
   expires_at: string;

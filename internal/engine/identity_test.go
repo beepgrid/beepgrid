@@ -21,7 +21,9 @@ func testStore(t testing.TB) (*Store, Actor) {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { _, _ = s.Pool.Exec(ctx, `DROP SCHEMA `+schema+` CASCADE`); s.Close() })
-	a, e := s.Bootstrap(ctx, "company/development", "Acme", "development", Secret())
+	// PostgreSQL notification hints span schemas; each concurrent fixture also
+	// needs a unique workspace name to observe only its own event hints.
+	a, e := s.Bootstrap(ctx, schema+"/development", "Acme", "development", Secret())
 	if e != nil {
 		t.Fatal(e)
 	}

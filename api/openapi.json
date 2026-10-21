@@ -4447,25 +4447,13 @@
           {
             "name": "summary",
             "in": "query",
-            "description": "With stream=1, summary=1 omits event data while preserving current authorization, metadata and replay cursors, except canonical message.created bodies for an optional selected conversation_id. Full events remain the default.",
+            "description": "With stream=1, summary=1 omits event data while preserving current authorization, metadata and replay cursors. Full events remain the default.",
             "schema": {
               "enum": [
                 "0",
                 "1"
               ]
             }
-          },
-          {
-            "name": "conversation_id",
-            "in": "query",
-            "description": "With stream=1 and summary=1, include canonical message.created data only for this readable conversation. All other event payloads remain null. This never grants access or filters out other visible event metadata.",
-            "schema": { "type": "string", "maxLength": 256 }
-          },
-          {
-            "name": "Last-Event-ID",
-            "in": "header",
-            "description": "Resume after the last complete event. Takes precedence over the initial after query during EventSource reconnection.",
-            "schema": { "type": "integer", "minimum": 0 }
           }
         ]
       }
@@ -5030,10 +5018,176 @@
         }
       }
     },
+    "/api/v1/assistance/settings": {
+      "get": {
+        "operationId": "get_api_v1_assistance_settings",
+        "description": "/api/v1/assistance/settings",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistanceSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "operationId": "post_api_v1_assistance_settings",
+        "description": "Owner-controlled optional assistance. Both features default off. Enabling requires a configured provider.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistanceSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistanceUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/fleet/status": {
       "post": {
         "operationId": "post_api_v1_fleet_status",
-        "description": "Read-only structured fleet status; command always returns CAPABILITY_UNSUPPORTED.",
+        "description": "Read-only structured fleet status filtered by current View permission.",
         "responses": {
           "200": {
             "description": "Success",
@@ -5126,17 +5280,377 @@
         }
       }
     },
-    "/api/v1/fleet/command": {
+    "/api/v1/fleet/plan": {
       "post": {
-        "operationId": "post_api_v1_fleet_command",
-        "description": "Read-only structured fleet status; command always returns CAPABILITY_UNSUPPORTED.",
+        "operationId": "post_api_v1_fleet_plan",
+        "description": "Optional overseer. Acts only as the caller. Outbound messages, questions and tasks require a saved preview and explicit confirmation.",
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/OverseerPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverseerInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fleet/plans": {
+      "get": {
+        "operationId": "get_api_v1_fleet_plans",
+        "description": "/api/v1/fleet/plans",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OverseerPlan"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/fleet/plans/{id}": {
+      "get": {
+        "operationId": "get_api_v1_fleet_plans_id",
+        "description": "/api/v1/fleet/plans/{id}",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverseerPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/fleet/plans/{id}/summary": {
+      "post": {
+        "operationId": "post_api_v1_fleet_plans_id_summary",
+        "description": "Read-only summary of currently authorized replies; changed permissions or replies invalidate derived output.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverseerPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fleet/command": {
+      "post": {
+        "operationId": "post_api_v1_fleet_command",
+        "description": "Atomically confirm a server-saved preview under current caller permissions. Idempotent per plan. No free-form targets or instructions accepted.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverseerPlan"
                 }
               }
             }
@@ -5210,11 +5724,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "target": {
-                    "$ref": "#/components/schemas/Target"
+                  "plan_id": {
+                    "type": "string"
                   }
                 },
-                "required": [],
+                "required": [
+                  "plan_id"
+                ],
                 "additionalProperties": false
               }
             }
@@ -7227,6 +7743,12 @@
           },
           "source_invalidated": {
             "type": "boolean"
+          },
+          "reuse_method": {
+            "type": "string"
+          },
+          "reuse_reason": {
+            "type": "string"
           }
         },
         "required": [],
@@ -7619,6 +8141,161 @@
       "SharedAnswer": {
         "type": "object",
         "description": "Scoped publication with answer, author/publisher, audience, provenance, validity and invalidation."
+      },
+      "AssistanceSettings": {
+        "type": "object",
+        "properties": {
+          "automatic_answers": {
+            "type": "boolean"
+          },
+          "overseer": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "matcher_configured": {
+            "type": "boolean"
+          },
+          "overseer_configured": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "AssistanceUpdate": {
+        "type": "object",
+        "properties": {
+          "automatic_answers": {
+            "type": "boolean"
+          },
+          "overseer": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "FleetAgent": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/Agent"
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Instance"
+            }
+          },
+          "fresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "OverseerInput": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "target": {
+            "$ref": "#/components/schemas/Target"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "OverseerDispatch": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "conversation_id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "OverseerPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "context_agent_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "target": {
+            "$ref": "#/components/schemas/Target"
+          },
+          "operation": {
+            "enum": [
+              "status",
+              "message",
+              "question",
+              "task"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FleetAgent"
+            }
+          },
+          "requires_confirmation": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "dispatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverseerDispatch"
+            }
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Request"
+            }
+          },
+          "reply_summary": {
+            "type": "string"
+          },
+          "reply_digest": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
       },
       "Event": {
         "type": "object",

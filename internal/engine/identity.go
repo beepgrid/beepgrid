@@ -51,11 +51,14 @@ func (s *Store) CreatePerson(ctx context.Context, a Actor, in CreatePerson) (Pri
 	return p, err
 }
 func (s *Store) ListPrincipals(ctx context.Context, a Actor, kind string) ([]Principal, error) {
+	return s.listPrincipals(ctx, s.Pool, a, kind)
+}
+func (s *Store) listPrincipals(ctx context.Context, db DB, a Actor, kind string) ([]Principal, error) {
 	ctx = withPolicySnapshot(ctx)
 	if kind != "person" && kind != "agent" && kind != "service" {
 		return nil, Bad("Invalid collection.")
 	}
-	rows, err := s.Pool.Query(ctx, `SELECT `+principalFields+` FROM principals WHERE scope=$1 AND kind=$2 ORDER BY created_at,id LIMIT 1000`, a.Scope, kind)
+	rows, err := db.Query(ctx, `SELECT `+principalFields+` FROM principals WHERE scope=$1 AND kind=$2 ORDER BY created_at,id LIMIT 1000`, a.Scope, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +78,7 @@ func (s *Store) ListPrincipals(ctx context.Context, a Actor, kind string) ([]Pri
 	}
 	visible := []Principal{}
 	for _, p := range all {
-		if p.ID == a.ID || s.allowed(ctx, s.Pool, a, "view", Target{p.Kind, p.ID}, "", "") {
+		if p.ID == a.ID || s.allowed(ctx, db, a, "view", Target{p.Kind, p.ID}, "", "") {
 			visible = append(visible, p)
 		}
 	}

@@ -8,6 +8,9 @@ import (
 // Callers pass only IDs whose visibility they already verified in this operation.
 // The per-agent bound matches the individual instances endpoint.
 func (s *Store) instancesForAgents(ctx context.Context, scope string, ids []string) (map[string][]Instance, error) {
+	return s.instancesForAgentsDB(ctx, s.Pool, scope, ids)
+}
+func (s *Store) instancesForAgentsDB(ctx context.Context, db DB, scope string, ids []string) (map[string][]Instance, error) {
 	out := map[string][]Instance{}
 	for _, id := range ids {
 		out[id] = []Instance{}
@@ -15,7 +18,7 @@ func (s *Store) instancesForAgents(ctx context.Context, scope string, ids []stri
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, e := s.Pool.Query(ctx, `SELECT id,agent_id,capabilities,progress,last_seen,presence FROM (
+	rows, e := db.Query(ctx, `SELECT id,agent_id,capabilities,progress,last_seen,presence FROM (
  SELECT i.id,i.agent_id,i.capabilities,i.progress,i.last_seen,
  CASE WHEN c.revoked OR c.expires_at<=now() OR p.disabled THEN 'offline' WHEN i.last_seen>now()-interval '45 seconds' THEN 'connected' WHEN i.last_seen>now()-interval '2 minutes' THEN 'stale' ELSE 'offline' END AS presence,
  row_number() OVER(PARTITION BY i.agent_id ORDER BY i.created_at DESC,i.id DESC) AS position

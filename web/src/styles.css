@@ -2105,3 +2105,5 @@ dialog::backdrop {
 .live-dot.reconnecting {
   background: #ad8241;
 }
+
+.overseer-message { white-space: pre-wrap; overflow-wrap: anywhere; }
