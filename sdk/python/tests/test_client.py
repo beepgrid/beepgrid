@@ -7,6 +7,29 @@ from notif import Client, NotifError
 
 
 class ClientTests(unittest.TestCase):
+    def test_identified_client_works_behind_a_gateway_rejecting_generic_urllib(self):
+        import http.server
+        import threading
+        class Gateway(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args): pass
+            def do_GET(self):
+                if self.headers.get("User-Agent", "").startswith("Python-urllib"):
+                    self.send_response(403); self.end_headers(); return
+                self.send_response(200); self.end_headers(); self.wfile.write(b'{"reachable":true}')
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Gateway)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        try:
+            import urllib.error
+            import urllib.request
+            url = "http://127.0.0.1:" + str(server.server_port)
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(url + "/api/v1/me")
+            self.assertEqual(error.exception.code, 403)
+            error.exception.close()
+            self.assertEqual(Client(url, "fixture").call("GET", "/api/v1/me"), {"reachable":True})
+        finally:
+            server.shutdown(); server.server_close(); thread.join()
+
     def test_timeout_does_not_cancel_request(self):
         c = Client("http://localhost", "token")
         with patch.object(c, "get_request", return_value={"state": "open"}) as query:

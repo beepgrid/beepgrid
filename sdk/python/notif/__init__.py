@@ -27,7 +27,8 @@ class Client:
         if not path.startswith("/api/v1/"):
             raise ValueError("Invalid API path")
         raw = json.dumps(data).encode() if data is not None else None
-        headers = {"Content-Type": "application/json", "Authorization": "Bearer " + self._token}
+        headers = {"Content-Type": "application/json", "Authorization": "Bearer " + self._token,
+                   "User-Agent": "NotifPython/0.1"}
         if minimal:
             headers["Prefer"] = "return=minimal"
         if key:
