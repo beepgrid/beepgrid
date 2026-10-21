@@ -7,6 +7,7 @@ import (
 	"github.com/notif-dev/notif/internal/engine"
 	sdk "github.com/notif-dev/notif/sdk/go/notif"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -106,6 +107,7 @@ func (l *loseSendAcknowledgement) RoundTrip(r *http.Request) (*http.Response, er
 	return response, e
 }
 func retryFault(ctx context.Context, fn func() error) error {
+	delay := 80 * time.Millisecond
 	for {
 		e := fn()
 		if e == nil {
@@ -118,7 +120,13 @@ func retryFault(ctx context.Context, fn func() error) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(80 * time.Millisecond):
+		case <-time.After(delay + time.Duration(rand.IntN(80))*time.Millisecond):
+			if delay < 2*time.Second {
+				delay *= 2
+				if delay > 2*time.Second {
+					delay = 2 * time.Second
+				}
+			}
 		}
 	}
 }
@@ -175,7 +183,9 @@ func TestFleetRecoversFromDatabasePartitionWithoutDuplicateAcceptedWork(t *testi
 				}
 				worker.BaseURL = servers[i%2].URL
 				loss := &loseSendAcknowledgement{}
-				worker.HTTP = &http.Client{Transport: loss, Timeout: 2 * time.Second}
+				// Keep250 callers concurrent. Allow real queueing on the8-connection
+				// replicas under race instrumentation, matching the hosted client budget.
+				worker.HTTP = &http.Client{Transport: loss, Timeout: 15 * time.Second}
 				workers = append(workers, worker)
 				sessions = append(sessions, session)
 				losses = append(losses, loss)
