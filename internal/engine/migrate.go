@@ -123,6 +123,9 @@ func OpenConfigured(ctx context.Context, url, name string, key []byte, maxConns 
 		return nil, fmt.Errorf("schema must be migrated to version %s before serving", strconv.Itoa(SchemaVersion))
 	}
 	s := &Store{Pool: p, SecretKey: key}
+	// Pipeline one active and one queued transaction per workspace so BEGIN
+	// round trips can overlap, while reserving capacity for other workspaces.
+	s.workspaceAdmission.capacity = min(2, int(maxConns)-1)
 	s.providerTransport = s.newProviderTransport()
 	s.startWakeups()
 	return s, nil

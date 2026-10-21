@@ -16,12 +16,16 @@ import (
 )
 
 func service(t *testing.T) (*Service, Config) {
+	return serviceWithBudget(t, 4)
+}
+
+func serviceWithBudget(t *testing.T, budget int32) (*Service, Config) {
 	t.Helper()
 	db := os.Getenv("NOTIF_TEST_DATABASE_URL")
 	if db == "" {
 		t.Skip("PostgreSQL is required")
 	}
-	c := Config{DatabaseURL: db, Schema: "runtime_" + strings.TrimPrefix(engine.ID(""), "_"), PublicURL: "http://localhost", SecretKey: []byte("01234567890123456789012345678901"), MaxConnections: 4}
+	c := Config{DatabaseURL: db, Schema: "runtime_" + strings.TrimPrefix(engine.ID(""), "_"), PublicURL: "http://localhost", SecretKey: []byte("01234567890123456789012345678901"), MaxConnections: budget}
 	if err := Migrate(context.Background(), c.DatabaseURL, c.Schema); err != nil {
 		t.Fatal(err)
 	}

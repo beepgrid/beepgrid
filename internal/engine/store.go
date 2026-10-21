@@ -18,6 +18,7 @@ type DB interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Store struct {
+	workspaceAdmission   workspaceAdmission
 	wakes                wakeHub
 	eventWakes           wakeHub
 	providerWakes        wakeHub
@@ -54,6 +55,11 @@ func (s *Store) Close() {
 	s.Pool.Close()
 }
 func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
+	release, err := s.workspaceAdmission.acquire(ctx, a.Scope)
+	if err != nil {
+		return err
+	}
+	defer release.release()
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return err
