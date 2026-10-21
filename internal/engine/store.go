@@ -78,13 +78,19 @@ func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 	}
 	if a.ProviderConnection != "" {
 		var valid bool
-		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM connections c JOIN principals p ON p.scope=c.scope WHERE c.scope=$1 AND c.id=$2 AND c.enabled AND p.id=$3 AND NOT p.disabled)`, a.Scope, a.ProviderConnection, a.ID).Scan(&valid); err != nil || !valid {
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM connections c JOIN principals p ON p.scope=c.scope WHERE c.scope=$1 AND c.id=$2 AND c.enabled AND p.id=$3 AND NOT p.disabled)`, a.Scope, a.ProviderConnection, a.ID).Scan(&valid); err != nil {
+			return authorizationUnavailable()
+		}
+		if !valid {
 			return Denied()
 		}
 	}
 	if a.CredentialID != "" {
 		var valid bool
 		err = tx.QueryRow(ctx, `SELECT NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now()) FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope WHERE c.id=$1 AND c.scope=$2`, a.CredentialID, a.Scope).Scan(&valid)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return authorizationUnavailable()
+		}
 		if err != nil || !valid {
 			return Denied()
 		}
@@ -196,13 +202,18 @@ func (s *Store) Authenticate(ctx context.Context, token string) (Actor, error) {
 	var a Actor
 	var meta []byte
 	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token)).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return a, authorizationUnavailable()
+	}
 	if err != nil {
 		return a, &Error{"UNAUTHENTICATED", "A valid credential is required.", 401}
 	}
 	_ = json.Unmarshal(meta, &a.Metadata)
 	a.Admin = a.CredentialKind == "admin"
 	if a.CredentialKind == "browser" {
-		_ = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, a.ID).Scan(&a.Admin)
+		if e := s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, a.ID).Scan(&a.Admin); e != nil {
+			return a, authorizationUnavailable()
+		}
 	}
 	return a, nil
 }

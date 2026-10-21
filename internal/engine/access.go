@@ -3,19 +3,30 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"github.com/jackc/pgx/v5"
 )
+
+func authorizationUnavailable() error {
+	return &Error{"AUTHORIZATION_UNAVAILABLE", "Authorization is temporarily unavailable; retry this request.", 503}
+}
 
 func (s *Store) RefreshActor(ctx context.Context, a Actor) (Actor, error) {
 	var out Actor
 	var meta []byte
 	e := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id WHERE c.scope=$1 AND c.id=$2 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, a.Scope, a.CredentialID).Scan(&out.ID, &out.Kind, &out.ExternalID, &out.Name, &meta, &out.CreatedAt, &out.Scope, &out.CredentialID, &out.CredentialKind, &out.Prefix, &out.InstanceID)
 	if e != nil {
+		if !errors.Is(e, pgx.ErrNoRows) {
+			return out, authorizationUnavailable()
+		}
 		return out, Denied()
 	}
 	_ = json.Unmarshal(meta, &out.Metadata)
 	out.Admin = out.CredentialKind == "admin"
 	if out.CredentialKind == "browser" {
-		_ = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, out.Scope, out.ID).Scan(&out.Admin)
+		if e := s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, out.Scope, out.ID).Scan(&out.Admin); e != nil {
+			return out, authorizationUnavailable()
+		}
 	}
 	return out, nil
 }
