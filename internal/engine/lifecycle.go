@@ -19,7 +19,7 @@ import (
 
 // This child-first order is deliberately checked against the live catalog.
 // A future scoped table must be considered before erasure or export can proceed.
-var lifecycleTables = []string{"answer_match_jobs", "overseer_plans", "answer_proposals", "delivery_attempts", "provider_threads", "participants", "request_audience", "execution_intents", "messages", "attachments", "requests", "shared_answers", "conversations", "deliveries", "instances", "credentials", "destinations", "connections", "memberships", "role_bindings", "roles", "groups", "idempotency", "events", "provider_events", "principals"}
+var lifecycleTables = []string{"workspace_usage", "workspace_budgets", "answer_match_jobs", "overseer_plans", "answer_proposals", "delivery_attempts", "provider_threads", "participants", "request_audience", "execution_intents", "messages", "attachments", "requests", "shared_answers", "conversations", "deliveries", "instances", "credentials", "destinations", "connections", "memberships", "role_bindings", "roles", "groups", "idempotency", "events", "provider_events", "principals"}
 
 type ErasureStatus struct {
 	Operation string     `json:"operation"`

@@ -106,6 +106,9 @@ func normalize(err error) error {
 	}
 	var e *pgconn.PgError
 	if errors.As(err, &e) {
+		if e.Code == "P0001" && e.Message == "NOTIF_QUOTA_EXCEEDED" {
+			return &Error{"QUOTA_EXCEEDED", "This workspace has reached its monthly accepted-work limit.", 429}
+		}
 		if e.Code == "23505" {
 			return Conflict("A record already exists.")
 		}
