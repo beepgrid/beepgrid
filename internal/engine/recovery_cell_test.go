@@ -38,12 +38,16 @@ func TestRestoredAccessRequiresHoldAndCannotLowerVersionsOrEraseMarkers(t *testi
 func TestRecoveryKeyReplayCannotTakeAnotherIdentityDigest(t *testing.T) {
 	s, a := testStore(t)
 	ctx := context.Background()
-	other, e := s.Bootstrap(ctx, "other/recovery", "Other", "recovery", Secret())
+	oldToken := Secret()
+	other, e := s.Bootstrap(ctx, "other/recovery", "Other", "recovery", oldToken)
 	if e != nil {
 		t.Fatal(e)
 	}
 	if _, e = s.HoldRestoredCell(ctx); e != nil {
 		t.Fatal(e)
+	}
+	if e = s.ReconcileRestored(ctx, other.Scope, oldToken); ErrorStatus(e) != 409 {
+		t.Fatal("bootstrap credential revived as a recovery key", e)
 	}
 	key := Secret()
 	if e = s.ReconcileRestored(ctx, other.Scope, key); e != nil {

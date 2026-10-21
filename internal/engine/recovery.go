@@ -86,7 +86,7 @@ func (s *Store) ReconcileRestored(ctx context.Context, scope, newOwnerToken stri
 	}
 	// A lost acknowledgement must be replayable with the same privately saved
 	// recovery key. Never revive a matching digest owned by a different identity.
-	tag, e := tx.Exec(ctx, `INSERT INTO credentials(id,scope,principal_id,digest,kind) VALUES($1,$2,$3,$4,'admin') ON CONFLICT(digest) DO UPDATE SET revoked=false WHERE credentials.scope=excluded.scope AND credentials.principal_id=excluded.principal_id AND credentials.kind='admin'`, ID("key"), scope, owner, Digest(newOwnerToken))
+	tag, e := tx.Exec(ctx, `INSERT INTO credentials(id,scope,principal_id,digest,kind,prefix) VALUES($1,$2,$3,$4,'admin','recovery') ON CONFLICT(digest) DO UPDATE SET revoked=false WHERE credentials.scope=excluded.scope AND credentials.principal_id=excluded.principal_id AND credentials.kind='admin' AND credentials.prefix='recovery'`, ID("key"), scope, owner, Digest(newOwnerToken))
 	if e != nil {
 		return e
 	}
