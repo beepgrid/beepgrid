@@ -439,7 +439,7 @@ func (s *Store) eventPage(ctx context.Context, a Actor, after int64, recent, sum
 		order = "DESC"
 	}
 
-	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,CASE WHEN $5 AND NOT (e.kind='message.created' AND e.conversation_id=$6 AND $6<>'') THEN 'null'::jsonb ELSE e.data END,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND ($3 OR (e.conversation_id<>'' AND EXISTS(SELECT 1 FROM participants p WHERE p.scope=e.scope AND p.conversation_id=e.conversation_id AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence `+order+` LIMIT 200`, a.Scope, after, a.Admin, a.ID, summary, conversation)
+	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,CASE WHEN $5 AND NOT (e.kind='message.created' AND e.conversation_id=$6 AND $6<>'') THEN 'null'::jsonb ELSE e.data END,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND ($3 OR (e.conversation_id<>'' AND e.conversation_id IN(SELECT p.conversation_id FROM participants p WHERE p.scope=$1 AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence `+order+` LIMIT 200`, a.Scope, after, a.Admin, a.ID, summary, conversation)
 	if e != nil {
 		return nil, after, e
 	}
