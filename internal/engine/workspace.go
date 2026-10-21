@@ -27,8 +27,12 @@ func (s *Store) applyWorkspaceControl(ctx context.Context, scope string, version
 	var current int64
 	var old bool
 	var oldDeadline *time.Time
-	if err = tx.QueryRow(ctx, `SELECT control_version,suspended,access_until FROM scopes WHERE id=$1 FOR UPDATE`, scope).Scan(&current, &old, &oldDeadline); err != nil {
+	var erasure string
+	if err = tx.QueryRow(ctx, `SELECT control_version,suspended,access_until,erasure_operation FROM scopes WHERE id=$1 FOR UPDATE`, scope).Scan(&current, &old, &oldDeadline, &erasure); err != nil {
 		return normalize(err)
+	}
+	if erasure != "" {
+		return Conflict("This workspace is reserved for erasure and cannot be reactivated.")
 	}
 	nextDeadline := oldDeadline
 	if deadline != nil {

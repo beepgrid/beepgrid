@@ -716,8 +716,10 @@ func (s *Store) HasProviderEvent(ctx context.Context, scope, connection, id stri
 	return found
 }
 func (s *Store) RecordProviderEvent(ctx context.Context, scope, connection, id string) error {
-	_, e := s.Pool.Exec(ctx, `INSERT INTO provider_events(scope,connection_id,external_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, scope, connection, id)
-	return e
+	return s.tx(ctx, Actor{Scope: scope}, func(tx pgx.Tx) error {
+		_, e := tx.Exec(ctx, `INSERT INTO provider_events(scope,connection_id,external_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, scope, connection, id)
+		return e
+	})
 }
 
 func (s *Store) WebhookActor(ctx context.Context, scope, connection, id string) (Actor, error) {

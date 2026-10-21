@@ -114,7 +114,24 @@ func (s *Service) ApplyWorkspaceAccess(ctx context.Context, id string, version i
 // All tenants share the query pool, listener and durable work selectors.
 func (s *Service) RunWorkers(ctx context.Context) {
 	var workers sync.WaitGroup
-	workers.Add(2)
+	workers.Add(3)
+	go func() {
+		defer workers.Done()
+		tick := time.NewTicker(5 * time.Second)
+		defer tick.Stop()
+		for ctx.Err() == nil {
+			step, cancel := context.WithTimeout(ctx, 25*time.Second)
+			_, err := s.store.ProcessWorkspaceErasure(step)
+			cancel()
+			if err != nil && ctx.Err() == nil {
+				slog.Error("workspace erasure requires retry", "error_type", fmt.Sprintf("%T", err))
+			}
+			select {
+			case <-ctx.Done():
+			case <-tick.C:
+			}
+		}
+	}()
 	go func() {
 		defer workers.Done()
 		tick := time.NewTicker(300 * time.Millisecond)
