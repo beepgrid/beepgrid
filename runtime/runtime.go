@@ -122,6 +122,9 @@ func (s *Service) RunWorkers(ctx context.Context) {
 		for ctx.Err() == nil {
 			step, cancel := context.WithTimeout(ctx, 25*time.Second)
 			_, err := s.store.ProcessWorkspaceErasure(step)
+			if err == nil {
+				_, err = s.store.ProcessAttachmentCleanup(step)
+			}
 			cancel()
 			if err != nil && ctx.Err() == nil {
 				slog.Error("workspace erasure requires retry", "error_type", fmt.Sprintf("%T", err))

@@ -19,7 +19,7 @@ import (
 
 // This child-first order is deliberately checked against the live catalog.
 // A future scoped table must be considered before erasure or export can proceed.
-var lifecycleTables = []string{"workspace_usage", "workspace_budgets", "answer_match_jobs", "overseer_plans", "answer_proposals", "delivery_attempts", "provider_threads", "participants", "request_audience", "execution_intents", "messages", "attachments", "requests", "shared_answers", "conversations", "deliveries", "instances", "credentials", "destinations", "connections", "memberships", "role_bindings", "roles", "groups", "idempotency", "events", "provider_events", "principals"}
+var lifecycleTables = []string{"attachment_uploads", "workspace_usage", "workspace_budgets", "answer_match_jobs", "overseer_plans", "answer_proposals", "delivery_attempts", "provider_threads", "participants", "request_audience", "execution_intents", "messages", "attachments", "requests", "shared_answers", "conversations", "deliveries", "instances", "credentials", "destinations", "connections", "memberships", "role_bindings", "roles", "groups", "idempotency", "events", "provider_events", "principals"}
 
 type ErasureStatus struct {
 	Operation string     `json:"operation"`
@@ -192,7 +192,14 @@ func (s *Store) EraseWorkspaceStep(ctx context.Context, scope, operation string)
 	if _, err = c.Exec(ctx, `UPDATE scopes SET erasure_started_at=COALESCE(erasure_started_at,now()) WHERE id=$1`, scope); err != nil {
 		return false, err
 	}
-	rows, err := c.Query(ctx, `SELECT id FROM attachments WHERE scope=$1 ORDER BY id LIMIT 8`, scope)
+	var liveUpload bool
+	if err = c.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM attachment_uploads WHERE scope=$1 AND lease_until>now())`, scope).Scan(&liveUpload); err != nil {
+		return false, err
+	}
+	if liveUpload {
+		return false, nil
+	}
+	rows, err := c.Query(ctx, `SELECT id FROM attachments WHERE scope=$1 UNION SELECT id FROM attachment_uploads WHERE scope=$1 ORDER BY id LIMIT 8`, scope)
 	if err != nil {
 		return false, err
 	}
@@ -230,6 +237,10 @@ func (s *Store) EraseWorkspaceStep(ctx context.Context, scope, operation string)
 		if _, err = c.Exec(ctx, `DELETE FROM attachments WHERE scope=$1 AND id=$2`, scope, id); err != nil {
 			return false, err
 		}
+		if _, err = c.Exec(ctx, `DELETE FROM attachment_uploads WHERE scope=$1 AND id=$2 AND lease_until<=now()`, scope, id); err != nil {
+			return false, err
+		}
+
 	}
 	if len(ids) > 0 {
 		return false, nil
@@ -290,12 +301,12 @@ func (s *Store) ExportWorkspace(ctx context.Context, scope string, output io.Wri
 		_, e := io.Copy(tarout, reader)
 		return e
 	}
-	manifest := JSON(map[string]any{"format": "notif-customer-export-v1", "schema_version": SchemaVersion, "scope": scope, "company": company, "environment": environment, "omitted": []string{"credentials", "idempotency", "provider_events", "connection secret and config", "instance credential_id"}})
+	manifest := JSON(map[string]any{"format": "notif-customer-export-v1", "schema_version": SchemaVersion, "scope": scope, "company": company, "environment": environment, "omitted": []string{"credentials", "idempotency", "provider_events", "attachment_uploads", "connection secret and config", "instance credential_id"}})
 	if err = write("manifest.json", int64(len(manifest)), bytes.NewReader(manifest)); err != nil {
 		return err
 	}
 	for _, table := range lifecycleTables {
-		if table == "credentials" || table == "idempotency" || table == "provider_events" {
+		if table == "credentials" || table == "idempotency" || table == "provider_events" || table == "attachment_uploads" {
 			continue
 		}
 		if err = func() error {

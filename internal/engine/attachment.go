@@ -57,8 +57,22 @@ func (s *Store) UploadAttachment(ctx context.Context, a Actor, conv, name, media
 	hash := sha256.Sum256(data)
 	out = Attachment{ID: ID("file"), ConversationID: conv, FileName: name, MediaType: media, Size: int64(len(data)), SHA256: hex.EncodeToString(hash[:]), CreatedAt: time.Now()}
 	path := s.attachmentPath(a.Scope, out.ID)
+	// A crash between remote PUT and metadata COMMIT used to leave untracked
+	// content. Reserve a cleanup lease before any external object is created.
+	if e := s.tx(ctx, a, func(tx pgx.Tx) error {
+		if _, e := s.conversationRecipients(ctx, tx, a, conv, "message"); e != nil {
+			return e
+		}
+		_, e := tx.Exec(ctx, `INSERT INTO attachment_uploads(id,scope) VALUES($1,$2)`, out.ID, a.Scope)
+		return e
+	}); e != nil {
+		return out, e
+	}
 	if s.AttachmentObjects != nil {
-		if e := s.AttachmentObjects.Put(ctx, attachmentObjectKey(a.Scope, out.ID), data); e != nil {
+		upload, cancel := context.WithTimeout(ctx, 30*time.Second)
+		e := s.AttachmentObjects.Put(upload, attachmentObjectKey(a.Scope, out.ID), data)
+		cancel()
+		if e != nil {
 			return out, fmt.Errorf("attachment upload failed: %w", e)
 		}
 	} else {
@@ -73,6 +87,10 @@ func (s *Store) UploadAttachment(ctx context.Context, a Actor, conv, name, media
 		if _, e := s.conversationRecipients(ctx, tx, a, conv, "message"); e != nil {
 			return e
 		}
+		var reserved string
+		if e := tx.QueryRow(ctx, `DELETE FROM attachment_uploads WHERE scope=$1 AND id=$2 AND lease_until>now() RETURNING id`, a.Scope, out.ID).Scan(&reserved); e != nil {
+			return Conflict("Upload reservation expired; retry the upload.")
+		}
 		if _, e := tx.Exec(ctx, `INSERT INTO attachments(id,scope,conversation_id,owner_id,file_name,media_type,size,sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, out.ID, a.Scope, conv, a.ID, name, media, len(data), out.SHA256); e != nil {
 			return e
 		}
@@ -86,9 +104,13 @@ func (s *Store) UploadAttachment(ctx context.Context, a Actor, conv, name, media
 		var exists bool
 		if err := s.Pool.QueryRow(check, `SELECT EXISTS(SELECT 1 FROM attachments WHERE scope=$1 AND id=$2)`, a.Scope, out.ID).Scan(&exists); err == nil && !exists {
 			if s.AttachmentObjects != nil {
-				_ = s.AttachmentObjects.Delete(check, attachmentObjectKey(a.Scope, out.ID))
+				if err := s.AttachmentObjects.Delete(check, attachmentObjectKey(a.Scope, out.ID)); err == nil {
+					s.removeUploadReservation(check, a.Scope, out.ID)
+				}
 			} else {
-				_ = os.Remove(path)
+				if err := os.Remove(path); err == nil || os.IsNotExist(err) {
+					s.removeUploadReservation(check, a.Scope, out.ID)
+				}
 			}
 		}
 	}
