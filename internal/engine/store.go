@@ -26,7 +26,8 @@ type Store struct {
 	providerTransport    http.RoundTripper
 	assistanceTransports []*http.Transport
 
-	AttachmentsRoot string
+	AttachmentsRoot   string
+	AttachmentObjects AttachmentObjectStore
 
 	Matcher            Matcher
 	AutomaticMatcher   AutomaticMatcher
@@ -59,12 +60,15 @@ func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 	}
 	defer tx.Rollback(ctx)
 	// One short workspace lock makes commit order and event cursors agree. Network calls never hold it.
-	var held bool
-	if err = tx.QueryRow(ctx, `SELECT recovery_hold FROM scopes WHERE id=$1 FOR UPDATE`, a.Scope).Scan(&held); err != nil {
+	var held, suspended bool
+	if err = tx.QueryRow(ctx, `SELECT recovery_hold,suspended FROM scopes WHERE id=$1 FOR UPDATE`, a.Scope).Scan(&held, &suspended); err != nil {
 		return err
 	}
 	if held {
 		return &Error{"RECOVERY_HOLD", "This workspace is paused for restore reconciliation.", 503}
+	}
+	if suspended {
+		return &Error{"WORKSPACE_SUSPENDED", "This workspace is suspended.", 503}
 	}
 	if a.ProviderConnection != "" {
 		var valid bool
@@ -182,7 +186,7 @@ func (s *Store) Bootstrap(ctx context.Context, scope, company, environment, toke
 func (s *Store) Authenticate(ctx context.Context, token string) (Actor, error) {
 	var a Actor
 	var meta []byte
-	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token)).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
+	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token)).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
 	if err != nil {
 		return a, &Error{"UNAUTHENTICATED", "A valid credential is required.", 401}
 	}

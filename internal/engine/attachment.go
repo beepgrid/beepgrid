@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/jackc/pgx/v5"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,7 @@ func (s *Store) attachmentPath(scope, id string) string {
 }
 func (s *Store) UploadAttachment(ctx context.Context, a Actor, conv, name, media string, data []byte) (Attachment, error) {
 	var out Attachment
-	if s.AttachmentsRoot == "" {
+	if s.AttachmentsRoot == "" && s.AttachmentObjects == nil {
 		return out, Bad("Attachment storage is not configured.")
 	}
 	if len(data) == 0 || len(data) > maxAttachment {
@@ -56,11 +57,17 @@ func (s *Store) UploadAttachment(ctx context.Context, a Actor, conv, name, media
 	hash := sha256.Sum256(data)
 	out = Attachment{ID: ID("file"), ConversationID: conv, FileName: name, MediaType: media, Size: int64(len(data)), SHA256: hex.EncodeToString(hash[:]), CreatedAt: time.Now()}
 	path := s.attachmentPath(a.Scope, out.ID)
-	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
-		return out, e
-	}
-	if e := os.WriteFile(path, data, 0600); e != nil {
-		return out, e
+	if s.AttachmentObjects != nil {
+		if e := s.AttachmentObjects.Put(ctx, attachmentObjectKey(a.Scope, out.ID), data); e != nil {
+			return out, fmt.Errorf("attachment upload failed: %w", e)
+		}
+	} else {
+		if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
+			return out, e
+		}
+		if e := os.WriteFile(path, data, 0600); e != nil {
+			return out, e
+		}
 	}
 	e := s.tx(ctx, a, func(tx pgx.Tx) error {
 		if _, e := s.conversationRecipients(ctx, tx, a, conv, "message"); e != nil {
@@ -72,7 +79,18 @@ func (s *Store) UploadAttachment(ctx context.Context, a Actor, conv, name, media
 		return event(ctx, tx, a, "attachment.created", conv, "", out)
 	})
 	if e != nil {
-		_ = os.Remove(path)
+		// A dropped COMMIT response can mean the metadata was committed. Never
+		// remove its content merely because the original connection failed.
+		check, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var exists bool
+		if err := s.Pool.QueryRow(check, `SELECT EXISTS(SELECT 1 FROM attachments WHERE scope=$1 AND id=$2)`, a.Scope, out.ID).Scan(&exists); err == nil && !exists {
+			if s.AttachmentObjects != nil {
+				_ = s.AttachmentObjects.Delete(check, attachmentObjectKey(a.Scope, out.ID))
+			} else {
+				_ = os.Remove(path)
+			}
+		}
 	}
 	return out, e
 }
@@ -95,15 +113,32 @@ func (s *Store) Attachments(ctx context.Context, a Actor, conv string) ([]Attach
 	}
 	return out, rows.Err()
 }
-func (s *Store) DownloadAttachment(ctx context.Context, a Actor, id string) (Attachment, *os.File, error) {
+func (s *Store) DownloadAttachment(ctx context.Context, a Actor, id string) (Attachment, io.ReadSeekCloser, error) {
 	var x Attachment
 	e := s.Pool.QueryRow(ctx, `SELECT id,conversation_id,file_name,media_type,size,sha256,created_at FROM attachments WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&x.ID, &x.ConversationID, &x.FileName, &x.MediaType, &x.Size, &x.SHA256, &x.CreatedAt)
 	if e != nil || !s.canRead(ctx, s.Pool, a, x.ConversationID) {
 		return x, nil, Missing()
 	}
-	file, e := os.Open(s.attachmentPath(a.Scope, id))
+	var file io.ReadSeekCloser
+	if s.AttachmentObjects != nil {
+		file, e = s.AttachmentObjects.Open(ctx, attachmentObjectKey(a.Scope, id))
+	} else {
+		file, e = os.Open(s.attachmentPath(a.Scope, id))
+	}
 	if e != nil {
 		return x, nil, fmt.Errorf("attachment content unavailable")
+	}
+	if s.AttachmentObjects != nil {
+		hash := sha256.New()
+		n, err := io.Copy(hash, io.LimitReader(file, maxAttachment+1))
+		if err != nil || n != x.Size || hex.EncodeToString(hash.Sum(nil)) != x.SHA256 {
+			file.Close()
+			return x, nil, fmt.Errorf("attachment content integrity check failed")
+		}
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			file.Close()
+			return x, nil, fmt.Errorf("attachment content unavailable")
+		}
 	}
 	return x, file, nil
 }

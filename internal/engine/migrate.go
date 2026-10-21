@@ -16,9 +16,13 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-const SchemaVersion = 13
+const SchemaVersion = 15
 
 func pool(ctx context.Context, url, name string) (*pgxpool.Pool, error) {
+	return configuredPool(ctx, url, name, 12)
+}
+
+func configuredPool(ctx context.Context, url, name string, maxConns int32) (*pgxpool.Pool, error) {
 	if !regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`).MatchString(name) {
 		return nil, Bad("Invalid database schema")
 	}
@@ -26,7 +30,10 @@ func pool(ctx context.Context, url, name string) (*pgxpool.Pool, error) {
 	if e != nil {
 		return nil, e
 	}
-	cfg.MaxConns = 12
+	if maxConns < 2 || maxConns > 100 {
+		return nil, Bad("Database pool size must be between 2 and 100.")
+	}
+	cfg.MaxConns = maxConns
 	cfg.ConnConfig.RuntimeParams["search_path"] = name + ",public"
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
@@ -100,7 +107,12 @@ func Open(ctx context.Context, url, name string, key []byte) (*Store, error) {
 	return OpenExisting(ctx, url, name, key)
 }
 func OpenExisting(ctx context.Context, url, name string, key []byte) (*Store, error) {
-	p, e := pool(ctx, url, name)
+	return OpenConfigured(ctx, url, name, key, 12)
+}
+
+// OpenConfigured shares one bounded query pool and one listener across workspaces.
+func OpenConfigured(ctx context.Context, url, name string, key []byte, maxConns int32) (*Store, error) {
+	p, e := configuredPool(ctx, url, name, maxConns)
 	if e != nil {
 		return nil, e
 	}

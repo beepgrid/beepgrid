@@ -12,7 +12,7 @@ func (s *Store) promoteQuestions(ctx context.Context) error {
 		return e
 	}
 	defer tx.Rollback(ctx)
-	rows, e := tx.Query(ctx, `SELECT `+deliveryFields+`,scope FROM deliveries WHERE state='waiting' AND connection_id<>'' AND (NOT EXISTS(SELECT 1 FROM requests r WHERE r.scope=deliveries.scope AND r.id=deliveries.operation_id AND r.state='open' AND r.expires_at>now()) OR NOT EXISTS(SELECT 1 FROM requests r WHERE r.scope=deliveries.scope AND r.id=deliveries.payload->>'_cluster' AND r.state='open' AND r.expires_at>now())) AND scope IN(SELECT id FROM scopes WHERE NOT recovery_hold) ORDER BY created_at,id LIMIT 100 FOR UPDATE SKIP LOCKED`)
+	rows, e := tx.Query(ctx, `SELECT `+deliveryFields+`,scope FROM deliveries WHERE state='waiting' AND connection_id<>'' AND (NOT EXISTS(SELECT 1 FROM requests r WHERE r.scope=deliveries.scope AND r.id=deliveries.operation_id AND r.state='open' AND r.expires_at>now()) OR NOT EXISTS(SELECT 1 FROM requests r WHERE r.scope=deliveries.scope AND r.id=deliveries.payload->>'_cluster' AND r.state='open' AND r.expires_at>now())) AND scope IN(SELECT id FROM scopes WHERE NOT recovery_hold AND NOT suspended) ORDER BY created_at,id LIMIT 100 FOR UPDATE SKIP LOCKED`)
 	if e != nil {
 		return e
 	}

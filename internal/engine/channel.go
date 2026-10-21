@@ -480,7 +480,7 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 	// Match mutation lock order: workspace first, then delivery. Skip busy
 	// workspaces so cancellation cannot deadlock and other tenants can progress.
 	var scope string
-	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND (SELECT d.id FROM deliveries d WHERE d.scope=s.id AND `+eligibleProvider+` ORDER BY d.next_at,d.id LIMIT 1) IS NOT NULL ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
+	e = tx.QueryRow(ctx, `SELECT id FROM scopes s WHERE NOT recovery_hold AND NOT suspended AND (SELECT d.id FROM deliveries d WHERE d.scope=s.id AND `+eligibleProvider+` ORDER BY d.next_at,d.id LIMIT 1) IS NOT NULL ORDER BY last_dispatch_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&scope)
 	if e == pgx.ErrNoRows {
 		return nil, worked, nil
 	}
