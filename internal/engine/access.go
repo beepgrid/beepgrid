@@ -8,7 +8,7 @@ import (
 func (s *Store) RefreshActor(ctx context.Context, a Actor) (Actor, error) {
 	var out Actor
 	var meta []byte
-	e := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id WHERE c.scope=$1 AND c.id=$2 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, a.Scope, a.CredentialID).Scan(&out.ID, &out.Kind, &out.ExternalID, &out.Name, &meta, &out.CreatedAt, &out.Scope, &out.CredentialID, &out.CredentialKind, &out.Prefix, &out.InstanceID)
+	e := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id WHERE c.scope=$1 AND c.id=$2 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, a.Scope, a.CredentialID).Scan(&out.ID, &out.Kind, &out.ExternalID, &out.Name, &meta, &out.CreatedAt, &out.Scope, &out.CredentialID, &out.CredentialKind, &out.Prefix, &out.InstanceID)
 	if e != nil {
 		return out, Denied()
 	}

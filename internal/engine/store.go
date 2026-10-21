@@ -61,7 +61,7 @@ func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 	defer tx.Rollback(ctx)
 	// One short workspace lock makes commit order and event cursors agree. Network calls never hold it.
 	var held, suspended bool
-	if err = tx.QueryRow(ctx, `SELECT recovery_hold,suspended FROM scopes WHERE id=$1 FOR UPDATE`, a.Scope).Scan(&held, &suspended); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT recovery_hold,(suspended OR (access_until IS NOT NULL AND access_until<=now())) FROM scopes WHERE id=$1 FOR UPDATE`, a.Scope).Scan(&held, &suspended); err != nil {
 		return err
 	}
 	if held {
@@ -186,7 +186,7 @@ func (s *Store) Bootstrap(ctx context.Context, scope, company, environment, toke
 func (s *Store) Authenticate(ctx context.Context, token string) (Actor, error) {
 	var a Actor
 	var meta []byte
-	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token)).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
+	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token)).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
 	if err != nil {
 		return a, &Error{"UNAUTHENTICATED", "A valid credential is required.", 401}
 	}

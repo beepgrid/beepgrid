@@ -46,7 +46,7 @@ func (s *Store) ProcessAutomaticAnswer(ctx context.Context) (bool, error) {
 	lease = ID("matchlease")
 	err := s.Pool.QueryRow(ctx, `WITH candidate AS (
  SELECT j.scope,j.request_id FROM answer_match_jobs j JOIN scopes s ON s.id=j.scope
- WHERE s.automatic_answers AND NOT s.recovery_hold AND NOT s.suspended AND s.assistance_version=j.version
+ WHERE s.automatic_answers AND NOT s.recovery_hold AND NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now()) AND s.assistance_version=j.version
  AND (j.state='queued' OR (j.state='leased' AND j.lease_until<now()))
  ORDER BY j.created_at LIMIT 1 FOR UPDATE OF j SKIP LOCKED)
  UPDATE answer_match_jobs j SET state='leased',lease=$1,lease_until=now()+interval '45 seconds',attempts=attempts+1

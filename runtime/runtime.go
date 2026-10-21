@@ -58,6 +58,8 @@ func Open(ctx context.Context, c Config) (*Service, error) {
 	return &Service{store: s, api: httpapi.New(s, c.PublicURL, web.Handler()), public: c.PublicURL}, nil
 }
 
+func (s *Service) DrainLiveStreams() { s.api.DrainLiveStreams() }
+
 func (s *Service) Close()                { s.store.Close() }
 func (s *Service) Handler() http.Handler { return s.api }
 
@@ -97,6 +99,15 @@ func (s *Service) ApplyWorkspaceState(ctx context.Context, id string, version in
 		return fmt.Errorf("invalid workspace state")
 	}
 	return s.store.ApplyWorkspaceState(ctx, id+"/production", version, suspended)
+}
+
+// ApplyWorkspaceAccess sets a versioned access deadline independently of the
+// customer's credentials. A zero deadline preserves unlimited OSS operation.
+func (s *Service) ApplyWorkspaceAccess(ctx context.Context, id string, version int64, suspended bool, until time.Time) error {
+	if !workspaceID.MatchString(id) || version < 1 {
+		return fmt.Errorf("invalid workspace access")
+	}
+	return s.store.ApplyWorkspaceAccess(ctx, id+"/production", version, suspended, until)
 }
 
 // RunWorkers blocks until cancellation and joins its goroutines before returning.

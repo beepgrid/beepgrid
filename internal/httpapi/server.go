@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/notif-dev/notif/api"
@@ -19,8 +20,10 @@ import (
 
 type actorKey struct{}
 type Server struct {
-	limits rateLimiter
-	oidc   *oidcConfig
+	limits     rateLimiter
+	streamStop chan struct{}
+	streamOnce sync.Once
+	oidc       *oidcConfig
 
 	Store     *engine.Store
 	PublicURL string
@@ -29,10 +32,15 @@ type Server struct {
 }
 
 func New(s *engine.Store, public string, ui http.Handler) *Server {
-	x := &Server{Store: s, PublicURL: strings.TrimRight(public, "/"), UI: ui, mux: http.NewServeMux()}
+	x := &Server{streamStop: make(chan struct{}), Store: s, PublicURL: strings.TrimRight(public, "/"), UI: ui, mux: http.NewServeMux()}
 	x.routes()
 	return x
 }
+
+// DrainLiveStreams closes this replica's live transports. Durable event cursors
+// let clients resume on another replica; canonical requests are left untouched.
+func (s *Server) DrainLiveStreams() { s.streamOnce.Do(func() { close(s.streamStop) }) }
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "same-origin")
@@ -548,6 +556,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 		select {
 		case <-r.Context().Done():
 			return nil
+		case <-s.streamStop:
+			return nil
 		case <-timer.C:
 			return nil
 		case <-tick.C:
@@ -559,6 +569,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 			coalesce := time.NewTimer(50 * time.Millisecond)
 			select {
 			case <-r.Context().Done():
+				coalesce.Stop()
+				return nil
+			case <-s.streamStop:
 				coalesce.Stop()
 				return nil
 			case <-coalesce.C:
