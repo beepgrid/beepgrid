@@ -250,8 +250,11 @@ func (s *Store) LinkSlackAccount(ctx context.Context, a Actor, personID, userID,
 	})
 }
 func (s *Store) validURL(ctx context.Context, raw string) (*url.URL, error) {
+	return validProviderURL(ctx, raw, s.AllowLocal)
+}
+func validProviderURL(ctx context.Context, raw string, allowLocal bool) (*url.URL, error) {
 	u, e := url.Parse(raw)
-	if e != nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" || (u.Scheme != "https" && !(s.AllowLocal && u.Scheme == "http")) {
+	if e != nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" || (u.Scheme != "https" && !(allowLocal && u.Scheme == "http")) {
 		return nil, Bad("An HTTPS provider URL is required.")
 	}
 	ips, e := net.DefaultResolver.LookupIPAddr(ctx, u.Hostname())
@@ -259,13 +262,16 @@ func (s *Store) validURL(ctx context.Context, raw string) (*url.URL, error) {
 		return nil, Bad("Provider host could not be resolved.")
 	}
 	for _, ip := range ips {
-		if !s.AllowLocal && (ip.IP.IsPrivate() || ip.IP.IsLoopback() || ip.IP.IsLinkLocalUnicast() || ip.IP.IsUnspecified() || ip.IP.IsMulticast()) {
+		if !allowLocal && (ip.IP.IsPrivate() || ip.IP.IsLoopback() || ip.IP.IsLinkLocalUnicast() || ip.IP.IsUnspecified() || ip.IP.IsMulticast()) {
 			return nil, Bad("Private provider addresses are disabled.")
 		}
 	}
 	return u, nil
 }
 func (s *Store) dial(ctx context.Context, network, address string) (net.Conn, error) {
+	return dialProvider(ctx, network, address, s.AllowLocal)
+}
+func dialProvider(ctx context.Context, network, address string, allowLocal bool) (net.Conn, error) {
 	host, port, e := net.SplitHostPort(address)
 	if e != nil {
 		return nil, e
@@ -275,7 +281,7 @@ func (s *Store) dial(ctx context.Context, network, address string) (net.Conn, er
 		return nil, e
 	}
 	for _, ip := range ips {
-		if !s.AllowLocal && (ip.IP.IsPrivate() || ip.IP.IsLoopback() || ip.IP.IsLinkLocalUnicast() || ip.IP.IsUnspecified() || ip.IP.IsMulticast()) {
+		if !allowLocal && (ip.IP.IsPrivate() || ip.IP.IsLoopback() || ip.IP.IsLinkLocalUnicast() || ip.IP.IsUnspecified() || ip.IP.IsMulticast()) {
 			return nil, fmt.Errorf("private provider address denied")
 		}
 	}

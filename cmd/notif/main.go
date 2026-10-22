@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/notif-dev/notif/internal/aimodel"
 	"github.com/notif-dev/notif/internal/engine"
 	"github.com/notif-dev/notif/internal/httpapi"
 	"github.com/notif-dev/notif/internal/mcp"
@@ -212,6 +213,13 @@ func serve(ctx context.Context, args []string) error {
 	defer stopDiagnostics()
 	store.AllowLocal = *dev
 	store.AttachmentsRoot = env("NOTIF_ATTACHMENTS_DIR", ".local/attachments")
+	aiConfig, e := aimodel.FromEnv(os.Getenv)
+	if e != nil {
+		return e
+	}
+	if e = store.ConfigureAI(ctx, aiConfig); e != nil {
+		return e
+	}
 	if e = store.ConfigureMatcher(ctx, os.Getenv("NOTIF_MATCHER_URL"), os.Getenv("NOTIF_MATCHER_TOKEN")); e != nil {
 		return e
 	}

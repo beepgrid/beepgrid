@@ -28,6 +28,7 @@ type Config struct {
 	MaxConnections                                 int32
 	Attachments                                    AttachmentObjectStore
 	AllowLocal                                     bool
+	AI                                             AIConfig
 }
 
 type Service struct {
@@ -55,6 +56,10 @@ func Open(ctx context.Context, c Config) (*Service, error) {
 		return nil, err
 	}
 	s.AllowLocal, s.AttachmentsRoot, s.AttachmentObjects = c.AllowLocal, c.AttachmentsDir, c.Attachments
+	if err := s.ConfigureAI(ctx, c.AI); err != nil {
+		s.Close()
+		return nil, err
+	}
 	return &Service{store: s, api: httpapi.New(s, c.PublicURL, web.Handler()), public: c.PublicURL}, nil
 }
 
