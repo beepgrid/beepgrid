@@ -75,7 +75,7 @@ func Serve(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer) er
 		var rpcError any
 		switch req.Method {
 		case "initialize":
-			result = map[string]any{"protocolVersion": "2025-11-25", "capabilities": map[string]any{"tools": map[string]bool{"listChanged": false}}, "serverInfo": map[string]string{"name": "notif", "version": "0.1.0-dev"}}
+			result = map[string]any{"protocolVersion": "2025-11-25", "capabilities": map[string]any{"tools": map[string]bool{"listChanged": false}}, "serverInfo": map[string]string{"name": "beepgrid", "version": "0.1.0-dev"}}
 		case "ping":
 			result = map[string]any{}
 		case "tools/list":

@@ -19,3 +19,8 @@ sdk/typescript/dist/
 sdk/react/dist/
 
 sdk/python/build/
+
+# Internal naming experiments never belong in the open source release.
+/domain-picker*/
+/naming-research/
+/naming-experiments*.zip

@@ -1,4 +1,4 @@
-"""Notif's dependency-free synchronous application and worker client."""
+"""Beep Grid's dependency-free synchronous application and worker client."""
 from __future__ import annotations
 import json
 import http.client
@@ -20,7 +20,7 @@ class Client:
     def __init__(self, base_url: str, token: str, timeout: float = 20):
         parsed = urllib.parse.urlsplit(base_url)
         if parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.username:
-            raise ValueError("Invalid Notif server URL")
+            raise ValueError("Invalid Beep Grid server URL")
         self.base_url, self._token, self.timeout = base_url.rstrip("/"), token, timeout
 
     def call(self, method: str, path: str, data: Any = None, *, key: str | None = None, minimal: bool = False, timeout: float | None = None) -> Any:

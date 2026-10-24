@@ -66,6 +66,8 @@ async function advance(ms: number) { await act(async () => { await vi.advanceTim
 describe("dashboard live path", () => {
   it("appends and deduplicates canonical replies without history or workspace refetch", async () => {
     await open();
+    expect(document.title).toBe("Conversations · Beep Grid");
+    expect(screen.getByRole("link", { name: "beepgrid" })).toBeVisible();
     expect(latest().url).toContain("summary=1");
     expect(latest().url).toContain("conversation_id=con_one");
     act(() => { latest().emit("message.created", 1, msg()); latest().emit("message.created", 1, msg()); latest().emit("message.created", 2, msg()); });
@@ -113,7 +115,7 @@ describe("dashboard live path", () => {
     expect(screen.getByText(msg("missed").body)).toBeVisible();
     expired = true;
     await advance(15000);
-    expect(screen.getByRole("heading", { name: "Welcome to Notif" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Welcome to Beep Grid" })).toBeVisible();
     expect(Source.all.every(s => s.closed)).toBe(true);
     expect(screen.queryByText(msg("missed").body)).toBeNull();
   });
@@ -132,7 +134,7 @@ describe("dashboard live path", () => {
     expect(screen.queryByText(msg("stale").body)).toBeNull();
     expired = true;
     await advance(5000);
-    expect(screen.getByRole("heading", { name: "Welcome to Notif" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Welcome to Beep Grid" })).toBeVisible();
   });
   it("keeps background messages lightweight and avoids refetching agent instance details", async () => {
     await open();

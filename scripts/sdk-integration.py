@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run both language SDKs against an isolated real Notif HTTP server."""
+"""Run both language SDKs against an isolated real Beep Grid HTTP server."""
 import contextlib
 import os
 import pathlib

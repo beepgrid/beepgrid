@@ -281,8 +281,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
     <main className="login">
       <div className="login-art">
         <div className="brand large">
-          <span className="brand-mark">n</span>notif
-          <span className="brand-period">.</span>
+          <span className="brand-mark" aria-hidden="true">b</span>beepgrid
         </div>
         <h1>
           Every agent.
@@ -296,7 +295,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
         <div className="connection-illustration">
           <span className="node human">You</span>
           <i />
-          <span className="node hub">n</span>
+          <span className="node hub">b</span>
           <i />
           <div>
             <span className="node worker">
@@ -313,7 +312,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
       </div>
       <form className="login-form" onSubmit={submit}>
         <span className="eyebrow">YOUR WORKSPACE</span>
-        <h2>Welcome to Notif</h2>
+        <h2>Welcome to Beep Grid</h2>
         <p>Sign in with your personal access token.</p>
         <Field label="Access token">
           <input
@@ -344,7 +343,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
           <strong>Running locally?</strong>
           <p>
             Your owner token is in <code>.local/owner-token</code> inside the
-            Notif project. Other people can sign in with their own issued token.
+            Beep Grid project. Other people can sign in with their own issued token.
           </p>
         </div>
       </form>
@@ -509,7 +508,7 @@ export function App() {
     return () => removeEventListener("popstate", route);
   }, []);
   useEffect(() => {
-    document.title = `${nav.find((x) => x[0] === page)?.[1] ?? "Notif"} · Notif`;
+    document.title = `${nav.find((x) => x[0] === page)?.[1] ?? "Beep Grid"} · Beep Grid`;
     setQuery("");
   }, [page]);
   useEffect(() => {
@@ -555,7 +554,7 @@ export function App() {
   if (checking)
     return (
       <div className="loading-screen">
-        <span className="brand-mark">n</span>
+        <span className="brand-mark" aria-hidden="true">b</span>
         <p>Opening your workspace…</p>
       </div>
     );
@@ -609,8 +608,7 @@ export function App() {
             navigate("inbox");
           }}
         >
-          <span className="brand-mark">n</span>notif
-          <span className="brand-period">.</span>
+          <span className="brand-mark" aria-hidden="true">b</span>beepgrid
         </a>
         <div className="workspace">
           <span className="workspace-symbol">{me.company.slice(0, 1)}</span>
@@ -1420,7 +1418,7 @@ export function App() {
         </div>
         <footer className="app-footer">
           <span>
-            notif. <span>Communication with context.</span>
+            beepgrid <span>Communication with context.</span>
           </span>
           <span>Open source · 0.1.0-dev</span>
         </footer>
@@ -2029,7 +2027,7 @@ function Forms({
             In Settings, issue an enrollment token restricted to a prefix such
             as <code>research/</code>.
           </li>
-          <li>Connect using a Notif SDK. Agents appear automatically.</li>
+          <li>Connect using a Beep Grid SDK. Agents appear automatically.</li>
         </ol>
         <pre className="code-block">{`from notif import Client\n\nlauncher = Client("http://localhost:4010", TOKEN)\nworker, session = launcher.connect(\n    "research/scout", "Scout",\n    capabilities=["message", "status"]\n)`}</pre>
         <p className="muted small">

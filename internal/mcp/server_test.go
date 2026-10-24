@@ -41,6 +41,9 @@ func TestStdioFramingAndScopedTools(t *testing.T) {
 	if !strings.Contains(lines[2], "agent-1") || !strings.Contains(lines[3], "-32601") {
 		t.Fatal(out.String())
 	}
+	if !strings.Contains(lines[0], `"name":"beepgrid"`) {
+		t.Fatal("MCP initialization returned the wrong product identity", lines[0])
+	}
 }
 
 func TestStableToolRetryKeyAndInvalidRequest(t *testing.T) {

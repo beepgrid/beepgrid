@@ -1,4 +1,4 @@
-// Package notif connects ordinary applications and agent runtimes to a Notif server.
+// Package notif connects ordinary applications and agent runtimes to a Beep Grid server.
 package notif
 
 import (
@@ -163,7 +163,7 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, key s
 func (c *Client) do(ctx context.Context, method, path string, in, out any, key string, minimal bool) error {
 	base, e := url.Parse(c.BaseURL)
 	if e != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") {
-		return fmt.Errorf("invalid Notif server URL")
+		return fmt.Errorf("invalid Beep Grid server URL")
 	}
 	if !strings.HasPrefix(path, "/api/v1/") {
 		return fmt.Errorf("invalid API path")
@@ -232,7 +232,7 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any, key s
 		}
 		res.Body.Close()
 		if limited.N <= 0 {
-			return fmt.Errorf("Notif response exceeds %d byte limit", limit)
+			return fmt.Errorf("Beep Grid response exceeds %d byte limit", limit)
 		}
 		// Error pages need not be JSON to preserve the useful HTTP status.
 		if res.StatusCode >= 400 {

@@ -14,7 +14,7 @@ const answer = await worker.wait(request.id, abortController.signal);
 
 The enrollment credential must permit the namespace. Grant a role to its launcher before connecting; workers inherit explicit role assignments, never administrator credential authority. Use a worker's own client after enrollment. The caller supplies a stable key when a business operation may be retried across process restarts.
 
-`run(handler, signal)` receives leased items and acknowledges only after the handler completes. A runtime must persist its checkpoint before acknowledging long work. Notif does not serialize process memory. The SDK retries idempotent writes after network errors using the same key. `wait` cancellation stops local waiting only.
+`run(handler, signal)` receives leased items and acknowledges only after the handler completes. A runtime must persist its checkpoint before acknowledging long work. Beep Grid does not serialize process memory. The SDK retries idempotent writes after network errors using the same key. `wait` cancellation stops local waiting only.
 
 For live chat, consume full events instead of refetching the entire conversation after every notification:
 

@@ -1,7 +1,7 @@
 {
   "name": "@notif/react",
   "version": "0.1.0-dev",
-  "description": "Authenticated request and conversation components for Notif",
+  "description": "Authenticated request and conversation components for Beep Grid",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {

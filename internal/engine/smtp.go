@@ -82,7 +82,7 @@ func (s *Store) sendMail(ctx context.Context, c Connection, to, body string) Dis
 	if err != nil {
 		return smtpFailure("DATA command", err, false)
 	}
-	if _, err = fmt.Fprintf(w, "From: %s\r\nTo: %s\r\nSubject: Notif update\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n", from.String(), recipient.String(), body); err != nil {
+	if _, err = fmt.Fprintf(w, "From: %s\r\nTo: %s\r\nSubject: Beep Grid update\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n", from.String(), recipient.String(), body); err != nil {
 		// The DATA terminator has not been sent, so this transaction cannot
 		// have been accepted. DotWriter escapes terminators within the body.
 		return smtpFailure("body", err, false)

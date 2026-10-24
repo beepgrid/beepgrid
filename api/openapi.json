@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Notif open source API",
+    "title": "Beep Grid open source API",
     "version": "0.1.0-dev",
     "license": {
       "name": "Apache-2.0"

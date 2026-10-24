@@ -136,7 +136,7 @@ func run() error {
 		}
 		return nil
 	case "version":
-		fmt.Println("notif 0.1.0-dev")
+		fmt.Println("Beep Grid 0.1.0-dev")
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
@@ -284,7 +284,7 @@ func serve(ctx context.Context, args []string) error {
 	}()
 	failures := make(chan error, 1)
 	go func() {
-		slog.Info("Notif ready", "url", public, "people_and_agents", "separate")
+		slog.Info("Beep Grid ready", "url", public, "people_and_agents", "separate")
 		if *dev {
 			slog.Info("Local owner credential file", "path", ".local/owner-token")
 		}

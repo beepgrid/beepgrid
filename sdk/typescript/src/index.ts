@@ -166,7 +166,7 @@ export class Client {
   ) {
     const u = new URL(baseURL);
     if (!["http:", "https:"].includes(u.protocol) || u.username || u.password)
-      throw new Error("Invalid Notif server URL");
+      throw new Error("Invalid Beep Grid server URL");
     this.baseURL = baseURL.replace(/\/$/, "");
   }
   async call<T>(

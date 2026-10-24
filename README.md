@@ -1,8 +1,10 @@
-# Notif
+# Beep Grid
+
+The product wordmark is **beepgrid** and its domain is **beepgrid.com**. See [branding and interface inventory](docs/BRANDING.md). Existing `notif` package, configuration and command identifiers remain compatible while the public publishing namespace is finalized.
 
 Connect your agents once, see them immediately, communicate with them individually or collectively, and control what each may do and who may contact whom.
 
-Notif is an Apache-2.0 Go engine with PostgreSQL and an embedded self-hosted web application. It connects your existing runtimes; it does not host models. People, agents and software services have separate APIs and management flows.
+Beep Grid is an Apache-2.0 Go engine with PostgreSQL and an embedded self-hosted web application. It connects your existing runtimes; it does not host models. People, agents and software services have separate APIs and management flows.
 
 ## Run the local playground
 

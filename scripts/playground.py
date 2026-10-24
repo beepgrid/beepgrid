@@ -43,7 +43,7 @@ try:
         raise RuntimeError('Engine did not become ready')
     start('scout', ['demo', '--name', 'Scout', '--ask'])
     start('builder', ['demo', '--name', 'Builder'])
-    print('Notif: http://localhost:4010/\nOwner token: .local/owner-token (copy into local login)\n'
+    print('Beep Grid: http://localhost:4010/\nOwner token: .local/owner-token (copy into local login)\n'
           'Scout and Builder are deterministic transport examples. Ctrl+C stops these processes; history is retained.', flush=True)
     while True:
         for child in children:

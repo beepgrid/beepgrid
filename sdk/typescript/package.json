@@ -1,7 +1,7 @@
 {
   "name": "@notif/client",
   "version": "0.1.0-dev",
-  "description": "Typed client and worker transport for Notif",
+  "description": "Typed client and worker transport for Beep Grid",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",

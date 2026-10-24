@@ -132,6 +132,6 @@ for path in ('/integrations/webhook/{id}','/integrations/slack/{id}','/integrati
  for name in (['X-Notif-Timestamp','X-Notif-Signature','X-Notif-Event-ID'] if 'webhook' in path else ['X-Slack-Request-Timestamp','X-Slack-Signature']):paths[path]['post']['parameters'].append({'name':name,'in':'header','required':True,'schema':S})
 paths['/integrations/slack/{id}']['post']['requestBody']={'required':True,'content':{'application/x-www-form-urlencoded':{'schema':obj({'payload':S},['payload'])}}}
 for path in ('/auth/oidc/start','/auth/oidc/callback'):paths[path]['get']['responses']['303']={'description':'Redirect after verified login'}
-spec={'openapi':'3.1.0','info':{'title':'Notif open source API','version':'0.1.0-dev','license':{'name':'Apache-2.0'}},'servers':[{'url':'/'}], 'security':[{'bearer':[]},{'session':[]}], 'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'},'session':{'type':'apiKey','in':'cookie','name':'notif_session'}}}}
+spec={'openapi':'3.1.0','info':{'title':'Beep Grid open source API','version':'0.1.0-dev','license':{'name':'Apache-2.0'}},'servers':[{'url':'/'}], 'security':[{'bearer':[]},{'session':[]}], 'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'},'session':{'type':'apiKey','in':'cookie','name':'notif_session'}}}}
 (root/'api/openapi.json').write_text(json.dumps(spec,indent=2)+'\n')
 print(f'Generated {sum(len(p) for p in paths.values())} API operations.')
