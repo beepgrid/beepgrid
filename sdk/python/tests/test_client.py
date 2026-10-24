@@ -125,6 +125,23 @@ class ClientTests(unittest.TestCase):
             worker.report_execution(execution["id"],"failed")
         self.assertEqual(raised.exception.status,409)
 
+    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    def test_real_workspace_queries_and_batches(self):
+        c = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        _, session = c.connect("sdk/query-python-" + str(uuid.uuid4()), "Query worker")
+        target = {"kind": "agent", "id": session["agent"]["id"]}
+        preview = c.dispatch_preview([target], "message")
+        sent = c.send_batch([target, target], "one", preview_token=preview["token"])
+        self.assertEqual(len(sent), 1)
+        page = c.query("messages", filters={"conversation_id": sent[0]["result"]["conversation_id"]}, limit=1)
+        self.assertEqual(len(page["items"]), 1)
+        requests = c.ask_batch([target], {"title": "Progress?"})
+        self.assertTrue(c.capabilities(request_id=requests[0]["request"]["id"])["operations"]["cancel"])
+        self.assertEqual(c.request_trace(requests[0]["request"]["id"])["request"]["id"], requests[0]["request"]["id"])
+        self.assertEqual(c.workspace()["deployment"], "self_hosted")
+        self.assertIn("applied", c.account())
+        self.assertIn("roles", c.access())
+
 
 if __name__ == "__main__":
     unittest.main()

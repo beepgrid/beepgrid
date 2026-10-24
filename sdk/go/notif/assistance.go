@@ -15,6 +15,7 @@ type AssistanceSettings struct {
 	OverseerConfigured bool  `json:"overseer_configured"`
 }
 type AssistanceUpdate struct {
+	Version          int64 `json:"version,omitempty"`
 	AutomaticAnswers *bool `json:"automatic_answers,omitempty"`
 	Overseer         *bool `json:"overseer,omitempty"`
 }

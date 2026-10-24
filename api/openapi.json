@@ -775,6 +775,1462 @@
         }
       }
     },
+    "/api/v1/capabilities": {
+      "post": {
+        "operationId": "post_api_v1_capabilities",
+        "description": "Current operation eligibility, not an authorization token. Every mutation rechecks current policy. Exact requests include audience, original Ask, reverse response and conditions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "observed_at": {
+                      "type": "string"
+                    },
+                    "operations": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "request_version": {
+                      "type": "integer"
+                    },
+                    "outcomes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "connection_id": {
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "$ref": "#/components/schemas/Action"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access": {
+      "get": {
+        "operationId": "get_api_v1_access",
+        "description": "Own effective access, including direct/group role provenance. Inspecting another subject requires identity visibility and explicit view access:<subject ID>, or an administrator credential.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subject": {
+                      "type": "object"
+                    },
+                    "basis": {
+                      "type": "string"
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "$ref": "#/components/schemas/Role"
+                          },
+                          "subject_kind": {
+                            "type": "string"
+                          },
+                          "subject_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [],
+                        "additionalProperties": false
+                      }
+                    },
+                    "observed_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "subject_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/query": {
+      "post": {
+        "operationId": "post_api_v1_query",
+        "description": "Complete bounded keyset reads with current per-record authorization. Continue until next_cursor is absent, including empty pages. Cursors are encrypted and bound to scope, actor, filters and limit for 24 hours. Message history requires conversation_id and is chronological; other collections use stable ascending IDs. Unsupported filters are rejected.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {}
+                    },
+                    "next_cursor": {
+                      "type": "string"
+                    },
+                    "order": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "collection": {
+                    "enum": [
+                      "people",
+                      "agents",
+                      "services",
+                      "groups",
+                      "roles",
+                      "connections",
+                      "destinations",
+                      "credentials",
+                      "instances",
+                      "requests",
+                      "conversations",
+                      "messages",
+                      "answers",
+                      "executions",
+                      "deliveries",
+                      "delivery_attempts",
+                      "attachments",
+                      "overseer_plans"
+                    ]
+                  },
+                  "search": {
+                    "type": "string"
+                  },
+                  "filters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200
+                  },
+                  "cursor": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "collection"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dispatch-preview": {
+      "post": {
+        "operationId": "post_api_v1_dispatch_preview",
+        "description": "Non-sending preview of 1 to 100 explicit individual/instance targets. Includes native, primary, copy and fallback permission/enablement observations. Token binds the authorized audience and route revisions for ten minutes. Hidden recipient identities and addresses remain private.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Target"
+                    }
+                  },
+                  "operation": {
+                    "enum": [
+                      "message",
+                      "ask"
+                    ]
+                  },
+                  "descriptor": {
+                    "$ref": "#/components/schemas/Action"
+                  }
+                },
+                "required": [
+                  "targets",
+                  "operation"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/message-batches": {
+      "post": {
+        "operationId": "post_api_v1_message_batches",
+        "description": "Atomic explicit recipient dispatch, deduplicated by logical identity. Conflicting replica targets are rejected. Private conversations and per-target receipts; failure rolls back the entire batch. Optional preview token prevents changed routes/audience from silently proceeding.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "target": {
+                        "$ref": "#/components/schemas/Target"
+                      },
+                      "result": {
+                        "$ref": "#/components/schemas/SendResult"
+                      }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Target"
+                    }
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "preview_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "targets",
+                  "body"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/request-batches": {
+      "post": {
+        "operationId": "post_api_v1_request_batches",
+        "description": "Atomic private request per explicit target. Each request has an independent response and execution lifecycle; no implicit shared approval or first-responder broadcast. The nested request must omit target and conversation_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "target": {
+                        "$ref": "#/components/schemas/Target"
+                      },
+                      "request": {
+                        "$ref": "#/components/schemas/Request"
+                      }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Target"
+                    }
+                  },
+                  "request": {
+                    "$ref": "#/components/schemas/AskInput"
+                  },
+                  "preview_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "targets",
+                  "request"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/catalog": {
+      "get": {
+        "operationId": "get_api_v1_integrations_catalog",
+        "description": "Supported providers and actual fields/capabilities only. Native inbox is built in; no planned integration is installable.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/connections/{id}/diagnostics": {
+      "get": {
+        "operationId": "get_api_v1_connections_id_diagnostics",
+        "description": "Non-sending configuration/credential checks for a scoped installation manager. Provider acceptance remains not_tested; no external network request is made.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/connections/{id}/test": {
+      "post": {
+        "operationId": "post_api_v1_connections_id_test",
+        "description": "Explicit durable test message to one configured destination only. Requires installation/destination management and Message permission. Queue acceptance is not provider acceptance. Inspect delivery evidence afterwards.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "destination_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "destination_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/requests/{id}/trace": {
+      "get": {
+        "operationId": "get_api_v1_requests_id_trace",
+        "description": "Current authorized request, paged delivery evidence and execution reports. Audience members see their own projection; requesters can inspect their outgoing deliveries. Provider acceptance never proves execution.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delivery_cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/workspace": {
+      "get": {
+        "operationId": "get_api_v1_workspace",
+        "description": "Authenticated scope, company, environment, deployment kind and schema version. Managed composition supplies deployment metadata explicitly.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/workspace/account": {
+      "get": {
+        "operationId": "get_api_v1_workspace_account",
+        "description": "Person-only scoped account access requires view account:workspace or an administrator credential. This entry point permits status inspection during service suspension with a still-valid credential and current account policy. Runtime-applied quotas/usage are separate from server-side managed requested/provisioning/entitlement state. No operator tokens enter the browser; managed read failures are 503, never zero usage.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/roles/preview": {
+      "post": {
+        "operationId": "post_api_v1_roles_preview",
+        "description": "Non-saving, version-checked role-edit preview. Same rule ceiling and assignment boundaries as SaveRole; reports exact affected assignments and before/after role-grant checks for authorized subjects. Administrator credential power and new assignments are not simulated. Other assigned roles remain effective.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "$ref": "#/components/schemas/Role"
+                  },
+                  "checks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subject_id": {
+                          "type": "string"
+                        },
+                        "action": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [],
+                          "additionalProperties": false
+                        },
+                        "connection_id": {
+                          "type": "string"
+                        },
+                        "action_name": {
+                          "type": "string"
+                        },
+                        "descriptor": {
+                          "$ref": "#/components/schemas/Action"
+                        }
+                      },
+                      "required": [
+                        "subject_id",
+                        "action",
+                        "target"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "role"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "get_api_v1_me",
@@ -2459,7 +3915,20 @@
                     "type": "string"
                   },
                   "target": {
-                    "$ref": "#/components/schemas/Target"
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
                   },
                   "connection_id": {
                     "type": "string"
@@ -7553,6 +9022,9 @@
       "SendInput": {
         "type": "object",
         "properties": {
+          "preview_token": {
+            "type": "string"
+          },
           "target": {
             "$ref": "#/components/schemas/Target"
           },
@@ -7661,6 +9133,9 @@
       "AskInput": {
         "type": "object",
         "properties": {
+          "preview_token": {
+            "type": "string"
+          },
           "target": {
             "$ref": "#/components/schemas/Target"
           },
@@ -7880,6 +9355,10 @@
       "Role": {
         "type": "object",
         "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
           "id": {
             "type": "string"
           },
@@ -7902,6 +9381,22 @@
       "Group": {
         "type": "object",
         "properties": {
+          "created_by": {
+            "type": "string",
+            "readOnly": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "member": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "members_complete": {
+            "type": "boolean",
+            "readOnly": true
+          },
           "id": {
             "type": "string"
           },
@@ -7950,6 +9445,10 @@
       "Connection": {
         "type": "object",
         "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
           "id": {
             "type": "string"
           },
@@ -7989,6 +9488,10 @@
       "Destination": {
         "type": "object",
         "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
           "id": {
             "type": "string"
           },
@@ -8167,6 +9670,10 @@
       "AssistanceUpdate": {
         "type": "object",
         "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
           "automatic_answers": {
             "type": "boolean"
           },

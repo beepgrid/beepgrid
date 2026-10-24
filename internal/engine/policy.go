@@ -22,56 +22,85 @@ func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, targ
 	}
 
 	for _, r := range all {
-		if r.Action != action && r.Action != "*" {
-			continue
+		if s.ruleAllows(ctx, db, a, r, action, target, connection, actionName, descriptor...) {
+			return true
 		}
-		groupMember := false
-		if r.TargetKind == "group" && (target.Kind == "person" || target.Kind == "agent" || target.Kind == "service") && target.ID != "*" {
-			groupMember = targetGroupMember(ctx, db, a.Scope, r.TargetID, target.ID)
-		}
-		if !groupMember && r.TargetKind != "*" && r.TargetKind != target.Kind {
-			continue
-		}
-		if !groupMember && r.TargetID != "*" && r.TargetID != target.ID && !(r.TargetID == "$self" && target.ID == a.ID) {
-			continue
-		}
-		if r.ConnectionID != "" && r.ConnectionID != connection && connection != "*" {
-			continue
-		}
-		if r.ActionName != "" && r.ActionName != actionName {
-			continue
-		}
-		var detail *Action
-		if len(descriptor) > 0 {
-			detail = descriptor[0]
-		}
-		if !conditionsAllow(r.Conditions, detail) {
-			continue
-		}
-		return true
 	}
 
 	return false
+}
+func (s *Store) ruleAllows(ctx context.Context, db DB, a Actor, r Rule, action string, target Target, connection, actionName string, descriptor ...*Action) bool {
+	if r.Action != action && r.Action != "*" {
+		return false
+	}
+	groupMember := false
+	if r.TargetKind == "group" && (target.Kind == "person" || target.Kind == "agent" || target.Kind == "service") && target.ID != "*" {
+		groupMember = targetGroupMember(ctx, db, a.Scope, r.TargetID, target.ID)
+	}
+	if !groupMember && r.TargetKind != "*" && r.TargetKind != target.Kind {
+		return false
+	}
+	if !groupMember && r.TargetID != "*" && r.TargetID != target.ID && !(r.TargetID == "$self" && target.ID == a.ID) {
+		return false
+	}
+	if r.ConnectionID != "" && r.ConnectionID != connection && connection != "*" {
+		return false
+	}
+	if r.ActionName != "" && r.ActionName != actionName {
+		return false
+	}
+	var detail *Action
+	if len(descriptor) > 0 {
+		detail = descriptor[0]
+	}
+	if !conditionsAllow(r.Conditions, detail) {
+		return false
+	}
+	return true
 }
 func (s *Store) Explain(ctx context.Context, a Actor, action string, target Target, connection, actionName string, descriptor ...*Action) (map[string]any, error) {
 	if a.CredentialKind == "enrollment" {
 		return nil, Denied()
 	}
-	if err := target.Validate(); err != nil {
-		return nil, err
+	switch action {
+	case "view", "message", "ask", "decide", "manage":
+	default:
+		return nil, Bad("Unsupported permission action.")
 	}
-	if target.Kind != "group" && target.Kind != "instance" {
-		p, e := principal(ctx, s.Pool, a.Scope, target.ID)
-		if e != nil || p.Disabled {
-			return map[string]any{"allowed": false, "reason": "Target unavailable or not permitted."}, nil
+	administrative := false
+	if action == "manage" {
+		_, administrative = PermissionCatalog()["management_targets"].(map[string]string)[target.Kind]
+	}
+	if action == "view" {
+		switch target.Kind {
+		case "role", "access", "account", "connection", "destination", "delivery", "answer":
+			administrative = true
+		}
+	}
+	if administrative {
+		if !ValidText(target.ID, 256) {
+			return nil, Bad("A resource ID is required.")
+		}
+	} else {
+		if err := target.Validate(); err != nil {
+			return nil, err
+		}
+		if target.Kind != "group" && target.Kind != "instance" {
+			p, e := principal(ctx, s.Pool, a.Scope, target.ID)
+			if e != nil || p.Disabled {
+				return map[string]any{"allowed": false, "reason": "Target unavailable or not permitted."}, nil
+			}
 		}
 	}
 	allowed := s.allowed(ctx, s.Pool, a, action, target, connection, actionName, descriptor...)
+	if action == "manage" {
+		allowed = s.manages(ctx, s.Pool, a, target.Kind, target.ID)
+	}
 	return map[string]any{"allowed": allowed, "action": action, "target": target, "reason": map[bool]string{true: "An effective role or administrator credential permits this operation.", false: "No effective permission permits this operation."}[allowed]}, nil
 }
 func (s *Store) Roles(ctx context.Context, a Actor) ([]Role, error) {
 
-	rows, e := s.Pool.Query(ctx, `SELECT id,name,rules FROM roles WHERE scope=$1 ORDER BY name`, a.Scope)
+	rows, e := s.Pool.Query(ctx, `SELECT id,name,rules,version FROM roles WHERE scope=$1 ORDER BY name`, a.Scope)
 	if e != nil {
 		return nil, e
 	}
@@ -80,7 +109,7 @@ func (s *Store) Roles(ctx context.Context, a Actor) ([]Role, error) {
 	for rows.Next() {
 		var r Role
 		var raw []byte
-		if e = rows.Scan(&r.ID, &r.Name, &raw); e != nil {
+		if e = rows.Scan(&r.ID, &r.Name, &raw, &r.Version); e != nil {
 			return nil, e
 		}
 		_ = json.Unmarshal(raw, &r.Rules)
@@ -99,39 +128,51 @@ func (s *Store) Roles(ctx context.Context, a Actor) ([]Role, error) {
 	}
 	return visible, nil
 }
-func (s *Store) SaveRole(ctx context.Context, a Actor, in Role) (Role, error) {
+func validateRole(in Role) error {
 	if !ValidText(in.Name, 100) || len(in.Rules) > 100 {
-		return in, Bad("A role name and at most 100 rules are required.")
+		return Bad("A role name and at most 100 rules are required.")
 	}
 	for _, r := range in.Rules {
 		if r.Conditions != nil {
 			if r.Action != "ask" && r.Action != "decide" {
-				return in, Bad("Action conditions apply only to ask and decide rules.")
+				return Bad("Action conditions apply only to ask and decide rules.")
 			}
 			if len(r.Conditions.Resource) > 200 || len(r.Conditions.ResourceVersion) > 200 {
-				return in, Bad("Resource constraints exceed their limits.")
+				return Bad("Resource constraints exceed their limits.")
 			}
 			if r.Conditions.MaxAmountMinor != nil && (*r.Conditions.MaxAmountMinor < 0 || r.Conditions.Currency == "" || *r.Conditions.MaxAmountMinor > 1_000_000_000_000) {
-				return in, Bad("Amount ceiling requires a currency and 0 to 10^12 minor units.")
+				return Bad("Amount ceiling requires a currency and 0 to 10^12 minor units.")
 			}
 		}
 		if !strings.Contains("|view|message|ask|decide|manage|*|", "|"+r.Action+"|") || r.TargetKind == "" || r.TargetID == "" {
-			return in, Bad("Invalid permission rule.")
+			return Bad("Invalid permission rule.")
 		}
+	}
+	return nil
+}
+func (s *Store) SaveRole(ctx context.Context, a Actor, in Role) (Role, error) {
+	if e := validateRole(in); e != nil {
+		return in, e
 	}
 	e := s.tx(ctx, a, func(tx pgx.Tx) error {
 		if !s.mayEditRole(ctx, tx, a, in) {
 			return Denied()
 		}
+		if e := checkRevision(ctx, tx, a.Scope, "roles", in.ID, in.Version); e != nil {
+			return e
+		}
 		if in.ID == "" {
 			in.ID = ID("rol")
 		}
-		tag, e := tx.Exec(ctx, `INSERT INTO roles(id,scope,name,rules) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,rules=EXCLUDED.rules WHERE roles.scope=EXCLUDED.scope`, in.ID, a.Scope, in.Name, JSON(in.Rules))
+		tag, e := tx.Exec(ctx, `INSERT INTO roles(id,scope,name,rules) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,rules=EXCLUDED.rules,version=roles.version+1 WHERE roles.scope=EXCLUDED.scope`, in.ID, a.Scope, in.Name, JSON(in.Rules))
 		if e != nil {
 			return e
 		}
 		if tag.RowsAffected() == 0 {
 			return Denied()
+		}
+		if e = tx.QueryRow(ctx, `SELECT version FROM roles WHERE scope=$1 AND id=$2`, a.Scope, in.ID).Scan(&in.Version); e != nil {
+			return e
 		}
 		return event(ctx, tx, a, "role.saved", "", a.ID, map[string]any{"id": in.ID})
 	})
@@ -190,7 +231,7 @@ func (s *Store) Bindings(ctx context.Context, a Actor) ([]Binding, error) {
 }
 func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	ctx = withPolicySnapshot(ctx)
-	rows, e := s.Pool.Query(ctx, `SELECT g.id,g.name,COALESCE(jsonb_agg(m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]') FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 GROUP BY g.id ORDER BY g.name`, a.Scope)
+	rows, e := s.Pool.Query(ctx, `SELECT g.id,g.name,COALESCE(jsonb_agg(m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]'),g.version,g.created_by FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 GROUP BY g.id ORDER BY g.name`, a.Scope)
 	if e != nil {
 		return nil, e
 	}
@@ -199,7 +240,7 @@ func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	for rows.Next() {
 		var g Group
 		var raw []byte
-		if e = rows.Scan(&g.ID, &g.Name, &raw); e != nil {
+		if e = rows.Scan(&g.ID, &g.Name, &raw, &g.Version, &g.CreatedBy); e != nil {
 			return nil, e
 		}
 		_ = json.Unmarshal(raw, &g.Members)
@@ -220,6 +261,8 @@ func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 					members = append(members, id)
 				}
 			}
+			g.Member = contains(g.Members, a.ID)
+			g.MembersComplete = len(members) == len(g.Members)
 			g.Members = members
 			visible = append(visible, g)
 		}
@@ -261,10 +304,15 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 		if !s.membershipChangeAllowed(ctx, tx, a, g.ID, old, g.Members) {
 			return Denied()
 		}
+		if e := checkRevision(ctx, tx, a.Scope, "groups", g.ID, g.Version); e != nil {
+			return e
+		}
 		if g.ID == "" {
 			g.ID = ID("grp")
+			g.CreatedBy = a.ID
 		}
-		tag, e := tx.Exec(ctx, `INSERT INTO groups(id,scope,name) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name WHERE groups.scope=EXCLUDED.scope`, g.ID, a.Scope, g.Name)
+		g.CreatedBy = a.ID // Trusted on INSERT; existing provenance is immutable.
+		tag, e := tx.Exec(ctx, `INSERT INTO groups(id,scope,name,created_by) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,version=groups.version+1 WHERE groups.scope=EXCLUDED.scope`, g.ID, a.Scope, g.Name, g.CreatedBy)
 		if e != nil {
 			return e
 		}
@@ -279,8 +327,15 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 				return e
 			}
 		}
+		if e = tx.QueryRow(ctx, `SELECT version,created_by FROM groups WHERE scope=$1 AND id=$2`, a.Scope, g.ID).Scan(&g.Version, &g.CreatedBy); e != nil {
+			return e
+		}
+		g.Member = contains(g.Members, a.ID)
+		g.MembersComplete = true
 		return event(ctx, tx, a, "group.saved", "", a.ID, map[string]any{"id": g.ID})
 	})
+	g.Member = contains(g.Members, a.ID)
+	g.MembersComplete = true
 	return g, err
 }
 
@@ -288,11 +343,8 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, action string, target Target, connection, actionName string, descriptor ...*Action) (map[string]any, error) {
 	a := caller
 	if subject != "" {
-		if !caller.Admin && subject != caller.ID {
-			return nil, Denied()
-		}
 		p, e := principal(ctx, s.Pool, caller.Scope, subject)
-		if e != nil || p.Disabled {
+		if e != nil || p.Disabled || !s.inspectAccess(ctx, s.Pool, caller, p) {
 			return nil, Missing()
 		}
 		a = Actor{Principal: p, Scope: caller.Scope, CredentialKind: "api"}
@@ -300,6 +352,23 @@ func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, actio
 	result, e := s.Explain(ctx, a, action, target, connection, actionName, descriptor...)
 	if e != nil {
 		return nil, e
+	}
+	access, e := s.Access(ctx, caller, a.ID)
+	if e != nil {
+		return nil, e
+	}
+	matches := []map[string]any{}
+	for _, assignment := range access.Roles {
+		for index, rule := range assignment.Role.Rules {
+			if s.ruleAllows(ctx, s.Pool, a, rule, action, target, connection, actionName, descriptor...) {
+				matches = append(matches, map[string]any{"role_id": assignment.Role.ID, "subject_kind": assignment.SubjectKind, "subject_id": assignment.SubjectID, "rule_index": index})
+			}
+		}
+	}
+	result["matched_grants"] = matches
+	result["permission_only"] = true
+	if action == "manage" && target.Kind == "group" && s.manages(ctx, s.Pool, a, "group", target.ID) && !s.allowed(ctx, s.Pool, a, "manage", target, "", "") {
+		result["derived_authority"] = "created_group_with_current_managed_members"
 	}
 	result["subject_id"] = a.ID
 	result["basis"] = "effective_role_grants"

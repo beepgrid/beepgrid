@@ -193,12 +193,12 @@ func (s *Store) Deliveries(ctx context.Context, a Actor) ([]Delivery, error) {
 }
 func (s *Store) RetryDelivery(ctx context.Context, a Actor, id string) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
-			return Denied()
-		}
 		d, e := deliveryScan(tx.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND id=$2`, a.Scope, id))
 		if e != nil {
 			return e
+		}
+		if !a.Admin && (!s.manages(ctx, tx, a, "delivery", d.ID) || !s.mayReadDelivery(ctx, tx, a, d)) {
+			return Denied()
 		}
 		if d.State != "failed" && d.State != "unknown" {
 			return Conflict("Only failed or unknown deliveries can be manually retried.")

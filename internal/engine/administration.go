@@ -9,7 +9,50 @@ import (
 // Administrative resources use the same explicit role rules as communication.
 // Authority to edit a subject is separate from authority to assign a role.
 func (s *Store) manages(ctx context.Context, db DB, a Actor, kind, id string) bool {
-	return s.allowed(ctx, db, a, "manage", Target{kind, id}, "", "")
+	if s.allowed(ctx, db, a, "manage", Target{kind, id}, "", "") {
+		return true
+	}
+	if kind != "group" || !s.allowed(ctx, db, a, "manage", Target{"group_creation", "workspace"}, "", "") {
+		return false
+	}
+	if id == "*" {
+		return true
+	}
+	return s.createdGroupManager(ctx, db, a, id)
+}
+
+// Creation authority is bound to the creator and current managed membership.
+// It never grants access to an existing group or an expanded outside team.
+func (s *Store) createdGroupManager(ctx context.Context, db DB, a Actor, id string) bool {
+	var creator string
+	if e := db.QueryRow(ctx, `SELECT created_by FROM groups WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&creator); e != nil || creator != a.ID {
+		return false
+	}
+	rows, e := db.Query(ctx, `SELECT principal_id FROM memberships WHERE scope=$1 AND group_id=$2`, a.Scope, id)
+	if e != nil {
+		return false
+	}
+	ids := []string{}
+	for rows.Next() {
+		var pid string
+		if rows.Scan(&pid) != nil {
+			rows.Close()
+			return false
+		}
+		ids = append(ids, pid)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return false
+	}
+	for _, pid := range ids {
+		p, e := principal(ctx, db, a.Scope, pid)
+		if e != nil || !s.managesIdentity(ctx, db, a, p) {
+			return false
+		}
+	}
+	return true
 }
 func (s *Store) inspectIdentity(ctx context.Context, db DB, a Actor, p Principal) bool {
 	return p.ID == a.ID || s.allowed(ctx, db, a, "view", Target{p.Kind, p.ID}, "", "") || s.manages(ctx, db, a, p.Kind, p.ID)

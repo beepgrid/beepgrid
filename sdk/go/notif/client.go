@@ -73,6 +73,7 @@ type Action struct {
 	OperationKey    string         `json:"operation_key"`
 }
 type AskInput struct {
+	PreviewToken   string     `json:"preview_token,omitempty"`
 	Target         Target     `json:"target"`
 	ConversationID string     `json:"conversation_id,omitempty"`
 	Kind           string     `json:"kind,omitempty"`
@@ -109,6 +110,7 @@ type Request struct {
 	ExpiresAt           time.Time `json:"expires_at"`
 }
 type SendInput struct {
+	PreviewToken   string `json:"preview_token,omitempty"`
 	Target         Target `json:"target"`
 	ConversationID string `json:"conversation_id,omitempty"`
 	Body           string `json:"body"`

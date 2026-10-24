@@ -129,9 +129,10 @@ type Rule struct {
 	ActionName   string          `json:"action_name,omitempty"`
 }
 type Role struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Rules []Rule `json:"rules"`
+	Version int64  `json:"version"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Rules   []Rule `json:"rules"`
 }
 type Binding struct {
 	RoleID      string `json:"role_id"`
@@ -139,9 +140,13 @@ type Binding struct {
 	SubjectID   string `json:"subject_id"`
 }
 type Group struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Members []string `json:"members"`
+	CreatedBy       string   `json:"created_by"`
+	Version         int64    `json:"version"`
+	Member          bool     `json:"member"`
+	MembersComplete bool     `json:"members_complete"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Members         []string `json:"members"`
 }
 type Target struct {
 	Kind string `json:"kind"`
@@ -164,6 +169,7 @@ type Message struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 type SendInput struct {
+	PreviewToken   string `json:"preview_token,omitempty"`
 	Target         Target `json:"target"`
 	ConversationID string `json:"conversation_id"`
 	Body           string `json:"body"`
@@ -182,6 +188,7 @@ type Action struct {
 	OperationKey    string         `json:"operation_key"`
 }
 type AskInput struct {
+	PreviewToken   string    `json:"preview_token,omitempty"`
 	Target         Target    `json:"target"`
 	ConversationID string    `json:"conversation_id"`
 	Kind           string    `json:"kind"`

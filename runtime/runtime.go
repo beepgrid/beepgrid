@@ -17,12 +17,19 @@ import (
 	"github.com/notif-dev/notif/internal/web"
 )
 
+type ManagedAccountReader = httpapi.ManagedAccountReader
+type ManagedAccountSubject = httpapi.ManagedAccountSubject
+type ManagedAccount = httpapi.ManagedAccount
+type ManagedAccess = httpapi.ManagedAccess
+
 type AttachmentObjectStore = engine.AttachmentObjectStore
 
 // ErrorStatus preserves retry classification without exposing engine internals.
 func ErrorStatus(err error) int { return engine.ErrorStatus(err) }
 
 type Config struct {
+	Deployment                                     string
+	AccountReader                                  ManagedAccountReader
 	DatabaseURL, Schema, PublicURL, AttachmentsDir string
 	SecretKey                                      []byte
 	MaxConnections                                 int32
@@ -60,7 +67,18 @@ func Open(ctx context.Context, c Config) (*Service, error) {
 		s.Close()
 		return nil, err
 	}
-	return &Service{store: s, api: httpapi.New(s, c.PublicURL, web.Handler()), public: c.PublicURL}, nil
+	deployment := c.Deployment
+	if deployment == "" {
+		deployment = "self_hosted"
+	}
+	if deployment != "self_hosted" && deployment != "managed" {
+		s.Close()
+		return nil, fmt.Errorf("invalid deployment kind")
+	}
+	api := httpapi.New(s, c.PublicURL, web.Handler())
+	api.Deployment = deployment
+	api.AccountReader = c.AccountReader
+	return &Service{store: s, api: api, public: c.PublicURL}, nil
 }
 
 func (s *Service) DrainLiveStreams() { s.api.DrainLiveStreams() }

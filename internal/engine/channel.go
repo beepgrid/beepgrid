@@ -26,6 +26,7 @@ import (
 )
 
 type Connection struct {
+	Version          int64             `json:"version"`
 	ID               string            `json:"id"`
 	Name             string            `json:"name"`
 	Kind             string            `json:"kind"`
@@ -35,6 +36,7 @@ type Connection struct {
 	Secret           string            `json:"secret,omitempty"`
 }
 type Destination struct {
+	Version      int64  `json:"version"`
 	Mode         string `json:"mode"`
 	Priority     int    `json:"priority"`
 	ID           string `json:"id"`
@@ -75,9 +77,12 @@ func (s *Store) unseal(raw []byte) ([]byte, error) {
 	}
 	return g.Open(nil, raw[:g.NonceSize()], raw[g.NonceSize():], []byte("notif/connection/v1"))
 }
+
+// AES-GCM envelopes contain a 12-byte nonce and 16-byte tag. The encrypted
+// empty value for unauthenticated SMTP is not a configured password.
 func (s *Store) Connections(ctx context.Context, a Actor) ([]Connection, error) {
 
-	rows, e := s.Pool.Query(ctx, `SELECT id,name,kind,config,enabled,octet_length(secret)>0 FROM connections WHERE scope=$1 ORDER BY name`, a.Scope)
+	rows, e := s.Pool.Query(ctx, `SELECT id,name,kind,config,enabled,octet_length(secret)>28,version FROM connections WHERE scope=$1 ORDER BY name`, a.Scope)
 	if e != nil {
 		return nil, e
 	}
@@ -86,7 +91,7 @@ func (s *Store) Connections(ctx context.Context, a Actor) ([]Connection, error) 
 	for rows.Next() {
 		var c Connection
 		var raw []byte
-		if e = rows.Scan(&c.ID, &c.Name, &c.Kind, &raw, &c.Enabled, &c.SecretConfigured); e != nil {
+		if e = rows.Scan(&c.ID, &c.Name, &c.Kind, &raw, &c.Enabled, &c.SecretConfigured, &c.Version); e != nil {
 			return nil, e
 		}
 		_ = json.Unmarshal(raw, &c.Config)
@@ -160,6 +165,9 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 				}
 			}
 		}
+		if e := checkRevision(ctx, tx, a.Scope, "connections", c.ID, c.Version); e != nil {
+			return e
+		}
 		if c.ID == "" {
 			if c.Kind != "email" && len(c.Secret) < 16 {
 				return Bad("A provider token or signing secret of at least 16 characters is required.")
@@ -190,17 +198,22 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 				return Bad("SMTP password is required when a username is configured.")
 			}
 		}
-		tag, e := tx.Exec(ctx, `INSERT INTO connections(id,scope,name,kind,config,secret,enabled) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,config=EXCLUDED.config,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled WHERE connections.scope=EXCLUDED.scope AND connections.kind=EXCLUDED.kind`, c.ID, a.Scope, c.Name, c.Kind, JSON(c.Config), encrypted, c.Enabled)
+		tag, e := tx.Exec(ctx, `INSERT INTO connections(id,scope,name,kind,config,secret,enabled) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,config=EXCLUDED.config,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled,version=connections.version+1 WHERE connections.scope=EXCLUDED.scope AND connections.kind=EXCLUDED.kind`, c.ID, a.Scope, c.Name, c.Kind, JSON(c.Config), encrypted, c.Enabled)
 		if e != nil {
 			return e
 		}
 		if tag.RowsAffected() == 0 {
 			return Denied()
 		}
+		if e = tx.QueryRow(ctx, `SELECT version,octet_length(secret)>28 FROM connections WHERE scope=$1 AND id=$2`, a.Scope, c.ID).Scan(&c.Version, &c.SecretConfigured); e != nil {
+			return e
+		}
 		return event(ctx, tx, a, "connection.saved", "", a.ID, map[string]any{"id": c.ID, "kind": c.Kind})
 	})
 	c.Secret = ""
-	c.SecretConfigured = e == nil
+	if e != nil {
+		c.SecretConfigured = false
+	}
 	return c, e
 }
 func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (Destination, error) {
@@ -213,6 +226,9 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
 		if !s.mayManageDestination(ctx, tx, a, d.ConnectionID, d.PrincipalID) {
 			return Denied()
+		}
+		if e := checkRevision(ctx, tx, a.Scope, "destinations", d.ID, d.Version); e != nil {
+			return e
 		}
 		var kind string
 		if e := tx.QueryRow(ctx, `SELECT kind FROM connections WHERE scope=$1 AND id=$2`, a.Scope, d.ConnectionID).Scan(&kind); e != nil {
@@ -237,19 +253,22 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 			}
 		}
 		if d.Mode == "primary" {
-			if _, e := tx.Exec(ctx, `UPDATE destinations SET mode='fallback' WHERE scope=$1 AND principal_id=$2 AND mode='primary'`, a.Scope, d.PrincipalID); e != nil {
+			if _, e := tx.Exec(ctx, `UPDATE destinations SET mode='fallback',version=version+1 WHERE scope=$1 AND principal_id=$2 AND mode='primary' AND id<>$3`, a.Scope, d.PrincipalID, d.ID); e != nil {
 				return e
 			}
 		}
 		if d.ID == "" {
 			d.ID = ID("dst")
 		}
-		tag, e := tx.Exec(ctx, `INSERT INTO destinations(id,scope,connection_id,principal_id,address,mode,priority) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET address=EXCLUDED.address,mode=EXCLUDED.mode,priority=EXCLUDED.priority WHERE destinations.scope=EXCLUDED.scope AND destinations.principal_id=EXCLUDED.principal_id AND destinations.connection_id=EXCLUDED.connection_id`, d.ID, a.Scope, d.ConnectionID, d.PrincipalID, d.Address, d.Mode, d.Priority)
+		tag, e := tx.Exec(ctx, `INSERT INTO destinations(id,scope,connection_id,principal_id,address,mode,priority) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET address=EXCLUDED.address,mode=EXCLUDED.mode,priority=EXCLUDED.priority,version=destinations.version+1 WHERE destinations.scope=EXCLUDED.scope AND destinations.principal_id=EXCLUDED.principal_id AND destinations.connection_id=EXCLUDED.connection_id`, d.ID, a.Scope, d.ConnectionID, d.PrincipalID, d.Address, d.Mode, d.Priority)
 		if e != nil {
 			return e
 		}
 		if tag.RowsAffected() != 1 {
 			return Denied()
+		}
+		if e = tx.QueryRow(ctx, `SELECT version FROM destinations WHERE scope=$1 AND id=$2`, a.Scope, d.ID).Scan(&d.Version); e != nil {
+			return e
 		}
 		return event(ctx, tx, a, "destination.created", "", d.PrincipalID, d)
 	})
@@ -257,7 +276,7 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 }
 func (s *Store) Destinations(ctx context.Context, a Actor) ([]Destination, error) {
 
-	rows, e := s.Pool.Query(ctx, `SELECT id,connection_id,principal_id,address,mode,priority FROM destinations WHERE scope=$1`, a.Scope)
+	rows, e := s.Pool.Query(ctx, `SELECT id,connection_id,principal_id,address,mode,priority,version FROM destinations WHERE scope=$1`, a.Scope)
 	if e != nil {
 		return nil, e
 	}
@@ -265,7 +284,7 @@ func (s *Store) Destinations(ctx context.Context, a Actor) ([]Destination, error
 	out := []Destination{}
 	for rows.Next() {
 		var d Destination
-		if e = rows.Scan(&d.ID, &d.ConnectionID, &d.PrincipalID, &d.Address, &d.Mode, &d.Priority); e != nil {
+		if e = rows.Scan(&d.ID, &d.ConnectionID, &d.PrincipalID, &d.Address, &d.Mode, &d.Priority, &d.Version); e != nil {
 			return nil, e
 		}
 		out = append(out, d)
@@ -811,6 +830,10 @@ func retryAfter(raw string, now time.Time) time.Duration {
 
 // Fallback is only scheduled after a definite failure. Unknown outcomes remain for reconciliation.
 func (s *Store) queueFallback(ctx context.Context, db DB, scope string, previous Delivery) error {
+	if diagnostic, ok := previous.Payload["diagnostic"].(bool); ok && diagnostic {
+		return nil
+	}
+
 	d, e := deliveryScan(db.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND id=$2`, scope, previous.ID))
 	if e != nil {
 		return e

@@ -127,6 +127,15 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 		return Bad("Only informational questions may use shared keys.")
 	}
 	return idempotent(ctx, tx, a, "ask", key, stable, out, func() error {
+		if in.PreviewToken != "" {
+			if in.ConversationID != "" {
+				return Bad("Recipient previews apply to new dispatches.")
+			}
+			if e := s.checkDispatchPreview(ctx, tx, a, DispatchPreviewInput{Targets: []Target{in.Target}, Operation: "ask", Descriptor: in.Action}, in.PreviewToken); e != nil {
+				return e
+			}
+		}
+
 		var rs []recipient
 		var e error
 		if in.ConversationID != "" {
@@ -214,56 +223,8 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 		}
 		return Conflict("The request is already " + r.State + ".")
 	}
-	var eligible bool
-	if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3)`, a.Scope, id, a.ID).Scan(&eligible); e != nil {
+	if e = s.responseAuthorization(ctx, tx, a, r); e != nil {
 		return e
-	}
-	if eligible && !a.Admin {
-		var target Target
-		var raw []byte
-		if e = tx.QueryRow(ctx, `SELECT policy_target FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, a.ID).Scan(&raw); e != nil {
-			return e
-		}
-		_ = json.Unmarshal(raw, &target)
-		if target.Kind == "group" {
-			var member bool
-			_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND group_id=$2 AND principal_id=$3)`, a.Scope, target.ID, a.ID).Scan(&member)
-			if !member {
-				return Denied()
-			}
-		}
-	}
-	if !eligible && !a.Admin {
-		return Denied()
-	}
-	requester, e := principal(ctx, tx, a.Scope, r.RequesterID)
-	if e != nil {
-		return e
-	}
-	actionName := ""
-	if r.Action != nil {
-		actionName = r.Action.Name
-	}
-	permission := "message"
-	if r.Kind == "approval" {
-		permission = "decide"
-	}
-	var originalTarget Target
-	var rawTarget []byte
-	if e = tx.QueryRow(ctx, `SELECT policy_target FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, a.ID).Scan(&rawTarget); e == nil {
-		_ = json.Unmarshal(rawTarget, &originalTarget)
-	} else if !a.Admin {
-		return Denied()
-	}
-	if originalTarget.Kind != "" {
-		proposer := Actor{Principal: requester, Scope: a.Scope}
-		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, requester.ID).Scan(&proposer.Admin)
-		if requester.Disabled || !s.allowed(ctx, tx, proposer, "ask", originalTarget, "*", actionName, r.Action) {
-			return Denied()
-		}
-	}
-	if !s.allowed(ctx, tx, a, permission, Target{requester.Kind, requester.ID}, a.ProviderConnection, actionName, r.Action) {
-		return Denied()
 	}
 	switch r.Kind {
 	case "approval":
@@ -307,7 +268,7 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 		return e
 	}
 	// The canonical result has already passed response authorization. Notify the original requester.
-	_, e = tx.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, id+"/result", requester.ID, JSON(map[string]any{"type": "request.resolved", "request": out, "conversation_id": out.ConversationID, "_policy": map[string]string{"engine_result": id}}), time.Now().Add(30*24*time.Hour))
+	_, e = tx.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, id+"/result", r.RequesterID, JSON(map[string]any{"type": "request.resolved", "request": out, "conversation_id": out.ConversationID, "_policy": map[string]string{"engine_result": id}}), time.Now().Add(30*24*time.Hour))
 	return e
 }
 func (s *Store) requestEvent(ctx context.Context, db DB, a Actor, r Request, kind string) error {
@@ -518,4 +479,62 @@ func (s *Store) Executions(ctx context.Context, a Actor) ([]Execution, error) {
 		}
 	}
 	return visible, nil
+}
+
+// Shared by response capabilities and the mutation. Reading a card never grants
+// response authority; every response rechecks current roles and audience.
+func (s *Store) responseAuthorization(ctx context.Context, db DB, a Actor, r Request) error {
+	var e error
+	var eligible bool
+	if e = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3)`, a.Scope, r.ID, a.ID).Scan(&eligible); e != nil {
+		return e
+	}
+	if eligible && !a.Admin {
+		var target Target
+		var raw []byte
+		if e = db.QueryRow(ctx, `SELECT policy_target FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, r.ID, a.ID).Scan(&raw); e != nil {
+			return e
+		}
+		_ = json.Unmarshal(raw, &target)
+		if target.Kind == "group" {
+			var member bool
+			_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND group_id=$2 AND principal_id=$3)`, a.Scope, target.ID, a.ID).Scan(&member)
+			if !member {
+				return Denied()
+			}
+		}
+	}
+	if !eligible && !a.Admin {
+		return Denied()
+	}
+	requester, e := principal(ctx, db, a.Scope, r.RequesterID)
+	if e != nil {
+		return e
+	}
+	actionName := ""
+	if r.Action != nil {
+		actionName = r.Action.Name
+	}
+	permission := "message"
+	if r.Kind == "approval" {
+		permission = "decide"
+	}
+	var originalTarget Target
+	var rawTarget []byte
+	if e = db.QueryRow(ctx, `SELECT policy_target FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, r.ID, a.ID).Scan(&rawTarget); e == nil {
+		_ = json.Unmarshal(rawTarget, &originalTarget)
+	} else if !a.Admin {
+		return Denied()
+	}
+	if originalTarget.Kind != "" {
+		proposer := Actor{Principal: requester, Scope: a.Scope}
+		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, requester.ID).Scan(&proposer.Admin)
+		if requester.Disabled || !s.allowed(ctx, db, proposer, "ask", originalTarget, "*", actionName, r.Action) {
+			return Denied()
+		}
+	}
+	if !s.allowed(ctx, db, a, permission, Target{requester.Kind, requester.ID}, a.ProviderConnection, actionName, r.Action) {
+		return Denied()
+	}
+	return nil
 }

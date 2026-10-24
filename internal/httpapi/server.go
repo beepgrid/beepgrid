@@ -25,10 +25,12 @@ type Server struct {
 	streamOnce sync.Once
 	oidc       *oidcConfig
 
-	Store     *engine.Store
-	PublicURL string
-	UI        http.Handler
-	mux       *http.ServeMux
+	Deployment    string
+	AccountReader ManagedAccountReader
+	Store         *engine.Store
+	PublicURL     string
+	UI            http.Handler
+	mux           *http.ServeMux
 }
 
 func New(s *engine.Store, public string, ui http.Handler) *Server {
@@ -117,7 +119,13 @@ func (s *Server) protect(fn func(http.ResponseWriter, *http.Request) error) http
 				token = c.Value
 			}
 		}
-		a, e := s.Store.Authenticate(r.Context(), token)
+		var a engine.Actor
+		var e error
+		if r.URL.Path == "/api/v1/workspace/account" && r.Method == "GET" {
+			a, e = s.Store.AuthenticateAccount(r.Context(), token)
+		} else {
+			a, e = s.Store.Authenticate(r.Context(), token)
+		}
 		if e != nil {
 			writeError(w, e)
 			return
@@ -145,6 +153,7 @@ func ok(w http.ResponseWriter, value any, err error) error {
 	return nil
 }
 func (s *Server) routes() {
+	s.workspaceRoutes()
 	m := s.mux
 	m.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

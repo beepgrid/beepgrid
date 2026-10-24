@@ -358,6 +358,15 @@ func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, ke
 	}
 
 	return idempotent(ctx, tx, a, "send", key, in, out, func() error {
+		if in.PreviewToken != "" {
+			if in.ConversationID != "" {
+				return Bad("Recipient previews apply to new dispatches.")
+			}
+			if e := s.checkDispatchPreview(ctx, tx, a, DispatchPreviewInput{Targets: []Target{in.Target}, Operation: "message"}, in.PreviewToken); e != nil {
+				return e
+			}
+		}
+
 		var rs []recipient
 		var e error
 		if in.ConversationID != "" {

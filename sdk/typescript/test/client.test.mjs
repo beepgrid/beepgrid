@@ -167,3 +167,17 @@ test("optional assistance helpers retain server authority and cancellation", asy
   assert.ok(calls[6].url.endsWith("/fleet/plans/a%2Fb/summary"));
   assert.equal(calls[6].signal,abort.signal);
 });
+
+test("real workspace queries and preview-fenced batches",{skip:!process.env.NOTIF_SDK_TEST_URL},async()=>{
+ const c=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
+ const {session}=await c.connect("sdk/query-ts-"+crypto.randomUUID(),"Query worker");
+ const target={kind:"agent",id:session.agent.id};
+ const preview=await c.dispatchPreview({targets:[target],operation:"message"});
+ const result=await c.sendBatch({targets:[target,target],body:"one",preview_token:preview.token},"batch-"+crypto.randomUUID());
+ assert.equal(result.length,1);
+ const page=await c.query({collection:"messages",filters:{conversation_id:result[0].result.conversation_id},limit:1});assert.equal(page.items.length,1);
+ const requests=await c.askBatch({targets:[target],request:{title:"Progress?"}});assert.equal(requests.length,1);
+ const caps=await c.capabilities({request_id:requests[0].request.id});assert.equal(caps.operations.cancel,true);
+ assert.equal((await c.requestTrace(requests[0].request.id)).request.id,requests[0].request.id);
+ assert.equal((await c.workspace()).deployment,"self_hosted");assert.ok((await c.account()).applied);assert.ok((await c.access()).roles);
+});

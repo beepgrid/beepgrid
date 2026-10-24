@@ -20,28 +20,28 @@ schemas={
 'Enrollment':obj({'agent':S,'name':S,'parent_id':S,'capabilities':array(S),'metadata':{'type':'object'}},['agent','name']),
 'Session':obj({'token':{'type':'string','writeOnly':False},'agent':ref('Agent'),'instance_id':S,'expires_at':S}),
 'Action':obj({'name':S,'executor_id':S,'resource':S,'resource_version':S,'operation_key':S,'arguments':{'type':'object'}},['name','executor_id','resource','resource_version','operation_key']),
-'SendInput':obj({'target':ref('Target'),'conversation_id':S,'body':{'type':'string','maxLength':32768},'title':S},['body']),
+'SendInput':obj({'preview_token':S,'target':ref('Target'),'conversation_id':S,'body':{'type':'string','maxLength':32768},'title':S},['body']),
 'Message':obj({'id':S,'conversation_id':S,'sender_id':S,'instance_id':S,'body':S,'created_at':S}),
 'SendResult':obj({'conversation_id':S,'messages':array(ref('Message'))}),
 'SendReceipt':obj({'conversation_id':S,'message_count':{'type':'integer','minimum':1}}),
 'Conversation':obj({'id':S,'title':S,'created_by':S,'created_at':S,'participants':array({'type':'object'}),'messages':array(ref('Message'))}),
-'AskInput':obj({'target':ref('Target'),'conversation_id':S,'kind':{'enum':['question','approval','task']},'title':S,'body':S,'choices':array(S),'action':ref('Action'),'expires_at':S,'shared_key':S},['title']),
+'AskInput':obj({'preview_token':S,'target':ref('Target'),'conversation_id':S,'kind':{'enum':['question','approval','task']},'title':S,'body':S,'choices':array(S),'action':ref('Action'),'expires_at':S,'shared_key':S},['title']),
 'ResponseInput':obj({'outcome':{'enum':['answered','approved','denied','completed','failed','rejected']},'answer':{},'version':{'type':'integer'}},['outcome','version']),
 'Response':obj({'responder_instance_id':S,'outcome':S,'answer':{},'version':{'type':'integer'},'source_answer_id':S,'source_invalidated':{'type':'boolean'},'reuse_method':S,'reuse_reason':S}),
 'Request':obj({'requester_instance_id':S,'id':S,'requester_id':S,'conversation_id':S,'kind':S,'title':S,'body':S,'choices':array(S),'action':ref('Action'),'state':{'enum':['open','resolved','cancelled','expired','superseded']},'version':{'type':'integer'},'response':ref('Response'),'resolved_by':S,'resolved_at':S,'expires_at':S,'created_at':S,'shared_key':S}),
 'Rule':obj({'action':{'enum':['view','message','ask','decide','manage','*']},'target_kind':S,'target_id':S,'connection_id':S,'action_name':S,'conditions':obj({'resource':S,'resource_version':S,'currency':S,'max_amount_minor':{'type':'integer','minimum':0},'before':S})},['action','target_kind','target_id']),
-'Role':obj({'id':S,'name':S,'rules':array(ref('Rule'))},['name','rules']),
-'Group':obj({'id':S,'name':S,'members':array(S)},['name','members']),
+'Role':obj({'version':{'type':'integer','minimum':0},'id':S,'name':S,'rules':array(ref('Rule'))},['name','rules']),
+'Group':obj({'created_by':{'type':'string','readOnly':True},'version':{'type':'integer','minimum':0},'member':{'type':'boolean','readOnly':True},'members_complete':{'type':'boolean','readOnly':True},'id':S,'name':S,'members':array(S)},['name','members']),
 'Binding':obj({'role_id':S,'subject_kind':{'enum':['principal','group']},'subject_id':S,'remove':{'type':'boolean'}},['role_id','subject_kind','subject_id']),
-'Connection':obj({'id':S,'name':S,'kind':{'enum':['webhook','slack','email']},'config':{'type':'object','additionalProperties':S},'enabled':{'type':'boolean'},'secret_configured':{'type':'boolean'},'secret':{'type':'string','writeOnly':True}},['name','kind']),
-'Destination':obj({'id':S,'connection_id':S,'principal_id':S,'address':S,'mode':{'enum':['primary','fallback','copy']},'priority':{'type':'integer'}},['connection_id','principal_id','address']),
+'Connection':obj({'version':{'type':'integer','minimum':0},'id':S,'name':S,'kind':{'enum':['webhook','slack','email']},'config':{'type':'object','additionalProperties':S},'enabled':{'type':'boolean'},'secret_configured':{'type':'boolean'},'secret':{'type':'string','writeOnly':True}},['name','kind']),
+'Destination':obj({'version':{'type':'integer','minimum':0},'id':S,'connection_id':S,'principal_id':S,'address':S,'mode':{'enum':['primary','fallback','copy']},'priority':{'type':'integer'}},['connection_id','principal_id','address']),
 'Execution':obj({'id':S,'request_id':S,'executor_id':S,'operation_key':S,'action':ref('Action'),'state':S,'result':{}}),
 'Delivery':obj({'id':S,'recipient_id':S,'operation_id':S,'payload':{'type':'object'},'state':S,'generation':{'type':'integer'},'attempts':{'type':'integer'},'last_error':S,'connection_id':S,'address':S,'expires_at':S}),
 'Attachment':obj({'id':S,'conversation_id':S,'file_name':S,'media_type':S,'size':{'type':'integer'},'sha256':S,'created_at':S}),
 'PublishAnswer':obj({'request_id':S,'key':S,'audience':array(S),'valid_until':S},['request_id','audience']),
 'SharedAnswer':{'type':'object','description':'Scoped publication with answer, author/publisher, audience, provenance, validity and invalidation.'},
 'AssistanceSettings':obj({'automatic_answers':{'type':'boolean'},'overseer':{'type':'boolean'},'version':{'type':'integer'},'matcher_configured':{'type':'boolean'},'overseer_configured':{'type':'boolean'}}),
-'AssistanceUpdate':obj({'automatic_answers':{'type':'boolean'},'overseer':{'type':'boolean'}}),
+'AssistanceUpdate':obj({'version':{'type':'integer','minimum':0},'automatic_answers':{'type':'boolean'},'overseer':{'type':'boolean'}}),
 'FleetAgent':obj({'agent':ref('Agent'),'instances':array(ref('Instance')),'fresh':{'type':'boolean'}}),
 'OverseerInput':obj({'prompt':{'type':'string','maxLength':4000},'target':ref('Target')},['prompt']),
 'OverseerDispatch':obj({'agent_id':S,'conversation_id':S,'request_id':S}),
@@ -58,6 +58,23 @@ def add(method,path,body=None,result=None,description=''):
 for resource,singular in [('people','Person'),('agents','Agent'),('services','Service')]:
  add('GET','/api/v1/'+resource,result=array(ref(singular)))
  add('POST','/api/v1/'+resource+'/{id}/status',obj({'disabled':{'type':'boolean'}},['disabled']))
+add('POST','/api/v1/capabilities',obj({'target':obj({'kind':S,'id':S}), 'request_id':S,'connection_id':S,'descriptor':ref('Action')}),obj({'observed_at':S,'operations':{'type':'object','additionalProperties':{'type':'boolean'}},'request_version':{'type':'integer'},'outcomes':array(S)}),description='Current operation eligibility, not an authorization token. Every mutation rechecks current policy. Exact requests include audience, original Ask, reverse response and conditions.')
+add('GET','/api/v1/access',result=obj({'subject':{'type':'object'},'basis':S,'roles':array(obj({'role':ref('Role'),'subject_kind':S,'subject_id':S})),'observed_at':S}),description='Own effective access, including direct/group role provenance. Inspecting another subject requires identity visibility and explicit view access:<subject ID>, or an administrator credential.')
+paths['/api/v1/access']['get']['parameters'].append({'name':'subject_id','in':'query','schema':S})
+add('POST','/api/v1/query',obj({'collection':{'enum':['people','agents','services','groups','roles','connections','destinations','credentials','instances','requests','conversations','messages','answers','executions','deliveries','delivery_attempts','attachments','overseer_plans']},'search':S,'filters':{'type':'object','additionalProperties':S},'limit':{'type':'integer','minimum':1,'maximum':200},'cursor':S},['collection']),obj({'items':array({}),'next_cursor':S,'order':S}),description='Complete bounded keyset reads with current per-record authorization. Continue until next_cursor is absent, including empty pages. Cursors are encrypted and bound to scope, actor, filters and limit for 24 hours. Message history requires conversation_id and is chronological; other collections use stable ascending IDs. Unsupported filters are rejected.')
+add('POST','/api/v1/dispatch-preview',obj({'targets':array(ref('Target')),'operation':{'enum':['message','ask']},'descriptor':ref('Action')},['targets','operation']),description='Non-sending preview of 1 to 100 explicit individual/instance targets. Includes native, primary, copy and fallback permission/enablement observations. Token binds the authorized audience and route revisions for ten minutes. Hidden recipient identities and addresses remain private.')
+add('POST','/api/v1/message-batches',obj({'targets':array(ref('Target')),'body':S,'title':S,'preview_token':S},['targets','body']),array(obj({'target':ref('Target'),'result':ref('SendResult')})),description='Atomic explicit recipient dispatch, deduplicated by logical identity. Conflicting replica targets are rejected. Private conversations and per-target receipts; failure rolls back the entire batch. Optional preview token prevents changed routes/audience from silently proceeding.')
+add('POST','/api/v1/request-batches',obj({'targets':array(ref('Target')),'request':ref('AskInput'),'preview_token':S},['targets','request']),array(obj({'target':ref('Target'),'request':ref('Request')})),description='Atomic private request per explicit target. Each request has an independent response and execution lifecycle; no implicit shared approval or first-responder broadcast. The nested request must omit target and conversation_id.')
+for path in ('/api/v1/message-batches','/api/v1/request-batches'):paths[path]['post']['parameters'].append({'name':'Idempotency-Key','in':'header','required':True,'schema':S})
+add('GET','/api/v1/integrations/catalog',result=array({'type':'object'}),description='Supported providers and actual fields/capabilities only. Native inbox is built in; no planned integration is installable.')
+add('GET','/api/v1/connections/{id}/diagnostics',description='Non-sending configuration/credential checks for a scoped installation manager. Provider acceptance remains not_tested; no external network request is made.')
+add('POST','/api/v1/connections/{id}/test',obj({'destination_id':S},['destination_id']),ref('Delivery'),description='Explicit durable test message to one configured destination only. Requires installation/destination management and Message permission. Queue acceptance is not provider acceptance. Inspect delivery evidence afterwards.')
+paths['/api/v1/connections/{id}/test']['post']['parameters'].append({'name':'Idempotency-Key','in':'header','required':True,'schema':S})
+add('GET','/api/v1/requests/{id}/trace',description='Current authorized request, paged delivery evidence and execution reports. Audience members see their own projection; requesters can inspect their outgoing deliveries. Provider acceptance never proves execution.')
+paths['/api/v1/requests/{id}/trace']['get']['parameters'].append({'name':'delivery_cursor','in':'query','schema':S})
+add('GET','/api/v1/workspace',description='Authenticated scope, company, environment, deployment kind and schema version. Managed composition supplies deployment metadata explicitly.')
+add('GET','/api/v1/workspace/account',description='Person-only scoped account access requires view account:workspace or an administrator credential. This entry point permits status inspection during service suspension with a still-valid credential and current account policy. Runtime-applied quotas/usage are separate from server-side managed requested/provisioning/entitlement state. No operator tokens enter the browser; managed read failures are 503, never zero usage.')
+add('POST','/api/v1/roles/preview',obj({'role':ref('Role'),'checks':array(obj({'subject_id':S,'action':S,'target':obj({'kind':S,'id':S}),'connection_id':S,'action_name':S,'descriptor':ref('Action')},['subject_id','action','target']))},['role']),description='Non-saving, version-checked role-edit preview. Same rule ceiling and assignment boundaries as SaveRole; reports exact affected assignments and before/after role-grant checks for authorized subjects. Administrator credential power and new assignments are not simulated. Other assigned roles remain effective.')
 add('GET','/api/v1/me')
 add('POST','/api/v1/people',ref('PersonInput'),ref('Person'))
 add('POST','/api/v1/people/{id}/profile',ref('PersonInput'),ref('Person'))
@@ -71,7 +88,7 @@ add('POST','/api/v1/destinations/{id}/remove',obj({}))
 add('GET','/api/v1/credentials',result=array({'type':'object','description':'Credential metadata only; no digest or plaintext.'}))
 add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','enrollment']},'prefix':S},['principal_id','kind']))
 add('POST','/api/v1/credentials/{id}/revoke',obj({}))
-add('POST','/api/v1/permissions/explain',obj({'subject_id':S,'action':S,'target':ref('Target'),'connection_id':S,'action_name':S,'descriptor':ref('Action')},['action','target']))
+add('POST','/api/v1/permissions/explain',obj({'subject_id':S,'action':S,'target':obj({'kind':S,'id':S},['kind','id']),'connection_id':S,'action_name':S,'descriptor':ref('Action')},['action','target']))
 add('POST','/api/v1/route-preview',obj({'target':ref('Target'),'action':S},['target','action']))
 add('GET','/api/v1/conversations',result=array(ref('Conversation')))
 add('GET','/api/v1/conversations/{id}',result=ref('Conversation'))

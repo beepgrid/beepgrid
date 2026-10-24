@@ -14,7 +14,7 @@ import (
 func boolValue(v bool) *bool { return &v }
 func enableAssistance(t *testing.T, s *Store, a Actor, automatic, overseer bool) {
 	t.Helper()
-	if _, err := s.UpdateAssistance(context.Background(), a, AssistanceUpdate{boolValue(automatic), boolValue(overseer)}); err != nil {
+	if _, err := s.UpdateAssistance(context.Background(), a, AssistanceUpdate{AutomaticAnswers: boolValue(automatic), Overseer: boolValue(overseer)}); err != nil {
 		t.Fatal(err)
 	}
 }

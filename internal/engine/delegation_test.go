@@ -27,7 +27,7 @@ func TestDelegatedGroupManagementAndProtectedMemberships(t *testing.T) {
 	}
 	grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "group", TargetID: g.ID}})
 	g.Name = "Finance operations"
-	if _, e = s.SaveGroup(ctx, lead, g); e != nil {
+	if g, e = s.SaveGroup(ctx, lead, g); e != nil {
 		t.Fatal("scoped rename", e)
 	}
 	if _, e = s.SaveGroup(ctx, lead, other); ErrorStatus(e) != 403 {
@@ -37,11 +37,11 @@ func TestDelegatedGroupManagementAndProtectedMemberships(t *testing.T) {
 		t.Fatal("collection creation", e)
 	}
 	g.Members = append(g.Members, outsider.ID)
-	if _, e = s.SaveGroup(ctx, lead, g); ErrorStatus(e) != 403 {
+	if g, e = s.SaveGroup(ctx, lead, g); ErrorStatus(e) != 403 {
 		t.Fatal("outside member", e)
 	}
 	grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "person", TargetID: outsider.ID}})
-	if _, e = s.SaveGroup(ctx, lead, g); e != nil {
+	if g, e = s.SaveGroup(ctx, lead, g); e != nil {
 		t.Fatal("explicitly managed new member", e)
 	}
 	approver, e := s.SaveRole(ctx, owner, Role{Name: "Approver", Rules: []Rule{{Action: "decide", TargetKind: "agent", TargetID: "*"}}})
@@ -52,11 +52,11 @@ func TestDelegatedGroupManagementAndProtectedMemberships(t *testing.T) {
 		t.Fatal(e)
 	}
 	g.Members = []string{lead.ID, member.ID}
-	if _, e = s.SaveGroup(ctx, lead, g); ErrorStatus(e) != 403 {
+	if g, e = s.SaveGroup(ctx, lead, g); ErrorStatus(e) != 403 {
 		t.Fatal("protected role membership change", e)
 	}
 	grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "role_binding", TargetID: approver.ID}})
-	if _, e = s.SaveGroup(ctx, lead, g); e != nil {
+	if g, e = s.SaveGroup(ctx, lead, g); e != nil {
 		t.Fatal("explicit assignment authority", e)
 	}
 	if _, e = s.Send(ctx, lead, SendInput{Target: Target{"person", member.ID}, Body: "unauthorized"}, "manage-is-not-message"); ErrorStatus(e) != 403 {
@@ -95,23 +95,23 @@ func TestDelegatedRoleAssignmentsAndEditorCeiling(t *testing.T) {
 	if e = s.BindRole(ctx, lead, Binding{powerful.ID, "principal", member.ID}, false); ErrorStatus(e) != 403 {
 		t.Fatal("unassigned role", e)
 	}
-	if _, e = s.SaveRole(ctx, lead, r); ErrorStatus(e) != 403 {
+	if r, e = s.SaveRole(ctx, lead, r); ErrorStatus(e) != 403 {
 		t.Fatal("assign permission became edit permission", e)
 	}
 	grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "role", TargetID: r.ID}, {Action: "message", TargetKind: "agent", TargetID: "team/*"}})
 	r.Name = "Updated"
-	if _, e = s.SaveRole(ctx, lead, r); e != nil {
+	if r, e = s.SaveRole(ctx, lead, r); e != nil {
 		t.Fatal("bounded role edit", e)
 	}
 	r.Rules = []Rule{{Action: "decide", TargetKind: "agent", TargetID: "*"}}
-	if _, e = s.SaveRole(ctx, lead, r); ErrorStatus(e) != 403 {
+	if r, e = s.SaveRole(ctx, lead, r); ErrorStatus(e) != 403 {
 		t.Fatal("expanded rule", e)
 	}
 	r.Rules = []Rule{{Action: "message", TargetKind: "agent", TargetID: "team/*"}}
 	if e = s.BindRole(ctx, owner, Binding{r.ID, "principal", outside.ID}, false); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = s.SaveRole(ctx, lead, r); ErrorStatus(e) != 403 {
+	if r, e = s.SaveRole(ctx, lead, r); ErrorStatus(e) != 403 {
 		t.Fatal("shared role outside managed boundary", e)
 	}
 	bindings, e := s.Bindings(ctx, lead)
@@ -177,13 +177,13 @@ func TestDelegatedAdministrationRevocationAndIsolation(t *testing.T) {
 	}
 	role := grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "group", TargetID: g.ID}})
 	g.Name = "Allowed"
-	if _, e = s.SaveGroup(ctx, lead, g); e != nil {
+	if g, e = s.SaveGroup(ctx, lead, g); e != nil {
 		t.Fatal(e)
 	}
 	if e = s.BindRole(ctx, owner, Binding{role.ID, "principal", lead.ID}, true); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = s.SaveGroup(ctx, lead, g); ErrorStatus(e) != 403 {
+	if g, e = s.SaveGroup(ctx, lead, g); ErrorStatus(e) != 403 {
 		t.Fatal("stale actor retained grants", e)
 	}
 	foreign, e := s.Bootstrap(ctx, "other/production", "Other", "production", Secret())
@@ -195,7 +195,7 @@ func TestDelegatedAdministrationRevocationAndIsolation(t *testing.T) {
 		t.Fatal(e)
 	}
 	grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "group", TargetID: "*"}})
-	if _, e = s.SaveGroup(ctx, lead, fg); ErrorStatus(e) != 403 {
+	if _, e = s.SaveGroup(ctx, lead, fg); ErrorStatus(e) != 404 {
 		t.Fatal("cross-workspace group", e)
 	}
 	if _, e = s.Groups(ctx, lead); e != nil {
@@ -393,6 +393,62 @@ func TestScopedAnswerAndAssistanceManagement(t *testing.T) {
 	}
 	grant(t, s, owner, reviewer, []Rule{{Action: "manage", TargetKind: "assistance", TargetID: "workspace"}})
 	if _, e = s.UpdateAssistance(ctx, reviewer, AssistanceUpdate{Overseer: &disabled}); e != nil {
+		t.Fatal(e)
+	}
+}
+
+func TestDelegatedGroupCreationStaysInsideCurrentTeam(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	lead := testPerson(t, s, owner, "lead")
+	member := testPerson(t, s, owner, "member")
+	outside := testPerson(t, s, owner, "outside")
+	team, e := s.SaveGroup(ctx, owner, Group{Name: "Finance", Members: []string{member.ID}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "group", TargetID: team.ID}})
+	creation := grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "group_creation", TargetID: "workspace"}})
+	subgroup, e := s.SaveGroup(ctx, lead, Group{Name: "Finance reviews", Members: []string{member.ID}, CreatedBy: owner.ID})
+	if e != nil || subgroup.CreatedBy != lead.ID {
+		t.Fatal(subgroup, e)
+	}
+	explanation, e := s.ExplainSubject(ctx, lead, "", "manage", Target{"group", subgroup.ID}, "", "")
+	if e != nil || explanation["allowed"] != true || explanation["derived_authority"] != "created_group_with_current_managed_members" {
+		t.Fatal(explanation, e)
+	}
+	subgroup.Name = "Finance audits"
+	if subgroup, e = s.SaveGroup(ctx, lead, subgroup); e != nil {
+		t.Fatal(e)
+	}
+	groups, e := s.Groups(ctx, lead)
+	if e != nil || len(groups) != 2 {
+		t.Fatal(groups, e)
+	}
+	if _, e = s.SaveGroup(ctx, lead, Group{Name: "Outside team", Members: []string{outside.ID}}); ErrorStatus(e) != 403 {
+		t.Fatal(e)
+	}
+	unrelated, e := s.SaveGroup(ctx, owner, Group{Name: "Unrelated"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	unrelated.CreatedBy = lead.ID
+	if _, e = s.SaveGroup(ctx, lead, unrelated); ErrorStatus(e) != 403 {
+		t.Fatal("claimed another creator's group", e)
+	}
+	// If an administrator expands the new group beyond delegated scope, the
+	// creator cannot use creation provenance to administer outside membership.
+	subgroup.Members = append(subgroup.Members, outside.ID)
+	if subgroup, e = s.SaveGroup(ctx, owner, subgroup); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.SaveGroup(ctx, lead, subgroup); ErrorStatus(e) != 403 {
+		t.Fatal("outside membership kept implicit authority", e)
+	}
+	if e = s.BindRole(ctx, owner, Binding{creation.ID, "principal", lead.ID}, true); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.SaveGroup(ctx, lead, Group{Name: "After revocation"}); ErrorStatus(e) != 403 {
 		t.Fatal(e)
 	}
 }

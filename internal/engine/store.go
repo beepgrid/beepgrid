@@ -113,7 +113,16 @@ func normalize(err error) error {
 	var e *pgconn.PgError
 	if errors.As(err, &e) {
 		if e.Code == "P0001" && e.Message == "NOTIF_QUOTA_EXCEEDED" {
-			return &Error{"QUOTA_EXCEEDED", "This workspace has reached its monthly accepted-work limit.", 429}
+			metric := "accepted-work"
+			switch e.Detail {
+			case "messages":
+				metric = "message"
+			case "requests":
+				metric = "request"
+			case "upload_bytes":
+				metric = "upload-byte"
+			}
+			return &Error{"QUOTA_EXCEEDED", "This workspace has reached its monthly " + metric + " limit.", 429}
 		}
 		if e.Code == "23505" {
 			return Conflict("A record already exists.")
@@ -199,9 +208,22 @@ func (s *Store) Bootstrap(ctx context.Context, scope, company, environment, toke
 	return actor, nil
 }
 func (s *Store) Authenticate(ctx context.Context, token string) (Actor, error) {
+	return s.authenticate(ctx, token, false)
+}
+
+// Only the account-status entry point may inspect access while service access is
+// suspended. Credentials, Person status and account policy still apply.
+func (s *Store) AuthenticateAccount(ctx context.Context, token string) (Actor, error) {
+	a, e := s.authenticate(ctx, token, true)
+	if e == nil && !s.accountReader(ctx, a) {
+		return Actor{}, Denied()
+	}
+	return a, e
+}
+func (s *Store) authenticate(ctx context.Context, token string, accountOnly bool) (Actor, error) {
 	var a Actor
 	var meta []byte
-	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token)).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
+	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND ($2 OR (NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())))) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token), accountOnly).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return a, authorizationUnavailable()
 	}

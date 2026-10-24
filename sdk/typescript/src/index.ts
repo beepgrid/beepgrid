@@ -67,6 +67,7 @@ export type Execution = {
   result: unknown;
 };
 export type AskInput = {
+  preview_token?: string;
   target: Target;
   title: string;
   body?: string;
@@ -85,6 +86,7 @@ export type Message = {
   body: string;
 };
 export type SendInput = {
+  preview_token?: string;
   target?: Target;
   conversation_id?: string;
   body: string;
@@ -157,6 +159,11 @@ export class NotifError extends Error {
     this.name = "NotifError";
   }
 }
+export type QueryInput = {collection: string; search?: string; filters?: Record<string,string>; limit?: number; cursor?: string};
+export type QueryPage<T=unknown> = {items:T[]; next_cursor?:string; order:string};
+export type CapabilityResult = {observed_at:string; operations:Record<string,boolean>; request_version?:number; outcomes:string[]};
+export type DispatchPreviewInput = {targets:Target[]; operation:"message"|"ask"; descriptor?:Action};
+export type DispatchPreview = {recipients:unknown[]; count:number; hidden_recipients:number; token:string; expires_at:string; sends:false};
 export class Client {
   readonly baseURL: string;
   constructor(
@@ -225,6 +232,15 @@ export class Client {
     }
     throw new Error("Request attempts exhausted");
   }
+  query<T=unknown>(input:QueryInput) {return this.call<QueryPage<T>>("POST","/api/v1/query",input);}
+  capabilities(input:{target?:{kind:string;id:string};request_id?:string;connection_id?:string;descriptor?:Action}={}) {return this.call<CapabilityResult>("POST","/api/v1/capabilities",input);}
+  access(subject="") {return this.call<unknown>("GET","/api/v1/access?subject_id="+encodeURIComponent(subject));}
+  dispatchPreview(input:DispatchPreviewInput) {return this.call<DispatchPreview>("POST","/api/v1/dispatch-preview",input);}
+  sendBatch(input:{targets:Target[];body:string;title?:string;preview_token?:string},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;result:{conversation_id:string;messages:Message[]}}>>("POST","/api/v1/message-batches",input,{key});}
+  askBatch(input:{targets:Target[];request:Omit<AskInput,"target"|"conversation_id"|"preview_token">;preview_token?:string},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;request:RequestItem}>>("POST","/api/v1/request-batches",input,{key});}
+  requestTrace(id:string,cursor=""){return this.call<unknown>("GET","/api/v1/requests/"+encodeURIComponent(id)+"/trace?delivery_cursor="+encodeURIComponent(cursor));}
+  workspace(){return this.call<unknown>("GET","/api/v1/workspace");}
+  account(){return this.call<unknown>("GET","/api/v1/workspace/account");}
   async connect(
     agent: string,
     name: string,
@@ -308,7 +324,7 @@ export class Client {
   }
   updateAssistance(
     settings: Partial<
-      Pick<AssistanceSettings, "automatic_answers" | "overseer">
+      Pick<AssistanceSettings, "automatic_answers" | "overseer" | "version">
     >,
   ) {
     return this.call<AssistanceSettings>(

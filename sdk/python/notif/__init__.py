@@ -51,6 +51,33 @@ class Client:
                 time.sleep(.2 * (attempt + 1))
         raise RuntimeError("Request attempts exhausted")
 
+    def query(self, collection: str, **options: Any) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/query", {"collection": collection, **options})
+
+    def capabilities(self, **options: Any) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/capabilities", options)
+
+    def access(self, subject_id: str = "") -> dict[str, Any]:
+        return self.call("GET", "/api/v1/access?subject_id=" + urllib.parse.quote(subject_id, safe=""))
+
+    def dispatch_preview(self, targets: list[dict[str, str]], operation: str, **options: Any) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/dispatch-preview", {"targets": targets, "operation": operation, **options})
+
+    def send_batch(self, targets: list[dict[str, str]], body: str, *, key: str | None = None, **options: Any) -> list[dict[str, Any]]:
+        return self.call("POST", "/api/v1/message-batches", {"targets": targets, "body": body, **options}, key=key or str(uuid.uuid4()))
+
+    def ask_batch(self, targets: list[dict[str, str]], request: dict[str, Any], *, key: str | None = None, **options: Any) -> list[dict[str, Any]]:
+        return self.call("POST", "/api/v1/request-batches", {"targets": targets, "request": request, **options}, key=key or str(uuid.uuid4()))
+
+    def request_trace(self, request_id: str, cursor: str = "") -> dict[str, Any]:
+        return self.call("GET", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/trace?delivery_cursor=" + urllib.parse.quote(cursor, safe=""))
+
+    def workspace(self) -> dict[str, Any]:
+        return self.call("GET", "/api/v1/workspace")
+
+    def account(self) -> dict[str, Any]:
+        return self.call("GET", "/api/v1/workspace/account")
+
     def connect(self, agent: str, name: str, capabilities: list[str] | None = None,
                 metadata: dict[str, Any] | None = None) -> tuple[Client, dict[str, Any]]:
         session = self.call("POST", "/api/v1/sessions", {"agent": agent, "name": name,
@@ -58,10 +85,12 @@ class Client:
         return Client(self.base_url, session["token"], self.timeout), session
 
     def send(self, *, body: str, target: dict[str, str] | None = None, conversation_id: str = "",
-             title: str = "", key: str | None = None, minimal: bool = False) -> dict[str, Any]:
+             title: str = "", key: str | None = None, minimal: bool = False, preview_token: str = "") -> dict[str, Any]:
         data: dict[str, Any] = {"body": body, "conversation_id": conversation_id, "title": title}
         if target:
             data["target"] = target
+        if preview_token:
+            data["preview_token"] = preview_token
         return self.call("POST", "/api/v1/messages", data, key=key or str(uuid.uuid4()), minimal=minimal)
 
     def notify(self, **options: Any) -> dict[str, Any]:
@@ -82,9 +111,9 @@ class Client:
         return self.call("GET", "/api/v1/assistance/settings")
 
     def update_assistance(self, *, automatic_answers: bool | None = None,
-                          overseer: bool | None = None) -> dict[str, Any]:
+                          overseer: bool | None = None, version: int | None = None) -> dict[str, Any]:
         settings = {key: value for key, value in {"automatic_answers": automatic_answers,
-                    "overseer": overseer}.items() if value is not None}
+                    "overseer": overseer, "version": version}.items() if value is not None}
         return self.call("POST", "/api/v1/assistance/settings", settings)
 
     def plan_overseer(self, prompt: str, target: dict[str, str] | None = None) -> dict[str, Any]:

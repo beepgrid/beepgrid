@@ -13,6 +13,7 @@ type AssistanceSettings struct {
 	OverseerConfigured bool  `json:"overseer_configured"`
 }
 type AssistanceUpdate struct {
+	Version          int64 `json:"version,omitempty"`
 	AutomaticAnswers *bool `json:"automatic_answers"`
 	Overseer         *bool `json:"overseer"`
 }
@@ -35,6 +36,12 @@ func (s *Store) UpdateAssistance(ctx context.Context, a Actor, in AssistanceUpda
 		out, err = s.assistanceSettings(ctx, tx, a.Scope)
 		if err != nil {
 			return err
+		}
+		if in.Version < 0 {
+			return Bad("Configuration version must not be negative.")
+		}
+		if in.Version > 0 && in.Version != out.Version {
+			return Conflict("Assistance settings changed. Reload before saving.")
 		}
 		previous := out
 		if in.AutomaticAnswers != nil {
