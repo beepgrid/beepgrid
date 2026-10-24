@@ -28,7 +28,7 @@ func (s *Store) AssistanceSettings(ctx context.Context, a Actor) (AssistanceSett
 func (s *Store) UpdateAssistance(ctx context.Context, a Actor, in AssistanceUpdate) (AssistanceSettings, error) {
 	var out AssistanceSettings
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		if a.Kind != "person" || !s.manages(ctx, tx, a, "assistance", "workspace") {
 			return Denied()
 		}
 		var err error

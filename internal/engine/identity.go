@@ -78,7 +78,7 @@ func (s *Store) listPrincipals(ctx context.Context, db DB, a Actor, kind string)
 	}
 	visible := []Principal{}
 	for _, p := range all {
-		if p.ID == a.ID || s.allowed(ctx, db, a, "view", Target{p.Kind, p.ID}, "", "") {
+		if s.inspectIdentity(ctx, db, a, p) {
 			visible = append(visible, p)
 		}
 	}
@@ -93,7 +93,7 @@ func (s *Store) SetDisabled(ctx context.Context, a Actor, id string, disabled bo
 		if id == a.ID {
 			return Bad("You cannot disable your own account.")
 		}
-		if !s.allowed(ctx, tx, a, "manage", Target{p.Kind, id}, "", "") {
+		if !s.managesIdentity(ctx, tx, a, p) {
 			return Denied()
 		}
 		if _, e = tx.Exec(ctx, `UPDATE principals SET disabled=$3 WHERE scope=$1 AND id=$2`, a.Scope, id, disabled); e != nil {
@@ -109,7 +109,7 @@ func (s *Store) NewCredential(ctx context.Context, a Actor, pid, kind, prefix st
 		if e != nil {
 			return e
 		}
-		if !a.Admin {
+		if !s.mayIssueCredential(ctx, tx, a, p) {
 			return Denied()
 		}
 		if kind != "api" && kind != "enrollment" {
@@ -130,9 +130,7 @@ func (s *Store) NewCredential(ctx context.Context, a Actor, pid, kind, prefix st
 	return map[string]any{"id": id, "token": token, "kind": kind}, err
 }
 func (s *Store) Credentials(ctx context.Context, a Actor) ([]Credential, error) {
-	if !a.Admin {
-		return nil, Denied()
-	}
+
 	rows, e := s.Pool.Query(ctx, `SELECT id,principal_id,kind,prefix,expires_at,revoked FROM credentials WHERE scope=$1 ORDER BY created_at DESC`, a.Scope)
 	if e != nil {
 		return nil, e
@@ -146,11 +144,30 @@ func (s *Store) Credentials(ctx context.Context, a Actor) ([]Credential, error) 
 		}
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Credential{}
+	for _, c := range out {
+		if a.Admin || c.PrincipalID == a.ID || s.manages(ctx, s.Pool, a, "credential", c.PrincipalID) {
+			visible = append(visible, c)
+		}
+	}
+	return visible, nil
 }
 func (s *Store) Revoke(ctx context.Context, a Actor, id string) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		var pid, kind string
+		if e := tx.QueryRow(ctx, `SELECT principal_id,kind FROM credentials WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&pid, &kind); e != nil {
+			return normalize(e)
+		}
+		p, e := principal(ctx, tx, a.Scope, pid)
+		if e != nil {
+			return e
+		}
+		if !a.Admin && (kind == "admin" || (pid != a.ID && !s.mayIssueCredential(ctx, tx, a, p))) {
 			return Denied()
 		}
 		tag, e := tx.Exec(ctx, `UPDATE credentials SET revoked=true WHERE scope=$1 AND id=$2`, a.Scope, id)
@@ -295,7 +312,9 @@ func (s *Store) Agents(ctx context.Context, a Actor) ([]Agent, error) {
 	}
 	ids := make([]string, 0, len(principals))
 	for _, p := range principals {
-		ids = append(ids, p.ID)
+		if p.ID == a.ID || s.allowed(ctx, s.Pool, a, "view", Target{"agent", p.ID}, "", "") {
+			ids = append(ids, p.ID)
+		}
 	}
 	byAgent, e := s.instancesForAgents(ctx, a.Scope, ids)
 	if e != nil {
@@ -315,12 +334,13 @@ func (s *Store) UpdatePerson(ctx context.Context, a Actor, id string, in CreateP
 		return out, Bad("A bounded name, email and department are required.")
 	}
 	e := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !s.allowed(ctx, tx, a, "manage", Target{"person", id}, "", "") {
-			return Denied()
-		}
+
 		p, e := principal(ctx, tx, a.Scope, id)
 		if e != nil || p.Kind != "person" {
 			return Missing()
+		}
+		if !s.managesIdentity(ctx, tx, a, p) {
+			return Denied()
 		}
 		next := in.ManagerID
 		visited := map[string]bool{id: true}

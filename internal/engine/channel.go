@@ -76,9 +76,7 @@ func (s *Store) unseal(raw []byte) ([]byte, error) {
 	return g.Open(nil, raw[:g.NonceSize()], raw[g.NonceSize():], []byte("notif/connection/v1"))
 }
 func (s *Store) Connections(ctx context.Context, a Actor) ([]Connection, error) {
-	if !a.Admin {
-		return nil, Denied()
-	}
+
 	rows, e := s.Pool.Query(ctx, `SELECT id,name,kind,config,enabled,octet_length(secret)>0 FROM connections WHERE scope=$1 ORDER BY name`, a.Scope)
 	if e != nil {
 		return nil, e
@@ -94,7 +92,26 @@ func (s *Store) Connections(ctx context.Context, a Actor) ([]Connection, error) 
 		_ = json.Unmarshal(raw, &c.Config)
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Connection{}
+	for _, c := range out {
+		manage := s.mayManageConnection(ctx, s.Pool, a, c.ID)
+		var own bool
+		if e = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM destinations WHERE scope=$1 AND connection_id=$2 AND principal_id=$3)`, a.Scope, c.ID, a.ID).Scan(&own); e != nil {
+			return nil, e
+		}
+		if manage || own || s.allowed(ctx, s.Pool, a, "view", Target{"connection", c.ID}, "", "") {
+			if !manage {
+				c.Config = map[string]string{}
+			}
+			visible = append(visible, c)
+		}
+	}
+	return visible, nil
 }
 func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Connection, error) {
 	if len(c.Secret) > 8192 || (c.Kind != "email" && c.Secret != "" && len(c.Secret) < 16) {
@@ -123,8 +140,25 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 		}
 	}
 	e := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		if !s.mayManageConnection(ctx, tx, a, c.ID) {
 			return Denied()
+		}
+		for _, field := range []string{"inbound_sender_id", "default_agent_id"} {
+			if id := c.Config[field]; id != "" {
+				p, e := principal(ctx, tx, a.Scope, id)
+				if e != nil {
+					return e
+				}
+				if !a.Admin && !s.managesIdentity(ctx, tx, a, p) {
+					return Denied()
+				}
+				if field == "inbound_sender_id" {
+					rules, e := roleRules(ctx, tx, Actor{Principal: p, Scope: a.Scope})
+					if e != nil || !s.rulesWithin(ctx, tx, a, rules, p.ID) {
+						return Denied()
+					}
+				}
+			}
 		}
 		if c.ID == "" {
 			if c.Kind != "email" && len(c.Secret) < 16 {
@@ -177,7 +211,7 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 		return d, Bad("Destination mode must be primary, fallback or copy.")
 	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		if !s.mayManageDestination(ctx, tx, a, d.ConnectionID, d.PrincipalID) {
 			return Denied()
 		}
 		var kind string
@@ -192,6 +226,16 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 				return Bad("Invalid email destination.")
 			}
 		}
+		if d.Mode == "primary" && !a.Admin {
+			var previous string
+			e := tx.QueryRow(ctx, `SELECT connection_id FROM destinations WHERE scope=$1 AND principal_id=$2 AND mode='primary'`, a.Scope, d.PrincipalID).Scan(&previous)
+			if e != nil && e != pgx.ErrNoRows {
+				return e
+			}
+			if e == nil && !s.mayManageDestination(ctx, tx, a, previous, d.PrincipalID) {
+				return Denied()
+			}
+		}
 		if d.Mode == "primary" {
 			if _, e := tx.Exec(ctx, `UPDATE destinations SET mode='fallback' WHERE scope=$1 AND principal_id=$2 AND mode='primary'`, a.Scope, d.PrincipalID); e != nil {
 				return e
@@ -200,17 +244,19 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 		if d.ID == "" {
 			d.ID = ID("dst")
 		}
-		if _, e := tx.Exec(ctx, `INSERT INTO destinations(id,scope,connection_id,principal_id,address,mode,priority) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET address=EXCLUDED.address,mode=EXCLUDED.mode,priority=EXCLUDED.priority WHERE destinations.scope=EXCLUDED.scope AND destinations.principal_id=EXCLUDED.principal_id AND destinations.connection_id=EXCLUDED.connection_id`, d.ID, a.Scope, d.ConnectionID, d.PrincipalID, d.Address, d.Mode, d.Priority); e != nil {
+		tag, e := tx.Exec(ctx, `INSERT INTO destinations(id,scope,connection_id,principal_id,address,mode,priority) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET address=EXCLUDED.address,mode=EXCLUDED.mode,priority=EXCLUDED.priority WHERE destinations.scope=EXCLUDED.scope AND destinations.principal_id=EXCLUDED.principal_id AND destinations.connection_id=EXCLUDED.connection_id`, d.ID, a.Scope, d.ConnectionID, d.PrincipalID, d.Address, d.Mode, d.Priority)
+		if e != nil {
 			return e
+		}
+		if tag.RowsAffected() != 1 {
+			return Denied()
 		}
 		return event(ctx, tx, a, "destination.created", "", d.PrincipalID, d)
 	})
 	return d, err
 }
 func (s *Store) Destinations(ctx context.Context, a Actor) ([]Destination, error) {
-	if !a.Admin {
-		return nil, Denied()
-	}
+
 	rows, e := s.Pool.Query(ctx, `SELECT id,connection_id,principal_id,address,mode,priority FROM destinations WHERE scope=$1`, a.Scope)
 	if e != nil {
 		return nil, e
@@ -224,11 +270,22 @@ func (s *Store) Destinations(ctx context.Context, a Actor) ([]Destination, error
 		}
 		out = append(out, d)
 	}
-	return out, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Destination{}
+	for _, d := range out {
+		if a.Admin || d.PrincipalID == a.ID || s.mayManageDestination(ctx, s.Pool, a, d.ConnectionID, d.PrincipalID) || s.allowed(ctx, s.Pool, a, "view", Target{"destination", d.PrincipalID}, "", "") {
+			visible = append(visible, d)
+		}
+	}
+	return visible, nil
 }
 func (s *Store) LinkSlackAccount(ctx context.Context, a Actor, personID, userID, teamID string) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		if !s.mayLinkAccount(ctx, tx, a, personID) {
 			return Denied()
 		}
 		if !ValidText(userID, 100) || !ValidText(teamID, 100) {
@@ -791,7 +848,11 @@ func (s *Store) queueFallback(ctx context.Context, db DB, scope string, previous
 
 func (s *Store) RemoveDestination(ctx context.Context, a Actor, id string) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		var connection, pid string
+		if e := tx.QueryRow(ctx, `SELECT connection_id,principal_id FROM destinations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&connection, &pid); e != nil {
+			return normalize(e)
+		}
+		if !s.mayManageDestination(ctx, tx, a, connection, pid) {
 			return Denied()
 		}
 		tag, e := tx.Exec(ctx, `DELETE FROM destinations WHERE scope=$1 AND id=$2`, a.Scope, id)

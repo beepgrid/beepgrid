@@ -67,7 +67,9 @@ func (s *Store) fleetStatus(ctx context.Context, db DB, a Actor, target *Target)
 		}
 	} else {
 		for _, p := range agents {
-			allowed[p.ID] = true
+			if p.ID == a.ID || s.allowed(ctx, db, a, "view", Target{"agent", p.ID}, "", "") {
+				allowed[p.ID] = true
+			}
 		}
 	}
 	if len(allowed) > 100 {

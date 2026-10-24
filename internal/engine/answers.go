@@ -63,7 +63,7 @@ func contains(ids []string, id string) bool {
 	return false
 }
 func (s *Store) canPublish(ctx context.Context, db DB, a Actor) bool {
-	return a.Admin || s.allowed(ctx, db, a, "manage", Target{"answer", "*"}, "", "")
+	return s.manages(ctx, db, a, "answer", a.ID)
 }
 func (s *Store) publisherCurrent(ctx context.Context, db DB, scope string, answer SharedAnswer) bool {
 	p, e := principal(ctx, db, scope, answer.PublisherID)
@@ -75,7 +75,18 @@ func (s *Store) publisherCurrent(ctx context.Context, db DB, scope string, answe
 	return s.canPublish(ctx, db, a)
 }
 func (s *Store) Answers(ctx context.Context, a Actor) ([]SharedAnswer, error) {
-	rows, e := s.Pool.Query(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND NOT invalidated AND valid_until>now() AND ($2 OR publisher_id=$3 OR audience ? $3) ORDER BY created_at DESC LIMIT 100`, a.Scope, a.Admin, a.ID)
+	rules, err := roleRules(ctx, s.Pool, a)
+	if err != nil {
+		return nil, err
+	}
+	managesAnswers := a.Admin
+	for _, r := range rules {
+		if (r.Action == "manage" || r.Action == "*") && (r.TargetKind == "answer" || r.TargetKind == "*") {
+			managesAnswers = true
+		}
+	}
+
+	rows, e := s.Pool.Query(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND NOT invalidated AND valid_until>now() AND ($2 OR publisher_id=$3 OR audience ? $3) ORDER BY created_at DESC LIMIT 100`, a.Scope, managesAnswers, a.ID)
 	if e != nil {
 		return nil, e
 	}
@@ -95,7 +106,7 @@ func (s *Store) Answers(ctx context.Context, a Actor) ([]SharedAnswer, error) {
 	}
 	out := []SharedAnswer{}
 	for _, v := range all {
-		if s.publisherCurrent(ctx, s.Pool, a.Scope, v) {
+		if (a.Admin || v.PublisherID == a.ID || contains(v.Audience, a.ID) || s.manages(ctx, s.Pool, a, "answer", v.ID)) && s.publisherCurrent(ctx, s.Pool, a.Scope, v) {
 			out = append(out, v)
 		}
 	}
@@ -229,7 +240,11 @@ func (s *Store) reuseExact(ctx context.Context, db DB, a Actor, r *Request) erro
 }
 func (s *Store) InvalidateAnswer(ctx context.Context, a Actor, id string) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !s.canPublish(ctx, tx, a) {
+		var publisher string
+		if e := tx.QueryRow(ctx, `SELECT publisher_id FROM shared_answers WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&publisher); e != nil {
+			return normalize(e)
+		}
+		if !s.manages(ctx, tx, a, "answer", id) && !(publisher == a.ID && s.canPublish(ctx, tx, a)) {
 			return Denied()
 		}
 		tag, e := tx.Exec(ctx, `UPDATE shared_answers SET invalidated=true WHERE scope=$1 AND id=$2`, a.Scope, id)

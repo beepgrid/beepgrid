@@ -43,7 +43,7 @@ func (s *Store) LoginOIDC(ctx context.Context, scope, issuer, subject, name, ema
 }
 func (s *Store) LinkOIDC(ctx context.Context, a Actor, id, issuer, subject string) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		if !s.mayLinkAccount(ctx, tx, a, id) {
 			return Denied()
 		}
 		if !ValidText(subject, 512) || !ValidText(issuer, 2048) {
@@ -65,7 +65,7 @@ func (s *Store) CreateService(ctx context.Context, a Actor, external, name strin
 		return p, Bad("Name and external_id are required.")
 	}
 	e := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		if !s.manages(ctx, tx, a, "service", "*") {
 			return Denied()
 		}
 		if _, e := tx.Exec(ctx, `INSERT INTO principals(id,scope,kind,external_id,name) VALUES($1,$2,'service',$3,$4)`, p.ID, a.Scope, external, name); e != nil {

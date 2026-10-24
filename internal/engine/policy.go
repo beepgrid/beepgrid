@@ -70,9 +70,7 @@ func (s *Store) Explain(ctx context.Context, a Actor, action string, target Targ
 	return map[string]any{"allowed": allowed, "action": action, "target": target, "reason": map[bool]string{true: "An effective role or administrator credential permits this operation.", false: "No effective permission permits this operation."}[allowed]}, nil
 }
 func (s *Store) Roles(ctx context.Context, a Actor) ([]Role, error) {
-	if !a.Admin && !s.allowed(ctx, s.Pool, a, "manage", Target{"role", "*"}, "", "") {
-		return nil, Denied()
-	}
+
 	rows, e := s.Pool.Query(ctx, `SELECT id,name,rules FROM roles WHERE scope=$1 ORDER BY name`, a.Scope)
 	if e != nil {
 		return nil, e
@@ -88,7 +86,18 @@ func (s *Store) Roles(ctx context.Context, a Actor) ([]Role, error) {
 		_ = json.Unmarshal(raw, &r.Rules)
 		out = append(out, r)
 	}
-	return out, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Role{}
+	for _, r := range out {
+		if s.roleVisible(ctx, s.Pool, a, r.ID) {
+			visible = append(visible, r)
+		}
+	}
+	return visible, nil
 }
 func (s *Store) SaveRole(ctx context.Context, a Actor, in Role) (Role, error) {
 	if !ValidText(in.Name, 100) || len(in.Rules) > 100 {
@@ -111,7 +120,7 @@ func (s *Store) SaveRole(ctx context.Context, a Actor, in Role) (Role, error) {
 		}
 	}
 	e := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		if !s.mayEditRole(ctx, tx, a, in) {
 			return Denied()
 		}
 		if in.ID == "" {
@@ -130,22 +139,17 @@ func (s *Store) SaveRole(ctx context.Context, a Actor, in Role) (Role, error) {
 }
 func (s *Store) BindRole(ctx context.Context, a Actor, b Binding, remove bool) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		target, e := s.bindingTarget(ctx, tx, a, b)
+		if e != nil {
+			return e
+		}
+		var role string
+		if e = tx.QueryRow(ctx, `SELECT id FROM roles WHERE scope=$1 AND id=$2`, a.Scope, b.RoleID).Scan(&role); e != nil {
+			return normalize(e)
+		}
+		if !s.mayAssign(ctx, tx, a, b.RoleID, target) {
 			return Denied()
 		}
-		if b.SubjectKind == "principal" {
-			if _, e := principal(ctx, tx, a.Scope, b.SubjectID); e != nil {
-				return e
-			}
-		} else if b.SubjectKind == "group" {
-			var id string
-			if e := tx.QueryRow(ctx, `SELECT id FROM groups WHERE scope=$1 AND id=$2`, a.Scope, b.SubjectID).Scan(&id); e != nil {
-				return e
-			}
-		} else {
-			return Bad("Invalid role subject.")
-		}
-		var e error
 		if remove {
 			_, e = tx.Exec(ctx, `DELETE FROM role_bindings WHERE scope=$1 AND role_id=$2 AND subject_kind=$3 AND subject_id=$4`, a.Scope, b.RoleID, b.SubjectKind, b.SubjectID)
 		} else {
@@ -158,9 +162,6 @@ func (s *Store) BindRole(ctx context.Context, a Actor, b Binding, remove bool) e
 	})
 }
 func (s *Store) Bindings(ctx context.Context, a Actor) ([]Binding, error) {
-	if !a.Admin {
-		return nil, Denied()
-	}
 	rows, e := s.Pool.Query(ctx, `SELECT role_id,subject_kind,subject_id FROM role_bindings WHERE scope=$1`, a.Scope)
 	if e != nil {
 		return nil, e
@@ -174,7 +175,18 @@ func (s *Store) Bindings(ctx context.Context, a Actor) ([]Binding, error) {
 		}
 		out = append(out, b)
 	}
-	return out, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	visible := []Binding{}
+	for _, b := range out {
+		if s.bindingVisible(ctx, s.Pool, a, b) {
+			visible = append(visible, b)
+		}
+	}
+	return visible, nil
 }
 func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	ctx = withPolicySnapshot(ctx)
@@ -200,7 +212,15 @@ func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	}
 	visible := []Group{}
 	for _, g := range all {
-		if a.Admin || s.allowed(ctx, s.Pool, a, "view", Target{"group", g.ID}, "", "") {
+		if a.Admin || s.allowed(ctx, s.Pool, a, "view", Target{"group", g.ID}, "", "") || s.manages(ctx, s.Pool, a, "group", g.ID) || contains(g.Members, a.ID) {
+			members := []string{}
+			for _, id := range g.Members {
+				p, e := principal(ctx, s.Pool, a.Scope, id)
+				if e == nil && s.inspectIdentity(ctx, s.Pool, a, p) {
+					members = append(members, id)
+				}
+			}
+			g.Members = members
 			visible = append(visible, g)
 		}
 	}
@@ -211,7 +231,34 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 		return g, Bad("A name and at most 1000 members are required.")
 	}
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if !a.Admin {
+		target := g.ID
+		if target == "" {
+			target = "*"
+		}
+		if !s.manages(ctx, tx, a, "group", target) {
+			return Denied()
+		}
+		old := []string{}
+		if g.ID != "" {
+			rows, e := tx.Query(ctx, `SELECT principal_id FROM memberships WHERE scope=$1 AND group_id=$2`, a.Scope, g.ID)
+			if e != nil {
+				return e
+			}
+			for rows.Next() {
+				var id string
+				if e = rows.Scan(&id); e != nil {
+					rows.Close()
+					return e
+				}
+				old = append(old, id)
+			}
+			e = rows.Err()
+			rows.Close()
+			if e != nil {
+				return e
+			}
+		}
+		if !s.membershipChangeAllowed(ctx, tx, a, g.ID, old, g.Members) {
 			return Denied()
 		}
 		if g.ID == "" {
