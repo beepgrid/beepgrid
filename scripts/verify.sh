@@ -5,6 +5,9 @@ export NOTIF_TEST_DATABASE_URL="${NOTIF_TEST_DATABASE_URL:-postgres://notif:noti
 psql "$NOTIF_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null
 go vet ./...
 go test -race ./... -count=1
+npm --prefix sdk/typescript audit --package-lock-only --audit-level=moderate
+npm --prefix sdk/react audit --package-lock-only --audit-level=moderate
+npm --prefix web audit --package-lock-only --audit-level=moderate
 npm --prefix sdk/typescript ci --no-fund
 npm --prefix sdk/typescript run build
 npm --prefix sdk/react ci --no-fund

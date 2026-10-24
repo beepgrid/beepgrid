@@ -1,4 +1,4 @@
-FROM node:24-alpine AS web
+FROM node:24.22.1-alpine AS web
 WORKDIR /src/web
 COPY web/package*.json ./
 RUN npm ci --no-fund
@@ -14,7 +14,8 @@ COPY --from=web /src/internal/web/dist ./internal/web/dist
 RUN CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o /notif ./cmd/notif
 RUN mkdir /data && chown 65532:65532 /data
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:18f4cc26c9ffa7f20a359298be7deadac5c607c8e03a02b8119f1a5fc2f82c99
+USER 65532:65532
 COPY --from=builder /notif /notif
 COPY --from=builder --chown=65532:65532 /data /data
 COPY LICENSE THIRD_PARTY_NOTICES.txt /licenses/
