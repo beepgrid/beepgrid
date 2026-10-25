@@ -41,7 +41,10 @@ export default function Fleet() {
     plan ? "/fleet/plans/" + plan.id : "/fleet/plans",
     !!plan && settings.data?.overseer === true,
   );
-  const current = detail.data || plan;
+  const current =
+    detail.error || settings.error || (plan && detail.isPending)
+      ? null
+      : detail.data || plan;
   return (
     <div className="form">
       <Field label="Fleet scope">

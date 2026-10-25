@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -289,6 +290,29 @@ export function Tabs({
           key={o.id}
           role="tab"
           aria-selected={value === o.id}
+          tabIndex={value === o.id ? 0 : -1}
+          onKeyDown={(e) => {
+            const index = options.findIndex((x) => x.id === o.id);
+            const next =
+              e.key === "ArrowRight"
+                ? (index + 1) % options.length
+                : e.key === "ArrowLeft"
+                  ? (index - 1 + options.length) % options.length
+                  : e.key === "Home"
+                    ? 0
+                    : e.key === "End"
+                      ? options.length - 1
+                      : -1;
+            if (next >= 0) {
+              e.preventDefault();
+              onChange(options[next].id);
+              const buttons =
+                e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                  "[role=tab]",
+                );
+              buttons?.[next]?.focus();
+            }
+          }}
           onClick={() => onChange(o.id)}
         >
           {o.label}
@@ -309,23 +333,32 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const d = ref.current!;
+    const previous = document.activeElement as HTMLElement | null;
     d.showModal();
-    return () => d.close();
+    return () => {
+      d.close();
+      if (previous?.isConnected) previous.focus();
+    };
   }, []);
   return (
     <dialog
       ref={ref}
       className={wide ? "wide" : ""}
-      onCancel={onClose}
+      onCancel={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }}
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
     >
       <header>
-        <h2 id="dialog-title">{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button className="icon-button" onClick={onClose} aria-label="Close">
           <Icon name="close" />
         </button>

@@ -95,3 +95,33 @@ func TestEmbeddedAssetsCompressionConditionalAndRange(t *testing.T) {
 		}
 	}
 }
+
+func TestIndependentWorkspaceEntrypointAndPrivateBuildFiles(t *testing.T) {
+	h := Handler()
+	for _, route := range []string{"/agents", "/inbox", "/conversations/con_test", "/settings/managed"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", route, nil))
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), `src="/theme.js"`) || !strings.Contains(rec.Body.String(), `href="/icon.svg"`) {
+			t.Fatalf("workspace deep link %s: %d", route, rec.Code)
+		}
+	}
+	for _, route := range []string{"/.vite/manifest.json", "/assets/index.js.map"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", route, nil))
+		if rec.Code != 404 {
+			t.Fatalf("private build file %s: %d", route, rec.Code)
+		}
+	}
+	root, _ := fs.Sub(assets, "dist")
+	if e := fs.WalkDir(root, ".", func(p string, d fs.DirEntry, e error) error {
+		if e != nil {
+			return e
+		}
+		if !d.IsDir() && strings.HasSuffix(p, ".map") {
+			t.Fatal("source map embedded", p)
+		}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+}

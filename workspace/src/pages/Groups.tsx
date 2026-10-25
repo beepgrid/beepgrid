@@ -1,6 +1,19 @@
 import { useDeferredValue, useState } from "react";
-import { useCapabilities, useCollection, useOperation } from "../data";
-import type { Group, Target } from "../contracts";
+import {
+  useCapabilities,
+  useCollection,
+  useOperation,
+  usePostResource,
+  useResource,
+} from "../data";
+import type {
+  Binding,
+  Group,
+  Target,
+  Identity,
+  Page,
+  Role,
+} from "../contracts";
 import { Compose } from "../Compose";
 import { TargetPicker } from "../TargetPicker";
 import {
@@ -157,11 +170,10 @@ function GroupDetail({
           </p>
         ) : null}
         {g.members.map((id) => (
-          <div className="pick-row" key={id}>
-            <code>{id}</code>
-          </div>
+          <MemberIdentity key={id} id={id} />
         ))}
       </section>
+      <AssignedRoles groupId={g.id} />
       <Details
         value={{
           member: g.member,
@@ -174,6 +186,49 @@ function GroupDetail({
         <GroupForm group={g} onClose={() => setEdit(false)} onSaved={onClose} />
       ) : null}
     </Modal>
+  );
+}
+function AssignedRoles({ groupId }: { groupId: string }) {
+  const bindings = useResource<Binding[]>("/role-bindings");
+  const own = bindings.data?.filter(
+    (b) => b.subject_kind === "group" && b.subject_id === groupId,
+  );
+  return (
+    <section className="section">
+      <h3>Assigned roles</h3>
+      <ErrorView error={bindings.error} />
+      {own?.length === 0 ? (
+        <p className="help">
+          No role assignments are visible to you for this group.
+        </p>
+      ) : null}
+      {own?.map((b) => (
+        <AssignedRole key={b.role_id} id={b.role_id} />
+      ))}
+      <p className="help">
+        Membership and role assignment are separate. Editing a roster does not
+        bypass role assignment bounds.
+      </p>
+    </section>
+  );
+}
+function AssignedRole({ id }: { id: string }) {
+  const role = usePostResource<Page<Role>>("/query", {
+    collection: "roles",
+    filters: { id },
+    limit: 1,
+  });
+  return (
+    <>
+      <ErrorView error={role.error} />
+      {role.data?.items.map((r) => (
+        <Details
+          key={r.id}
+          label={r.name}
+          value={{ id: r.id, rules: r.rules, version: r.version }}
+        />
+      ))}
+    </>
   );
 }
 function GroupForm({
@@ -233,6 +288,7 @@ function GroupForm({
               onChange={setMembers}
               multiple
               allowGroups={false}
+              allowInstances={false}
             />
             <p className="help">
               Membership changes are checked against your delegated boundary and
@@ -248,15 +304,43 @@ function GroupForm({
         <ErrorView error={op.error} />
         <div className="form-actions">
           <Button onClick={onClose}>Cancel</Button>
-          <Button
-            primary
-            type="submit"
-            disabled={op.pending || (!!group && !group.members_complete)}
-          >
+          <Button primary type="submit" disabled={op.pending}>
             Save group
           </Button>
         </div>
       </Form>
     </Modal>
+  );
+}
+
+function identityKind(id: string): "person" | "agent" | "service" {
+  return id.startsWith("agt_")
+    ? "agent"
+    : id.startsWith("svc_")
+      ? "service"
+      : "person";
+}
+function MemberIdentity({ id }: { id: string }) {
+  const kind = identityKind(id);
+  const query = usePostResource<Page<Identity>>("/query", {
+    collection: { person: "people", agent: "agents", service: "services" }[
+      kind
+    ],
+    filters: { id },
+    limit: 1,
+  });
+  const identity = query.data?.items[0];
+  return (
+    <div className="pick-row">
+      <IdentityIcon kind={kind} />
+      <span>
+        {identity?.name || "Member"}
+        <br />
+        <small>
+          {kind === "service" ? "Software service" : kind} · {id}
+        </small>
+      </span>
+      <ErrorView error={query.error} />
+    </div>
   );
 }

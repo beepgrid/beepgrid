@@ -1,14 +1,20 @@
 import { memo, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useCapabilities,
+  usePostResource,
   useCollection,
   useDraft,
   useOperation,
   useResource,
   useSession,
 } from "../data";
-import type { Attachment, Conversation, Message, Target } from "../contracts";
+import type {
+  Capability,
+  Attachment,
+  Conversation,
+  Message,
+  Request,
+} from "../contracts";
 import { bytes, timestamp, upload } from "../client";
 import { navigate, useRoute } from "../navigation";
 import { Compose } from "../Compose";
@@ -46,7 +52,14 @@ export default function Conversations() {
           </Button>
         }
       />
-      <div className="message-view">
+      {route.id ? (
+        <div className="mobile-chat-back">
+          <Button onClick={() => navigate("/conversations")}>
+            All conversations
+          </Button>
+        </div>
+      ) : null}
+      <div className={`message-view ${route.id ? "has-selection" : ""}`}>
         <aside className="conversation-list" aria-label="Conversations">
           <Search
             value={search}
@@ -83,24 +96,26 @@ function Chat({ id }: { id: string }) {
   const me = useSession(),
     q = useResource<Conversation>("/conversations/" + id),
     cache = useQueryClient();
-  const [target, setTarget] = useState<Target | null>(null),
-    [body, setBody] = useDraft("conversation:" + id),
+  const [body, setBody] = useDraft("conversation:" + id),
     [error, setError] = useState<Error | null>(null),
     [uploading, setUploading] = useState(false),
     [history, setHistory] = useState(false),
     [ask, setAsk] = useState(false);
-  const op = useOperation(),
+  const op = useOperation("conversation:" + id),
     end = useRef<HTMLDivElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     pinned = useRef(true),
     fileInput = useRef<HTMLInputElement>(null);
   const participants =
     q.data?.participants?.filter((p) => p.id !== me.person.id) || [];
-  const destination =
-    target ||
-    (participants[0] && { kind: participants[0].kind, id: participants[0].id });
-  const caps = useCapabilities(
-    destination || { kind: "person", id: me.person.id },
+  const destination = participants[0] && {
+    kind: participants[0].kind,
+    id: participants[0].id,
+  };
+  const caps = usePostResource<Capability>(
+    "/capabilities",
+    { conversation_id: id },
+    !!q.data && !q.error,
   );
   const attachments = useCollection<Attachment>(
     "attachments",
@@ -115,6 +130,13 @@ function Chat({ id }: { id: string }) {
     history && !!q.data && !q.error,
   );
   const messages = history ? all.items : q.data?.messages || [];
+  const related = useCollection<Request>(
+    "requests",
+    "",
+    { conversation_id: id },
+    !!q.data && !q.error,
+  );
+  const [showRequests, setShowRequests] = useState(false);
   useEffect(() => {
     if (pinned.current) end.current?.scrollIntoView({ block: "end" });
   }, [messages.length, id]);
@@ -180,13 +202,14 @@ function Chat({ id }: { id: string }) {
           kind={participants[0]?.kind}
           label={participants[0]?.name}
         />
-        <div style={{ flex: 1 }}>
+        <div className="chat-heading">
           <strong>{c.title || "Conversation"}</strong>
           <p>{c.participants.map((p) => p.name).join(", ")}</p>
         </div>
         {caps.data?.operations.ask ? (
           <Button onClick={() => setAsk(true)}>New request</Button>
         ) : null}
+        <Button onClick={() => setShowRequests((x) => !x)}>Requests</Button>
         <Details
           value={{
             id: c.id,
@@ -200,6 +223,28 @@ function Chat({ id }: { id: string }) {
           label="Context"
         />
       </header>
+      {showRequests ? (
+        <section className="conversation-requests">
+          <h3>Related requests</h3>
+          <QueryState
+            query={related}
+            empty="No readable requests in this conversation"
+          >
+            {related.items.map((r) => (
+              <button
+                key={r.id}
+                className="conversation-row"
+                onClick={() => navigate("/requests/" + r.id)}
+              >
+                <strong>{r.title}</strong>
+                <p>
+                  {r.kind} · {r.response?.outcome || r.state} · {r.id}
+                </p>
+              </button>
+            ))}
+          </QueryState>
+        </section>
+      ) : null}
       <div
         className="messages"
         ref={scroll}
@@ -279,6 +324,10 @@ function Chat({ id }: { id: string }) {
               <Icon name="file" size={14} />
               {a.file_name}
               <small>{(a.size / 1024).toFixed(1)} KiB</small>
+              <span className="attachment-meta">
+                {a.media_type} · {timestamp(a.created_at)} · {a.id} · SHA256{" "}
+                {a.sha256}
+              </span>
             </a>
           ))}
           {attachments.hasNextPage ? (
@@ -293,21 +342,11 @@ function Chat({ id }: { id: string }) {
         {caps.data?.operations.message ? (
           <Form onSubmit={() => void send()}>
             {participants.length > 1 ? (
-              <Field label="Reply to">
-                <select
-                  value={destination?.id}
-                  onChange={(e) => {
-                    const p = participants.find((p) => p.id === e.target.value);
-                    if (p) setTarget({ kind: p.kind, id: p.id });
-                  }}
-                >
-                  {participants.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} · {p.kind}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <p className="help">
+                Reply goes to the current conversation participants:{" "}
+                {participants.map((p) => p.name).join(", ")}. Current permission
+                is checked for each recipient.
+              </p>
             ) : null}
             <textarea
               aria-label="Message"

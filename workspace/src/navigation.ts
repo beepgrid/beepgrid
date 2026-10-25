@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { beginNavigation } from "./performance";
 const listen = (fn: () => void) => {
   window.addEventListener("popstate", fn);
   return () => window.removeEventListener("popstate", fn);
@@ -10,6 +11,7 @@ export function useRoute() {
   return { page, id };
 }
 export function navigate(path: string) {
+  beginNavigation(path);
   history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }

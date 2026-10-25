@@ -171,6 +171,16 @@ func TestDestinationCapabilitiesRequireAllDelegatedBounds(t *testing.T) {
 	check(false)
 	final := grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "destination", TargetID: member.ID}})
 	check(true)
+	changed, e := s.SaveDestination(ctx, owner, Destination{ID: destination.ID, Version: destination.Version, ConnectionID: connection.ID, PrincipalID: member.ID, Address: "new-address", Mode: "primary"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.RemoveDestination(ctx, lead, destination.ID, destination.Version); ErrorStatus(e) != 409 {
+		t.Fatal("stale destination removal accepted", e)
+	}
+	if changed.Version <= destination.Version {
+		t.Fatal("revision did not advance")
+	}
 	if e := s.BindRole(ctx, owner, Binding{final.ID, "principal", lead.ID}, true); e != nil {
 		t.Fatal(e)
 	}
@@ -214,5 +224,45 @@ func TestAnswerCapabilitiesSeparatePublicationAndRecordManagement(t *testing.T) 
 	}
 	if _, err = s.Capabilities(ctx, manager, CapabilityInput{Target: Target{"answer", answer.ID}}); ErrorStatus(err) != 404 {
 		t.Fatal("revoked answer manager", err)
+	}
+}
+
+func TestDeliveryCapabilitiesUseCurrentRoutePolicy(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	sender := testPerson(t, s, owner, "delivery-cap-sender")
+	worker := testWorker(t, s, owner, "delivery-cap-worker")
+	role := grant(t, s, owner, sender, []Rule{{Action: "message", TargetKind: "agent", TargetID: worker.ID}})
+	sent, err := s.Send(ctx, sender, SendInput{Target: Target{"agent", worker.ID}, Body: "Delivery policy"}, "delivery-cap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := s.Query(ctx, owner, QueryInput{Collection: "deliveries", Filters: map[string]string{"operation_id": sent.Messages[0].ID}})
+	if err != nil || len(page.Items) != 1 {
+		t.Fatal(page, err)
+	}
+	delivery := page.Items[0].(DeliveryEvidence).Delivery
+	check := func(want bool) {
+		t.Helper()
+		c, e := s.Capabilities(ctx, owner, CapabilityInput{Target: Target{"delivery", delivery.ID}})
+		if e != nil || c.Operations["retry"] != want {
+			t.Fatal(c, e, want)
+		}
+	}
+	check(false)
+	if _, err = s.Pool.Exec(ctx, `UPDATE deliveries SET state='failed' WHERE scope=$1 AND id=$2`, owner.Scope, delivery.ID); err != nil {
+		t.Fatal(err)
+	}
+	check(true)
+	if err = s.BindRole(ctx, owner, Binding{role.ID, "principal", sender.ID}, true); err != nil {
+		t.Fatal(err)
+	}
+	check(false)
+	if err = s.RetryDelivery(ctx, owner, delivery.ID); ErrorStatus(err) != 403 {
+		t.Fatal("retry ignored current source policy", err)
+	}
+	outsider := testPerson(t, s, owner, "delivery-cap-outside")
+	if _, err = s.Capabilities(ctx, outsider, CapabilityInput{Target: Target{"delivery", delivery.ID}}); ErrorStatus(err) != 404 {
+		t.Fatal("hidden delivery leaked", err)
 	}
 }

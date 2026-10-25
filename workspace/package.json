@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "build": "tsc --noEmit && vite build && node scripts/assets.mjs",
+    "test": "vitest run",
+    "embed": "node scripts/assets.mjs --embed"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.5",

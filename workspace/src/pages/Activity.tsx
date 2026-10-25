@@ -1,5 +1,10 @@
 import { useDeferredValue, useState } from "react";
-import { useCollection, useOperation, useResource } from "../data";
+import {
+  useCapabilities,
+  useCollection,
+  useOperation,
+  useResource,
+} from "../data";
 import { navigate } from "../navigation";
 import {
   Badge,
@@ -224,6 +229,7 @@ function DeliveryDetail({
   const [confirm, setConfirm] = useState(false),
     [risk, setRisk] = useState(false),
     op = useOperation(),
+    cap = useCapabilities({ kind: "delivery", id: d.id }),
     attempts = useCollection<Record<string, unknown>>("delivery_attempts", "", {
       delivery_id: d.id,
     });
@@ -273,7 +279,8 @@ function DeliveryDetail({
           </div>
         ))}
       </QueryState>
-      {["failed", "unknown"].includes(d.state) &&
+      {cap.data?.operations.retry &&
+      ["failed", "unknown"].includes(d.state) &&
       Date.parse(d.expires_at) > Date.now() ? (
         <>
           <Button danger onClick={() => setConfirm(true)}>

@@ -8,6 +8,10 @@ export class APIError extends Error {
   }
 }
 let expire = () => {};
+let sessionGeneration = 0;
+export function advanceSession() {
+  sessionGeneration++;
+}
 export function onSessionExpired(handler: () => void) {
   expire = handler;
   return () => {
@@ -15,6 +19,7 @@ export function onSessionExpired(handler: () => void) {
   };
 }
 export async function upload<T>(path: string, file: File): Promise<T> {
+  const generation = sessionGeneration;
   const body = new FormData();
   body.append("file", file);
   const response = await fetch("/api/v1" + path, {
@@ -24,7 +29,7 @@ export async function upload<T>(path: string, file: File): Promise<T> {
   });
   const value = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 401) expire();
+    if (response.status === 401 && generation === sessionGeneration) expire();
     throw new APIError(
       response.status,
       value?.error?.code || "UPLOAD_FAILED",
@@ -39,6 +44,7 @@ export async function api<T>(
   body?: unknown,
   options: { signal?: AbortSignal; key?: string; method?: string } = {},
 ): Promise<T> {
+  const generation = sessionGeneration;
   const response = await fetch("/api/v1" + path, {
     method: options.method || (body === undefined ? "GET" : "POST"),
     credentials: "same-origin",
@@ -54,7 +60,13 @@ export async function api<T>(
   });
   const value = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 401 && path !== "/auth/login" && path !== "/me")
+    if (
+      response.status === 401 &&
+      generation === sessionGeneration &&
+      path !== "/auth/login" &&
+      path !== "/me" &&
+      path !== "/workspace/account"
+    )
       expire();
     throw new APIError(
       response.status,
@@ -71,17 +83,38 @@ export async function api<T>(
 export class Operation {
   private signature = "";
   private key = "";
+  constructor(private journal?: string) {
+    if (journal)
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(journal) || "null");
+        if (saved?.signature && saved?.key) {
+          this.signature = saved.signature;
+          this.key = saved.key;
+        }
+      } catch {}
+  }
   async send<T>(path: string, body: unknown) {
     const signature = JSON.stringify([path, body]);
     if (signature !== this.signature) {
       this.signature = signature;
       this.key = crypto.randomUUID();
+      if (this.journal)
+        try {
+          sessionStorage.setItem(
+            this.journal,
+            JSON.stringify({ signature: this.signature, key: this.key }),
+          );
+        } catch {}
     }
     return api<T>(path, body, { key: this.key });
   }
   accepted() {
     this.signature = "";
     this.key = "";
+    if (this.journal)
+      try {
+        sessionStorage.removeItem(this.journal);
+      } catch {}
   }
 }
 export const bytes = (value: string) => new TextEncoder().encode(value).length;

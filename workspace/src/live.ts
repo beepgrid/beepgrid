@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { applyLiveEvent, nextCursor } from "./live-cache";
 import { useScope } from "./data";
 
 export function useLive(conversation: string) {
@@ -39,29 +40,24 @@ export function useLive(conversation: string) {
       };
       source.onerror = () => {
         setStatus(navigator.onLine ? "Reconnecting" : "Offline");
+        reconcile();
       };
+      source.addEventListener("cursor", (e) => {
+        cursor = nextCursor(cursor, (e as MessageEvent).lastEventId);
+        try {
+          sessionStorage.setItem(key, cursor);
+        } catch {}
+      });
       source.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data);
-          const seq = String(event.sequence || e.lastEventId || "");
-          if (seq) {
-            cursor = seq;
-            try {
-              sessionStorage.setItem(key, seq);
-            } catch {}
-          }
-          // Invalidation is deliberately authoritative. The backend filters every replay.
-          // Remove cached private content on policy changes before fetching fresh views.
-          if (
-            /(role|binding|membership|disabled|credential|status_changed|recovery|suspend)/.test(
-              event.kind || "",
-            )
-          ) {
-            void query.resetQueries({
-              predicate: (q) => q.queryKey[0] === scope,
-            });
-          }
-          reconcile();
+          const previous = cursor;
+          cursor = nextCursor(cursor, event.sequence || e.lastEventId);
+          if (cursor === previous) return;
+          try {
+            sessionStorage.setItem(key, cursor);
+          } catch {}
+          applyLiveEvent(query, scope, conversation, event);
         } catch {
           reconcile();
         }

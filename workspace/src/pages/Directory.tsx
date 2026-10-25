@@ -3,9 +3,10 @@ import {
   useCapabilities,
   useCollection,
   useOperation,
+  useResource,
   useSession,
 } from "../data";
-import type { Identity, Instance, Target } from "../contracts";
+import type { Group, Identity, Instance, Target } from "../contracts";
 import { relative } from "../client";
 import { navigate } from "../navigation";
 import { Compose } from "../Compose";
@@ -31,16 +32,19 @@ export default function Directory({ section }: { section: string }) {
   const agents = section === "agents";
   const [search, setSearch] = useState(""),
     [filter, setFilter] = useState(""),
+    [presence, setPresence] = useState(""),
     [field, setField] = useState("project"),
     [value, setValue] = useState(""),
     [selected, setSelected] = useState<Identity | null>(null),
     [compose, setCompose] = useState<Target[] | null>(null),
+    [composeMode, setComposeMode] = useState("message"),
     [creating, setCreating] = useState(false),
     [connect, setConnect] = useState(false),
     [selection, setSelection] = useState<string[]>([]),
     [fleet, setFleet] = useState(false);
   const filters: Record<string, string> = {};
   if (filter) filters.disabled = filter;
+  if (agents && presence) filters.presence = presence;
   if (value) filters[field] = value;
   const q = useCollection<Identity>(
       agents ? "agents" : "people",
@@ -89,6 +93,18 @@ export default function Directory({ section }: { section: string }) {
             <option value="false">Enabled</option>
             <option value="true">Disabled</option>
           </select>
+          {agents ? (
+            <select
+              aria-label="Instance presence"
+              value={presence}
+              onChange={(e) => setPresence(e.target.value)}
+            >
+              <option value="">Any instance presence</option>
+              <option value="connected">Connected</option>
+              <option value="stale">Stale</option>
+              <option value="offline">Offline or no instances</option>
+            </select>
+          ) : null}
           <select
             aria-label="Filter field"
             value={field}
@@ -154,7 +170,7 @@ export default function Directory({ section }: { section: string }) {
       <QueryState
         query={q}
         empty={
-          search || value
+          search || value || filter || presence
             ? "No matching identities"
             : "No permitted identities yet"
         }
@@ -215,11 +231,49 @@ export default function Directory({ section }: { section: string }) {
         {q.items.length} permitted {agents ? "agents" : "people"} loaded
         {q.hasNextPage ? " · More available" : ""}
       </p>
+      {agents &&
+      !search &&
+      !value &&
+      !filter &&
+      !presence &&
+      !q.isPending &&
+      !q.error &&
+      q.items.length === 0 ? (
+        <section className="section">
+          <h2>Make your first connection</h2>
+          <p>
+            Connect an agent through a trusted launcher, give it bounded contact
+            rights, then start one conversation. Agents appear here
+            automatically after enrollment.
+          </p>
+          {caps.data?.operations.enroll_agent ? (
+            <div className="actions">
+              <Button onClick={() => navigate("/people")}>Add people</Button>
+              <Button onClick={() => navigate("/settings/services")}>
+                Software services
+              </Button>
+              <Button onClick={() => navigate("/permissions")}>
+                Set contact permissions
+              </Button>
+              <Button primary onClick={() => setConnect(true)}>
+                Connect agent
+              </Button>
+            </div>
+          ) : (
+            <p className="help">
+              Your workspace administrator or delegated launcher can connect
+              agents. You can continue using the identities and conversations
+              available to you.
+            </p>
+          )}
+        </section>
+      ) : null}
       {selected ? (
         <IdentityDetail
           identity={selected}
           onClose={() => setSelected(null)}
-          onCompose={(t) => {
+          onCompose={(t, mode = "message") => {
+            setComposeMode(mode);
             setCompose([t]);
             setSelected(null);
           }}
@@ -227,6 +281,7 @@ export default function Directory({ section }: { section: string }) {
       ) : null}
       {compose ? (
         <Compose
+          mode={composeMode}
           initial={compose}
           multiple={compose.length > 1}
           onClose={() => setCompose(null)}
@@ -249,7 +304,7 @@ export function IdentityDetail({
 }: {
   identity: Identity;
   onClose: () => void;
-  onCompose: (t: Target) => void;
+  onCompose: (t: Target, mode?: string) => void;
 }) {
   const caps = useCapabilities({ kind: p.kind, id: p.id }),
     op = useOperation(),
@@ -259,6 +314,11 @@ export function IdentityDetail({
     "",
     { agent_id: p.id },
     p.kind === "agent" && caps.data?.operations.view === true,
+  );
+  const groups = useResource<Group[]>(
+    "/groups",
+    caps.data?.operations.view === true ||
+      caps.data?.operations.manage === true,
   );
   const [editing, setEditing] = useState(false),
     [linking, setLinking] = useState(false),
@@ -299,7 +359,9 @@ export function IdentityDetail({
           </Button>
         ) : null}
         {caps.data?.operations.ask ? (
-          <Button onClick={() => onCompose({ kind: p.kind, id: p.id })}>
+          <Button
+            onClick={() => onCompose({ kind: p.kind, id: p.id }, "question")}
+          >
             Ask or request
           </Button>
         ) : null}
@@ -389,6 +451,26 @@ export function IdentityDetail({
             </div>
           ))}
       </dl>
+      <section className="section">
+        <h3>Visible group memberships</h3>
+        <ErrorView error={groups.error} />
+        {groups.data ? (
+          <>
+            {groups.data
+              .filter((g) => g.members.includes(p.id))
+              .map((g) => (
+                <p key={g.id}>
+                  {g.name} <small>{g.id}</small>
+                </p>
+              ))}
+            <p className="help">
+              From your current permitted group list. Hidden groups and hidden
+              roster entries are excluded. Role provenance is available under
+              Access.
+            </p>
+          </>
+        ) : null}
+      </section>
       {p.kind === "agent" && caps.data?.operations.view ? (
         <section className="section">
           <h2>Running instances</h2>
@@ -424,13 +506,21 @@ export function IdentityDetail({
                         <DateValue value={i.last_seen} />
                       </td>
                       <td>
-                        <Button
-                          onClick={() =>
-                            onCompose({ kind: "instance", id: i.id })
-                          }
-                        >
-                          Address instance
-                        </Button>
+                        {caps.data?.operations.message ||
+                        caps.data?.operations.ask ? (
+                          <Button
+                            onClick={() =>
+                              onCompose(
+                                { kind: "instance", id: i.id },
+                                caps.data?.operations.message
+                                  ? "message"
+                                  : "question",
+                              )
+                            }
+                          >
+                            Address instance
+                          </Button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

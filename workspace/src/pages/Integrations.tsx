@@ -166,7 +166,7 @@ export default function Integrations() {
     </>
   );
 }
-function ConnectionForm({
+export function ConnectionForm({
   provider: p,
   connection: c,
   onClose,
@@ -319,10 +319,11 @@ function ConnectionDetail({
     [confirm, setConfirm] = useState(false),
     [result, setResult] = useState<unknown>(null),
     op = useOperation();
-  if (cap.error)
+  if (cap.error || cap.isPending)
     return (
       <Modal title="Connection unavailable" onClose={onClose}>
         <ErrorView error={cap.error} />
+        {cap.isPending ? <Loading label="Checking connection access" /> : null}
       </Modal>
     );
   return (
@@ -508,8 +509,8 @@ function DestinationRow({
   onEdit: () => void;
 }) {
   const connection = useCapabilities({
-      kind: "connection",
-      id: d.connection_id,
+      kind: "destination",
+      id: d.id,
     }),
     op = useOperation(),
     [confirm, setConfirm] = useState(false);
@@ -576,6 +577,11 @@ function DestinationForm({
     [mode, setMode] = useState(d?.mode || "primary"),
     [priority, setPriority] = useState(d?.priority || 0),
     op = useOperation();
+  const recipient = useCapabilities(
+    d ? { kind: "destination", id: d.id } : target[0],
+    undefined,
+    connection,
+  );
   return (
     <Modal
       title={d ? "Edit destination" : "Add destination"}
@@ -627,6 +633,7 @@ function DestinationForm({
             value={target}
             onChange={setTarget}
             allowGroups={false}
+            allowInstances={false}
           />
         )}
         <Field
@@ -665,7 +672,16 @@ function DestinationForm({
         <ErrorView error={op.error} />
         <div className="form-actions">
           <Button onClick={onClose}>Cancel</Button>
-          <Button primary disabled={op.pending} type="submit">
+          <Button
+            primary
+            disabled={
+              op.pending ||
+              !(d
+                ? recipient.data?.operations.manage
+                : recipient.data?.operations.manage_destination)
+            }
+            type="submit"
+          >
             Save destination
           </Button>
         </div>

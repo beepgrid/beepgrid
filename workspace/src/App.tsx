@@ -1,6 +1,12 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import {
+  Component as ReactComponent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, APIError, onSessionExpired } from "./client";
+import { api, APIError, advanceSession, onSessionExpired } from "./client";
 import { client, clearDrafts, Session, useResource, useSession } from "./data";
 import type { Me, Workspace } from "./contracts";
 import {
@@ -14,7 +20,10 @@ import {
   Logo,
 } from "./ui";
 import { navigate, useRoute } from "./navigation";
+import { recordNavigationPaint } from "./performance";
+import { PageLoader, usePage } from "./route-loader";
 import { useLive } from "./live";
+import { AccountView, type Account } from "./AccountView";
 
 const modules = {
   agents: () => import("./pages/Directory"),
@@ -28,9 +37,7 @@ const modules = {
   activity: () => import("./pages/Activity"),
   settings: () => import("./pages/Settings"),
 };
-const pages = Object.fromEntries(
-  Object.entries(modules).map(([key, load]) => [key, lazy(load)]),
-);
+const pages = new PageLoader(modules);
 const links = [
   ["inbox", "Inbox"],
   ["conversations", "Conversations"],
@@ -44,15 +51,24 @@ const links = [
 
 export default function App() {
   const [epoch, setEpoch] = useState(0);
+  const [logoutError, setLogoutError] = useState<Error | null>(null);
   const me = useQuery({
     queryKey: ["session", epoch],
     queryFn: ({ signal }) => api<Me>("/me", undefined, { signal }),
     retry: false,
     refetchInterval: 15_000,
   });
+  const account = useQuery({
+    queryKey: ["session-account", epoch],
+    queryFn: ({ signal }) =>
+      api<Account>("/workspace/account", undefined, { signal }),
+    enabled: !!me.error,
+    retry: false,
+  });
   useEffect(
     () =>
       onSessionExpired(() => {
+        advanceSession();
         void client.cancelQueries();
         client.clear();
         clearDrafts();
@@ -60,6 +76,17 @@ export default function App() {
       }),
     [],
   );
+  useEffect(() => {
+    if (me.error instanceof APIError && me.error.status === 401) {
+      clearDrafts();
+      void client.cancelQueries({
+        predicate: (q) => String(q.queryKey[0]).includes("/"),
+      });
+      client.removeQueries({
+        predicate: (q) => String(q.queryKey[0]).includes("/"),
+      });
+    }
+  }, [me.error]);
   if (me.isPending)
     return (
       <div className="startup">
@@ -68,10 +95,47 @@ export default function App() {
       </div>
     );
   if (me.error) {
+    if (account.isPending)
+      return (
+        <div className="startup">
+          <Logo />
+          <Loading label="Checking workspace access" />
+        </div>
+      );
+    if (account.data && !account.error)
+      return (
+        <main className="access-unavailable">
+          <Logo />
+          <ErrorView error={me.error} />
+          <AccountView account={account.data} />
+          <ErrorView error={logoutError} />
+          <div className="actions">
+            <Button primary onClick={() => void me.refetch()}>
+              Check workspace access again
+            </Button>
+            <Button
+              onClick={() =>
+                void api("/auth/logout", {})
+                  .then(() => {
+                    advanceSession();
+                    client.clear();
+                    clearDrafts();
+                    setEpoch((x) => x + 1);
+                  })
+                  .catch(setLogoutError)
+              }
+            >
+              Sign out
+            </Button>
+          </div>
+        </main>
+      );
     if (me.error instanceof APIError && me.error.status === 401)
       return (
         <Login
           onDone={() => {
+            advanceSession();
+            clearDrafts();
             client.clear();
             setEpoch((x) => x + 1);
           }}
@@ -99,6 +163,7 @@ export default function App() {
       <WorkspaceApp
         key={`${me.data.company}/${me.data.environment}/${me.data.person.id}/${epoch}`}
         onLogout={() => {
+          advanceSession();
           client.clear();
           clearDrafts();
           setEpoch((x) => x + 1);
@@ -178,9 +243,28 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
   const [menu, setMenu] = useState(false),
     [error, setError] = useState<Error | null>(null),
     [signingOut, setSigningOut] = useState(false);
+  useEffect(() => {
+    if (!menu) return;
+    const previous = document.activeElement as HTMLElement | null;
+    (document.querySelector(".sidebar nav a") as HTMLElement | null)?.focus();
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMenu(false);
+      }
+    };
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("keydown", escape);
+      previous?.focus();
+    };
+  }, [menu]);
   const [theme, setTheme] = useState(() => {
     try {
-      return localStorage.getItem("beepgrid:workspace:theme") || "system";
+      const saved = localStorage.getItem("beepgrid:workspace:theme");
+      return saved && ["light", "dark", "system"].includes(saved)
+        ? saved
+        : "system";
     } catch {
       return "system";
     }
@@ -201,8 +285,9 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     setMenu(false);
     document.title =
-      (links.find((x) => x[0] === route.page)?.[1] || "Settings") +
-      " · beepgrid";
+      (links.find(
+        (x) => x[0] === (route.page === "requests" ? "inbox" : route.page),
+      )?.[1] || "Settings") + " · beepgrid";
   }, [route.page]);
   const page =
     route.page === "requests"
@@ -210,8 +295,10 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
       : route.page === "connections"
         ? "integrations"
         : route.page;
-  const Component = pages[page] || pages.agents;
+  const section = usePage(pages, page);
+  const Component = section.component;
   function link(path: string) {
+    setMenu(false);
     navigate("/" + path);
   }
   return (
@@ -250,8 +337,8 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
               key={id}
               href={"/" + id}
               aria-current={page === id ? "page" : undefined}
-              onMouseEnter={() => void modules[id as keyof typeof modules]()}
-              onFocus={() => void modules[id as keyof typeof modules]()}
+              onMouseEnter={() => void pages.load(id).catch(() => {})}
+              onFocus={() => void pages.load(id).catch(() => {})}
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey) return;
                 e.preventDefault();
@@ -318,7 +405,7 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       </aside>
-      <div className="main-shell">
+      <div className="main-shell" inert={menu || undefined}>
         <header className="topbar">
           <button
             className="icon-button mobile-menu"
@@ -338,9 +425,18 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
         </header>
         <main id="main" tabIndex={-1}>
           <ErrorView error={error} />
-          <Suspense fallback={<Loading label="Opening section" />}>
-            <Component key={page} section={page} />
-          </Suspense>
+          <SectionBoundary key={page}>
+            {section.error ? (
+              <ErrorView error={section.error} retry={section.retry} />
+            ) : Component ? (
+              <>
+                <Component key={page} section={page} />
+                <PaintReady route={route.page + route.id} />
+              </>
+            ) : (
+              <Loading label="Opening section" />
+            )}
+          </SectionBoundary>
         </main>
       </div>
     </div>
@@ -355,4 +451,33 @@ function BadgeDeployment({ deployment }: { deployment?: string }) {
       />
     </span>
   ) : null;
+}
+
+class SectionBoundary extends ReactComponent<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? (
+      <ErrorView
+        error={
+          new Error(
+            "This section could not open. Reload to get the latest workspace app.",
+          )
+        }
+        retry={() => window.location.reload()}
+      />
+    ) : (
+      this.props.children
+    );
+  }
+}
+
+function PaintReady({ route }: { route: string }) {
+  useLayoutEffect(recordNavigationPaint, [route]);
+  return null;
 }

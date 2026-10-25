@@ -53,22 +53,22 @@ it("continues across a zero-visible-row page with a cursor", async () => {
   await waitFor(() => expect(result.current.hasNextPage).toBe(true));
   expect(result.current.items).toEqual([]);
   await act(() => result.current.fetchNextPage());
-  await waitFor(() => expect(result.current.items).toEqual([{ id: "visible" }]));
+  await waitFor(() =>
+    expect(result.current.items).toEqual([{ id: "visible" }]),
+  );
   expect(JSON.parse(fetcher.mock.calls[1][1].body).cursor).toBe("opaque");
 });
 it("never converts a policy failure into an empty successful collection", async () => {
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            error: { code: "POLICY_DENIED", message: "Not permitted" },
-          }),
-          { status: 403 },
-        ),
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: "POLICY_DENIED", message: "Not permitted" },
+        }),
+        { status: 403 },
       ),
+    ),
   );
   const { result } = renderHook(() => useCollection("groups"), {
     wrapper: wrapper(),
@@ -97,4 +97,18 @@ it("fences repeated submits while one mutation is pending", async () => {
     await pending;
   });
   expect(result.current.pending).toBe(false);
+});
+it("prevents blind retry of an administrative create with an unknown result", async () => {
+  const fetcher = vi.fn().mockRejectedValue(Error("Network lost"));
+  vi.stubGlobal("fetch", fetcher);
+  const { result } = renderHook(() => useOperation(), { wrapper: wrapper() });
+  await act(() =>
+    result.current.run("/credentials", { principal_id: "p1", kind: "api" }),
+  );
+  expect(result.current.uncertain).toBe(true);
+  expect(result.current.error?.message).toContain("result is unknown");
+  await act(() =>
+    result.current.run("/credentials", { principal_id: "p1", kind: "api" }),
+  );
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });

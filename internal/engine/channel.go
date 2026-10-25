@@ -869,7 +869,7 @@ func (s *Store) queueFallback(ctx context.Context, db DB, scope string, previous
 	return nil
 }
 
-func (s *Store) RemoveDestination(ctx context.Context, a Actor, id string) error {
+func (s *Store) RemoveDestination(ctx context.Context, a Actor, id string, observed ...int64) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
 		var connection, pid string
 		if e := tx.QueryRow(ctx, `SELECT connection_id,principal_id FROM destinations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&connection, &pid); e != nil {
@@ -878,6 +878,14 @@ func (s *Store) RemoveDestination(ctx context.Context, a Actor, id string) error
 		if !s.mayManageDestination(ctx, tx, a, connection, pid) {
 			return Denied()
 		}
+		version := int64(0)
+		if len(observed) > 0 {
+			version = observed[0]
+		}
+		if e := checkRevision(ctx, tx, a.Scope, "destinations", id, version); e != nil {
+			return e
+		}
+
 		tag, e := tx.Exec(ctx, `DELETE FROM destinations WHERE scope=$1 AND id=$2`, a.Scope, id)
 		if e != nil {
 			return e

@@ -8,11 +8,13 @@ export function TargetPicker({
   onChange,
   multiple = false,
   allowGroups = true,
+  allowInstances = true,
 }: {
   value: Target[];
   onChange: (v: Target[]) => void;
   multiple?: boolean;
   allowGroups?: boolean;
+  allowInstances?: boolean;
 }) {
   const [kind, setKind] = useState<Kind>("agent"),
     [search, setSearch] = useState("");
@@ -52,7 +54,9 @@ export function TargetPicker({
             {allowGroups && !multiple ? (
               <option value="group">Groups</option>
             ) : null}
-            <option value="instance">Exact running instance</option>
+            {allowInstances ? (
+              <option value="instance">Exact running instance</option>
+            ) : null}
           </select>
         </Field>
         <Field label="Find a recipient">

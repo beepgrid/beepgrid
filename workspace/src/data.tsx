@@ -32,12 +32,13 @@ export function useScope() {
 }
 export function useResource<T>(path: string, enabled = true) {
   const scope = useScope();
-  return useQuery({
+  const q = useQuery({
     queryKey: [scope, "resource", path],
     queryFn: ({ signal }) => api<T>(path, undefined, { signal }),
     enabled,
     refetchInterval: 15_000,
   });
+  return { ...q, data: q.error ? undefined : q.data };
 }
 export function usePostResource<T>(
   path: string,
@@ -45,20 +46,23 @@ export function usePostResource<T>(
   enabled = true,
 ) {
   const scope = useScope();
-  return useQuery({
+  const q = useQuery({
     queryKey: [scope, "read", path, body],
     queryFn: ({ signal }) => api<T>(path, body, { signal }),
     enabled,
     refetchInterval: 15_000,
   });
+  return { ...q, data: q.error ? undefined : q.data };
 }
 export function useCapabilities(
   target?: Target | { kind: string; id: string },
   requestId?: string,
+  connectionId?: string,
 ) {
   return usePostResource<Capability>("/capabilities", {
     target: target || {},
     request_id: requestId || undefined,
+    connection_id: connectionId || undefined,
   });
 }
 export function useCollection<T>(
@@ -80,16 +84,27 @@ export function useCollection<T>(
     getNextPageParam: (page) => page.next_cursor || undefined,
     enabled,
   });
-  return { ...q, items: q.data?.pages.flatMap((p) => p.items || []) || [] };
+  return {
+    ...q,
+    items: q.error ? [] : q.data?.pages.flatMap((p) => p.items || []) || [],
+  };
 }
-export function useOperation() {
+export function useOperation(recoveryName?: string) {
   const query = useQueryClient();
-  const op = useRef(new Operation());
+  const scope = useScope();
+  const op = useRef(
+    new Operation(
+      recoveryName
+        ? "beepgrid:workspace:draft:" + scope + ":operation:" + recoveryName
+        : undefined,
+    ),
+  );
   const [pending, setPending] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const locked = useRef(false);
   async function run<T>(path: string, body: unknown): Promise<T | undefined> {
-    if (locked.current) return;
+    if (locked.current || uncertain) return;
     locked.current = true;
     setPending(true);
     setError(null);
@@ -99,7 +114,27 @@ export function useOperation() {
       void query.invalidateQueries();
       return value;
     } catch (e) {
-      setError(e as Error);
+      // Several administrative creates have no durable idempotency contract.
+      // Do not invite a blind retry when their first result may have committed.
+      const unkeyedCreate = [
+        "/people",
+        "/services",
+        "/groups",
+        "/roles",
+        "/connections",
+        "/destinations",
+        "/credentials",
+        "/answers",
+      ].includes(path);
+      if (unkeyedCreate && (!(e instanceof APIError) || e.status >= 500)) {
+        setUncertain(true);
+        setError(
+          new Error(
+            "The result is unknown. Close this form and refresh the current records before creating anything again. For an issued token with a lost secret, revoke its metadata record and issue a replacement.",
+          ),
+        );
+        void query.invalidateQueries();
+      } else setError(e as Error);
       if (e instanceof APIError && [403, 404, 409].includes(e.status))
         await query.invalidateQueries();
       return undefined;
@@ -108,7 +143,13 @@ export function useOperation() {
       setPending(false);
     }
   }
-  return { run, pending, error, clear: () => setError(null) };
+  return {
+    run,
+    pending: pending || uncertain,
+    uncertain,
+    error,
+    clear: () => setError(null),
+  };
 }
 const draftPrefix = "beepgrid:workspace:draft:";
 export function clearDrafts() {

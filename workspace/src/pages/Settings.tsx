@@ -17,7 +17,9 @@ import type {
 import { readable } from "../client";
 import { useRoute, navigate } from "../navigation";
 import { TargetPicker } from "../TargetPicker";
+import { Compose } from "../Compose";
 import { IdentityDetail } from "./Directory";
+import { AccountView, type Account } from "../AccountView";
 import {
   Badge,
   Button,
@@ -152,6 +154,8 @@ export default function Settings() {
   );
 }
 function Services() {
+  const [compose, setCompose] = useState<Target[] | null>(null),
+    [composeMode, setComposeMode] = useState("message");
   const q = useCollection<Identity>("services"),
     cap = useCapabilities(),
     [create, setCreate] = useState(false),
@@ -233,10 +237,18 @@ function Services() {
         <IdentityDetail
           identity={selected}
           onClose={() => setSelected(null)}
-          onCompose={() => {
+          onCompose={(target, mode = "message") => {
             setSelected(null);
-            navigate("/conversations");
+            setComposeMode(mode);
+            setCompose([target]);
           }}
+        />
+      ) : null}
+      {compose ? (
+        <Compose
+          initial={compose}
+          mode={composeMode}
+          onClose={() => setCompose(null)}
         />
       ) : null}
     </>
@@ -313,6 +325,7 @@ function Credentials() {
               value={target}
               onChange={setTarget}
               allowGroups={false}
+              allowInstances={false}
             />
             <Field label="Credential kind">
               <select value={kind} onChange={(e) => setKind(e.target.value)}>
@@ -562,7 +575,6 @@ function Assistance() {
 }
 function Answers() {
   const q = useCollection<PublishedAnswer>("answers"),
-    cap = useCapabilities(),
     op = useOperation(),
     [confirm, setConfirm] = useState<PublishedAnswer | null>(null);
   return (
@@ -607,11 +619,7 @@ function Answers() {
               <Button onClick={() => navigate("/requests/" + a.source_request)}>
                 Source request
               </Button>
-              {cap.data?.operations.publish_answer && !a.invalidated ? (
-                <Button danger onClick={() => setConfirm(a)}>
-                  Invalidate
-                </Button>
-              ) : null}
+              <AnswerInvalidate answer={a} onClick={() => setConfirm(a)} />
             </div>
           </section>
         ))}
@@ -648,31 +656,32 @@ function Answers() {
   );
 }
 export function AccountStatus() {
-  const q = useResource<Record<string, unknown>>("/workspace/account");
+  const q = useResource<Account>("/workspace/account");
   return (
     <section className="section">
       <h2>Account and usage</h2>
       <ErrorView error={q.error} />
       {q.isPending ? <Loading /> : null}
-      {q.data ? (
+      {q.data && !q.error ? (
         <>
-          <p>
-            Requested control state and runtime-applied access may differ. The
-            authenticated account response below keeps their sources separate.
-          </p>
-          <Details
-            value={q.data}
-            label="Account, access, applied quotas and monthly usage"
-          />
-          <p className="help">
-            Usage uses UTC months and counts canonical recipient messages,
-            request records and accepted upload bytes. Group fan-out counts per
-            recipient; canonical idempotent replay is not charged again. Upload
-            intake is not retained storage. This is not a payment receipt or
-            provider invoice.
-          </p>
+          <AccountView account={q.data} />
         </>
       ) : null}
     </section>
   );
+}
+
+function AnswerInvalidate({
+  answer,
+  onClick,
+}: {
+  answer: PublishedAnswer;
+  onClick: () => void;
+}) {
+  const cap = useCapabilities({ kind: "answer", id: answer.id });
+  return cap.data?.operations.invalidate ? (
+    <Button danger onClick={onClick}>
+      Invalidate
+    </Button>
+  ) : null;
 }

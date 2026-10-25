@@ -46,16 +46,14 @@ describe("operation identity", () => {
   it("preserves structured permission errors and UTF-8 limits", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          response(403, {
-            error: {
-              code: "POLICY_DENIED",
-              message: "This operation is not permitted.",
-            },
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        response(403, {
+          error: {
+            code: "POLICY_DENIED",
+            message: "This operation is not permitted.",
+          },
+        }),
+      ),
     );
     await expect(api("/groups")).rejects.toMatchObject({
       status: 403,
@@ -63,4 +61,59 @@ describe("operation identity", () => {
     });
     expect(bytes("😀")).toBe(4);
   });
+});
+
+it("retains an ambiguous send identity across form remounts within the same scope", async () => {
+  sessionStorage.clear();
+  const fetcher = vi
+    .fn()
+    .mockRejectedValueOnce(Error("Lost response"))
+    .mockResolvedValue(new Response(JSON.stringify({ id: "canonical" })));
+  vi.stubGlobal("fetch", fetcher);
+  const journal = "beepgrid:workspace:draft:scope:conversation";
+  await expect(
+    new Operation(journal).send("/messages", { body: "keep" }),
+  ).rejects.toThrow();
+  const remounted = new Operation(journal);
+  await remounted.send("/messages", { body: "keep" });
+  expect(fetcher.mock.calls[0][1].headers["Idempotency-Key"]).toBe(
+    fetcher.mock.calls[1][1].headers["Idempotency-Key"],
+  );
+  remounted.accepted();
+  expect(sessionStorage.getItem(journal)).toBeNull();
+});
+it("does not restart the session repeatedly for unauthenticated access probes", async () => {
+  const { onSessionExpired } = await import("../src/client");
+  const expired = vi.fn();
+  const off = onSessionExpired(expired);
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(response(401, { error: { message: "Unauthorized" } })),
+      ),
+  );
+  await expect(api("/me")).rejects.toThrow();
+  await expect(api("/workspace/account")).rejects.toThrow();
+  expect(expired).not.toHaveBeenCalled();
+  await expect(api("/conversations/private")).rejects.toThrow();
+  expect(expired).toHaveBeenCalledTimes(1);
+  off();
+});
+it("ignores a late old-session failure after a new sign-in", async () => {
+  const { onSessionExpired, advanceSession } = await import("../src/client");
+  const expired = vi.fn();
+  const off = onSessionExpired(expired);
+  let resolve!: (r: Response) => void;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation(() => new Promise((r) => (resolve = r))),
+  );
+  const old = api("/conversations/private");
+  advanceSession();
+  resolve(response(401, {}));
+  await expect(old).rejects.toThrow();
+  expect(expired).not.toHaveBeenCalled();
+  off();
 });

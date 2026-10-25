@@ -26,7 +26,15 @@ func (s *Server) channelRoutes() {
 		return ok(w, x, e)
 	}))
 	m.HandleFunc("POST /api/v1/destinations/{id}/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
-		return ok(w, map[string]bool{"removed": true}, s.Store.RemoveDestination(r.Context(), actor(r), r.PathValue("id")))
+		var in struct {
+			Version int64 `json:"version"`
+		}
+		if r.ContentLength != 0 {
+			if e := decode(r, &in); e != nil {
+				return e
+			}
+		}
+		return ok(w, map[string]bool{"removed": true}, s.Store.RemoveDestination(r.Context(), actor(r), r.PathValue("id"), in.Version))
 	}))
 	m.HandleFunc("GET /api/v1/destinations", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.Destinations(r.Context(), actor(r))

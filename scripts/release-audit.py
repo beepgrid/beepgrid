@@ -46,8 +46,8 @@ for module in modules:
         notices.append('\n' + path.read_text(errors='replace') + '\n')
 goroot = pathlib.Path(subprocess.check_output(['go', 'env', 'GOROOT'], cwd=root).decode().strip())
 notices.append('\n## Go standard library\n\n' + (goroot / 'LICENSE').read_text() + '\n')
-for name in ('react', 'react-dom', 'scheduler', 'vite'):
-    directory = root / 'web/node_modules' / name
+for name in ('react', 'react-dom', 'scheduler', '@tanstack/react-query', '@tanstack/query-core', 'vite'):
+    directory = root / 'workspace/node_modules' / name
     package = json.loads((directory / 'package.json').read_text())
     license_file = next((p for p in directory.iterdir() if p.name.upper().startswith('LICENSE')), None)
     if not license_file:

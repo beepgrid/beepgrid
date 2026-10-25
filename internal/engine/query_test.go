@@ -172,3 +172,55 @@ func TestQueryFiltersCannotRevealHiddenMemberships(t *testing.T) {
 		t.Fatal(page, e)
 	}
 }
+
+func TestAgentPresenceQueryUsesCurrentPermittedReplicas(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	reader := testPerson(t, s, owner, "presence-reader")
+	visible, e := s.Enroll(ctx, owner, EnrollInput{Agent: "visible", Name: "Visible"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	hidden, e := s.Enroll(ctx, owner, EnrollInput{Agent: "hidden", Name: "Hidden"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	replica, e := s.Enroll(ctx, owner, EnrollInput{Agent: "visible", Name: "Visible"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	grant(t, s, owner, reader, []Rule{{Action: "view", TargetKind: "agent", TargetID: visible.Agent.ID}})
+	query := func(presence string, want int) {
+		t.Helper()
+		page, err := s.Query(ctx, reader, QueryInput{Collection: "agents", Filters: map[string]string{"presence": presence}, Limit: 50})
+		if err != nil || len(page.Items) != want {
+			t.Fatalf("%s: %#v %v", presence, page, err)
+		}
+		for _, item := range page.Items {
+			if item.(Principal).ID == hidden.Agent.ID {
+				t.Fatal("hidden identity leaked")
+			}
+		}
+	}
+	query("connected", 1)
+	query("stale", 0)
+	query("offline", 0)
+	if _, e = s.Pool.Exec(ctx, `UPDATE instances SET last_seen=now()-interval '80 seconds' WHERE scope=$1 AND id=$2`, owner.Scope, visible.InstanceID); e != nil {
+		t.Fatal(e)
+	}
+	query("connected", 1)
+	if _, e = s.Pool.Exec(ctx, `UPDATE credentials SET revoked=true WHERE scope=$1 AND id=(SELECT credential_id FROM instances WHERE scope=$1 AND id=$2)`, owner.Scope, replica.InstanceID); e != nil {
+		t.Fatal(e)
+	}
+	query("connected", 0)
+	query("stale", 1)
+	if _, e = s.Pool.Exec(ctx, `UPDATE principals SET disabled=true WHERE scope=$1 AND id=$2`, owner.Scope, visible.Agent.ID); e != nil {
+		t.Fatal(e)
+	}
+	// Disabled identities remain discoverable to permitted directory readers,
+	// while their runtime presence is offline, even if a heartbeat is recent.
+	query("offline", 1)
+	if _, e = s.Query(ctx, owner, QueryInput{Collection: "agents", Filters: map[string]string{"presence": "invented"}}); ErrorStatus(e) != 400 {
+		t.Fatal(e)
+	}
+}

@@ -11,7 +11,12 @@ export default defineConfig({
       "/auth": "http://127.0.0.1:4010",
     },
   },
-  build: { outDir: "dist", sourcemap: true, chunkSizeWarningLimit: 250 },
+  build: {
+    outDir: "dist",
+    sourcemap: "hidden",
+    manifest: true,
+    chunkSizeWarningLimit: 320,
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],

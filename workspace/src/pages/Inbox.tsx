@@ -1,7 +1,8 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import {
   useCapabilities,
   useCollection,
+  useDraft,
   useOperation,
   useResource,
   useSession,
@@ -9,6 +10,10 @@ import {
 import type { Capability, Conversation, Request } from "../contracts";
 import { bytes, readable, relative } from "../client";
 import { navigate, useRoute } from "../navigation";
+import { IdentityReference } from "../IdentityReference";
+import { groupQuestions } from "../request-groups";
+import { TargetPicker } from "../TargetPicker";
+import type { Target } from "../contracts";
 import { Compose } from "../Compose";
 import {
   Badge,
@@ -21,6 +26,7 @@ import {
   Icon,
   IdentityIcon,
   Loading,
+  Modal,
   PageHeader,
   QueryState,
   Search,
@@ -44,7 +50,10 @@ export default function Inbox() {
     useDeferredValue(search),
     filters,
   );
-  if (route.id) return <RequestDetail id={route.id} />;
+  if (route.id) return <RequestDetail id={route.id} key={route.id} />;
+  const visible = q.items.filter(
+    (r) => tab !== "history" || r.state !== "open",
+  );
   return (
     <>
       <PageHeader
@@ -85,32 +94,49 @@ export default function Inbox() {
         />
       </div>
       <QueryState
-        query={q}
+        query={{ ...q, items: visible }}
         empty={search ? "No matching requests" : "No requests in this view"}
       >
         <div className="requests-list">
-          {q.items
-            .filter((r) => tab !== "history" || r.state !== "open")
-            .map((r) => (
-              <button
-                className="request-row"
-                key={r.id}
-                onClick={() => navigate("/requests/" + r.id)}
-              >
-                <IdentityIcon
-                  kind={r.kind === "approval" ? "service" : "agent"}
-                  label={r.kind}
-                />
-                <div className="request-text">
-                  <strong>{r.title}</strong>
-                  <p>{r.body}</p>
-                </div>
-                <Badge>{r.kind}</Badge>
-                <Status value={r.response?.outcome || r.state} />
-                <time title={r.created_at}>{relative(r.created_at)}</time>
-                <Icon name="chevron" size={15} />
-              </button>
-            ))}
+          {groupQuestions(visible).map((group) => (
+            <section
+              className={group.length > 1 ? "question-group" : ""}
+              key={group[0].id}
+            >
+              {group.length > 1 ? (
+                <p className="help">
+                  {group.length} matching informational questions · Each remains
+                  an independent request.
+                </p>
+              ) : null}
+              {group.map((r) => (
+                <button
+                  className="request-row"
+                  key={r.id}
+                  onClick={() => navigate("/requests/" + r.id)}
+                >
+                  <IdentityIcon
+                    kind={r.kind === "approval" ? "service" : "agent"}
+                    label={r.kind}
+                  />
+                  <div className="request-text">
+                    <strong>{r.title}</strong>
+                    <p>{r.body}</p>
+                    {group.length > 1 ? (
+                      <small>
+                        Requester <IdentityReference id={r.requester_id} /> ·{" "}
+                        <span title={r.id}>Request {r.id.slice(-8)}</span>
+                      </small>
+                    ) : null}
+                  </div>
+                  <Badge>{r.kind}</Badge>
+                  <Status value={r.response?.outcome || r.state} />
+                  <time title={r.created_at}>{relative(r.created_at)}</time>
+                  <Icon name="chevron" size={15} />
+                </button>
+              ))}
+            </section>
+          ))}
         </div>
       </QueryState>
       <small>
@@ -128,18 +154,26 @@ function RequestDetail({ id }: { id: string }) {
     caps = useCapabilities(undefined, id),
     publish = useCapabilities(),
     me = useSession();
-  const [answer, setAnswer] = useState(""),
-    [confirm, setConfirm] = useState(""),
+  const [answer, setAnswer] = useDraft("response:" + id);
+  const [confirm, setConfirm] = useState(""),
     [clarify, setClarify] = useState(false),
     [validation, setValidation] = useState<Error | null>(null),
-    [sharing, setSharing] = useState(false);
-  const op = useOperation();
+    [sharing, setSharing] = useState(false),
+    [shareNow, setShareNow] = useState(false),
+    [structured, setStructured] = useState(false);
+  const op = useOperation("response:" + id);
+  const pending = useCollection<Request>("requests", "", { state: "open" });
+  const next = pending.items.find((item) => item.id !== id);
   const conversation = useResource<Conversation>(
     request.data
       ? "/conversations/" + request.data.conversation_id
       : "/conversations",
     !!request.data,
   );
+  useEffect(() => {
+    if (caps.error || (caps.data && !caps.data.operations.respond))
+      setAnswer("");
+  }, [caps.error, caps.data, setAnswer]);
   if (request.isPending || caps.isPending)
     return <Loading label="Opening request" />;
   if (request.error || caps.error)
@@ -160,11 +194,22 @@ function RequestDetail({ id }: { id: string }) {
       setValidation(Error("Enter an answer within 32,768 UTF-8 bytes."));
       return;
     }
-    await op.run("/requests/" + id + "/responses", {
+    let value: unknown = answer || undefined;
+    try {
+      if (structured && r.kind === "question" && !r.choices?.length)
+        value = JSON.parse(answer);
+    } catch {
+      setValidation(
+        Error("Enter valid JSON, or turn off structured answer mode."),
+      );
+      return;
+    }
+    const result = await op.run("/requests/" + id + "/responses", {
       outcome,
-      answer: answer || undefined,
+      answer: value,
       version: r.version,
     });
+    if (result) setAnswer("");
   }
   const requester = conversation.data?.participants.find(
     (p) => p.id === r.requester_id,
@@ -175,7 +220,14 @@ function RequestDetail({ id }: { id: string }) {
       <PageHeader
         title="Request"
         actions={
-          <Button onClick={() => navigate("/inbox")}>Back to inbox</Button>
+          <>
+            <Button onClick={() => navigate("/inbox")}>Back to inbox</Button>
+            {next ? (
+              <Button onClick={() => navigate("/requests/" + next.id)}>
+                Next open request
+              </Button>
+            ) : null}
+          </>
         }
       />
       <ErrorView error={op.error || validation} />
@@ -305,6 +357,16 @@ function RequestDetail({ id }: { id: string }) {
                 />
               </Field>
             ) : null}
+            {r.kind === "question" && !r.choices?.length ? (
+              <label className="inline-check">
+                <input
+                  type="checkbox"
+                  checked={structured}
+                  onChange={(e) => setStructured(e.target.checked)}
+                />
+                Answer as structured JSON
+              </label>
+            ) : null}
             <div className="response-buttons">
               {c.outcomes.map((outcome) => (
                 <Button
@@ -337,6 +399,23 @@ function RequestDetail({ id }: { id: string }) {
                   )[outcome] || outcome}
                 </Button>
               ))}
+              {r.kind === "question" &&
+              r.shared_key &&
+              publish.data?.operations.publish_answer ? (
+                <Button
+                  disabled={op.pending || !answer.trim()}
+                  onClick={() => {
+                    try {
+                      if (structured) JSON.parse(answer);
+                      setShareNow(true);
+                    } catch {
+                      setValidation(Error("Enter valid JSON before sharing."));
+                    }
+                  }}
+                >
+                  Answer and share…
+                </Button>
+              ) : null}
             </div>
             {["approved", "denied"].includes(confirm) ? (
               <section className="approval">
@@ -448,6 +527,17 @@ function RequestDetail({ id }: { id: string }) {
           initial={[{ kind: requester.kind, id: requester.id }]}
           conversation={r.conversation_id}
           onClose={() => setClarify(false)}
+        />
+      ) : null}
+      {shareNow ? (
+        <AnswerAndShare
+          request={r}
+          answer={structured ? JSON.parse(answer) : answer}
+          onClose={() => setShareNow(false)}
+          onAccepted={() => {
+            setAnswer("");
+            setShareNow(false);
+          }}
         />
       ) : null}
       {sharing ? (
@@ -585,7 +675,7 @@ function Publish({
   request: Request;
   onClose: () => void;
 }) {
-  const [audience, setAudience] = useState(""),
+  const [audience, setAudience] = useState<Target[]>([]),
     [until, setUntil] = useState(""),
     [key, setKey] = useState(r.shared_key),
     op = useOperation();
@@ -598,7 +688,7 @@ function Publish({
             .run("/answers", {
               request_id: r.id,
               key,
-              audience: audience.split(/[\s,]+/).filter(Boolean),
+              audience: audience.map((t) => t.id),
               valid_until: until ? new Date(until).toISOString() : undefined,
             })
             .then((v) => {
@@ -618,16 +708,14 @@ function Publish({
             onChange={(e) => setKey(e.target.value)}
           />
         </Field>
-        <Field
-          label="Explicit audience identity IDs"
-          hint="Separate with commas or new lines."
-        >
-          <textarea
-            required
-            value={audience}
-            onChange={(e) => setAudience(e.target.value)}
-          />
-        </Field>
+        <h3>Explicit audience</h3>
+        <TargetPicker
+          value={audience}
+          onChange={setAudience}
+          multiple
+          allowGroups={false}
+          allowInstances={false}
+        />
         <Field
           label="Valid until"
           hint="Defaults to 24 hours, maximum 90 days."
@@ -641,11 +729,78 @@ function Publish({
         <ErrorView error={op.error} />
         <div className="form-actions">
           <Button onClick={onClose}>Cancel</Button>
-          <Button primary type="submit" disabled={op.pending}>
+          <Button
+            primary
+            type="submit"
+            disabled={op.pending || !audience.length}
+          >
             Publish answer
           </Button>
         </div>
       </Form>
     </section>
+  );
+}
+
+function AnswerAndShare({
+  request: r,
+  answer,
+  onClose,
+  onAccepted,
+}: {
+  request: Request;
+  answer: unknown;
+  onClose: () => void;
+  onAccepted: () => void;
+}) {
+  const [audience, setAudience] = useState<Target[]>([]);
+  const op = useOperation("answer-share:" + r.id);
+  return (
+    <Modal title="Answer and share information" wide onClose={onClose}>
+      <Form
+        onSubmit={() =>
+          void op
+            .run("/requests/" + r.id + "/answer-and-share", {
+              outcome: "answered",
+              answer,
+              version: r.version,
+              audience: audience.map((t) => t.id),
+            })
+            .then((v) => {
+              if (v) onAccepted();
+            })
+        }
+      >
+        <p>
+          This records your answer and publishes it for the explicit audience
+          below. Compatible pending questions may resolve using it. The
+          publication lasts 24 hours. Approvals and tasks are never reused.
+        </p>
+        <dl className="detail-list">
+          <dt>Scope key</dt>
+          <dd>{r.shared_key}</dd>
+          <dt>Exact answer</dt>
+          <dd className="prose">{readable(answer)}</dd>
+        </dl>
+        <TargetPicker
+          value={audience}
+          onChange={setAudience}
+          multiple
+          allowGroups={false}
+          allowInstances={false}
+        />
+        <ErrorView error={op.error} />
+        <div className="form-actions">
+          <Button onClick={onClose}>Keep private</Button>
+          <Button
+            primary
+            type="submit"
+            disabled={op.pending || !audience.length}
+          >
+            Confirm answer and publication
+          </Button>
+        </div>
+      </Form>
+    </Modal>
   );
 }

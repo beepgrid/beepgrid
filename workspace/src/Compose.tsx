@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { api, bytes } from "./client";
-import { useDraft, useOperation } from "./data";
-import type { Action, Preview, Target } from "./contracts";
+import { useDraft, useOperation, useSession } from "./data";
+import type {
+  Action,
+  Capability,
+  Conversation,
+  Message,
+  Preview,
+  Target,
+} from "./contracts";
 import { TargetPicker } from "./TargetPicker";
 import {
   Button,
@@ -25,6 +32,7 @@ type Draft = {
   sharedKey: string;
   conversation: string;
   action: Action;
+  argumentsText?: string;
 };
 const action: Action = {
   name: "",
@@ -47,6 +55,10 @@ export function Compose({
   multiple?: boolean;
   conversation?: string;
 }) {
+  const me = useSession();
+  const [receipt, setReceipt] = useState<
+    { target?: Target; conversation_id?: string; request_id?: string }[] | null
+  >(null);
   const [saved, setSaved] = useDraft(
     "compose:" +
       mode +
@@ -71,20 +83,32 @@ export function Compose({
       action,
     };
   });
-  const [args, setArgs] = useState(() =>
-      JSON.stringify(draft.action.arguments, null, 2),
+  const [args, setArgs] = useState(
+      () =>
+        draft.argumentsText ?? JSON.stringify(draft.action.arguments, null, 2),
     ),
     [preview, setPreview] = useState<Preview | null>(null),
     [error, setError] = useState<Error | null>(null),
     [previewing, setPreviewing] = useState(false);
-  const operation = useOperation();
-  useEffect(() => setSaved(JSON.stringify(draft)), [draft, setSaved]);
+  const operation = useOperation(
+    "compose:" +
+      mode +
+      ":" +
+      initial.map((t) => t.kind + t.id).join(",") +
+      ":" +
+      conversation,
+  );
+  useEffect(
+    () => setSaved(JSON.stringify({ ...draft, argumentsText: args })),
+    [draft, args, setSaved],
+  );
   const update = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((x) => ({ ...x, [key]: value }));
     setPreview(null);
   };
   function validate() {
-    if (!draft.targets.length) throw Error("Choose a recipient.");
+    if (!draft.targets.length && !draft.conversation)
+      throw Error("Choose a recipient.");
     if (!draft.body.trim() || bytes(draft.body) > 32768)
       throw Error("Enter a message of at most 32,768 UTF-8 bytes.");
     if (
@@ -123,13 +147,41 @@ export function Compose({
     try {
       const descriptor = validate();
       setPreviewing(true);
-      setPreview(
-        await api<Preview>("/dispatch-preview", {
-          targets: draft.targets,
-          operation: draft.mode === "message" ? "message" : "ask",
-          descriptor,
-        }),
-      );
+      if (draft.conversation) {
+        const [context, cap] = await Promise.all([
+          api<Conversation>("/conversations/" + draft.conversation),
+          api<Capability>("/capabilities", {
+            conversation_id: draft.conversation,
+            descriptor,
+          }),
+        ]);
+        if (!cap.operations[draft.mode === "message" ? "message" : "ask"])
+          throw Error(
+            "Current conversation permissions do not allow this operation.",
+          );
+        const recipients = context.participants
+          .filter((p) => p.id !== me.person.id)
+          .map((p) => ({
+            target: { kind: p.kind, id: p.id },
+            name: p.name,
+            routes: [],
+          }));
+        setPreview({
+          recipients,
+          count: recipients.length,
+          hidden_recipients: 0,
+          token: "",
+          expires_at: new Date(Date.now() + 600000).toISOString(),
+          sends: false,
+        });
+      } else
+        setPreview(
+          await api<Preview>("/dispatch-preview", {
+            targets: draft.targets,
+            operation: draft.mode === "message" ? "message" : "ask",
+            descriptor,
+          }),
+        );
     } catch (e) {
       setError(e as Error);
     } finally {
@@ -156,7 +208,7 @@ export function Compose({
         shared_key: draft.sharedKey,
         conversation_id: draft.conversation,
         action: descriptor,
-        preview_token: preview.token,
+        preview_token: draft.conversation ? undefined : preview.token,
       };
       const body =
         draft.mode === "message"
@@ -165,7 +217,7 @@ export function Compose({
               body: draft.body,
               title: draft.title,
               conversation_id: draft.conversation,
-              preview_token: preview.token,
+              preview_token: draft.conversation ? undefined : preview.token,
             }
           : request;
       const batch = draft.targets.length > 1;
@@ -176,10 +228,14 @@ export function Compose({
         : draft.mode === "message"
           ? "/messages"
           : "/requests";
-      const result = await operation.run<{
-        conversation_id?: string;
-        id?: string;
-      }>(
+      const result = await operation.run<
+        | { conversation_id?: string; id?: string; messages?: Message[] }
+        | {
+            target: Target;
+            result?: { conversation_id: string };
+            request?: { id: string; conversation_id: string };
+          }[]
+      >(
         path,
         batch
           ? draft.mode === "message"
@@ -187,13 +243,40 @@ export function Compose({
                 targets: draft.targets,
                 body: draft.body,
                 title: draft.title,
+                preview_token: draft.conversation ? undefined : preview.token,
+              }
+            : {
+                targets: draft.targets,
+                request: {
+                  ...request,
+                  target: undefined,
+                  conversation_id: undefined,
+                  preview_token: undefined,
+                },
                 preview_token: preview.token,
               }
-            : { targets: draft.targets, request, preview_token: preview.token }
           : body,
       );
       if (result) {
         setSaved("");
+        if (Array.isArray(result)) {
+          setReceipt(
+            result.map((item) => ({
+              target: item.target,
+              conversation_id:
+                item.request?.conversation_id || item.result?.conversation_id,
+              request_id: item.request?.id,
+            })),
+          );
+          return;
+        }
+        const conversations = [
+          ...new Set(result.messages?.map((m) => m.conversation_id) || []),
+        ];
+        if (conversations.length > 1) {
+          setReceipt(conversations.map((id) => ({ conversation_id: id })));
+          return;
+        }
         onClose();
         if (result.conversation_id)
           navigate("/conversations/" + result.conversation_id);
@@ -203,11 +286,56 @@ export function Compose({
       setError(e as Error);
     }
   }
+  if (receipt)
+    return (
+      <Modal title="Dispatch accepted" wide onClose={onClose}>
+        <p>
+          {receipt.length} independent recipient records were accepted. Delivery
+          and replies remain separate.
+        </p>
+        {receipt.map((item, i) => (
+          <section className="section" key={i}>
+            <p>
+              {item.target
+                ? item.target.kind + " · " + item.target.id
+                : "Private recipient conversation"}
+            </p>
+            <div className="actions">
+              {item.conversation_id ? (
+                <Button
+                  onClick={() => {
+                    onClose();
+                    navigate("/conversations/" + item.conversation_id);
+                  }}
+                >
+                  Open conversation
+                </Button>
+              ) : null}
+              {item.request_id ? (
+                <Button
+                  onClick={() => {
+                    onClose();
+                    navigate("/requests/" + item.request_id);
+                  }}
+                >
+                  Open request
+                </Button>
+              ) : null}
+            </div>
+          </section>
+        ))}
+        <Button primary onClick={onClose}>
+          Done
+        </Button>
+      </Modal>
+    );
   return (
     <Modal
       title={
         draft.mode === "message"
-          ? "New conversation"
+          ? draft.conversation
+            ? "Reply in conversation"
+            : "New conversation"
           : draft.mode === "question"
             ? "Ask a question"
             : draft.mode === "approval"
@@ -229,23 +357,34 @@ export function Compose({
             <option value="approval">Approval</option>
           </select>
         </Field>
-        <TargetPicker
-          value={draft.targets}
-          onChange={(v) => update("targets", v)}
-          multiple={multiple}
-        />
-        <Field
-          label={
-            draft.mode === "message" ? "Conversation title (optional)" : "Title"
-          }
-        >
-          <input
-            required={draft.mode !== "message"}
-            maxLength={200}
-            value={draft.title}
-            onChange={(e) => update("title", e.target.value)}
+        {!draft.conversation ? (
+          <TargetPicker
+            value={draft.targets}
+            onChange={(v) => update("targets", v)}
+            multiple={multiple}
           />
-        </Field>
+        ) : (
+          <p className="help">
+            Continuing conversation <code>{draft.conversation}</code>. Its
+            actual participants are checked before sending.
+          </p>
+        )}
+        {!(draft.conversation && draft.mode === "message") ? (
+          <Field
+            label={
+              draft.mode === "message"
+                ? "Conversation title (optional)"
+                : "Title"
+            }
+          >
+            <input
+              required={draft.mode !== "message"}
+              maxLength={200}
+              value={draft.title}
+              onChange={(e) => update("title", e.target.value)}
+            />
+          </Field>
+        ) : null}
         <Field label={draft.mode === "message" ? "Message" : "Context"}>
           <textarea
             rows={5}
@@ -365,7 +504,9 @@ export function Compose({
                   {" "}
                   · {r.target.kind} · {r.target.id}
                 </small>
-                <Details value={r.routes} label="Permitted routes" />
+                {!draft.conversation ? (
+                  <Details value={r.routes} label="Permitted routes" />
+                ) : null}
               </div>
             ))}
             {preview.hidden_recipients ? (
@@ -375,8 +516,14 @@ export function Compose({
               </small>
             ) : null}
             <small>
-              Preview expires <DateValue value={preview.expires_at} />. Current
-              policy is checked again when sent.
+              {draft.conversation ? (
+                "Current conversation access is checked again when sent."
+              ) : (
+                <>
+                  Preview expires <DateValue value={preview.expires_at} />.
+                  Current policy is checked again when sent.
+                </>
+              )}
             </small>
           </section>
         ) : null}

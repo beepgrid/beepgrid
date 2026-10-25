@@ -1,9 +1,10 @@
 FROM node:24.22.1-alpine AS web
-WORKDIR /src/web
-COPY web/package*.json ./
+WORKDIR /src/workspace
+COPY workspace/package*.json ./
 RUN npm ci --no-fund
-COPY web ./
-RUN npm run build
+COPY workspace ./
+COPY internal/web/web.go ../internal/web/web.go
+RUN npm run build && npm run embed
 
 FROM golang:1.26.10-alpine AS builder
 WORKDIR /src

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useCapabilities,
   useCollection,
@@ -212,7 +212,7 @@ function RoleDetail({ role: r, onClose }: { role: Role; onClose: () => void }) {
   );
 }
 const blank: Rule = { action: "view", target_kind: "agent", target_id: "" };
-function RoleForm({
+export function RoleForm({
   role,
   onClose,
   onSaved,
@@ -562,7 +562,11 @@ function Assignments() {
               Load more roles
             </Button>
           ) : null}
-          <TargetPicker value={targets} onChange={setTargets} />
+          <TargetPicker
+            value={targets}
+            onChange={setTargets}
+            allowInstances={false}
+          />
           <Button
             primary
             type="submit"
@@ -663,12 +667,28 @@ function PolicyExplain() {
     [subject, setSubject] = useState(me.person.id),
     [target, setTarget] = useState<Target[]>([]),
     [action, setAction] = useState("view"),
+    [resourceKind, setResourceKind] = useState("group"),
+    [resourceId, setResourceId] = useState(""),
     [connection, setConnection] = useState(""),
     [name, setName] = useState(""),
     [descriptor, setDescriptor] = useState(""),
     [result, setResult] = useState<unknown>(null),
     [error, setError] = useState<Error | null>(null);
   const op = useOperation();
+  const meta = useResource<Workspace>("/workspace");
+  useEffect(
+    () => setResult(null),
+    [
+      subject,
+      action,
+      target,
+      connection,
+      name,
+      descriptor,
+      resourceKind,
+      resourceId,
+    ],
+  );
   return (
     <Form
       onSubmit={() => {
@@ -678,7 +698,10 @@ function PolicyExplain() {
             .run("/permissions/explain", {
               subject_id: subject,
               action,
-              target: target[0],
+              target:
+                action === "manage"
+                  ? { kind: resourceKind, id: resourceId }
+                  : target[0],
               connection_id: connection,
               action_name: name,
               descriptor: descriptor ? JSON.parse(descriptor) : undefined,
@@ -709,7 +732,34 @@ function PolicyExplain() {
           ))}
         </select>
       </Field>
-      <TargetPicker value={target} onChange={setTarget} />
+      {action === "manage" ? (
+        <div className="form-grid">
+          <Field label="Resource category">
+            <select
+              value={resourceKind}
+              onChange={(e) => setResourceKind(e.target.value)}
+            >
+              {Object.keys(
+                meta.data?.permission_model.management_targets || {},
+              ).map((kind) => (
+                <option key={kind}>{kind}</option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label="Exact resource ID"
+            hint={meta.data?.permission_model.management_targets[resourceKind]}
+          >
+            <input
+              required
+              value={resourceId}
+              onChange={(e) => setResourceId(e.target.value)}
+            />
+          </Field>
+        </div>
+      ) : (
+        <TargetPicker value={target} onChange={setTarget} />
+      )}
       <div className="form-grid">
         <Field label="Connection (optional)">
           <input
@@ -727,7 +777,13 @@ function PolicyExplain() {
         onChange={setDescriptor}
       />
       <ErrorView error={error || op.error} />
-      <Button primary type="submit" disabled={op.pending || !target.length}>
+      <Button
+        primary
+        type="submit"
+        disabled={
+          op.pending || (action === "manage" ? !resourceId : !target.length)
+        }
+      >
         Check permission
       </Button>
       {result ? (

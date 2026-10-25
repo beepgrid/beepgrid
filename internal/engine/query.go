@@ -108,6 +108,15 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 				}
 				expression = "t.disabled::text"
 			}
+		case "presence":
+			if in.Collection == "agents" {
+				if value != "connected" && value != "stale" && value != "offline" {
+					return out, Bad("presence must be connected, stale or offline.")
+				}
+				// One live replica keeps the stable identity connected. Revoked,
+				// expired and disabled credentials never count as live presence.
+				expression = `CASE WHEN t.disabled THEN 'offline' WHEN EXISTS(SELECT 1 FROM instances i JOIN credentials c ON c.scope=i.scope AND c.id=i.credential_id WHERE i.scope=t.scope AND i.agent_id=t.id AND NOT c.revoked AND c.expires_at>now() AND i.last_seen>now()-interval '45 seconds') THEN 'connected' WHEN EXISTS(SELECT 1 FROM instances i JOIN credentials c ON c.scope=i.scope AND c.id=i.credential_id WHERE i.scope=t.scope AND i.agent_id=t.id AND NOT c.revoked AND c.expires_at>now() AND i.last_seen>now()-interval '2 minutes') THEN 'stale' ELSE 'offline' END`
+			}
 		case "project", "type", "parent_id", "enrolled_by", "department", "manager_id":
 			if source.table == "principals" {
 				expression = "t.metadata->>'" + name + "'"

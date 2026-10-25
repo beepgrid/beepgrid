@@ -1,6 +1,6 @@
 NOTIF_TEST_DATABASE_URL ?= postgres://notif:notif@localhost:5499/notif?sslmode=disable
 export NOTIF_TEST_DATABASE_URL
-.PHONY: infra build dev playground test web sdk verify clean
+.PHONY: infra build dev playground test web workspace sdk verify clean
 infra:
 	docker compose up -d --wait
 build:
@@ -11,10 +11,12 @@ playground:
 	python3 scripts/playground.py
 test:
 	go test -race ./... -count=1
-web:
-	npm --prefix web ci --no-fund
-	npm --prefix web run build
-	npm --prefix web test
+web: workspace
+workspace:
+	npm --prefix workspace ci --no-fund
+	npm --prefix workspace test
+	npm --prefix workspace run build
+	npm --prefix workspace run embed
 sdk:
 	npm --prefix sdk/typescript ci --no-fund
 	npm --prefix sdk/typescript run build

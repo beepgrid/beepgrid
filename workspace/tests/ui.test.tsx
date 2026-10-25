@@ -1,7 +1,31 @@
+import { useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Button, QueryState } from "../src/ui";
+import { Button, Modal, QueryState } from "../src/ui";
 describe("shared primitives", () => {
+  it("returns keyboard focus to the opener after a dialog closes", () => {
+    function Example() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <Button onClick={() => setOpen(true)}>Open details</Button>
+          {open ? (
+            <Modal title="Details" onClose={() => setOpen(false)}>
+              <p>Record</p>
+            </Modal>
+          ) : null}
+        </>
+      );
+    }
+    render(<Example />);
+    const opener = screen.getByRole("button", { name: "Open details" });
+    opener.focus();
+    fireEvent.click(opener);
+    const close = screen.getByRole("button", { name: "Close" });
+    close.focus();
+    fireEvent.click(close);
+    expect(opener).toHaveFocus();
+  });
   it("secondary buttons do not accidentally submit their containing form", () => {
     const submit = vi.fn((e) => e.preventDefault());
     render(
