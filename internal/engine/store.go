@@ -220,6 +220,16 @@ func (s *Store) AuthenticateAccount(ctx context.Context, token string) (Actor, e
 	}
 	return a, e
 }
+
+// Logout can revoke a Person's own browser credential even while workspace
+// admission is suspended. This grants no data access or configuration authority.
+func (s *Store) AuthenticateLogout(ctx context.Context, token string) (Actor, error) {
+	a, e := s.authenticate(ctx, token, true)
+	if e == nil && (a.Kind != "person" || a.CredentialKind == "enrollment") {
+		return Actor{}, Denied()
+	}
+	return a, e
+}
 func (s *Store) authenticate(ctx context.Context, token string, accountOnly bool) (Actor, error) {
 	var a Actor
 	var meta []byte

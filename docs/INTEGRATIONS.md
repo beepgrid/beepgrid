@@ -73,3 +73,11 @@ A group-target grant also matches its current members for individual contact. Re
 MCP `send` and `ask` accept an optional `idempotency_key`. Save and reuse it across agent/tool retries and runtime restarts. Omitting it creates a new logical operation on each tool call.
 
 All three SDKs expose approval redemption and execution reporting (`Redeem`/`redeem` and `ReportExecution`/`reportExecution`/`report_execution`). MCP exposes `redeem_approval` and `report_execution`. These calls return authorization and reported evidence, and do not run arbitrary business tools. The protected tool must enforce the exact resource version and operation key.
+
+### Workspace replacement contracts
+
+The paged `POST /api/v1/query` endpoint accepts `conversation_id` for `requests`, as well as for `messages` and `attachments`. Request rows remain independently authorized; supplying a conversation ID does not grant access to any request or another tenant's data.
+
+For `POST /api/v1/groups`, omitting `members` (or sending null) on an existing versioned group changes only its name and preserves its current roster. Send an explicit empty array to request removing all members, subject to current membership and role-assignment checks. A name-only edit returns the caller's filtered roster, with `members_complete=false` when appropriate. Keep the observed positive `version` to prevent stale writes.
+
+`POST /api/v1/auth/logout` can revoke a valid Person browser session during workspace suspension. This exception provides no business-data or account-status access. Normal workspace admission checks continue to apply to other routes; account status retains its separate explicit authorization.

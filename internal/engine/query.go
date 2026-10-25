@@ -86,7 +86,7 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 				expression = "t.delivery_id"
 			}
 		case "conversation_id":
-			if in.Collection == "messages" || in.Collection == "attachments" {
+			if in.Collection == "messages" || in.Collection == "attachments" || in.Collection == "requests" {
 				expression = "t.conversation_id"
 			}
 		case "state":

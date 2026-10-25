@@ -270,6 +270,9 @@ func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	return visible, nil
 }
 func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) {
+	// Omitting members on an existing group is a name-only edit. An explicit
+	// empty array still means clear membership, under the usual assignment checks.
+	preserveMembers := g.ID != "" && g.Members == nil
 	if !ValidText(g.Name, 100) || len(g.Members) > 1000 {
 		return g, Bad("A name and at most 1000 members are required.")
 	}
@@ -300,6 +303,9 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 			if e != nil {
 				return e
 			}
+		}
+		if preserveMembers {
+			g.Members = old
 		}
 		if !s.membershipChangeAllowed(ctx, tx, a, g.ID, old, g.Members) {
 			return Denied()
@@ -336,6 +342,14 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 	})
 	g.Member = contains(g.Members, a.ID)
 	g.MembersComplete = true
+	if err == nil && preserveMembers {
+		// A name-only edit must not reveal the hidden roster preserved above.
+		visible, e := s.queryRecord(ctx, a, "groups", g.ID)
+		if e != nil {
+			return Group{}, e
+		}
+		return visible.(Group), nil
+	}
 	return g, err
 }
 

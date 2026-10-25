@@ -123,6 +123,8 @@ func (s *Server) protect(fn func(http.ResponseWriter, *http.Request) error) http
 		var e error
 		if r.URL.Path == "/api/v1/workspace/account" && r.Method == "GET" {
 			a, e = s.Store.AuthenticateAccount(r.Context(), token)
+		} else if r.URL.Path == "/api/v1/auth/logout" && r.Method == "POST" {
+			a, e = s.Store.AuthenticateLogout(r.Context(), token)
 		} else {
 			a, e = s.Store.Authenticate(r.Context(), token)
 		}
