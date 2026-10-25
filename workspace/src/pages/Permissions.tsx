@@ -110,33 +110,40 @@ export default function Permissions() {
       ) : null}
       {tab === "roles" ? (
         <QueryState query={roles} empty="No permitted role definitions">
-          <table>
-            <thead>
-              <tr>
-                <th>Role</th>
-                <th>Rules</th>
-                <th>Revision</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {roles.items.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <strong>{r.name}</strong>
-                    <p>
-                      <small>{r.id}</small>
-                    </p>
-                  </td>
-                  <td>{r.rules.length}</td>
-                  <td>{r.version}</td>
-                  <td>
-                    <Button onClick={() => setRole(r)}>Inspect</Button>
-                  </td>
+          <div
+            className="table-wrap"
+            role="region"
+            aria-label="Role definitions"
+            tabIndex={0}
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>Rules</th>
+                  <th>Revision</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {roles.items.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <strong>{r.name}</strong>
+                      <p>
+                        <small>{r.id}</small>
+                      </p>
+                    </td>
+                    <td>{r.rules.length}</td>
+                    <td>{r.version}</td>
+                    <td>
+                      <Button onClick={() => setRole(r)}>Inspect</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </QueryState>
       ) : null}
       {tab === "assignments" ? <Assignments /> : null}

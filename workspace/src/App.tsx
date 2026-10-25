@@ -380,7 +380,11 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
             ))}
           </div>
           <div className="profile">
-            <IdentityIcon kind="person" />
+            <IdentityIcon
+              id={me.person.id}
+              kind="person"
+              label={me.person.name}
+            />
             <div>
               <strong>{me.person.name}</strong>
               <span>
@@ -423,7 +427,7 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
           </span>
           <span className="environment">{me.environment}</span>
         </header>
-        <main id="main" tabIndex={-1}>
+        <main id="main" data-page={page} tabIndex={-1}>
           <ErrorView error={error} />
           <SectionBoundary key={page}>
             {section.error ? (

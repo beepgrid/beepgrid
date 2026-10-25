@@ -73,7 +73,7 @@ export default function Groups() {
                 <tr key={g.id}>
                   <td>
                     <div className="identity">
-                      <IdentityIcon kind="group" />
+                      <IdentityIcon id={g.id} kind="group" label={g.name} />
                       <div>
                         <strong>{g.name}</strong>
                         <small>{g.id}</small>
@@ -143,7 +143,7 @@ function GroupDetail({
   return (
     <Modal title={g.name} wide onClose={onClose}>
       <div className="intro">
-        <IdentityIcon kind="group" />
+        <IdentityIcon id={g.id} kind="group" label={g.name} />
         <div>
           <h2>{g.name}</h2>
           <p>
@@ -332,7 +332,7 @@ function MemberIdentity({ id }: { id: string }) {
   const identity = query.data?.items[0];
   return (
     <div className="pick-row">
-      <IdentityIcon kind={kind} />
+      <IdentityIcon id={identity?.id} kind={kind} label={identity?.name} />
       <span>
         {identity?.name || "Member"}
         <br />

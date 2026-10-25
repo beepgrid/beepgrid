@@ -97,7 +97,7 @@ export function TargetPicker({
                   )}
                   onChange={() => toggle(item.id)}
                 />
-                <IdentityIcon kind={kind} label={name} />
+                <IdentityIcon id={item.id} kind={kind} label={name} />
                 <span>
                   {name}
                   <br />

@@ -88,6 +88,7 @@ export default function Integrations() {
                 <header>
                   <IdentityIcon
                     kind={p.kind === "native" ? "agent" : "service"}
+                    label={names[p.kind] || p.kind}
                   />
                   <h3>{names[p.kind] || p.kind}</h3>
                   {p.builtin ? <Badge>Built in</Badge> : null}
@@ -329,7 +330,7 @@ function ConnectionDetail({
   return (
     <Modal title={c.name} wide onClose={onClose}>
       <div className="intro">
-        <IdentityIcon kind="service" />
+        <IdentityIcon id={c.id} kind="service" label={c.name} />
         <div>
           <h2>{c.name}</h2>
           <p>

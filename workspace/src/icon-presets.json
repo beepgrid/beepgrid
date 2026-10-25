@@ -1,0 +1,27 @@
+[
+  {
+    "id": "open-tabs",
+    "name": "Open Tabs \u00b7 Outline",
+    "description": "Closest to your shortlist: familiar outline symbols on flat neutral tiles."
+  },
+  {
+    "id": "lucide-tint",
+    "name": "Lucide \u00b7 Tinted",
+    "description": "Crisp outline symbols with a restrained color wash. No shine or gradient."
+  },
+  {
+    "id": "phosphor-duotone",
+    "name": "Phosphor \u00b7 Duotone",
+    "description": "Rounder silhouettes with two-tone fills and a quiet, flat surface."
+  },
+  {
+    "id": "geometric-flat",
+    "name": "Geometric \u00b7 Flat",
+    "description": "Distinct abstract marks on solid colors, with no highlight or shadow."
+  },
+  {
+    "id": "dimensional",
+    "name": "Geometric \u00b7 Shaded",
+    "description": "The previous geometric marks with softly shaded tiles, kept for comparison."
+  }
+]

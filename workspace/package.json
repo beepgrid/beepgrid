@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build && node scripts/assets.mjs",
+    "dev": "node scripts/typography.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/typography.mjs && tsc --noEmit && vite build && node scripts/assets.mjs",
     "test": "vitest run",
     "embed": "node scripts/assets.mjs --embed"
   },

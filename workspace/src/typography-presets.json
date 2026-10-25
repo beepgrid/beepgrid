@@ -1,0 +1,102 @@
+[
+  {
+    "id": "inter-reference",
+    "name": "Inter \u00b7 Reference",
+    "family": "BG Inter",
+    "font": "inter",
+    "body": 15,
+    "weight": 450,
+    "strong": 625,
+    "description": "Closest overall match: open letters, firm names and readable secondary text."
+  },
+  {
+    "id": "inter-strong",
+    "name": "Inter \u00b7 Stronger ink",
+    "family": "BG Inter",
+    "font": "inter",
+    "body": 15,
+    "weight": 500,
+    "strong": 650,
+    "description": "The same proportions with slightly heavier strokes throughout."
+  },
+  {
+    "id": "system-reference",
+    "name": "System \u00b7 Native clarity",
+    "family": "system-ui",
+    "font": null,
+    "body": 15,
+    "weight": 450,
+    "strong": 625,
+    "description": "Your Mac system typeface with the reference sizing and hierarchy."
+  },
+  {
+    "id": "geist-reference",
+    "name": "Geist \u00b7 Precise",
+    "family": "BG Geist",
+    "font": "geist",
+    "body": 15,
+    "weight": 460,
+    "strong": 625,
+    "description": "A crisp, slightly more technical alternative with substantial labels."
+  },
+  {
+    "id": "source-readable",
+    "name": "Source Sans 3 \u00b7 Humanist",
+    "family": "BG Source Sans 3",
+    "font": "source-sans-3",
+    "body": 16,
+    "weight": 470,
+    "strong": 650,
+    "description": "Open shapes and a softer rhythm, sized up to match the reference."
+  },
+  {
+    "id": "inter-roomy",
+    "name": "Inter \u00b7 Roomier",
+    "family": "BG Inter",
+    "font": "inter",
+    "body": 16,
+    "weight": 450,
+    "strong": 625,
+    "description": "Larger text for a more relaxed, readable workspace."
+  },
+  {
+    "id": "dm-balanced",
+    "name": "DM Sans \u00b7 Balanced",
+    "family": "BG DM Sans",
+    "font": "dm-sans",
+    "body": 15,
+    "weight": 470,
+    "strong": 625,
+    "description": "Soft geometry with a firmer reading weight."
+  },
+  {
+    "id": "plex-clear",
+    "name": "IBM Plex Sans \u00b7 Distinct",
+    "family": "BG IBM Plex Sans",
+    "font": "ibm-plex-sans",
+    "body": 15.5,
+    "weight": 450,
+    "strong": 600,
+    "description": "More individual letterforms and a practical, technical character."
+  },
+  {
+    "id": "manrope-soft",
+    "name": "Manrope \u00b7 Soft geometric",
+    "family": "BG Manrope",
+    "font": "manrope",
+    "body": 15,
+    "weight": 500,
+    "strong": 650,
+    "description": "Rounder shapes with extra weight to keep small labels clear."
+  },
+  {
+    "id": "jakarta-modern",
+    "name": "Plus Jakarta Sans \u00b7 Rounded",
+    "family": "BG Plus Jakarta Sans",
+    "font": "plus-jakarta-sans",
+    "body": 15,
+    "weight": 470,
+    "strong": 650,
+    "description": "A more rounded interpretation, furthest from the reference of these options."
+  }
+]

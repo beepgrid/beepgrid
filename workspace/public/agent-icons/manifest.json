@@ -1,0 +1,178 @@
+{
+  "commits": {
+    "lucide": "7faf87628a1ad6175975bc595344337ce14a7db4",
+    "phosphor": "2b75f3ad12b420c9504ef05df8d2564a28f8500e"
+  },
+  "icons": [
+    {
+      "pack": "lucide",
+      "index": 0,
+      "name": "file-text",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/file-text.svg",
+      "sha256": "52ca55846c202335fb870c8aa23e9345630ec10489303756d62e750f7109605c"
+    },
+    {
+      "pack": "lucide",
+      "index": 1,
+      "name": "code-xml",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/code-xml.svg",
+      "sha256": "a6d2110227be375be21da7324d3c09262c1bf019d06bdeab356d515342ab7cce"
+    },
+    {
+      "pack": "lucide",
+      "index": 2,
+      "name": "database",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/database.svg",
+      "sha256": "471eb14bc8d144896a82dfc4aa9daf350f769f0896f4bef33e50aabdbb51130d"
+    },
+    {
+      "pack": "lucide",
+      "index": 3,
+      "name": "shield-check",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/shield-check.svg",
+      "sha256": "8d4fcdbde5bba4abb1a2f6fe53e37ceb6343a1d5449a9d88f6f97c1971d26c4e"
+    },
+    {
+      "pack": "lucide",
+      "index": 4,
+      "name": "messages-square",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/messages-square.svg",
+      "sha256": "97733c58b74f8beddd569927f8453c86bca4afa394e6aad606db1acff4bd8355"
+    },
+    {
+      "pack": "lucide",
+      "index": 5,
+      "name": "compass",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/compass.svg",
+      "sha256": "c5a4d147bf48424f48b514712dd61c1b07cb689612a7baef87c88870092c1659"
+    },
+    {
+      "pack": "lucide",
+      "index": 6,
+      "name": "cpu",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/cpu.svg",
+      "sha256": "ec83bb69ec029d367d749afc445b39c8e95891ebf99b0400652677c2b149b99c"
+    },
+    {
+      "pack": "lucide",
+      "index": 7,
+      "name": "scan-search",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/scan-search.svg",
+      "sha256": "a2919e740bb122bb737542119c1d3c1042bcd62c79d702804553cc95ac768e1e"
+    },
+    {
+      "pack": "lucide",
+      "index": 8,
+      "name": "workflow",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/workflow.svg",
+      "sha256": "ae99ea8f56a2835a2cca35b2fbb57643ab73443610970dba23e24bd9df75cfec"
+    },
+    {
+      "pack": "lucide",
+      "index": 9,
+      "name": "boxes",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/boxes.svg",
+      "sha256": "7e301f6c38337389f5a96675d14cb9d8ef8a613329e99c3dfcf7c635bdd1faae"
+    },
+    {
+      "pack": "lucide",
+      "index": 10,
+      "name": "radio-tower",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/radio-tower.svg",
+      "sha256": "d5d2728425fe115bed9f309c03b9dd1e2b7483a9242df87966c37e36ee3381cf"
+    },
+    {
+      "pack": "lucide",
+      "index": 11,
+      "name": "search",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/7faf87628a1ad6175975bc595344337ce14a7db4/icons/search.svg",
+      "sha256": "283d371c2e433817bb9c0c8310caa6c77fa4177c0f4f1168d9c83b97af7389dc"
+    },
+    {
+      "pack": "phosphor",
+      "index": 0,
+      "name": "file-text",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/file-text-duotone.svg",
+      "sha256": "6b0867a397af11f3c0a66091a4e17e3c172a42f48812ba99fc8157d9093cb7ea"
+    },
+    {
+      "pack": "phosphor",
+      "index": 1,
+      "name": "code",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/code-duotone.svg",
+      "sha256": "bafb91fe5a241756d0102490d48d7146c74e81831414a6f6d3792835c5f65ed1"
+    },
+    {
+      "pack": "phosphor",
+      "index": 2,
+      "name": "database",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/database-duotone.svg",
+      "sha256": "2543df52f9d509307cd7d08d8bf2ba9033aa23207791c32e2526841ef869ea1c"
+    },
+    {
+      "pack": "phosphor",
+      "index": 3,
+      "name": "shield-check",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/shield-check-duotone.svg",
+      "sha256": "e42c34a900022e60b41136a5744989af1cfb977247079afbfaf5a8440b86fd91"
+    },
+    {
+      "pack": "phosphor",
+      "index": 4,
+      "name": "chats-circle",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/chats-circle-duotone.svg",
+      "sha256": "b760d5cc31d6e86191969557d908c1f3238f3742b4d991ec8ec67b74c578b552"
+    },
+    {
+      "pack": "phosphor",
+      "index": 5,
+      "name": "compass",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/compass-duotone.svg",
+      "sha256": "00b82ffc59e709c6605a7fe02a0c541c49e2d26c4d58f5dad557ddaeae76e745"
+    },
+    {
+      "pack": "phosphor",
+      "index": 6,
+      "name": "cpu",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/cpu-duotone.svg",
+      "sha256": "90317b07d6f560aebf37e2aa29fa5750f3f4f959797c610054cc750bbbebab9c"
+    },
+    {
+      "pack": "phosphor",
+      "index": 7,
+      "name": "magnifying-glass",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/magnifying-glass-duotone.svg",
+      "sha256": "7a840ea2341e75cf1d9187e07223be4501d6c6078a064a4097be07c1b3a52fb6"
+    },
+    {
+      "pack": "phosphor",
+      "index": 8,
+      "name": "tree-structure",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/tree-structure-duotone.svg",
+      "sha256": "576f858cd9a82372aa845dd98ca00ef37cd4cf72e518399554fee4177ddd3814"
+    },
+    {
+      "pack": "phosphor",
+      "index": 9,
+      "name": "cube",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/cube-duotone.svg",
+      "sha256": "5a4833e706e0d7431e607b930ce22af06fcb8ee29ff05da50cb12701a8e64e5b"
+    },
+    {
+      "pack": "phosphor",
+      "index": 10,
+      "name": "broadcast",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/broadcast-duotone.svg",
+      "sha256": "d11faf62485744d441a5edb183b14ba6cdfb513f2cda3b1bf8b8bfbe58e44989"
+    },
+    {
+      "pack": "phosphor",
+      "index": 11,
+      "name": "binoculars",
+      "source": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/duotone/binoculars-duotone.svg",
+      "sha256": "8fb8e2b85f5005e340a3ee99d9142a3d04943f601a227f13c3da6c6382b763dd"
+    }
+  ],
+  "sprite_sha256": "83c97b93fc37beb7bd48ca74f3e3ecd9988a14c23f1ef56375da190ddabc97b2",
+  "normalization": "Lucide stroke width normalized to 1.65 for the Open Tabs reference; original view boxes retained."
+}

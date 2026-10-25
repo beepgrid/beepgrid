@@ -81,7 +81,11 @@ export default function Settings() {
               <section className="section">
                 <h2>My account</h2>
                 <div className="intro">
-                  <IdentityIcon kind="person" />
+                  <IdentityIcon
+                    id={me.person.id}
+                    kind="person"
+                    label={me.person.name}
+                  />
                   <div>
                     <h3>{me.person.name}</h3>
                     <p>{me.person.external_id}</p>
@@ -180,7 +184,7 @@ function Services() {
         {q.items.map((s) => (
           <div className="section" key={s.id}>
             <div className="identity">
-              <IdentityIcon kind="service" />
+              <IdentityIcon id={s.id} kind="service" label={s.name} />
               <div style={{ flex: 1 }}>
                 <strong>{s.name}</strong>
                 <p>{s.external_id}</p>

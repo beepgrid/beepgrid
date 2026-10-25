@@ -7,6 +7,8 @@ import {
   type FormEvent,
 } from "react";
 import { APIError, readable, timestamp } from "./client";
+import type { Identity } from "./contracts";
+import { AgentMark, identitySeed } from "./AgentMark";
 
 const paths: Record<string, string> = {
   inbox: "M4 4h16v16H4z M4 13h5l2 3h2l2-3h5",
@@ -95,10 +97,13 @@ export function Logo({ word = true }: { word?: boolean }) {
 export function IdentityIcon({
   kind = "agent",
   label,
+  id,
 }: {
   kind?: string;
   label?: string;
+  id?: string;
 }) {
+  const seed = identitySeed(`${kind}:${id || label || "unassigned"}`);
   const glyph =
     kind === "person"
       ? "people"
@@ -108,17 +113,110 @@ export function IdentityIcon({
           ? "groups"
           : kind === "instance"
             ? "code"
-            : /research|search|scout/i.test(label || "")
-              ? "search"
-              : /build|code|engineer/i.test(label || "")
-                ? "code"
-                : /review|audit/i.test(label || "")
-                  ? "eye"
-                  : "agents";
+            : "conversations";
   return (
-    <span className="identity-icon">
+    <span
+      className={`identity-icon identity-${kind}`}
+      data-tone={
+        ["blue", "teal", "amber", "slate", "copper", "forest"][seed % 6]
+      }
+      aria-hidden="true"
+    >
+      {kind === "agent" ? (
+        <AgentMark seed={seed} />
+      ) : kind === "person" && label ? (
+        initials(label)
+      ) : (
+        <Icon name={glyph} />
+      )}
+    </span>
+  );
+}
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => Array.from(word)[0])
+    .join("")
+    .toLocaleUpperCase();
+}
+type Participant = Pick<Identity, "id" | "kind" | "name">;
+export function conversationPeers(
+  participants: readonly Participant[],
+  currentId: string,
+) {
+  const unique = participants.filter(
+    (person, index, all) => all.findIndex((p) => p.id === person.id) === index,
+  );
+  const others = unique.filter((person) => person.id !== currentId);
+  return others.length ? others : unique;
+}
+export function conversationLabel(
+  participants: readonly Participant[],
+  currentId: string,
+) {
+  const peers = conversationPeers(participants, currentId);
+  return peers.length > 1
+    ? `${new Set(participants.map((person) => person.id)).size} participants`
+    : peers[0]?.kind || "Conversation";
+}
+export function ConversationAvatar({
+  participants,
+  currentId,
+}: {
+  participants: readonly Participant[];
+  currentId: string;
+}) {
+  const peers = conversationPeers(participants, currentId)
+    .slice()
+    .sort((a, b) => a.id.localeCompare(b.id));
+  if (peers.length <= 1)
+    return (
+      <IdentityIcon
+        id={peers[0]?.id}
+        kind={peers[0]?.kind || "conversation"}
+        label={peers[0]?.name}
+      />
+    );
+  return (
+    <span
+      className="conversation-avatar"
+      data-count={Math.min(4, peers.length)}
+      aria-hidden="true"
+    >
+      {peers.slice(0, peers.length > 4 ? 3 : 4).map((person) => (
+        <IdentityIcon
+          key={person.id}
+          id={person.id}
+          kind={person.kind}
+          label={person.name}
+        />
+      ))}
+      {peers.length > 4 ? (
+        <span className="avatar-more">+{peers.length - 3}</span>
+      ) : null}
+    </span>
+  );
+}
+export function RequestKind({
+  kind,
+  iconOnly = false,
+}: {
+  kind: string;
+  iconOnly?: boolean;
+}) {
+  const glyph =
+    kind === "approval" ? "permissions" : kind === "task" ? "task" : "question";
+  return iconOnly ? (
+    <span className={`request-kind-icon request-${kind}`} aria-hidden="true">
       <Icon name={glyph} />
     </span>
+  ) : (
+    <Badge tone={`request-${kind}`}>
+      <Icon name={glyph} size={12} />
+      {kind}
+    </Badge>
   );
 }
 export function Button({

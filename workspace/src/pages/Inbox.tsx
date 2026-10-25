@@ -24,7 +24,7 @@ import {
   Field,
   Form,
   Icon,
-  IdentityIcon,
+  RequestKind,
   Loading,
   Modal,
   PageHeader,
@@ -116,10 +116,7 @@ export default function Inbox() {
                   key={r.id}
                   onClick={() => navigate("/requests/" + r.id)}
                 >
-                  <IdentityIcon
-                    kind={r.kind === "approval" ? "service" : "agent"}
-                    label={r.kind}
-                  />
+                  <RequestKind kind={r.kind} iconOnly />
                   <div className="request-text">
                     <strong>{r.title}</strong>
                     <p>{r.body}</p>
@@ -130,9 +127,13 @@ export default function Inbox() {
                       </small>
                     ) : null}
                   </div>
-                  <Badge>{r.kind}</Badge>
-                  <Status value={r.response?.outcome || r.state} />
-                  <time title={r.created_at}>{relative(r.created_at)}</time>
+                  <div className="request-meta">
+                    <RequestKind kind={r.kind} />
+                    <Status value={r.response?.outcome || r.state} />
+                    <time dateTime={r.created_at} title={r.created_at}>
+                      {relative(r.created_at)}
+                    </time>
+                  </div>
                   <Icon name="chevron" size={15} />
                 </button>
               ))}
@@ -240,7 +241,7 @@ function RequestDetail({ id }: { id: string }) {
       <ErrorView error={op.error || validation} />
       <section className="request-hero">
         <div className="actions">
-          <Badge>{r.kind}</Badge>
+          <RequestKind kind={r.kind} />
           <Status value={r.response?.outcome || r.state} />
           <small>Version {r.version}</small>
         </div>

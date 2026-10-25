@@ -3,6 +3,9 @@ package web
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"io"
 	"io/fs"
 	"net/http/httptest"
@@ -10,6 +13,67 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestEmbeddedTypographyFontsAndLicenses(t *testing.T) {
+	root, _ := fs.Sub(assets, "dist")
+	raw, err := fs.ReadFile(root, "fonts/manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fonts []struct {
+		Name, File, SHA256, License string
+		Bytes                       int
+	}
+	if err := json.Unmarshal(raw, &fonts); err != nil || len(fonts) != 7 {
+		t.Fatalf("font manifest: %v (%d fonts)", err, len(fonts))
+	}
+	for _, font := range fonts {
+		t.Run(font.Name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/fonts/"+font.File, nil))
+			body := rec.Body.Bytes()
+			hash := sha256.Sum256(body)
+			if rec.Code != 200 || rec.Header().Get("Content-Type") != "font/woff2" || len(body) != font.Bytes || !bytes.HasPrefix(body, []byte("wOF2")) || hex.EncodeToString(hash[:]) != font.SHA256 {
+				t.Fatalf("font integrity or delivery: %d %s %d bytes", rec.Code, rec.Header().Get("Content-Type"), len(body))
+			}
+			license, err := fs.ReadFile(root, "fonts/"+font.Name+"-OFL.txt")
+			if err != nil || font.License != "OFL-1.1" || !bytes.Contains(license, []byte("SIL OPEN FONT LICENSE")) {
+				t.Fatalf("missing font license: %v", err)
+			}
+		})
+	}
+}
+
+func TestEmbeddedAgentIconSpriteAndLicenses(t *testing.T) {
+	root, _ := fs.Sub(assets, "dist")
+	raw, err := fs.ReadFile(root, "agent-icons/manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		SpriteSHA256 string `json:"sprite_sha256"`
+		Icons        []struct {
+			Pack  string
+			Index int
+		}
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil || len(manifest.Icons) != 24 {
+		t.Fatalf("icon manifest: %v, %d icons", err, len(manifest.Icons))
+	}
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/agent-icons/marks.svg", nil))
+	body := rec.Body.Bytes()
+	hash := sha256.Sum256(body)
+	if rec.Code != 200 || !strings.Contains(rec.Header().Get("Content-Type"), "image/svg+xml") || hex.EncodeToString(hash[:]) != manifest.SpriteSHA256 {
+		t.Fatal("missing or changed SVG sprite", rec.Code)
+	}
+	for _, pack := range []string{"lucide", "phosphor"} {
+		license, err := fs.ReadFile(root, "agent-icons/"+pack+"-LICENSE.txt")
+		if err != nil || !bytes.Contains(license, []byte("Permission")) {
+			t.Fatalf("missing icon license for %s: %v", pack, err)
+		}
+	}
+}
 
 func TestEmbeddedAssetsCompressionConditionalAndRange(t *testing.T) {
 	h := Handler()

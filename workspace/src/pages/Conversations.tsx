@@ -15,11 +15,14 @@ import type {
   Message,
   Request,
 } from "../contracts";
-import { bytes, timestamp, upload } from "../client";
+import { bytes, relative, timestamp, upload } from "../client";
 import { navigate, useRoute } from "../navigation";
 import { Compose } from "../Compose";
 import {
   Button,
+  ConversationAvatar,
+  conversationPeers,
+  conversationLabel,
   DateValue,
   Details,
   Empty,
@@ -36,7 +39,8 @@ import {
 } from "../ui";
 
 export default function Conversations() {
-  const route = useRoute();
+  const route = useRoute(),
+    me = useSession();
   const [search, setSearch] = useState(""),
     [compose, setCompose] = useState(false);
   const q = useCollection<Conversation>(
@@ -70,13 +74,34 @@ export default function Conversations() {
           <QueryState query={q} empty="No permitted conversations">
             {q.items.map((c) => (
               <button
-                className="conversation-row"
+                className="conversation-row conversation-preview"
                 key={c.id}
                 aria-current={route.id === c.id}
                 onClick={() => navigate("/conversations/" + c.id)}
               >
-                <strong>{c.title || "Untitled conversation"}</strong>
-                <p>{c.participants?.map((p) => p.name).join(", ") || c.id}</p>
+                <ConversationAvatar
+                  participants={c.participants || []}
+                  currentId={me.person.id}
+                />
+                <div className="conversation-copy">
+                  <strong>{c.title || "Untitled conversation"}</strong>
+                  <p>
+                    {conversationPeers(c.participants || [], me.person.id)
+                      .map((p) => p.name)
+                      .join(", ") || "Conversation"}
+                  </p>
+                  <div className="conversation-meta">
+                    <span>
+                      {conversationLabel(c.participants || [], me.person.id)}
+                    </span>
+                    <time
+                      dateTime={c.created_at}
+                      title={timestamp(c.created_at)}
+                    >
+                      Started {relative(c.created_at)}
+                    </time>
+                  </div>
+                </div>
               </button>
             ))}
           </QueryState>
@@ -205,9 +230,9 @@ function Chat({ id }: { id: string }) {
   return (
     <section className="chat">
       <header className="chat-head">
-        <IdentityIcon
-          kind={participants[0]?.kind}
-          label={participants[0]?.name}
+        <ConversationAvatar
+          participants={c.participants}
+          currentId={me.person.id}
         />
         <div className="chat-heading">
           <strong>{c.title || "Conversation"}</strong>
@@ -428,7 +453,7 @@ const ChatMessage = memo(function ChatMessage({
 }) {
   return (
     <article className="message">
-      <IdentityIcon kind={kind} label={name} />
+      <IdentityIcon id={m.sender_id} kind={kind} label={name} />
       <div className="message-body">
         <div className="message-meta">
           <strong>{name}</strong>

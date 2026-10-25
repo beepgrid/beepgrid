@@ -207,7 +207,7 @@ export default function Directory({ section }: { section: string }) {
                   )
                 }
               />
-              <IdentityIcon kind={item.kind} label={item.name} />
+              <IdentityIcon id={item.id} kind={item.kind} label={item.name} />
               <div>
                 <strong>{item.name}</strong>
                 <p>{String(item.metadata?.description || item.external_id)}</p>
@@ -333,7 +333,7 @@ export function IdentityDetail({
   return (
     <Modal title={p.name} wide onClose={onClose}>
       <div className="intro">
-        <IdentityIcon kind={p.kind} label={p.name} />
+        <IdentityIcon id={p.id} kind={p.kind} label={p.name} />
         <div>
           <h2>{p.name}</h2>
           <p>
