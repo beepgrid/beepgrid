@@ -79,7 +79,8 @@ export async function api<T>(
   return value as T;
 }
 // A retry retains the operation identity only while both the path and exact body match.
-// This lives in the mounted form, never in the global cache or a shared credential store.
+// A scoped recovery journal can retain it across navigation. Acceptance and
+// confirmed context revocation clear it; it is never a shared credential store.
 export class Operation {
   private signature = "";
   private key = "";

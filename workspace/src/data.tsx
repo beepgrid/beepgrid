@@ -1,4 +1,11 @@
-import { createContext, useContext, useRef, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import {
   QueryClient,
   useQuery,
@@ -103,6 +110,7 @@ export function useOperation(recoveryName?: string) {
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const locked = useRef(false);
+  const forget = useCallback(() => op.current.accepted(), []);
   async function run<T>(path: string, body: unknown): Promise<T | undefined> {
     if (locked.current || uncertain) return;
     locked.current = true;
@@ -149,6 +157,7 @@ export function useOperation(recoveryName?: string) {
     uncertain,
     error,
     clear: () => setError(null),
+    forget,
   };
 }
 const draftPrefix = "beepgrid:workspace:draft:";

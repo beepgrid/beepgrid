@@ -32,6 +32,7 @@ import {
   PageHeader,
   QueryState,
   Search,
+  unavailable,
 } from "../ui";
 
 export default function Conversations() {
@@ -141,9 +142,15 @@ function Chat({ id }: { id: string }) {
     if (pinned.current) end.current?.scrollIntoView({ block: "end" });
   }, [messages.length, id]);
   useEffect(() => {
-    if (q.error || caps.error || (caps.data && !caps.data.operations.message))
+    if (
+      unavailable(q.error) ||
+      unavailable(caps.error) ||
+      (caps.data && !caps.data.operations.message)
+    ) {
       setBody("");
-  }, [q.error, caps.error, caps.data, setBody]);
+      op.forget();
+    }
+  }, [q.error, caps.error, caps.data, setBody, op.forget]);
   async function send() {
     setError(null);
     if (!destination || !body.trim()) return;

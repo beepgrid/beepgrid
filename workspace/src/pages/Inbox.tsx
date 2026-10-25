@@ -32,6 +32,7 @@ import {
   Search,
   Status,
   Tabs,
+  unavailable,
 } from "../ui";
 
 export default function Inbox() {
@@ -171,9 +172,15 @@ function RequestDetail({ id }: { id: string }) {
     !!request.data,
   );
   useEffect(() => {
-    if (caps.error || (caps.data && !caps.data.operations.respond))
+    if (
+      unavailable(request.error) ||
+      unavailable(caps.error) ||
+      (caps.data && !caps.data.operations.respond)
+    ) {
       setAnswer("");
-  }, [caps.error, caps.data, setAnswer]);
+      op.forget();
+    }
+  }, [request.error, caps.error, caps.data, setAnswer, op.forget]);
   if (request.isPending || caps.isPending)
     return <Loading label="Opening request" />;
   if (request.error || caps.error)
