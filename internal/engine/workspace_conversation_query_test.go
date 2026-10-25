@@ -74,3 +74,58 @@ func TestGroupNameEditPreservesMembershipAndVisibility(t *testing.T) {
 		t.Fatal("stale rename accepted", err)
 	}
 }
+
+func TestExactQueryIdentityAndLightweightConversations(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	worker := testWorker(t, s, owner, "list-participant")
+	hidden := testPerson(t, s, owner, "hidden-query-id")
+	reader := testPerson(t, s, owner, "reader-query-id")
+	page, err := s.Query(ctx, reader, QueryInput{Collection: "people", Filters: map[string]string{"id": hidden.ID}})
+	if err != nil || len(page.Items) != 0 {
+		t.Fatal("exact ID broadened policy", page, err)
+	}
+	sent, err := s.Send(ctx, owner, SendInput{Target: Target{"agent", worker.ID}, Body: "Not needed in the list"}, "light-list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err = s.Query(ctx, owner, QueryInput{Collection: "conversations", Filters: map[string]string{"id": sent.ConversationID}})
+	if err != nil || len(page.Items) != 1 {
+		t.Fatal(page, err)
+	}
+	c := page.Items[0].(Conversation)
+	if len(c.Participants) != 2 || len(c.Messages) != 0 {
+		t.Fatal("missing participants or heavy message hydration", c)
+	}
+	for _, p := range c.Participants {
+		if p.Name == "" || p.Kind == "" || p.ID == "" || len(p.Metadata) > 0 {
+			t.Fatal("wrong presentation projection", p)
+		}
+	}
+}
+
+func TestConversationCapabilitiesRecheckReverseContact(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	worker := testWorker(t, s, owner, "reverse-cap-worker")
+	person := testPerson(t, s, owner, "reverse-cap-person")
+	grant(t, s, owner, person, []Rule{{Action: "view", TargetKind: "agent", TargetID: worker.ID}})
+	sent, err := s.Send(ctx, worker, SendInput{Target: Target{"person", person.ID}, Body: "You may read this"}, "reverse-cap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(want bool) {
+		t.Helper()
+		c, e := s.Capabilities(ctx, person, CapabilityInput{ConversationID: sent.ConversationID})
+		if e != nil || !c.Operations["view"] || c.Operations["message"] != want {
+			t.Fatal(c, e, want)
+		}
+	}
+	check(false)
+	role := grant(t, s, owner, person, []Rule{{Action: "message", TargetKind: "agent", TargetID: worker.ID}})
+	check(true)
+	if err = s.BindRole(ctx, owner, Binding{role.ID, "principal", person.ID}, true); err != nil {
+		t.Fatal(err)
+	}
+	check(false)
+}

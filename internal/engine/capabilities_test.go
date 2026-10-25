@@ -144,3 +144,75 @@ func TestScopedCapabilitiesAndAccessProvenance(t *testing.T) {
 		t.Fatal(c, e)
 	}
 }
+
+func TestDestinationCapabilitiesRequireAllDelegatedBounds(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	lead := testPerson(t, s, owner, "destination-cap-lead")
+	member := testPerson(t, s, owner, "destination-cap-member")
+	connection, err := s.SaveConnection(ctx, owner, Connection{Name: "Scoped hook", Kind: "webhook", Enabled: true, Config: map[string]string{"url": "https://example.com/hook"}, Secret: "test-only-signing-secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	destination, err := s.SaveDestination(ctx, owner, Destination{ConnectionID: connection.ID, PrincipalID: member.ID, Address: "member", Mode: "primary"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant(t, s, owner, lead, []Rule{{Action: "view", TargetKind: "destination", TargetID: member.ID}, {Action: "manage", TargetKind: "connection", TargetID: connection.ID}})
+	check := func(want bool) {
+		t.Helper()
+		cap, e := s.Capabilities(ctx, lead, CapabilityInput{Target: Target{"destination", destination.ID}})
+		if e != nil || cap.Operations["manage"] != want {
+			t.Fatal(cap, e, want)
+		}
+	}
+	check(false)
+	grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "person", TargetID: member.ID}})
+	check(false)
+	final := grant(t, s, owner, lead, []Rule{{Action: "manage", TargetKind: "destination", TargetID: member.ID}})
+	check(true)
+	if e := s.BindRole(ctx, owner, Binding{final.ID, "principal", lead.ID}, true); e != nil {
+		t.Fatal(e)
+	}
+	check(false)
+	outsider := testPerson(t, s, owner, "destination-cap-outsider")
+	if _, e := s.Capabilities(ctx, outsider, CapabilityInput{Target: Target{"destination", destination.ID}}); ErrorStatus(e) != 404 {
+		t.Fatal("hidden destination capability leaked", e)
+	}
+}
+
+func TestAnswerCapabilitiesSeparatePublicationAndRecordManagement(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	worker := testWorker(t, s, owner, "answer-cap-worker")
+	manager := testPerson(t, s, owner, "answer-cap-manager")
+	request, err := s.Ask(ctx, worker, AskInput{Target: Target{"person", owner.ID}, Title: "Public information?", SharedKey: "answer-cap"}, "cap-answer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Respond(ctx, owner, request.ID, Response{Outcome: "answered", Answer: "Yes", Version: request.Version}); err != nil {
+		t.Fatal(err)
+	}
+	answer, err := s.PublishAnswer(ctx, owner, PublishInput{RequestID: request.ID, Audience: []string{worker.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Capabilities(ctx, manager, CapabilityInput{Target: Target{"answer", answer.ID}}); ErrorStatus(err) != 404 {
+		t.Fatal(err)
+	}
+	role := grant(t, s, owner, manager, []Rule{{Action: "manage", TargetKind: "answer", TargetID: answer.ID}})
+	cap, err := s.Capabilities(ctx, manager, CapabilityInput{Target: Target{"answer", answer.ID}})
+	if err != nil || !cap.Operations["invalidate"] {
+		t.Fatal(cap, err)
+	}
+	broad, err := s.Capabilities(ctx, manager, CapabilityInput{})
+	if err != nil || broad.Operations["publish_answer"] {
+		t.Fatal("record management became publication", broad, err)
+	}
+	if err = s.BindRole(ctx, owner, Binding{role.ID, "principal", manager.ID}, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Capabilities(ctx, manager, CapabilityInput{Target: Target{"answer", answer.ID}}); ErrorStatus(err) != 404 {
+		t.Fatal("revoked answer manager", err)
+	}
+}

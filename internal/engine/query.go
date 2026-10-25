@@ -81,6 +81,8 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	for name, value := range in.Filters {
 		expression := ""
 		switch name {
+		case "id":
+			expression = "t.id"
 		case "delivery_id":
 			if in.Collection == "delivery_attempts" {
 				expression = "t.delivery_id"
@@ -292,7 +294,25 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 		}
 		var c Conversation
 		e := db.QueryRow(ctx, `SELECT id,title,created_by,created_at FROM conversations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt)
-		return c, normalize(e)
+		if e != nil {
+			return c, normalize(e)
+		}
+		// A directory row needs participant presentation, not 500 message bodies
+		// or private profile metadata. Visibility is the same canRead check above.
+		rows, e := db.Query(ctx, `SELECT p.id,p.kind,p.name FROM participants cp JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE cp.scope=$1 AND cp.conversation_id=$2 ORDER BY p.id`, a.Scope, id)
+		if e != nil {
+			return c, e
+		}
+		defer rows.Close()
+		c.Participants = []Principal{}
+		for rows.Next() {
+			var p Principal
+			if e = rows.Scan(&p.ID, &p.Kind, &p.Name); e != nil {
+				return c, e
+			}
+			c.Participants = append(c.Participants, p)
+		}
+		return c, rows.Err()
 	case "messages":
 		var m Message
 		e := db.QueryRow(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at FROM messages WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt)

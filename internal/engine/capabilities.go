@@ -10,10 +10,11 @@ import (
 // Capabilities are observations, never bearer grants. A mutation always checks
 // current policy independently. Descriptor-specific rules need that descriptor.
 type CapabilityInput struct {
-	Target       Target  `json:"target"`
-	RequestID    string  `json:"request_id,omitempty"`
-	ConnectionID string  `json:"connection_id,omitempty"`
-	Descriptor   *Action `json:"descriptor,omitempty"`
+	Target         Target  `json:"target"`
+	ConversationID string  `json:"conversation_id,omitempty"`
+	RequestID      string  `json:"request_id,omitempty"`
+	ConnectionID   string  `json:"connection_id,omitempty"`
+	Descriptor     *Action `json:"descriptor,omitempty"`
 }
 type CapabilityResult struct {
 	ObservedAt     time.Time       `json:"observed_at"`
@@ -47,6 +48,18 @@ func (s *Store) Capabilities(ctx context.Context, a Actor, in CapabilityInput) (
 			}
 			return nil
 		}
+		if in.ConversationID != "" {
+			if !s.canRead(ctx, db, a, in.ConversationID) {
+				return Missing()
+			}
+			out.Operations["view"] = true
+			for _, operation := range []string{"message", "ask"} {
+				_, e := s.conversationRecipients(ctx, db, a, in.ConversationID, operation, in.Descriptor)
+				out.Operations[operation] = e == nil
+			}
+			return nil
+		}
+
 		t := in.Target
 		if t.Kind == "" && t.ID == "" {
 			for _, kind := range []string{"person", "service", "group", "role", "connection"} {
@@ -74,6 +87,9 @@ func (s *Store) Capabilities(ctx context.Context, a Actor, in CapabilityInput) (
 			out.Operations["manage"] = s.managesIdentity(ctx, db, a, p)
 			out.Operations["issue_credential"] = !p.Disabled && s.mayIssueCredential(ctx, db, a, p)
 			out.Operations["link_account"] = p.Kind == "person" && !p.Disabled && s.mayLinkAccount(ctx, db, a, p.ID)
+			if in.ConnectionID != "" {
+				out.Operations["manage_destination"] = s.mayManageDestination(ctx, db, a, in.ConnectionID, p.ID)
+			}
 		case "group":
 			var exists, member bool
 			e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE scope=$1 AND id=$2),EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND group_id=$2 AND principal_id=$3)`, a.Scope, t.ID, a.ID).Scan(&exists, &member)
@@ -121,6 +137,38 @@ func (s *Store) Capabilities(ctx context.Context, a Actor, in CapabilityInput) (
 				return Missing()
 			}
 			out.Operations["view"] = true
+		case "destination":
+			var connection, pid string
+			if e := db.QueryRow(ctx, `SELECT connection_id,principal_id FROM destinations WHERE scope=$1 AND id=$2`, a.Scope, t.ID).Scan(&connection, &pid); e != nil {
+				return normalize(e)
+			}
+			managed := s.mayManageDestination(ctx, db, a, connection, pid)
+			if !a.Admin && a.ID != pid && !managed && !s.allowed(ctx, db, a, "view", Target{"destination", pid}, "", "") {
+				return Missing()
+			}
+			out.Operations["view"] = true
+			out.Operations["manage"] = managed
+		case "delivery":
+			d, e := deliveryScan(db.QueryRow(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND id=$2`, a.Scope, t.ID))
+			if e != nil {
+				return normalize(e)
+			}
+			if !s.mayReadDelivery(ctx, db, a, d) {
+				return Missing()
+			}
+			out.Operations["view"] = true
+			out.Operations["retry"] = (a.Admin || s.manages(ctx, db, a, "delivery", d.ID)) && (d.State == "failed" || d.State == "unknown") && d.ExpiresAt.After(time.Now()) && s.currentDeliveryPolicy(ctx, db, a.Scope, d)
+		case "answer":
+			x, e := scanAnswer(db.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2`, a.Scope, t.ID))
+			if e != nil {
+				return normalize(e)
+			}
+			managed := a.Admin || s.manages(ctx, db, a, "answer", t.ID) || (x.PublisherID == a.ID && s.canPublish(ctx, db, a))
+			if !managed && (!contains(x.Audience, a.ID) || x.Invalidated || !x.ValidUntil.After(time.Now()) || !s.publisherCurrent(ctx, db, a.Scope, x)) {
+				return Missing()
+			}
+			out.Operations["view"] = true
+			out.Operations["invalidate"] = managed && !x.Invalidated
 		default:
 			return Bad("Unsupported capability resource.")
 		}
