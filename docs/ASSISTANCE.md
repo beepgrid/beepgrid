@@ -78,6 +78,10 @@ The engine accepts only a supplied candidate ID, `equivalent: true`, confidence 
 
 External alerts wait up to 25 seconds for matching, then recover independently. Native history is immediate. Jobs use expiring leases and a fencing token so a stale worker cannot apply a second result. Disabling assistance invalidates pending model decisions and releases delayed alerts. No public inbound endpoint or separate queue service is required.
 
+This is not all-pairs request clustering. The automatic worker handles only open informational questions with an explicit reuse key, prefilters at most eight published answers by workspace/key/choices/requester audience, and skips the model when none qualify. The current runtime runs one matching-job loop per engine process. A slow matcher can accumulate queued jobs; the 25-second external-alert hold remains a product tradeoff even if matching eventually fails. Model confidence is self-reported and is not a calibrated accuracy guarantee. Keep this optional path disabled when immediate external alerts take priority.
+
+Exact reuse also rechecks the original answerer's current ability to read and respond to the new request, including recipient/group eligibility and reply permission. Publishing an answer to an agent audience does not turn its author into another person's authorized responder. This applies both when publication visits existing waiters and when a future identical question is created. A rejected reuse leaves that question open for its intended recipient.
+
 Manual reviewed suggestions retain their separate `NOTIF_MATCHER_URL` / `NOTIF_MATCHER_TOKEN` configuration and existing `{request,candidates,instructions}` request with `{suggestions:[{answer_id,reason}]}` response. You may use the same gateway if it supports both contracts; automatic calls have an explicit `task` field. Configuring either adapter does not silently change the other.
 
 ## Overseer

@@ -180,17 +180,46 @@ func (s *Store) publishTx(ctx context.Context, tx pgx.Tx, a Actor, in PublishInp
 	}
 	for _, r := range waiters {
 		if contains(out.Audience, r.RequesterID) && contextHash(key, r.Title, r.Body, r.Choices) == out.ContextHash {
-			if e = s.resolveFromAnswer(ctx, tx, a, r, *out); e != nil {
+			if _, e = s.resolveFromAnswer(ctx, tx, a, r, *out); e != nil {
 				return e
 			}
 		}
 	}
 	return nil
 }
-func (s *Store) resolveFromAnswer(ctx context.Context, db DB, a Actor, r Request, answer SharedAnswer) error {
+func (s *Store) resolveFromAnswer(ctx context.Context, db DB, a Actor, r Request, answer SharedAnswer) (bool, error) {
+	// Publication grants an explicit reuse audience, never another person's
+	// response authority. Exact matching must enforce the same current boundary
+	// as semantic reuse, including original group membership and contact rights.
+	author, err := principal(ctx, db, a.Scope, answer.AuthorID)
+	if err != nil {
+		if ErrorStatus(err) == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+	if author.Disabled {
+		return false, nil
+	}
+	responder := Actor{Principal: author, Scope: a.Scope}
+	if err = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, author.ID).Scan(&responder.Admin); err != nil {
+		return false, err
+	}
+	if _, err = s.request(ctx, db, responder, r.ID); err != nil {
+		if ErrorStatus(err) < 500 {
+			return false, nil
+		}
+		return false, err
+	}
+	if err = s.responseAuthorization(ctx, db, responder, r); err != nil {
+		if ErrorStatus(err) < 500 {
+			return false, nil
+		}
+		return false, err
+	}
 	response := Response{Outcome: "answered", Answer: answer.Answer, Version: r.Version, SourceAnswerID: answer.ID}
 	if _, e := db.Exec(ctx, `UPDATE requests SET state='resolved',response=$3,resolved_by=$4,resolved_at=now() WHERE scope=$1 AND id=$2 AND state='open'`, a.Scope, r.ID, JSON(response), answer.AuthorID); e != nil {
-		return e
+		return false, e
 	}
 	r.State = "resolved"
 	r.Response = &response
@@ -198,10 +227,10 @@ func (s *Store) resolveFromAnswer(ctx context.Context, db DB, a Actor, r Request
 	now := time.Now()
 	r.ResolvedAt = &now
 	if e := s.requestEvent(ctx, db, a, r, "request.answer_reused"); e != nil {
-		return e
+		return false, e
 	}
 	_, e := db.Exec(ctx, `INSERT INTO deliveries(id,scope,operation_id,recipient_id,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, ID("del"), a.Scope, r.ID+"/shared-result", r.RequesterID, JSON(map[string]any{"type": "request.resolved", "request": r, "conversation_id": r.ConversationID, "_policy": map[string]string{"engine_result": r.ID}}), time.Now().Add(30*24*time.Hour))
-	return e
+	return e == nil, e
 }
 func (s *Store) reuseExact(ctx context.Context, db DB, a Actor, r *Request) error {
 	if r.Kind != "question" || r.SharedKey == "" {
@@ -227,8 +256,12 @@ func (s *Store) reuseExact(ctx context.Context, db DB, a Actor, r *Request) erro
 	}
 	for _, answer := range answers {
 		if s.publisherCurrent(ctx, db, a.Scope, answer) {
-			if e = s.resolveFromAnswer(ctx, db, a, *r, answer); e != nil {
-				return e
+			reused, err := s.resolveFromAnswer(ctx, db, a, *r, answer)
+			if err != nil {
+				return err
+			}
+			if !reused {
+				continue
 			}
 			r.State = "resolved"
 			r.Response = &Response{Outcome: "answered", Answer: answer.Answer, Version: r.Version, SourceAnswerID: answer.ID}

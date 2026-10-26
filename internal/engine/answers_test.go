@@ -6,6 +6,59 @@ import (
 	"time"
 )
 
+func TestExactAnswerReuseRequiresCurrentIntendedResponder(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	first := testWorker(t, s, owner, "first")
+	second := testWorker(t, s, owner, "second")
+	alice := testPerson(t, s, owner, "alice")
+	bob := testPerson(t, s, owner, "bob")
+	for _, worker := range []Actor{first, second} {
+		grant(t, s, owner, worker, []Rule{{Action: "ask", TargetKind: "person", TargetID: alice.ID}, {Action: "ask", TargetKind: "person", TargetID: bob.ID}})
+	}
+	authorRole := grant(t, s, owner, alice, []Rule{{Action: "view", TargetKind: "agent", TargetID: "*"}, {Action: "message", TargetKind: "agent", TargetID: "*"}})
+	ask := AskInput{Target: Target{"person", alice.ID}, Title: "Include GST?", SharedKey: "qa/india/2026/v1"}
+	source, err := s.Ask(ctx, first, ask, "source")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Respond(ctx, alice, source.ID, Response{Outcome: "answered", Version: 1, Answer: "Yes"}); err != nil {
+		t.Fatal(err)
+	}
+	other := ask
+	other.Target.ID = bob.ID
+	pendingBob, err := s.Ask(ctx, second, other, "pending-bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pendingAlice, err := s.Ask(ctx, second, ask, "pending-alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.PublishAnswer(ctx, owner, PublishInput{RequestID: source.ID, Audience: []string{first.ID, second.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	if current, e := s.Request(ctx, owner, pendingBob.ID); e != nil || current.State != "open" {
+		t.Fatal("publication crossed responder boundary", current, e)
+	}
+	if current, e := s.Request(ctx, owner, pendingAlice.ID); e != nil || current.State != "resolved" {
+		t.Fatal("authorized waiter not reused", current, e)
+	}
+	if current, e := s.Ask(ctx, second, other, "future-bob"); e != nil || current.State != "open" {
+		t.Fatal("exact reuse crossed responder boundary", current, e)
+	}
+	if current, e := s.Ask(ctx, second, ask, "future-alice"); e != nil || current.State != "resolved" {
+		t.Fatal("authorized exact reuse failed", current, e)
+	}
+	authorRole.Rules = []Rule{{Action: "view", TargetKind: "agent", TargetID: "*"}}
+	if _, err = s.SaveRole(ctx, owner, authorRole); err != nil {
+		t.Fatal(err)
+	}
+	if current, e := s.Ask(ctx, second, ask, "revoked-author"); e != nil || current.State != "open" {
+		t.Fatal("revoked author contact reused", current, e)
+	}
+}
+
 func TestSharedAnswersKeepWaitersScopedAndInvalidate(t *testing.T) {
 	s, a := testStore(t)
 	ctx := context.Background()
