@@ -19,7 +19,7 @@ import {
   Loading,
   Logo,
 } from "./ui";
-import { navigate, useRoute } from "./navigation";
+import { navigate, useRoute, workspaceURL } from "./navigation";
 import { recordNavigationPaint } from "./performance";
 import { PageLoader, usePage } from "./route-loader";
 import { useLive } from "./live";
@@ -37,8 +37,21 @@ const modules = {
   activity: () => import("./pages/Activity"),
   settings: () => import("./pages/Settings"),
 };
-const pages = new PageLoader(modules);
-const links = [
+const defaultPages = new PageLoader(modules);
+export function createWorkspacePages(
+  extra: ConstructorParameters<typeof PageLoader>[0],
+) {
+  return new PageLoader({ ...modules, ...extra });
+}
+export type WorkspaceExtension = {
+  pages?: PageLoader;
+  navigation?: string[][];
+  navigationSection?: (page: string) => string;
+  sidebar?: ReactNode;
+  authRequired?: ReactNode;
+  logout?: () => Promise<unknown>;
+};
+const defaultLinks = [
   ["inbox", "Inbox"],
   ["conversations", "Conversations"],
   ["agents", "Agents"],
@@ -49,7 +62,11 @@ const links = [
   ["activity", "Activity"],
 ];
 
-export default function App() {
+export default function App({
+  extension = {},
+}: {
+  extension?: WorkspaceExtension;
+}) {
   const [epoch, setEpoch] = useState(0);
   const [logoutError, setLogoutError] = useState<Error | null>(null);
   const me = useQuery({
@@ -95,6 +112,12 @@ export default function App() {
       </div>
     );
   if (me.error) {
+    if (
+      extension.authRequired &&
+      me.error instanceof APIError &&
+      (me.error.status === 401 || me.error.code === "SSO_REQUIRED")
+    )
+      return extension.authRequired;
     if (account.isPending)
       return (
         <div className="startup">
@@ -115,7 +138,11 @@ export default function App() {
             </Button>
             <Button
               onClick={() =>
-                void api("/auth/logout", {})
+                void (
+                  extension.logout
+                    ? extension.logout()
+                    : api("/auth/logout", {})
+                )
                   .then(() => {
                     advanceSession();
                     client.clear();
@@ -161,6 +188,7 @@ export default function App() {
   return (
     <Session.Provider value={me.data}>
       <WorkspaceApp
+        extension={extension}
         key={`${me.data.company}/${me.data.environment}/${me.data.person.id}/${epoch}`}
         onLogout={() => {
           advanceSession();
@@ -235,7 +263,15 @@ function Login({ onDone }: { onDone: () => void }) {
     </main>
   );
 }
-function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
+function WorkspaceApp({
+  onLogout,
+  extension,
+}: {
+  onLogout: () => void;
+  extension: WorkspaceExtension;
+}) {
+  const links = extension.navigation || defaultLinks;
+  const pages = extension.pages || defaultPages;
   const me = useSession(),
     route = useRoute(),
     meta = useResource<Workspace>("/workspace");
@@ -286,7 +322,10 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
     setMenu(false);
     document.title =
       (links.find(
-        (x) => x[0] === (route.page === "requests" ? "inbox" : route.page),
+        (x) =>
+          x[0] ===
+          (extension.navigationSection?.(route.page) ||
+            (route.page === "requests" ? "inbox" : route.page)),
       )?.[1] || "Settings") + " · beepgrid";
   }, [route.page]);
   const page =
@@ -295,6 +334,7 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
       : route.page === "connections"
         ? "integrations"
         : route.page;
+  const activeSection = extension.navigationSection?.(page) || page;
   const section = usePage(pages, page);
   const Component = section.component;
   function link(path: string) {
@@ -315,7 +355,7 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
       >
         <a
           className="brand-link"
-          href="/agents"
+          href={workspaceURL("/agents")}
           onClick={(e) => {
             e.preventDefault();
             link("agents");
@@ -332,11 +372,11 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
           <BadgeDeployment deployment={meta.data?.deployment} />
         </div>
         <nav>
-          {links.map(([id, title]) => (
+          {links.map(([id, title, icon]) => (
             <a
               key={id}
-              href={"/" + id}
-              aria-current={page === id ? "page" : undefined}
+              href={workspaceURL("/" + id)}
+              aria-current={activeSection === id ? "page" : undefined}
               onMouseEnter={() => void pages.load(id).catch(() => {})}
               onFocus={() => void pages.load(id).catch(() => {})}
               onClick={(e) => {
@@ -345,15 +385,16 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
                 link(id);
               }}
             >
-              <Icon name={id} />
+              <Icon name={icon || id} />
               <span>{title}</span>
-              {page === id ? <i /> : null}
+              {activeSection === id ? <i /> : null}
             </a>
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {extension.sidebar}
           <a
-            href="/settings"
+            href={workspaceURL("/settings")}
             aria-current={page === "settings" ? "page" : undefined}
             onClick={(e) => {
               e.preventDefault();
@@ -398,7 +439,11 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
               disabled={signingOut}
               onClick={() => {
                 setSigningOut(true);
-                void api("/auth/logout", {})
+                void (
+                  extension.logout
+                    ? extension.logout()
+                    : api("/auth/logout", {})
+                )
                   .then(onLogout)
                   .catch(setError)
                   .finally(() => setSigningOut(false));
@@ -420,7 +465,9 @@ function WorkspaceApp({ onLogout }: { onLogout: () => void }) {
           </button>
           <span>{me.company}</span>
           <span className="slash">/</span>
-          <span>{links.find((x) => x[0] === page)?.[1] || "Settings"}</span>
+          <span>
+            {links.find((x) => x[0] === activeSection)?.[1] || "Settings"}
+          </span>
           <span className="live-indicator">
             <i className={live === "Live" ? "good" : ""} />
             {live}

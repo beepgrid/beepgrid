@@ -1,3 +1,4 @@
+import { workspaceURL } from "./navigation";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { applyLiveEvent, nextCursor } from "./live-cache";
@@ -28,7 +29,7 @@ export function useLive(conversation: string) {
     function connect() {
       if (disposed) return;
       source = new EventSource(
-        "/api/v1/events?stream=1&summary=1&after=" +
+        workspaceURL("/api/v1/events?stream=1&summary=1&after=") +
           encodeURIComponent(cursor) +
           (conversation
             ? "&conversation_id=" + encodeURIComponent(conversation)

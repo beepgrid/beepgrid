@@ -1,3 +1,4 @@
+import { workspaceURL } from "./navigation";
 export class APIError extends Error {
   constructor(
     public status: number,
@@ -22,7 +23,7 @@ export async function upload<T>(path: string, file: File): Promise<T> {
   const generation = sessionGeneration;
   const body = new FormData();
   body.append("file", file);
-  const response = await fetch("/api/v1" + path, {
+  const response = await fetch(workspaceURL("/api/v1" + path), {
     method: "POST",
     credentials: "same-origin",
     body,
@@ -45,7 +46,7 @@ export async function api<T>(
   options: { signal?: AbortSignal; key?: string; method?: string } = {},
 ): Promise<T> {
   const generation = sessionGeneration;
-  const response = await fetch("/api/v1" + path, {
+  const response = await fetch(workspaceURL("/api/v1" + path), {
     method: options.method || (body === undefined ? "GET" : "POST"),
     credentials: "same-origin",
     signal: options.signal,

@@ -16,7 +16,7 @@ import type {
   Request,
 } from "../contracts";
 import { bytes, relative, timestamp, upload } from "../client";
-import { navigate, useRoute } from "../navigation";
+import { navigate, useRoute, workspaceURL } from "../navigation";
 import { Compose } from "../Compose";
 import {
   Button,
@@ -360,7 +360,7 @@ function Chat({ id }: { id: string }) {
             <a
               className="file-chip"
               key={a.id}
-              href={"/api/v1/attachments/" + a.id}
+              href={workspaceURL("/api/v1/attachments/" + a.id)}
               download
             >
               <Icon name="file" size={14} />
