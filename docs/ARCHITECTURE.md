@@ -1,6 +1,6 @@
 # Open source architecture
 
-The product has a Go modular monolith, a React web app embedded into its binary, three language clients, an MCP stdio adapter and React/headless embeds. Channel adapters and optional semantic assistance are modules of the same engine. A PostgreSQL database is the only required stateful service. Mailpit is a local test aid.
+The product has a Go modular monolith, a React web app embedded into its binary, three language clients, an MCP stdio adapter and React/headless embeds. Channel adapters and optional Coordinator assistance are modules of the same engine. A PostgreSQL database is the only required stateful service. Mailpit is a local test aid.
 
 ```mermaid
 flowchart LR
@@ -13,7 +13,7 @@ flowchart LR
     C --> X[Slack / SMTP / signed webhook]
     X -->|Verified inbound identity| H
     H --> I[Employee inbox and self-hosted administration]
-    E --> K[Optional reviewed answer suggestions]
+    H --> K[Optional user-invoked Coordinator]
 ```
 
 ## Public concepts
@@ -32,7 +32,7 @@ flowchart LR
 | Conversation and message | Canonical private history and credential-derived authorship. Several conversations may contain the same participants. Private fan-out creates a separate conversation for each recipient. |
 | Request | A durable question, approval or task. Open becomes resolved, cancelled, expired or superseded, with a typed resolution. Clarification and other questions do not cancel it. |
 | Execution intent | An idempotently redeemed approval bound to exact executor, resource/version, arguments and operation key. Reports remain worker-reported evidence. |
-| Shared answer | Published informational knowledge with source, author, publisher, explicit audience, key, expiry and invalidation. Semantic similarity creates review proposals only. |
+| Shared answer | Published informational knowledge with source, author, publisher, explicit audience, key, expiry and invalidation. Reuse requires identical context and current responder authority. |
 
 Credentials, delivery attempts, policy bookkeeping and events are implementation resources, not extra concepts required to send a message. IDs are server-generated. Caller-supplied external agent/person IDs bind stable application identities; names never authenticate anything.
 
@@ -69,7 +69,7 @@ Attachments are limited to 5 MiB and safe download types, stored under generated
 
 ## Optional assistance and commercial boundary
 
-Exact answers require an explicit scoped key and matching content, authorized publication and a declared reuse audience. Invalidated/expired/revoked publications stop reuse; historical consumers carry provenance and invalidation status. A configured customer judge sees only authorized bounded candidates. It can suggest a match, not grant permission or resolve an approval. Limits are per engine process: two simultaneous calls, five seconds, bounded inputs/outputs, per-requester throttling and 1,000 judge calls per hour.
+Exact answers require an explicit scoped key and matching content, authorized publication and a declared reuse audience. Invalidated/expired/revoked publications stop reuse; historical consumers carry provenance and invalidation status. Coordinator is a separate user-invoked interface with bounded context and explicit confirmation before outbound work.
 
 Fleet status is a read-only structured view of permitted instances and worker-reported progress, with timestamps and partial coverage. It does not infer an exact total from overlapping counts, execute commands or access private tools through a hidden overseer identity.
 

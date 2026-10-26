@@ -1,6 +1,6 @@
 # Optional assistance
 
-Automatic answer reuse and the overseer are off in every new workspace. An owner enables each independently in Settings. People, agents and services keep their existing identities. There is no privileged overseer account.
+Coordinator is off in every new workspace. An authorized person enables it in Settings. People, agents and services keep their existing identities. There is no privileged overseer account.
 
 Configure a built-in model adapter or keep your own HTTP model gateway. No provider or model is selected by default. Your existing agents can use any runtime or model independently of this optional assistance configuration.
 
@@ -14,7 +14,7 @@ export NOTIF_AI_MODEL=YOUR_EXPLICIT_MODEL_ID
 export NOTIF_AI_API_KEY=YOUR_PROVIDER_CREDENTIAL
 ```
 
-These are illustrative placeholders. Supply secrets through your environment or secret manager, never a tracked file or browser bundle. No API keys are discovered from other provider variables. Neither model discovery nor a model request runs at startup. An incomplete configuration fails startup instead of selecting a model for you. Both workspace toggles remain off until the owner enables them. Manual suggestions still require an explicit reviewer request.
+These are illustrative placeholders. Supply secrets through your environment or secret manager, never a tracked file or browser bundle. No API keys are discovered from other provider variables. Neither model discovery nor a model request runs at startup. An incomplete configuration fails startup instead of selecting a model for you. Coordinator remains off until an authorized person enables it.
 
 | Provider value | Native API / default base URL | Default output mode |
 | --- | --- | --- |
@@ -25,11 +25,11 @@ These are illustrative placeholders. Supply secrets through your environment or 
 
 `NOTIF_AI_BASE_URL` is a base URL including the API version path, not the final operation URL. For example, a compatible endpoint at `http://127.0.0.1:11434/v1` receives POST requests at `/v1/chat/completions`. Specify your installed model's ID and set `NOTIF_AI_ALLOW_PRIVATE=true` to use an HTTP or private-network inference endpoint in production. This opt-in applies only to the configured AI endpoint; channel and legacy gateway address restrictions remain unchanged. Use HTTPS when sending credentials over a network. TLS certificate verification, connection-time DNS validation/pinning and redirect rejection remain enforced. Google model names may optionally start with `models/`.
 
-One model configuration serves automatic matching, reviewed suggestions, overseer planning and reply summarization. It adds no required runtime, database or proxy service. Native APIs use provider-specific authentication headers; Google credentials never appear in query strings. OpenAI response storage and background execution are disabled. The adapters never send tools, hosted-agent definitions or previous conversation references.
+One model configuration serves Coordinator planning and reply summarization. It adds no required runtime, database or proxy service. Native APIs use provider-specific authentication headers; Google credentials never appear in query strings. OpenAI response storage and background execution are disabled. The adapters never send tools, hosted-agent definitions or previous conversation references.
 
 Applications embedding the public Go runtime set `runtime.Config.AI` with `runtime.AIConfig`. The optional `runtime.AIConfigFromEnv(os.Getenv)` helper reads exactly the same variables as the standalone binary. A library never reads environment variables implicitly. Models and workspace feature toggles remain explicit, and every tenant retains separate authorization and saved-plan visibility even when sharing a provider.
 
-`NOTIF_AI_OUTPUT_MODE` explicitly selects `schema`, `json` or `text`. Schema mode requests native structured output. JSON mode requests JSON-object output from OpenAI/compatible endpoints or JSON MIME output from Google. Anthropic supports `schema` or `text`. Text mode supplies the schema in the prompt for models without native structured output. Every mode enforces the same local schema, byte bounds and engine authorization checks; there is no silent mode change, JSON repair or cross-provider failover. Unsupported model/API settings produce a failed assistance call, leaving the normal delivery and human response paths available. A valid JSON response alone is not proof of a correct semantic match.
+`NOTIF_AI_OUTPUT_MODE` explicitly selects `schema`, `json` or `text`. Schema mode requests native structured output. JSON mode requests JSON-object output from OpenAI/compatible endpoints or JSON MIME output from Google. Anthropic supports `schema` or `text`. Text mode supplies the schema in the prompt for models without native structured output. Every mode enforces the same local schema, byte bounds and engine authorization checks; there is no silent mode change, JSON repair or cross-provider failover. Unsupported model/API settings produce a failed assistance call, leaving the normal delivery and human response paths available. Valid JSON alone is not proof of a correct interpretation.
 
 Use `NOTIF_AI_OPTIONS` for a JSON object of provider generation settings. They are passed unchanged, except for engine-owned formatting, model selection and context fields. Unknown or protected settings fail configuration rather than being silently discarded.
 
@@ -46,43 +46,13 @@ The implementation uses Go's HTTP/JSON stack behind the existing bounded assista
 
 ## Existing custom gateways
 
-Use `NOTIF_AUTOMATIC_ANSWER_URL` / `NOTIF_AUTOMATIC_ANSWER_TOKEN`, `NOTIF_OVERSEER_URL` / `NOTIF_OVERSEER_TOKEN` or `NOTIF_MATCHER_URL` / `NOTIF_MATCHER_TOKEN` for the original HTTP contracts. Each explicitly configured URL overrides the built-in model for only that feature; an overseer URL covers planning and summarization. Unspecified gateway URLs leave the built-in model in place. Gateway-only installations do not need any `NOTIF_AI_*` variables. Native API credentials and gateway tokens remain separate. Tokens authenticate only to the gateway. Engine credentials are never sent to it. Production gateway URLs use the existing public-address validation, pinned dialing, HTTPS and redirect restrictions. Loopback development gateways require `serve --dev`.
+Use `NOTIF_OVERSEER_URL` / `NOTIF_OVERSEER_TOKEN` for an explicitly configured custom HTTP gateway. It overrides the built-in model for Coordinator planning and summarization. Gateway-only installations do not need `NOTIF_AI_*` variables. Native API credentials and gateway tokens remain separate. Engine credentials are never sent to the gateway. Production gateways use public-address validation, pinned dialing, HTTPS and redirect restrictions. Loopback development gateways require `serve --dev`.
 
-The gateway accepts JSON POST requests and returns JSON with HTTP 200. It may use any model provider or local model. Model I/O runs outside the workspace transaction. Context and output are bounded to 32 KiB, with at most two active calls per configured adapter, one call per person per second and 1000 calls per adapter per hour. Automatic matching has a 20-second deadline; overseer planning/summarization have 30 seconds. Failures never turn into authorization or fabricated success.
+The gateway accepts JSON POST requests and returns JSON with HTTP 200. Model I/O runs outside the workspace transaction. Context and output are bounded to 32 KiB, with at most two active calls, one call per person per second and 1000 calls per adapter per hour. Coordinator planning and summarization have 30-second deadlines. Failures never turn into authorization or fabricated success.
 
-## Automatic informational answers
+## Exact published answers
 
-1. An agent asks an ordinary question with an explicit `shared_key`, such as `india-pricing/2026/policy-v1`.
-2. A person answers, then explicitly publishes that answer for a chosen audience and validity period. The existing exact-match reuse behavior remains available without a model or toggle.
-3. If automatic reuse is enabled, a differently worded question with the same key and choices gets a durable matching job. Only active published answers whose audience includes the requester become candidates. Approval requests and tasks never enter this path.
-4. A sufficiently confident equivalent match is applied through normal response authorization. The engine rechecks the requester credential, author/publisher rights, current group eligibility, audience, expiry, request state and settings after the model returns. The result includes its source ID, automatic method and explanation. Invalidated sources remain visibly marked on historical results.
-
-Request to matching gateway:
-
-```json
-{
-  "task": "automatic_answer_match",
-  "instructions": "...engine-supplied matching rules...",
-  "request": {"title": "Should amounts include GST?", "body": "India report", "scope_key": "india-pricing/2026/policy-v1", "choices": []},
-  "candidates": [{"id": "ans_example", "question": "Use tax-inclusive prices?", "scope_key": "india-pricing/2026/policy-v1"}]
-}
-```
-
-Response:
-
-```json
-{"answer_id":"ans_example","equivalent":true,"confidence":0.995,"reason":"Same informational question and policy version."}
-```
-
-The engine accepts only a supplied candidate ID, `equivalent: true`, confidence in [0.98, 1], and a bounded explanation. Ambiguity, conflicting meanings, invented IDs, timeouts and provider failures leave the question open for its human recipients. Semantic confidence is a model estimate, not proof; use narrow versioned keys and conservative publications. Never use shared informational answers as permission to perform a business action.
-
-External alerts wait up to 25 seconds for matching, then recover independently. Native history is immediate. Jobs use expiring leases and a fencing token so a stale worker cannot apply a second result. Disabling assistance invalidates pending model decisions and releases delayed alerts. No public inbound endpoint or separate queue service is required.
-
-This is not all-pairs request clustering. The automatic worker handles only open informational questions with an explicit reuse key, prefilters at most eight published answers by workspace/key/choices/requester audience, and skips the model when none qualify. The current runtime runs one matching-job loop per engine process. A slow matcher can accumulate queued jobs; the 25-second external-alert hold remains a product tradeoff even if matching eventually fails. Model confidence is self-reported and is not a calibrated accuracy guarantee. Keep this optional path disabled when immediate external alerts take priority.
-
-Exact reuse also rechecks the original answerer's current ability to read and respond to the new request, including recipient/group eligibility and reply permission. Publishing an answer to an agent audience does not turn its author into another person's authorized responder. This applies both when publication visits existing waiters and when a future identical question is created. A rejected reuse leaves that question open for its intended recipient.
-
-Manual reviewed suggestions retain their separate `NOTIF_MATCHER_URL` / `NOTIF_MATCHER_TOKEN` configuration and existing `{request,candidates,instructions}` request with `{suggestions:[{answer_id,reason}]}` response. You may use the same gateway if it supports both contracts; automatic calls have an explicit `task` field. Configuring either adapter does not silently change the other.
+Informational answers can be explicitly published for an audience, scoped key and validity period. Reuse requires identical context, compatible choices and current requester, publisher and original responder authority. Publication does not grant the original answerer permission to answer another person's question. Invalidating a publication stops future reuse and marks historical consumers. This deterministic path does not call a model or delay alerts.
 
 ## Overseer
 
@@ -100,13 +70,13 @@ Supported operations are `status`, `message`, `question`, and `task`. The engine
 
 `POST /api/v1/fleet/plans/{id}/summary` sends authorized replies to the gateway with `task: overseer_summary`, `prompt`, `replies` and engine instructions. Each reply includes `agent_id`, `name`, `state`, optional `outcome` and `answer`. The only response field is `summary`. The UI offers an explicit summary action for settled replies, retains individual replies and leaves retries to the person after a provider failure. A digest caches summaries and prevents committing a summary when replies changed during the model call.
 
-Every read, confirmation and summary is scoped to the original workspace and person. All context sources are rechecked, including sources that influenced the model but were not selected for outbound messages. Revocation, disabled people/agents, credential expiry, group changes, feature toggles and recovery holds fail closed. An already displayed response cannot be erased from a person's memory, but subsequent reads and actions enforce current authority. New assistance decisions are disabled and pending jobs cancelled during backup restore reconciliation.
+Every read, confirmation and summary is scoped to the original workspace and person. All context sources are rechecked, including sources that influenced the model but were not selected for outbound messages. Revocation, disabled people/agents, credential expiry, group changes, feature toggles and recovery holds fail closed. An already displayed response cannot be erased from a person's memory, but subsequent reads and actions enforce current authority. New assistance decisions are disabled during backup restore reconciliation.
 
-Go, TypeScript and Python clients expose settings, planning, confirmation, saved-plan reads and reply summaries. Agent MCP `ask` already supports `shared_key`; automatic reuse needs no agent-specific tool or model dependency. The overseer UI and SDKs act using a person's credential.
+Go, TypeScript and Python clients expose settings, planning, confirmation, saved-plan reads and reply summaries. Agent MCP `ask` supports `shared_key` for explicit exact-answer reuse. The overseer UI and SDKs act using a person's credential.
 
 ## Local verification
 
-The normal Go tests exercise all four provider protocols through local HTTP servers and a real PostgreSQL database, including default-off flags, provenance, independent budgets, explicit gateway precedence, confirmation replay and permission changes during model I/O. Provider fixtures are protocol tests, not evidence of live vendor access or identical model quality. `scripts/verify.sh` runs functional, SDK, UI, race and release checks. For an explicitly authorized local model run, `python3 scripts/codex-assistance-e2e.py` uses saved Codex ChatGPT authentication in an isolated schema. It rejects API-key authentication and does not copy authentication into the repo, container or public CI. The OSS runtime has no Codex dependency.
+The normal Go tests exercise all four provider protocols through local HTTP servers and a real PostgreSQL database, including default-off configuration, explicit gateway precedence, confirmation replay and permission changes during model I/O. Provider fixtures are protocol tests, not evidence of live vendor access or identical model quality. `scripts/verify.sh` runs functional, SDK, UI, race and release checks. For an explicitly authorized local model run, `python3 scripts/codex-assistance-e2e.py` tests Coordinator using saved Codex ChatGPT authentication in an isolated schema. It rejects API-key authentication and does not copy authentication into the repo, container or public CI. The OSS runtime has no Codex dependency.
 
 Add `--protocol openai-compatible` to qualify the built-in compatible adapter against a local endpoint backed by that same subscription. The harness also accepts `openai`, `anthropic` and `google` wire wrappers. These flags select local protocol emulation, not live vendor APIs or vendor credentials. The qualification script explicitly selects its recorded test model; the OSS engine still has no default model.
 

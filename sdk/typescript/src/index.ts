@@ -109,10 +109,8 @@ export type Session = {
   expires_at: string;
 };
 export type AssistanceSettings = {
-  automatic_answers: boolean;
   overseer: boolean;
   version: number;
-  matcher_configured: boolean;
   overseer_configured: boolean;
 };
 export type OverseerInput = { prompt: string; target?: Target; previous_plan_id?: string };
@@ -325,7 +323,7 @@ export class Client {
   }
   updateAssistance(
     settings: Partial<
-      Pick<AssistanceSettings, "automatic_answers" | "overseer" | "version">
+      Pick<AssistanceSettings, "overseer" | "version">
     >,
   ) {
     return this.call<AssistanceSettings>(

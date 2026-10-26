@@ -137,7 +137,7 @@ func (s *Service) ApplyWorkspaceAccess(ctx context.Context, id string, version i
 // All tenants share the query pool, listener and durable work selectors.
 func (s *Service) RunWorkers(ctx context.Context) {
 	var workers sync.WaitGroup
-	workers.Add(3)
+	workers.Add(2)
 	go func() {
 		defer workers.Done()
 		tick := time.NewTicker(5 * time.Second)
@@ -178,24 +178,6 @@ func (s *Service) RunWorkers(ctx context.Context) {
 			case <-ready:
 			}
 			release()
-		}
-	}()
-	go func() {
-		defer workers.Done()
-		tick := time.NewTicker(time.Second)
-		defer tick.Stop()
-		for ctx.Err() == nil {
-			worked, err := s.store.ProcessAutomaticAnswer(ctx)
-			if err != nil && ctx.Err() == nil {
-				slog.Error("automatic answers failed", "error", err)
-			}
-			if worked && err == nil {
-				continue
-			}
-			select {
-			case <-ctx.Done():
-			case <-tick.C:
-			}
 		}
 	}()
 	workers.Wait()

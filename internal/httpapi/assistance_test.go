@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -35,14 +36,13 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 		t.Fatal(err)
 	}
 	settings, err := owner.Assistance(ctx)
-	if err != nil || settings.AutomaticAnswers || settings.Overseer {
+	if err != nil || settings.Overseer {
 		t.Fatal(settings, err)
 	}
 	yes := true
 	if _, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes}); err == nil {
 		t.Fatal("enabled unconfigured provider")
 	}
-	var answerID string
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Task string `json:"task"`
@@ -52,8 +52,6 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch in.Task {
-		case "automatic_answer_match":
-			json.NewEncoder(w).Encode(engine.AutomaticMatch{AnswerID: answerID, Equivalent: true, Confidence: 1, Reason: "Same policy and informational meaning"})
 		case "overseer_plan":
 			json.NewEncoder(w).Encode(engine.OverseerDecision{Operation: "question", AgentIDs: []string{session.Agent.ID}, Body: "How much is complete?", Summary: "Ask Scout for progress."})
 		case "overseer_summary":
@@ -64,14 +62,11 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 		}
 	}))
 	defer provider.Close()
-	if err = store.ConfigureAutomaticAnswers(ctx, provider.URL, ""); err != nil {
-		t.Fatal(err)
-	}
 	if err = store.ConfigureOverseer(ctx, provider.URL, ""); err != nil {
 		t.Fatal(err)
 	}
-	settings, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{AutomaticAnswers: &yes, Overseer: &yes})
-	if err != nil || !settings.Overseer || !settings.AutomaticAnswers {
+	settings, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes})
+	if err != nil || !settings.Overseer {
 		t.Fatal(settings, err)
 	}
 	if _, err = worker.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes}); err == nil {
@@ -90,22 +85,12 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 	if err = owner.Do(ctx, "POST", "/api/v1/answers", map[string]any{"request_id": source.ID, "audience": []string{session.Agent.ID}}, &published, ""); err != nil {
 		t.Fatal(err)
 	}
-	answerID = published.ID
-	q, err := worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Should this report's prices include tax?", SharedKey: "report/2026/v1"}, "future")
+	q, err := worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Use GST inclusive prices?", SharedKey: "report/2026/v1"}, "future")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for {
-		worked, err := store.ProcessAutomaticAnswer(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !worked {
-			break
-		}
-	}
 	q, err = worker.GetRequest(ctx, q.ID)
-	if err != nil || q.State != "resolved" || q.Response.ReuseMethod != "automatic" {
+	if err != nil || q.State != "resolved" || q.Response.SourceAnswerID != published.ID {
 		t.Fatal(q, err)
 	}
 	plan, err := owner.PlanOverseer(ctx, notif.OverseerInput{Prompt: "Ask Scout what is complete"})
@@ -139,10 +124,36 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 		t.Fatal("forged automatic provenance")
 	}
 	no := false
-	if _, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &no, AutomaticAnswers: &no}); err != nil {
+	if _, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &no}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = owner.OverseerPlan(ctx, plan.ID); err == nil {
 		t.Fatal("disabled overseer accessible")
+	}
+}
+
+func TestRetiredMatchingAPIIsUnavailable(t *testing.T) {
+	_, owner, _ := setup(t)
+	ctx := context.Background()
+	var settings map[string]any
+	if err := owner.Do(ctx, "GET", "/api/v1/assistance/settings", nil, &settings, ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"automatic_answers", "matcher_configured"} {
+		if _, exists := settings[field]; exists {
+			t.Fatal("retired field exposed", field)
+		}
+	}
+	for _, path := range []string{"/api/v1/requests/missing/suggestions", "/api/v1/answer-proposals/missing"} {
+		err := owner.Do(ctx, "POST", path, map[string]any{}, nil, "")
+		var apiError *notif.APIError
+		if !errors.As(err, &apiError) || (apiError.Status != 404 && apiError.Status != 405) {
+			t.Fatal("retired route still available", path, err)
+		}
+	}
+	err := owner.Do(ctx, "POST", "/api/v1/assistance/settings", map[string]any{"automatic_answers": true}, nil, "")
+	var apiError *notif.APIError
+	if !errors.As(err, &apiError) || apiError.Status != 400 {
+		t.Fatal("retired toggle accepted", err)
 	}
 }

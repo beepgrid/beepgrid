@@ -74,7 +74,7 @@ func TestEmbeddedRuntimeAIConfigurationAndTenantBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	settings, err := a.Assistance(ctx)
-	if err != nil || settings.Overseer || settings.AutomaticAnswers || !settings.OverseerConfigured || !settings.MatcherConfigured || calls.Load() != 0 {
+	if err != nil || settings.Overseer || !settings.OverseerConfigured || calls.Load() != 0 {
 		t.Fatal("embedded configuration enabled a feature or chose a different model", err)
 	}
 	yes := true

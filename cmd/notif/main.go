@@ -220,12 +220,6 @@ func serve(ctx context.Context, args []string) error {
 	if e = store.ConfigureAI(ctx, aiConfig); e != nil {
 		return e
 	}
-	if e = store.ConfigureMatcher(ctx, os.Getenv("NOTIF_MATCHER_URL"), os.Getenv("NOTIF_MATCHER_TOKEN")); e != nil {
-		return e
-	}
-	if e = store.ConfigureAutomaticAnswers(ctx, os.Getenv("NOTIF_AUTOMATIC_ANSWER_URL"), os.Getenv("NOTIF_AUTOMATIC_ANSWER_TOKEN")); e != nil {
-		return e
-	}
 	if e = store.ConfigureOverseer(ctx, os.Getenv("NOTIF_OVERSEER_URL"), os.Getenv("NOTIF_OVERSEER_TOKEN")); e != nil {
 		return e
 	}
@@ -241,24 +235,6 @@ func serve(ctx context.Context, args []string) error {
 	server := &http.Server{Addr: addr, Handler: handler, BaseContext: func(net.Listener) context.Context { return ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	defer stopWorker()
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			worked, err := store.ProcessAutomaticAnswer(workerCtx)
-			if err != nil && workerCtx.Err() == nil {
-				slog.Error("automatic answer processing failed", "error", err)
-			}
-			if worked && err == nil {
-				continue
-			}
-			select {
-			case <-workerCtx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-	}()
 	go func() {
 		ticker := time.NewTicker(300 * time.Millisecond)
 		defer ticker.Stop()

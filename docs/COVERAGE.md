@@ -25,7 +25,7 @@ Every scenario's cold/warm end-user setup time is **not measured by unfamiliar u
 | 17 | Ask now/wait later | Same durable handle, SDK wait cancellation tests | Cannot keep an uncheckpointed process alive |
 | 18 | Several pending questions | Independent requests, focused queue, drafts, clarification/UI tests | Channel-native controls differ; web is the full receiving surface |
 | 19 | Exact scoped duplicates | Stacked UI, suppressed duplicate external attention, atomic answer/share and independent handles | Explicit publication/audience required; no inferred approval reuse |
-| 20 | Paraphrase questions | Optional bounded judge, reviewed proposals, invented-ID/adversarial tests | Semantic quality/cost corpus not measured; no automatic semantic resolution |
+| 20 | Paraphrase questions | Removed from current product | No model matching or suggestions |
 | 21 | Reuse prior answer | Explicit audience/provenance/expiry, invalidation and current publisher checks | Source-system changes require explicit invalidation/versioning |
 | 22 | Replace proposal | Cancel/supersede, exact descriptor/version, stale response rejection | Re-proposal creates a new request; no external undo |
 | 23 | Offline worker | Timed presence, durable queue, expiry, logical/exact-instance targets | Large offline backlog/soak capacity not measured |
@@ -42,7 +42,7 @@ Every scenario's cold/warm end-user setup time is **not measured by unfamiliar u
 - Real PostgreSQL Go integration/race suite covers identity isolation, policies, requests, concurrent decisions, leases, private history, providers, OIDC, shared answers, checkpoint adapter and CLI seed.
 - Clean quickstart and non-root container smoke scripts validate fresh databases, two agents, a reply, cookie login and history across restart. These are maintainer-run checks.
 - The SDK harness builds a separate server/schema, migrates it, runs thirteen TypeScript and seven Python tests with real HTTP, and cleans only its generated schema.
-- The dashboard/React suites cover separate directories, question focus, clarification, group review, semantic suggestions, stale fleet coverage, response denials and embeds.
+- The dashboard/React suites cover separate directories, question focus, clarification, group review, stale fleet coverage, response denials and embeds.
 - The dump/restore drill uses generated test databases and a simulated external effect after the snapshot. Old credentials are revoked, approvals superseded and re-execution denied. Its report is `.local/recovery-drill.json`; local automated timing excludes manual business reconciliation and is not a production RTO.
 - Thirty local server qualification trials used up to 25 separate authenticated SDK worker processes and verified 3,890 replies/receipts, including jitter, lost committed responses, signed provider failures and real lease-expiry replacement. [Results and limitations](SERVER-PERFORMANCE.md) separate deterministic fleet performance from real Codex model checks; they are not a production capacity or hosting-cost guarantee.
 - `govulncheck` is run with the pinned toolchain, and npm audit/dependency notices cover the installed locked dependencies. Scans are point-in-time checks, not a security guarantee.

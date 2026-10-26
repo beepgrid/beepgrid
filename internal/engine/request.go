@@ -196,7 +196,7 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 		if e := s.reuseExact(ctx, tx, a, out); e != nil {
 			return e
 		}
-		return s.queueAutomaticAnswer(ctx, tx, a, *out)
+		return nil
 	})
 }
 func (s *Store) Respond(ctx context.Context, a Actor, id string, in Response) (Request, error) {

@@ -16,7 +16,7 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-const SchemaVersion = 22
+const SchemaVersion = 23
 
 func pool(ctx context.Context, url, name string) (*pgxpool.Pool, error) {
 	return configuredPool(ctx, url, name, 12)

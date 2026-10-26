@@ -8,16 +8,13 @@ import (
 )
 
 type AssistanceSettings struct {
-	AutomaticAnswers   bool  `json:"automatic_answers"`
 	Overseer           bool  `json:"overseer"`
 	Version            int64 `json:"version"`
-	MatcherConfigured  bool  `json:"matcher_configured"`
 	OverseerConfigured bool  `json:"overseer_configured"`
 }
 type AssistanceUpdate struct {
-	Version          int64 `json:"version,omitempty"`
-	AutomaticAnswers *bool `json:"automatic_answers,omitempty"`
-	Overseer         *bool `json:"overseer,omitempty"`
+	Version  int64 `json:"version,omitempty"`
+	Overseer *bool `json:"overseer,omitempty"`
 }
 type OverseerInput struct {
 	PreviousPlanID string  `json:"previous_plan_id,omitempty"`

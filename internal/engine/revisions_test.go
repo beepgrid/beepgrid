@@ -97,7 +97,7 @@ func TestAssistanceSettingsInitialRevisionDetectsStaleToggle(t *testing.T) {
 	s, owner := testStore(t)
 	ctx := context.Background()
 	settings, e := s.AssistanceSettings(ctx, owner)
-	if e != nil || settings.Version < 1 || settings.Overseer || settings.AutomaticAnswers {
+	if e != nil || settings.Version < 1 || settings.Overseer {
 		t.Fatal(settings, e)
 	}
 	s.OverseerPlanner = func(context.Context, string, []FleetStatus) (OverseerDecision, error) { return OverseerDecision{}, nil }

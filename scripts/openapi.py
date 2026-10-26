@@ -40,8 +40,8 @@ schemas={
 'Attachment':obj({'id':S,'conversation_id':S,'file_name':S,'media_type':S,'size':{'type':'integer'},'sha256':S,'created_at':S}),
 'PublishAnswer':obj({'request_id':S,'key':S,'audience':array(S),'valid_until':S},['request_id','audience']),
 'SharedAnswer':{'type':'object','description':'Scoped publication with answer, author/publisher, audience, provenance, validity and invalidation.'},
-'AssistanceSettings':obj({'automatic_answers':{'type':'boolean'},'overseer':{'type':'boolean'},'version':{'type':'integer'},'matcher_configured':{'type':'boolean'},'overseer_configured':{'type':'boolean'}}),
-'AssistanceUpdate':obj({'version':{'type':'integer','minimum':0},'automatic_answers':{'type':'boolean'},'overseer':{'type':'boolean'}}),
+'AssistanceSettings':obj({'overseer':{'type':'boolean'},'version':{'type':'integer'},'overseer_configured':{'type':'boolean'}}),
+'AssistanceUpdate':obj({'version':{'type':'integer','minimum':0},'overseer':{'type':'boolean'}}),
 'FleetAgent':obj({'agent':ref('Agent'),'instances':array(ref('Instance')),'fresh':{'type':'boolean'}}),
 'OverseerInput':obj({'prompt':{'type':'string','maxLength':4000},'target':ref('Target')},['prompt']),
 'OverseerDispatch':obj({'agent_id':S,'conversation_id':S,'request_id':S}),
@@ -121,8 +121,6 @@ paths['/api/v1/events']['get']['responses']['200']['content']['text/event-stream
 add('GET','/api/v1/answers',result=array(ref('SharedAnswer')))
 add('POST','/api/v1/answers',ref('PublishAnswer'),ref('SharedAnswer'))
 add('POST','/api/v1/answers/{id}/invalidate',obj({}))
-add('POST','/api/v1/requests/{id}/suggestions',obj({}))
-add('POST','/api/v1/answer-proposals/{id}',obj({'accept':{'type':'boolean'}},['accept']),ref('Request'))
 add('GET','/api/v1/assistance/settings',result=ref('AssistanceSettings'))
 add('POST','/api/v1/assistance/settings',ref('AssistanceUpdate'),ref('AssistanceSettings'),description='Owner-controlled optional assistance. Both features default off. Enabling requires a configured provider.')
 add('POST','/api/v1/fleet/status',obj({'target':ref('Target')}),description='Read-only structured fleet status filtered by current View permission.')

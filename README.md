@@ -70,7 +70,7 @@ For local source use, set `PYTHONPATH=sdk/python`. See [Go/Python/TypeScript and
 - Outbound worker connections, fenced delivery leases, event replay, provider recovery and explicit uncertain outcomes.
 - Self-hosted dashboard, employee inbox/chat, agent directory, access administration, activity/recovery surfaces and authenticated React embeds.
 - Native web, signed incoming/outgoing webhooks, Slack messages/threads/verified interactive responses, and SMTP email with authenticated web response links.
-- Exact scoped informational answer reuse, explicit publication/audiences/invalidation, optional reviewed semantic suggestions and a permission-filtered read-only fleet status view.
+- Exact scoped informational answer reuse, explicit publication/audiences/invalidation, a permission-filtered read-only fleet status view.
 - REST, Go/TypeScript/Python SDKs, MCP stdio tools, CLI, versioned migrations, non-root Docker packaging and a tested restore reconciliation procedure.
 
 Transport receipt, a human decision and worker-reported execution are distinct evidence. The engine cannot sandbox an arbitrary external agent or guarantee exactly-once effects in an unrelated API. Enforce permits at protected business tools and use destination idempotency/version fences. These boundaries are part of the API contract.

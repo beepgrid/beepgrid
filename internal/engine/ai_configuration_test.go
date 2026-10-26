@@ -45,9 +45,6 @@ func nativeAssistanceFixture(t *testing.T, s *Store, provider string, respond fu
 			return
 		}
 		task, _ := payload["task"].(string)
-		if task == "" {
-			task = "answer_suggestions"
-		}
 		result := respond(task, payload)
 		raw, _ := json.Marshal(result)
 		var envelope any
@@ -75,7 +72,7 @@ func TestNativeAIEndToEnd(t *testing.T) {
 		t.Run(provider, func(t *testing.T) {
 			s, owner := testStore(t)
 			ctx := context.Background()
-			worker, answer, in := publishedFixture(t, s, owner)
+			worker := testWorker(t, s, owner, "scout")
 			hidden := testWorker(t, s, owner, "hidden")
 			person := testPerson(t, s, owner, "operator")
 			grant(t, s, owner, person, []Rule{{Action: "view", TargetKind: "agent", TargetID: worker.ID}, {Action: "ask", TargetKind: "agent", TargetID: worker.ID}, {Action: "message", TargetKind: "agent", TargetID: worker.ID}})
@@ -84,14 +81,6 @@ func TestNativeAIEndToEnd(t *testing.T) {
 					t.Error("hidden agent reached provider")
 				}
 				switch task {
-				case "answer_suggestions":
-					return map[string]any{"suggestions": []any{map[string]any{"answer_id": answer.ID, "reason": "Same scoped informational question"}}}
-				case "automatic_answer_match":
-					candidates := payload["candidates"].([]any)
-					if len(candidates) != 1 || candidates[0].(map[string]any)["id"] != answer.ID || strings.Contains(string(JSON(payload)), `"answer":"Yes"`) {
-						t.Error("wrong or excessive matching context")
-					}
-					return AutomaticMatch{answer.ID, true, 0.995, "Same resource, year and informational decision"}
 				case "overseer_plan":
 					return map[string]any{"operation": "question", "agent_ids": []string{worker.ID}, "body": "Report progress", "summary": "Ask the permitted agent for current progress"}
 				case "overseer_summary":
@@ -101,28 +90,13 @@ func TestNativeAIEndToEnd(t *testing.T) {
 				return nil
 			})
 			settings, err := s.AssistanceSettings(ctx, owner)
-			if err != nil || settings.AutomaticAnswers || settings.Overseer || !settings.MatcherConfigured || !settings.OverseerConfigured {
+			if err != nil || settings.Overseer || !settings.OverseerConfigured {
 				t.Fatal(settings, err)
 			}
 			if _, err = s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Status?"}); ErrorStatus(err) != 409 || calls.Load() != 0 {
 				t.Fatal("configuration enabled a feature", err)
 			}
-			suggestions, err := s.Matcher(ctx, Request{RequesterID: worker.ID, Title: in.Title, SharedKey: in.SharedKey}, []SharedAnswer{answer})
-			if err != nil || len(suggestions) != 1 || suggestions[0].AnswerID != answer.ID {
-				t.Fatal(suggestions, err)
-			}
-			enableAssistance(t, s, owner, true, true)
-			q, err := s.Ask(ctx, worker, in, "native-model-question")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if worked, err := s.ProcessAutomaticAnswer(ctx); err != nil || !worked {
-				t.Fatal(worked, err)
-			}
-			q, err = s.Request(ctx, worker, q.ID)
-			if err != nil || q.State != "resolved" || q.Response.SourceAnswerID != answer.ID || q.Response.Answer != "Yes" {
-				t.Fatal(q, err)
-			}
+			enableAssistance(t, s, owner, true)
 			plan, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Ask my agent for progress"})
 			if err != nil || !plan.RequiresConfirmation || len(plan.Dispatches) != 0 {
 				t.Fatal(plan, err)
@@ -144,7 +118,7 @@ func TestNativeAIEndToEnd(t *testing.T) {
 			if err != nil || plan.ReplySummary == "" {
 				t.Fatal(plan, err)
 			}
-			if _, err = s.SummarizeOverseer(ctx, person, plan.ID); err != nil || calls.Load() != 4 {
+			if _, err = s.SummarizeOverseer(ctx, person, plan.ID); err != nil || calls.Load() != 2 {
 				t.Fatal("summary cache lost", calls.Load(), err)
 			}
 			if _, err = s.Pool.Exec(ctx, `DELETE FROM role_bindings WHERE scope=$1 AND subject_id=$2`, owner.Scope, person.ID); err != nil {
@@ -153,7 +127,7 @@ func TestNativeAIEndToEnd(t *testing.T) {
 			if _, err = s.OverseerPlan(ctx, person, plan.ID); ErrorStatus(err) != 404 {
 				t.Fatal("derived read survived revocation", err)
 			}
-			if _, err = s.SummarizeOverseer(ctx, person, plan.ID); ErrorStatus(err) != 404 || calls.Load() != 4 {
+			if _, err = s.SummarizeOverseer(ctx, person, plan.ID); ErrorStatus(err) != 404 || calls.Load() != 2 {
 				t.Fatal("revoked caller reached provider", err)
 			}
 		})
@@ -162,11 +136,11 @@ func TestNativeAIEndToEnd(t *testing.T) {
 
 func TestNativeAIRechecksAuthorityAfterModelCall(t *testing.T) {
 	for _, provider := range []string{"openai", "anthropic", "google", "openai-compatible"} {
-		for _, scenario := range []string{"invented target", "view revoked", "ask missing", "source invalidated"} {
+		for _, scenario := range []string{"invented target", "view revoked", "ask missing"} {
 			t.Run(provider+"/"+scenario, func(t *testing.T) {
 				s, owner := testStore(t)
 				ctx := context.Background()
-				worker, answer, in := publishedFixture(t, s, owner)
+				worker := testWorker(t, s, owner, "scout")
 				person := testPerson(t, s, owner, "limited")
 				rules := []Rule{{Action: "view", TargetKind: "agent", TargetID: worker.ID}}
 				if scenario != "ask missing" {
@@ -174,12 +148,6 @@ func TestNativeAIRechecksAuthorityAfterModelCall(t *testing.T) {
 				}
 				grant(t, s, owner, person, rules)
 				nativeAssistanceFixture(t, s, provider, func(task string, payload map[string]any) any {
-					if task == "automatic_answer_match" {
-						if err := s.InvalidateAnswer(ctx, owner, answer.ID); err != nil {
-							t.Error(err)
-						}
-						return AutomaticMatch{answer.ID, true, 1, "Same question"}
-					}
 					id := worker.ID
 					if scenario == "invented target" {
 						id = "agt_not_supplied"
@@ -191,27 +159,13 @@ func TestNativeAIRechecksAuthorityAfterModelCall(t *testing.T) {
 					}
 					return map[string]any{"operation": "question", "agent_ids": []string{id}, "body": "Report progress", "summary": "A bounded proposal"}
 				})
-				enableAssistance(t, s, owner, true, true)
-				if scenario == "source invalidated" {
-					q, err := s.Ask(ctx, worker, in, "invalidated-during-native-call")
-					if err != nil {
-						t.Fatal(err)
-					}
-					if _, err = s.ProcessAutomaticAnswer(ctx); err != nil {
-						t.Fatal(err)
-					}
-					q, err = s.Request(ctx, worker, q.ID)
-					if err != nil || q.State != "open" {
-						t.Fatal("revoked source resolved request", err)
-					}
-				} else {
-					if _, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Ask my agent"}); ErrorStatus(err) != 403 {
-						t.Fatal("model bypassed authority", err)
-					}
-					var count int
-					if err := s.Pool.QueryRow(ctx, `SELECT count(*) FROM overseer_plans WHERE scope=$1`, owner.Scope).Scan(&count); err != nil || count != 0 {
-						t.Fatal("unauthorized plan persisted", count, err)
-					}
+				enableAssistance(t, s, owner, true)
+				if _, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Ask my agent"}); ErrorStatus(err) != 403 {
+					t.Fatal("model bypassed authority", err)
+				}
+				var count int
+				if err := s.Pool.QueryRow(ctx, `SELECT count(*) FROM overseer_plans WHERE scope=$1`, owner.Scope).Scan(&count); err != nil || count != 0 {
+					t.Fatal("unauthorized plan persisted", count, err)
 				}
 			})
 		}
@@ -221,7 +175,7 @@ func TestNativeAIRechecksAuthorityAfterModelCall(t *testing.T) {
 func TestAIConfigurationAndLegacyIsolation(t *testing.T) {
 	s, owner := testStore(t)
 	ctx := context.Background()
-	if err := s.ConfigureAI(ctx, aimodel.Config{}); err != nil || s.OverseerPlanner != nil || s.Matcher != nil || s.AutomaticMatcher != nil {
+	if err := s.ConfigureAI(ctx, aimodel.Config{}); err != nil || s.OverseerPlanner != nil {
 		t.Fatal("unconfigured model activated", err)
 	}
 	if err := s.ConfigureAI(ctx, aimodel.Config{Provider: "openai"}); err == nil || s.OverseerPlanner != nil {
@@ -236,12 +190,6 @@ func TestAIConfigurationAndLegacyIsolation(t *testing.T) {
 	var nativeCalls, legacyCalls atomic.Int32
 	nativeAssistanceFixture(t, s, "openai", func(task string, payload map[string]any) any {
 		nativeCalls.Add(1)
-		if task == "automatic_answer_match" {
-			return AutomaticMatch{"ans_native", false, 0, "Native match abstention"}
-		}
-		if task == "answer_suggestions" {
-			return map[string]any{"suggestions": []any{}}
-		}
 		return map[string]any{"summary": "native summary"}
 	})
 	if s.AllowLocal {
@@ -272,18 +220,8 @@ func TestAIConfigurationAndLegacyIsolation(t *testing.T) {
 	if _, err = s.OverseerSummarizer(context.WithValue(ctx, assistanceActorKey{}, "different-person"), "summary", nil); err != nil {
 		t.Fatal(err)
 	}
-	// The summarizer belongs to the same explicit overseer gateway; automatic
-	// matching and reviewed suggestions remain separately configured.
-	if legacyCalls.Load() != 2 || nativeCalls.Load() != 0 || s.AutomaticMatcher == nil || s.Matcher == nil {
-		t.Fatal("gateway override affected unrelated capabilities")
-	}
-	if _, err := s.AutomaticMatcher(ctx, Request{RequesterID: "native-auto"}, nil); err != nil {
-		t.Fatal("automatic matcher was overridden", err)
-	}
-	if _, err := s.Matcher(ctx, Request{RequesterID: "native-reviewed"}, nil); err != nil {
-		t.Fatal("reviewed matcher was overridden", err)
-	}
-	if nativeCalls.Load() != 2 || legacyCalls.Load() != 2 {
-		t.Fatal("per-feature routing changed")
+	// Both operations use the same explicitly selected gateway.
+	if legacyCalls.Load() != 2 || nativeCalls.Load() != 0 {
+		t.Fatal("gateway override routing changed")
 	}
 }

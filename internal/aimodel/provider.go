@@ -30,7 +30,7 @@ func (p *Provider) Call(ctx context.Context, client *http.Client, payload, out a
 	if !ok {
 		return fmt.Errorf("model context must be an object")
 	}
-	task := "answer_suggestions"
+	task := ""
 	if name, exists := input["task"]; exists {
 		task, ok = name.(string)
 		if !ok {

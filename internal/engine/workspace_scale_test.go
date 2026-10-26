@@ -89,7 +89,7 @@ func TestWorkspaceOverseerSeesOnlySevenOfOneHundredAgents(t *testing.T) {
 		}
 		return OverseerDecision{Operation: "status", AgentIDs: ids, Summary: "Status of the seven permitted agents."}, nil
 	}
-	enableAssistance(t, s, owner, false, true)
+	enableAssistance(t, s, owner, true)
 	plan, e := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Show my fleet status"})
 	if e != nil || !called || len(plan.Sources) != 7 || plan.RequiresConfirmation {
 		t.Fatal(plan, e)

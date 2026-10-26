@@ -16,8 +16,6 @@ import { agent, harness, json, me, requestBody } from "./fixtures";
 const settings = {
   overseer: true,
   overseer_configured: true,
-  automatic_answers: true,
-  matcher_configured: true,
   version: 2,
 };
 function plan(id = "ovr_first"): Plan {
@@ -79,9 +77,9 @@ it("keeps a 25-agent result compact and reveals canonical per-agent details on d
   expect(screen.queryByText("Result 0")).not.toBeInTheDocument();
   fireEvent.click(summary);
   await screen.findByText("Result 0");
-  expect(
-    screen.getAllByRole("button", { name: "Conversation" }),
-  ).toHaveLength(25);
+  expect(screen.getAllByRole("button", { name: "Conversation" })).toHaveLength(
+    25,
+  );
   expect(screen.getAllByText("Awaiting an authorized reply")).toHaveLength(22);
 });
 

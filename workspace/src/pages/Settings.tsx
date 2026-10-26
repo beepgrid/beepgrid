@@ -475,9 +475,7 @@ function Assistance() {
   const q = useResource<AssistanceSettings>("/assistance/settings"),
     cap = useCapabilities(),
     op = useOperation(),
-    [pending, setPending] = useState<"automatic_answers" | "overseer" | null>(
-      null,
-    );
+    [confirm, setConfirm] = useState(false);
   if (q.isPending) return <Loading />;
   if (q.error) return <ErrorView error={q.error} />;
   const s = q.data!;
@@ -485,75 +483,57 @@ function Assistance() {
     <>
       <h2>Optional assistance</h2>
       <p className="help">
-        Both features are independently opt-in. The configured model may receive
-        permitted question context or authorized fleet reports. No provider or
-        model is selected by default. Model credentials stay in deployment
-        configuration.
+        Coordinator is opt-in. The configured model receives only authorized
+        fleet reports and conversation context. Model credentials stay in
+        deployment configuration.
       </p>
       <ErrorView error={op.error} />
-      {(["automatic_answers", "overseer"] as const).map((key) => (
-        <section className="section" key={key}>
-          <div className="page-header">
-            <div>
-              <h3>
-                {key === "overseer"
-                  ? "Coordinator"
-                  : "Automatic informational answers"}
-              </h3>
-              <p>
-                {key === "overseer"
-                  ? "Permission-filtered fleet interpretation with explicit confirmation before sending."
-                  : "Reuse eligible informational answers. This never automatically approves actions."}
-              </p>
-            </div>
-            <Badge>{s[key] ? "On" : "Off"}</Badge>
+      <section className="section">
+        <div className="page-header">
+          <div>
+            <h3>Coordinator</h3>
+            <p>
+              Permission-filtered fleet interpretation with explicit
+              confirmation before sending.
+            </p>
           </div>
-          <small>
-            {key === "overseer"
-              ? s.overseer_configured
-                ? "Provider configured"
-                : "Provider not configured"
-              : s.matcher_configured
-                ? "Matcher configured"
-                : "Matcher not configured"}
-          </small>
-          {cap.data?.operations.configure_assistance ? (
-            <div className="actions">
-              <Button
-                disabled={
-                  op.pending ||
-                  (!s[key] &&
-                    !(key === "overseer"
-                      ? s.overseer_configured
-                      : s.matcher_configured))
-                }
-                onClick={() => setPending(key)}
-              >
-                {s[key] ? "Disable" : "Enable"}
-              </Button>
-            </div>
-          ) : null}
-        </section>
-      ))}
+          <Badge>{s.overseer ? "On" : "Off"}</Badge>
+        </div>
+        <small>
+          {s.overseer_configured
+            ? "Provider configured"
+            : "Provider not configured"}
+        </small>
+        {cap.data?.operations.configure_assistance ? (
+          <div className="actions">
+            <Button
+              disabled={op.pending || (!s.overseer && !s.overseer_configured)}
+              onClick={() => setConfirm(true)}
+            >
+              {s.overseer ? "Disable" : "Enable"}
+            </Button>
+          </div>
+        ) : null}
+      </section>
       <small>
-        Settings revision {s.version}. Disabling invalidates pending model work;
-        re-enabling does not resend or revive stale plans. Existing exact
-        published answers have their own validity and invalidation controls.
+        Settings revision {s.version}. Disabling invalidates unconfirmed plans;
+        re-enabling does not resend them. Published answers have independent
+        validity controls.
       </small>
-      {pending ? (
+      {confirm ? (
         <Modal
-          title={`${s[pending] ? "Disable" : "Enable"} ${pending === "overseer" ? "Coordinator" : pending.replaceAll("_", " ")}?`}
-          onClose={() => setPending(null)}
+          title={`${s.overseer ? "Disable" : "Enable"} Coordinator?`}
+          onClose={() => setConfirm(false)}
         >
           <div className="form">
             <p>
-              {s[pending]
-                ? "Future model work stops and pending work is reevaluated. Durable history remains."
-                : "This shares the authorized context needed for this feature with the configured model provider. Current permissions and explicit send confirmation still apply."}
+              {s.overseer
+                ? "Future model work stops. Durable history remains."
+                : "Authorized context is shared with the configured provider. Current permissions and explicit send confirmation still apply."}
             </p>
             <ErrorView error={op.error} />
             <div className="form-actions">
-              <Button onClick={() => setPending(null)}>Cancel</Button>
+              <Button onClick={() => setConfirm(false)}>Cancel</Button>
               <Button
                 primary
                 disabled={op.pending}
@@ -561,10 +541,10 @@ function Assistance() {
                   void op
                     .run("/assistance/settings", {
                       version: s.version,
-                      [pending]: !s[pending],
+                      overseer: !s.overseer,
                     })
                     .then((v) => {
-                      if (v) setPending(null);
+                      if (v) setConfirm(false);
                     })
                 }
               >

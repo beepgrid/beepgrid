@@ -108,8 +108,6 @@ def object_schema(properties):
 
 
 schemas = {
-    "automatic_answer_match": object_schema({"answer_id": {"type": "string"}, "equivalent": {"type": "boolean"},
-                                              "confidence": {"type": "number"}, "reason": {"type": "string"}}),
     "overseer_plan": object_schema({"operation": {"type": "string", "enum": ["status", "question", "message", "task"]},
                                    "agent_ids": {"type": "array", "items": {"type": "string"}},
                                    "body": {"type": "string"}, "summary": {"type": "string"}}),
@@ -156,9 +154,7 @@ class Provider(http.server.BaseHTTPRequestHandler):
         label = "provider-%02d-%s" % (provider_calls, task)
         try:
             if args.followup_only and not payload.get("history"):
-                if task == "automatic_answer_match":
-                    output = {"answer_id": payload["candidates"][0]["id"], "equivalent": True, "confidence": .995, "reason": "Local setup fixture"}
-                elif task == "overseer_plan":
+                if task == "overseer_plan":
                     output = {"operation": "question", "agent_ids": [payload["sources"][0]["agent"]["id"]], "body": "Report progress", "summary": "Local setup fixture"}
                 else:
                     output = {"summary": "Local fixture: three pages complete; seven remain."}
@@ -200,10 +196,10 @@ subprocess.run(["go", "build", "-buildvcs=false", "-o", str(binary), "./cmd/noti
 database = os.environ.get("NOTIF_TEST_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable")
 engine_env = dict(environment, NOTIF_DATABASE_URL=database, NOTIF_SCHEMA=schema_name, NOTIF_WORKSPACE="assistance-audit",
                   NOTIF_BOOTSTRAP_TOKEN=secrets.token_hex(32), NOTIF_SECRET_KEY=secrets.token_hex(32), NOTIF_ADDR="127.0.0.1:" + str(port),
-                  NOTIF_PUBLIC_URL=url, NOTIF_AUTOMATIC_ANSWER_URL=provider_url, NOTIF_AUTOMATIC_ANSWER_TOKEN=provider_token,
+                  NOTIF_PUBLIC_URL=url,
                   NOTIF_OVERSEER_URL=provider_url, NOTIF_OVERSEER_TOKEN=provider_token)
 if args.protocol != "gateway":
-    for key in ("NOTIF_AUTOMATIC_ANSWER_URL", "NOTIF_AUTOMATIC_ANSWER_TOKEN", "NOTIF_OVERSEER_URL", "NOTIF_OVERSEER_TOKEN"):
+    for key in ("NOTIF_OVERSEER_URL", "NOTIF_OVERSEER_TOKEN"):
         engine_env.pop(key)
     engine_env.update(NOTIF_AI_PROVIDER=args.protocol, NOTIF_AI_MODEL=model, NOTIF_AI_API_KEY=provider_token,
                       NOTIF_AI_BASE_URL=provider_url + "/v1", NOTIF_AI_ALLOW_PRIVATE="true")
@@ -228,17 +224,10 @@ with (local / "server.log").open("w") as log:
             {"action": action, "target_kind": "person", "target_id": person} for action in ("view", "message", "ask")]})
         owner.call("POST", "/api/v1/role-bindings", {"role_id": role["id"], "subject_kind": "principal", "subject_id": session["agent"]["id"]})
         worker.heartbeat(completed_pages=3, total_pages=10, project="India pricing report 2026")
-        assert not owner.assistance()["overseer"] and not owner.assistance()["automatic_answers"]
+        assert not owner.assistance()["overseer"]
         assert provider_calls == 0
         passed("Default-off flags make no provider calls")
-        source = worker.ask(target={"kind": "person", "id": person}, title="Should India report 2026 prices include GST?", body="Use the 2026 India pricing policy.", shared_key="reports/india/2026/v1")
-        owner.respond(source["id"], "answered", version=1, answer="Yes, use tax-inclusive prices.")
-        answer = owner.call("POST", "/api/v1/answers", {"request_id": source["id"], "audience": [session["agent"]["id"]]})
-        owner.update_assistance(automatic_answers=True, overseer=True)
-        q = worker.ask(target={"kind": "person", "id": person}, title="For the India 2026 pricing report, should the displayed amounts already contain GST?", body="Use the 2026 India pricing policy.", shared_key="reports/india/2026/v1")
-        result = worker.wait(q["id"], timeout=55, interval=.25)
-        assert result["response"]["source_answer_id"] == answer["id"] and result["response"]["reuse_method"] == "automatic"
-        passed("Live Codex semantic match resolves differently worded informational question with provenance")
+        owner.update_assistance(overseer=True)
         plan = owner.plan_overseer("Ask Scout for a fresh update on how many pages are complete.")
         assert plan["operation"] == "question" and plan["requires_confirmation"] and len(plan["sources"]) == 1
         assert not plan["dispatches"]
@@ -269,7 +258,7 @@ with (local / "server.log").open("w") as log:
         except NotifError as error:
             assert error.status == 404
         passed("Current source removal denies saved derived data")
-        owner.update_assistance(automatic_answers=False, overseer=False)
+        owner.update_assistance(overseer=False)
         passed("Both features explicitly disabled after qualification")
     except Exception as error:
         report["failure"] = {"type": type(error).__name__, "message": str(error)[:1000]}

@@ -49,8 +49,6 @@ func TestAssistanceProviderProtocolsAndBounds(t *testing.T) {
 		_ = json.Unmarshal(in["task"], &task)
 		w.Header().Set("Content-Type", "application/json")
 		switch task {
-		case "automatic_answer_match":
-			w.Write([]byte(`{"answer_id":"ans_1","equivalent":true,"confidence":0.99,"reason":"Same explicitly scoped informational question"}`))
 		case "overseer_plan":
 			w.Write([]byte(`{"operation":"status","agent_ids":["agt_1"],"summary":"Only the authorized agent is visible"}`))
 		case "overseer_summary":
@@ -61,21 +59,12 @@ func TestAssistanceProviderProtocolsAndBounds(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	if err := s.ConfigureAutomaticAnswers(ctx, server.URL, "provider-only-secret"); err != nil {
+	if err := s.ConfigureOverseer(ctx, server.URL, "provider-only-secret"); err != nil {
 		t.Fatal(err)
 	}
-	result, err := s.AutomaticMatcher(ctx, Request{RequesterID: "one", Title: "Tax inclusive?", SharedKey: "tax/v1"}, []SharedAnswer{{ID: "ans_1", Question: "Include GST?", Key: "tax/v1", Answer: "PRIVATE ANSWER"}})
-	if err != nil || !result.Equivalent || result.AnswerID != "ans_1" {
-		t.Fatal(result, err)
-	}
-	if _, err = s.AutomaticMatcher(ctx, Request{RequesterID: "one"}, nil); err == nil {
-		t.Fatal("per-requester budget missing")
-	}
-	if _, err = s.AutomaticMatcher(ctx, Request{RequesterID: "large", Body: strings.Repeat("x", 32769)}, nil); err == nil {
+	largeContext := context.WithValue(ctx, assistanceActorKey{}, "large")
+	if _, err := s.OverseerPlanner(largeContext, strings.Repeat("x", 32769), nil); err == nil {
 		t.Fatal("unbounded payload")
-	}
-	if err = s.ConfigureOverseer(ctx, server.URL, "provider-only-secret"); err != nil {
-		t.Fatal(err)
 	}
 	plan, err := s.OverseerPlanner(context.WithValue(ctx, assistanceActorKey{}, "scope/person1"), "Status?", []FleetStatus{{Agent: Principal{ID: "agt_1"}}})
 	if err != nil || plan.Operation != "status" {

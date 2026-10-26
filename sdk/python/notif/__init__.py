@@ -110,10 +110,8 @@ class Client:
     def assistance(self) -> dict[str, Any]:
         return self.call("GET", "/api/v1/assistance/settings")
 
-    def update_assistance(self, *, automatic_answers: bool | None = None,
-                          overseer: bool | None = None, version: int | None = None) -> dict[str, Any]:
-        settings = {key: value for key, value in {"automatic_answers": automatic_answers,
-                    "overseer": overseer, "version": version}.items() if value is not None}
+    def update_assistance(self, *, overseer: bool | None = None, version: int | None = None) -> dict[str, Any]:
+        settings = {key: value for key, value in {"overseer": overseer, "version": version}.items() if value is not None}
         return self.call("POST", "/api/v1/assistance/settings", settings)
 
     def plan_overseer(self, prompt: str, target: dict[str, str] | None = None, *, previous_plan_id: str | None = None, key: str | None = None) -> dict[str, Any]:

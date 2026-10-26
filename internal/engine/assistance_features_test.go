@@ -2,19 +2,17 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func boolValue(v bool) *bool { return &v }
-func enableAssistance(t *testing.T, s *Store, a Actor, automatic, overseer bool) {
+func enableAssistance(t *testing.T, s *Store, a Actor, overseer bool) {
 	t.Helper()
-	if _, err := s.UpdateAssistance(context.Background(), a, AssistanceUpdate{AutomaticAnswers: boolValue(automatic), Overseer: boolValue(overseer)}); err != nil {
+	if _, err := s.UpdateAssistance(context.Background(), a, AssistanceUpdate{Overseer: boolValue(overseer)}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -37,250 +35,6 @@ func publishedFixture(t *testing.T, s *Store, a Actor) (Actor, SharedAnswer, Ask
 	in.Title = "For this report, are prices tax-inclusive?"
 	return worker, answer, in
 }
-func TestAssistanceDefaultsAndOwnerControls(t *testing.T) {
-	s, a := testStore(t)
-	ctx := context.Background()
-	worker, answer, in := publishedFixture(t, s, a)
-	var calls atomic.Int32
-	s.AutomaticMatcher = func(context.Context, Request, []SharedAnswer) (AutomaticMatch, error) {
-		calls.Add(1)
-		return AutomaticMatch{answer.ID, true, 1, "Same scoped question"}, nil
-	}
-	settings, err := s.AssistanceSettings(ctx, a)
-	if err != nil || settings.AutomaticAnswers || settings.Overseer {
-		t.Fatal(settings, err)
-	}
-	q, err := s.Ask(ctx, worker, in, "off")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if worked, err := s.ProcessAutomaticAnswer(ctx); err != nil || worked || calls.Load() != 0 {
-		t.Fatal("disabled feature called a model", worked, err)
-	}
-	if _, err = s.UpdateAssistance(ctx, worker, AssistanceUpdate{AutomaticAnswers: boolValue(true)}); ErrorStatus(err) != 403 {
-		t.Fatal(err)
-	}
-	enableAssistance(t, s, a, true, false)
-	if _, err = s.PlanOverseer(ctx, a, OverseerInput{Prompt: "Status?"}); ErrorStatus(err) != 409 {
-		t.Fatal(err)
-	}
-	q, err = s.Request(ctx, worker, q.ID)
-	if err != nil || q.State != "open" {
-		t.Fatal(q, err)
-	}
-}
-func TestAutomaticAnswersDurableScopedProvenance(t *testing.T) {
-	s, a := testStore(t)
-	ctx := context.Background()
-	worker, answer, in := publishedFixture(t, s, a)
-	s.AutomaticMatcher = func(_ context.Context, q Request, candidates []SharedAnswer) (AutomaticMatch, error) {
-		if len(candidates) != 1 || candidates[0].ID != answer.ID {
-			t.Error("wrong candidates", candidates)
-		}
-		return AutomaticMatch{answer.ID, true, 0.995, "Same tax convention, resource and year."}, nil
-	}
-	enableAssistance(t, s, a, true, false)
-	q, err := s.Ask(ctx, worker, in, "automatic")
-	if err != nil || q.State != "open" {
-		t.Fatal(q, err)
-	}
-	if worked, err := s.ProcessAutomaticAnswer(ctx); err != nil || !worked {
-		t.Fatal(worked, err)
-	}
-	q, err = s.Request(ctx, worker, q.ID)
-	if err != nil || q.State != "resolved" || q.Response.SourceAnswerID != answer.ID || q.Response.ReuseMethod != "automatic" || q.Response.Answer != "Yes" {
-		t.Fatal(q, err)
-	}
-	if worked, err := s.ProcessAutomaticAnswer(ctx); err != nil || worked {
-		t.Fatal("job replayed", worked, err)
-	}
-	if err = s.InvalidateAnswer(ctx, a, answer.ID); err != nil {
-		t.Fatal(err)
-	}
-	q, err = s.Request(ctx, worker, q.ID)
-	if err != nil || !q.Response.SourceInvalidated {
-		t.Fatal(q, err)
-	}
-}
-func TestAutomaticAnswersRejectUnsafeMatchesAndInFlightChanges(t *testing.T) {
-	for _, scenario := range []string{"invented", "uncertain", "abstain", "provider failure", "different key", "different choices", "invalidated", "expired", "publisher disabled", "requester disabled", "credential revoked", "requester permission removed", "disabled during call", "human answered"} {
-		t.Run(scenario, func(t *testing.T) {
-			s, a := testStore(t)
-			ctx := context.Background()
-			worker, answer, in := publishedFixture(t, s, a)
-			s.AutomaticMatcher = func(context.Context, Request, []SharedAnswer) (AutomaticMatch, error) { return AutomaticMatch{}, nil }
-			enableAssistance(t, s, a, true, false)
-			if scenario == "different key" {
-				in.SharedKey = "another/resource/version"
-			}
-			if scenario == "different choices" {
-				in.Choices = []string{"Include", "Exclude"}
-			}
-			q, err := s.Ask(ctx, worker, in, "question")
-			if err != nil {
-				t.Fatal(err)
-			}
-			s.AutomaticMatcher = func(_ context.Context, _ Request, _ []SharedAnswer) (AutomaticMatch, error) {
-				result := AutomaticMatch{answer.ID, true, 1, "Exact same informational meaning in the same scope."}
-				switch scenario {
-				case "invented":
-					result.AnswerID = "private-answer-not-in-candidates"
-				case "uncertain":
-					result.Confidence = 0.9
-				case "abstain":
-					result.Equivalent = false
-				case "provider failure":
-					return result, errors.New("provider unavailable")
-				case "invalidated":
-					if err := s.InvalidateAnswer(ctx, a, answer.ID); err != nil {
-						t.Error(err)
-					}
-				case "expired":
-					_, err := s.Pool.Exec(ctx, `UPDATE shared_answers SET valid_until=now()-interval '1 second' WHERE id=$1`, answer.ID)
-					if err != nil {
-						t.Error(err)
-					}
-				case "publisher disabled":
-					_, err := s.Pool.Exec(ctx, `UPDATE principals SET disabled=true WHERE id=$1`, a.ID)
-					if err != nil {
-						t.Error(err)
-					}
-				case "requester disabled":
-					_, err := s.Pool.Exec(ctx, `UPDATE principals SET disabled=true WHERE id=$1`, worker.ID)
-					if err != nil {
-						t.Error(err)
-					}
-				case "credential revoked":
-					_, err := s.Pool.Exec(ctx, `UPDATE credentials SET revoked=true WHERE id=$1`, worker.CredentialID)
-					if err != nil {
-						t.Error(err)
-					}
-				case "requester permission removed":
-					_, err := s.Pool.Exec(ctx, `DELETE FROM role_bindings WHERE subject_id=$1`, worker.ID)
-					if err != nil {
-						t.Error(err)
-					}
-				case "disabled during call":
-					if _, err := s.UpdateAssistance(ctx, a, AssistanceUpdate{AutomaticAnswers: boolValue(false)}); err != nil {
-						t.Error(err)
-					}
-				case "human answered":
-					if _, err := s.Respond(ctx, a, q.ID, Response{Outcome: "answered", Answer: "No", Version: 1}); err != nil {
-						t.Error(err)
-					}
-				}
-				return result, nil
-			}
-			if _, err = s.ProcessAutomaticAnswer(ctx); err != nil {
-				t.Fatal(err)
-			}
-			current, err := scanRequest(s.Pool.QueryRow(ctx, `SELECT `+requestFields+` FROM requests r WHERE r.scope=$1 AND r.id=$2`, a.Scope, q.ID))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if scenario == "human answered" {
-				if current.Response.Answer != "No" || current.Response.SourceAnswerID != "" {
-					t.Fatal(current)
-				}
-			} else if current.State != "open" {
-				t.Fatal("unsafe automatic resolution", current)
-			}
-		})
-	}
-}
-func TestAutomaticAnswersRespectCurrentResponderAndGroupRights(t *testing.T) {
-	for _, change := range []string{"responder rights", "group membership", "publisher rights"} {
-		t.Run(change, func(t *testing.T) {
-			s, owner := testStore(t)
-			ctx := context.Background()
-			human := testPerson(t, s, owner, "reviewer")
-			w := testWorker(t, s, owner, "worker")
-			replyRole := grant(t, s, owner, human, []Rule{{Action: "view", TargetKind: "agent", TargetID: w.ID}, {Action: "message", TargetKind: "agent", TargetID: w.ID}})
-			publishRole := grant(t, s, owner, human, []Rule{{Action: "manage", TargetKind: "answer", TargetID: "*"}})
-			group, err := s.SaveGroup(ctx, owner, Group{Name: "Reviewers", Members: []string{human.ID}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			in := AskInput{Target: Target{"group", group.ID}, Title: "Include GST?", SharedKey: "policy/one"}
-			source, err := s.Ask(ctx, w, in, "source")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err = s.Respond(ctx, human, source.ID, Response{Outcome: "answered", Answer: "Yes", Version: 1}); err != nil {
-				t.Fatal(err)
-			}
-			answer, err := s.PublishAnswer(ctx, human, PublishInput{RequestID: source.ID, Audience: []string{w.ID}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			s.AutomaticMatcher = func(context.Context, Request, []SharedAnswer) (AutomaticMatch, error) { return AutomaticMatch{}, nil }
-			enableAssistance(t, s, owner, true, false)
-			in.Title = "Are prices GST-inclusive?"
-			q, err := s.Ask(ctx, w, in, "future")
-			if err != nil {
-				t.Fatal(err)
-			}
-			s.AutomaticMatcher = func(context.Context, Request, []SharedAnswer) (AutomaticMatch, error) {
-				var err error
-				switch change {
-				case "responder rights":
-					err = s.BindRole(ctx, owner, Binding{replyRole.ID, "principal", human.ID}, true)
-				case "publisher rights":
-					err = s.BindRole(ctx, owner, Binding{publishRole.ID, "principal", human.ID}, true)
-				case "group membership":
-					_, err = s.SaveGroup(ctx, owner, Group{ID: group.ID, Name: group.Name, Members: []string{}})
-				}
-				if err != nil {
-					t.Error(err)
-				}
-				return AutomaticMatch{answer.ID, true, 1, "Same question"}, nil
-			}
-			if _, err = s.ProcessAutomaticAnswer(ctx); err != nil {
-				t.Fatal(err)
-			}
-			current, err := s.Request(ctx, w, q.ID)
-			if err != nil || current.State != "open" {
-				t.Fatal("revoked authority reused", current, err)
-			}
-		})
-	}
-}
-func TestAutomaticAnswerLeaseFencesCompetingWorkers(t *testing.T) {
-	s, a := testStore(t)
-	ctx := context.Background()
-	w, answer, in := publishedFixture(t, s, a)
-	started, release := make(chan struct{}), make(chan struct{})
-	var calls atomic.Int32
-	s.AutomaticMatcher = func(context.Context, Request, []SharedAnswer) (AutomaticMatch, error) {
-		if calls.Add(1) == 1 {
-			close(started)
-			<-release
-		}
-		return AutomaticMatch{answer.ID, true, 1, "Same question"}, nil
-	}
-	enableAssistance(t, s, a, true, false)
-	q, err := s.Ask(ctx, w, in, "race")
-	if err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() { _, err := s.ProcessAutomaticAnswer(ctx); done <- err }()
-	<-started
-	if _, err = s.Pool.Exec(ctx, `UPDATE answer_match_jobs SET lease_until=now()-interval '1 second' WHERE request_id=$1`, q.ID); err != nil {
-		t.Fatal(err)
-	}
-	if worked, err := s.ProcessAutomaticAnswer(ctx); err != nil || !worked {
-		t.Fatal(worked, err)
-	}
-	close(release)
-	if err = <-done; err != nil {
-		t.Fatal(err)
-	}
-	var count int
-	if err = s.Pool.QueryRow(ctx, `SELECT count(*) FROM deliveries WHERE scope=$1 AND operation_id=$2`, a.Scope, q.ID+"/result").Scan(&count); err != nil || count != 1 {
-		t.Fatal(count, err)
-	}
-}
 
 func TestOverseerPreviewAtomicConfirmationAndPrivateReplies(t *testing.T) {
 	s, owner := testStore(t)
@@ -293,7 +47,7 @@ func TestOverseerPreviewAtomicConfirmationAndPrivateReplies(t *testing.T) {
 	if _, err := s.PlanOverseer(ctx, owner, OverseerInput{Prompt: "Ask the fleet for progress"}); ErrorStatus(err) != 409 {
 		t.Fatal(err)
 	}
-	enableAssistance(t, s, owner, false, true)
+	enableAssistance(t, s, owner, true)
 	plan, err := s.PlanOverseer(ctx, owner, OverseerInput{Prompt: "Ask the fleet for progress"})
 	if err != nil || !plan.RequiresConfirmation {
 		t.Fatal(plan, err)
@@ -354,7 +108,7 @@ func TestOverseerRechecksPermissionsAndDoesNotTrustModel(t *testing.T) {
 				t.Fatal(err)
 			}
 			s.OverseerPlanner = func(context.Context, string, []FleetStatus) (OverseerDecision, error) { return OverseerDecision{}, nil }
-			enableAssistance(t, s, owner, false, true)
+			enableAssistance(t, s, owner, true)
 			s.OverseerPlanner = func(_ context.Context, _ string, sources []FleetStatus) (OverseerDecision, error) {
 				d := OverseerDecision{Operation: "message", AgentIDs: []string{one.ID, two.ID}, Body: "Use the revised report format.", Summary: "Notify the fleet."}
 				if change == "invented target" {
@@ -431,7 +185,7 @@ func TestOverseerPermissionIntersectionAndReplySummary(t *testing.T) {
 				}
 				return OverseerDecision{Operation: operation, AgentIDs: []string{one.ID}, Body: "Report progress", Summary: "Only the permitted agent is included."}, nil
 			}
-			enableAssistance(t, s, owner, false, true)
+			enableAssistance(t, s, owner, true)
 			plan, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Get my team's update"})
 			if err != nil {
 				t.Fatal(err)
@@ -495,7 +249,7 @@ func TestOverseerPermissionIntersectionAndReplySummary(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			enableAssistance(t, s, other, false, true)
+			enableAssistance(t, s, other, true)
 			if _, err = s.OverseerPlan(ctx, other, plan.ID); ErrorStatus(err) != 404 {
 				t.Fatal("cross workspace plan", err)
 			}
@@ -517,7 +271,7 @@ func TestOverseerDeniesMissingAskAndRevokedContext(t *testing.T) {
 				t.Fatal(err)
 			}
 			s.OverseerPlanner = func(context.Context, string, []FleetStatus) (OverseerDecision, error) { return OverseerDecision{}, nil }
-			enableAssistance(t, s, owner, false, true)
+			enableAssistance(t, s, owner, true)
 			if change == "ask missing" {
 				_, err = s.SaveRole(ctx, owner, Role{ID: role.ID, Name: role.Name, Rules: []Rule{{Action: "view", TargetKind: "agent", TargetID: "*"}}})
 			}
@@ -593,107 +347,60 @@ func TestOverseerDeniesMissingAskAndRevokedContext(t *testing.T) {
 	}
 }
 
-func TestAssistanceDurableRestartAndRestoreHold(t *testing.T) {
+func TestAssistanceDefaultsAndOwnerControls(t *testing.T) {
 	s, owner := testStore(t)
 	ctx := context.Background()
-	w, answer, in := publishedFixture(t, s, owner)
-	matcher := func(context.Context, Request, []SharedAnswer) (AutomaticMatch, error) {
-		return AutomaticMatch{answer.ID, true, 1, "Same scoped informational question"}, nil
+	worker := testWorker(t, s, owner, "scout")
+	settings, err := s.AssistanceSettings(ctx, owner)
+	if err != nil || settings.Overseer || settings.OverseerConfigured {
+		t.Fatal(settings, err)
 	}
+	if _, err = s.UpdateAssistance(ctx, worker, AssistanceUpdate{Overseer: boolValue(true)}); ErrorStatus(err) != 403 {
+		t.Fatal(err)
+	}
+	if _, err = s.UpdateAssistance(ctx, owner, AssistanceUpdate{Overseer: boolValue(true)}); ErrorStatus(err) != 409 {
+		t.Fatal("unconfigured Coordinator enabled", err)
+	}
+	if _, err = s.PlanOverseer(ctx, owner, OverseerInput{Prompt: "Status?"}); ErrorStatus(err) != 409 {
+		t.Fatal(err)
+	}
+}
+
+func TestCoordinatorDurableRestartAndRestoreHold(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	testWorker(t, s, owner, "scout")
 	planner := func(context.Context, string, []FleetStatus) (OverseerDecision, error) {
 		return OverseerDecision{Operation: "status", Summary: "One permitted agent."}, nil
 	}
-	s.AutomaticMatcher = matcher
 	s.OverseerPlanner = planner
-	enableAssistance(t, s, owner, true, true)
-	q, err := s.Ask(ctx, w, in, "restart")
-	if err != nil {
-		t.Fatal(err)
-	}
+	enableAssistance(t, s, owner, true)
 	plan, err := s.PlanOverseer(ctx, owner, OverseerInput{Prompt: "Fleet status"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A fresh runtime has no in-memory job, setting or plan state from the first process.
 	schema := strings.Split(s.Pool.Config().ConnConfig.RuntimeParams["search_path"], ",")[0]
 	second, err := OpenExisting(ctx, os.Getenv("NOTIF_TEST_DATABASE_URL"), schema, s.SecretKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer second.Close()
-	second.AutomaticMatcher = matcher
 	second.OverseerPlanner = planner
 	settings, err := second.AssistanceSettings(ctx, owner)
-	if err != nil || !settings.AutomaticAnswers || !settings.Overseer {
+	if err != nil || !settings.Overseer {
 		t.Fatal(settings, err)
-	}
-	if _, err = second.ProcessAutomaticAnswer(ctx); err != nil {
-		t.Fatal(err)
-	}
-	q, err = second.Request(ctx, w, q.ID)
-	if err != nil || q.Response == nil || q.Response.SourceAnswerID != answer.ID {
-		t.Fatal(q, err)
 	}
 	if got, err := second.OverseerPlan(ctx, owner, plan.ID); err != nil || got.ID != plan.ID {
 		t.Fatal(got, err)
-	}
-	in.Title = "Another tax-inclusive report question"
-	if _, err = second.Ask(ctx, w, in, "before-restore"); err != nil {
-		t.Fatal(err)
 	}
 	if err = second.ReconcileRestored(ctx, owner.Scope, Secret()); err != nil {
 		t.Fatal(err)
 	}
 	settings, err = second.AssistanceSettings(ctx, owner)
-	if err != nil || settings.AutomaticAnswers || settings.Overseer {
+	if err != nil || settings.Overseer {
 		t.Fatal(settings, err)
 	}
-	if worked, err := second.ProcessAutomaticAnswer(ctx); err != nil || worked {
-		t.Fatal("restored job replayed", worked, err)
-	}
-	var pending int
-	if err = second.Pool.QueryRow(ctx, `SELECT count(*) FROM answer_match_jobs WHERE state IN ('queued','leased')`).Scan(&pending); err != nil || pending != 0 {
-		t.Fatal(pending, err)
-	}
-}
-
-func TestAutomaticAnswersAcceptEquivalentEmptyChoiceRepresentations(t *testing.T) {
-	for _, choices := range [][]string{nil, {}} {
-		s, owner := testStore(t)
-		ctx := context.Background()
-		worker := testWorker(t, s, owner, "researcher")
-		source, err := s.Ask(ctx, worker, AskInput{Target: Target{"person", owner.ID}, Title: "Which locale is our report using?", SharedKey: "report/locale/v1", Choices: choices}, "source")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = s.Respond(ctx, owner, source.ID, Response{Outcome: "answered", Answer: "English", Version: 1}); err != nil {
-			t.Fatal(err)
-		}
-		answer, err := s.PublishAnswer(ctx, owner, PublishInput{RequestID: source.ID, Audience: []string{worker.ID}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		s.AutomaticMatcher = func(_ context.Context, _ Request, candidates []SharedAnswer) (AutomaticMatch, error) {
-			if len(candidates) != 1 {
-				t.Error(candidates)
-			}
-			return AutomaticMatch{answer.ID, true, 1, "Same report locale question"}, nil
-		}
-		enableAssistance(t, s, owner, true, false)
-		future := []string{}
-		if choices != nil {
-			future = nil
-		}
-		q, err := s.Ask(ctx, worker, AskInput{Target: Target{"person", owner.ID}, Title: "What language should be used for the report?", SharedKey: "report/locale/v1", Choices: future}, "future")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = s.ProcessAutomaticAnswer(ctx); err != nil {
-			t.Fatal(err)
-		}
-		q, err = s.Request(ctx, worker, q.ID)
-		if err != nil || q.State != "resolved" {
-			t.Fatal(q, err)
-		}
+	if _, err = second.OverseerPlan(ctx, owner, plan.ID); ErrorStatus(err) < 400 {
+		t.Fatal("restored plan accessible", err)
 	}
 }

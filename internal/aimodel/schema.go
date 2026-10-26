@@ -74,7 +74,7 @@ func value(d *json.Decoder, depth int) (any, error) {
 func object(properties map[string]any) map[string]any {
 	keys := make([]string, 0, len(properties))
 	// Stable order avoids sending a different schema on each model call.
-	for _, key := range []string{"answer_id", "equivalent", "confidence", "reason", "operation", "agent_ids", "body", "summary", "suggestions"} {
+	for _, key := range []string{"operation", "agent_ids", "body", "summary"} {
 		if _, ok := properties[key]; ok {
 			keys = append(keys, key)
 		}
@@ -85,10 +85,6 @@ func object(properties map[string]any) map[string]any {
 func taskSchema(task string) (map[string]any, error) {
 	text := map[string]any{"type": "string"}
 	switch task {
-	case "answer_suggestions":
-		return object(map[string]any{"suggestions": map[string]any{"type": "array", "items": object(map[string]any{"answer_id": text, "reason": text})}}), nil
-	case "automatic_answer_match":
-		return object(map[string]any{"answer_id": text, "equivalent": map[string]any{"type": "boolean"}, "confidence": map[string]any{"type": "number"}, "reason": text}), nil
 	case "overseer_plan":
 		return object(map[string]any{"operation": map[string]any{"type": "string", "enum": []string{"status", "message", "question", "task"}}, "agent_ids": map[string]any{"type": "array", "items": text}, "body": text, "summary": text}), nil
 	case "overseer_summary":
@@ -99,7 +95,7 @@ func taskSchema(task string) (map[string]any, error) {
 }
 
 // validate enforces the small schema subset owned by taskSchema, independently
-// of provider decoding guarantees. Semantic and permission checks follow in the engine.
+// of provider decoding guarantees. Operation and permission checks follow in the engine.
 func validate(v any, schema map[string]any) bool {
 	switch schema["type"] {
 	case "object":

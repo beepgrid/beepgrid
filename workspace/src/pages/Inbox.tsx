@@ -526,9 +526,6 @@ function RequestDetail({ id }: { id: string }) {
           </div>
         </section>
       ) : null}
-      {r.kind === "question" && r.state === "open" && c.operations.respond ? (
-        <Suggestions request={r} />
-      ) : null}
       <RequestEvidence request={r} />
       {clarify && requester ? (
         <Compose
@@ -598,81 +595,6 @@ function RequestEvidence({ request: r }: { request: Request }) {
           </div>
         ))}
       </QueryState>
-    </section>
-  );
-}
-function Suggestions({ request: r }: { request: Request }) {
-  const op = useOperation();
-  const [suggestions, setSuggestions] = useState<
-    { id: string; answer: Record<string, unknown>; reason: string }[] | null
-  >(null);
-  return (
-    <section className="section">
-      <h3>Reusable information</h3>
-      <p>
-        Review a candidate's source, audience and validity before accepting it.
-      </p>
-      <Button
-        disabled={op.pending}
-        onClick={() =>
-          void op
-            .run<{
-              proposals: {
-                id: string;
-                answer: Record<string, unknown>;
-                reason: string;
-              }[];
-            }>("/requests/" + r.id + "/suggestions", {})
-            .then((v) => {
-              if (v) setSuggestions(v.proposals);
-            })
-        }
-      >
-        Find shared answer suggestions
-      </Button>
-      <ErrorView error={op.error} />
-      {suggestions?.length === 0 ? (
-        <p>No eligible suggestion found. You can answer normally.</p>
-      ) : null}
-      {suggestions?.map((s) => (
-        <div className="approval" key={s.id}>
-          <p>{s.reason}</p>
-          <Details
-            value={s.answer}
-            label="Answer, source, audience and expiry"
-          />
-          <div className="actions">
-            <Button
-              primary
-              disabled={op.pending}
-              onClick={() =>
-                void op
-                  .run("/answer-proposals/" + s.id, { accept: true })
-                  .then((v) => {
-                    if (v) setSuggestions(null);
-                  })
-              }
-            >
-              Accept this answer
-            </Button>
-            <Button
-              disabled={op.pending}
-              onClick={() =>
-                void op
-                  .run("/answer-proposals/" + s.id, { accept: false })
-                  .then((v) => {
-                    if (v)
-                      setSuggestions(
-                        (x) => x?.filter((p) => p.id !== s.id) || null,
-                      );
-                  })
-              }
-            >
-              Keep separate
-            </Button>
-          </div>
-        </div>
-      ))}
     </section>
   );
 }

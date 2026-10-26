@@ -25,7 +25,7 @@ func TestOverseerPersonalFollowupsAndReplay(t *testing.T) {
 		}
 		return OverseerDecision{Operation: "status", Summary: prompt, AgentIDs: []string{worker.ID}}, nil
 	}
-	enableAssistance(t, s, owner, false, true)
+	enableAssistance(t, s, owner, true)
 	first, err := s.PlanOverseer(ctx, alice, OverseerInput{Prompt: "Alice's first question"}, "turn-1")
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestOverseerBoundedHistoryRechecksDuringPlanning(t *testing.T) {
 			s.OverseerPlanner = func(context.Context, string, []FleetStatus) (OverseerDecision, error) {
 				return OverseerDecision{Operation: "status", Summary: "Current reports"}, nil
 			}
-			enableAssistance(t, s, owner, false, true)
+			enableAssistance(t, s, owner, true)
 			first, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Start"})
 			if err != nil {
 				t.Fatal(err)
@@ -146,7 +146,7 @@ func TestOverseerDerivedHistoryRetainsGroupProvenance(t *testing.T) {
 	s.OverseerPlanner = func(context.Context, string, []FleetStatus) (OverseerDecision, error) {
 		return OverseerDecision{Operation: "status", Summary: "Team report"}, nil
 	}
-	enableAssistance(t, s, owner, false, true)
+	enableAssistance(t, s, owner, true)
 	first, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Team report", Target: &Target{Kind: "group", ID: group.ID}})
 	if err != nil {
 		t.Fatal(err)
@@ -171,7 +171,7 @@ func TestOverseerConcurrentPlanningReceiptAndCallerBoundary(t *testing.T) {
 	s.OverseerPlanner = func(context.Context, string, []FleetStatus) (OverseerDecision, error) {
 		return OverseerDecision{Operation: "status", Summary: "Current status"}, nil
 	}
-	enableAssistance(t, s, owner, false, true)
+	enableAssistance(t, s, owner, true)
 	if _, err := s.PlanOverseer(ctx, worker, OverseerInput{Prompt: "Use person context"}); ErrorStatus(err) != 403 {
 		t.Fatal(err)
 	}

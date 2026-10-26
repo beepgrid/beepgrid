@@ -150,7 +150,7 @@ test("optional assistance helpers retain server authority and cancellation", asy
   const calls = [];
   const c = new Client("http://localhost", "person-token", async (url, opts) => {
     calls.push({url, body:opts.body ? JSON.parse(opts.body):undefined, signal:opts.signal, key:opts.headers["Idempotency-Key"]});
-    return new Response(JSON.stringify({id:"ovr_1", automatic_answers:false, overseer:false}));
+    return new Response(JSON.stringify({id:"ovr_1", overseer:false}));
   });
   const abort = new AbortController();
   const settings=await c.assistance(abort.signal);

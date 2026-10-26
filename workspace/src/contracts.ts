@@ -178,9 +178,7 @@ export type PublishedAnswer = {
   invalidated: boolean;
 };
 export type AssistanceSettings = {
-  automatic_answers: boolean;
   overseer: boolean;
-  matcher_configured: boolean;
   overseer_configured: boolean;
   version: number;
 };

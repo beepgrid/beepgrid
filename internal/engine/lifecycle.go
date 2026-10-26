@@ -19,7 +19,7 @@ import (
 
 // This child-first order is deliberately checked against the live catalog.
 // A future scoped table must be considered before erasure or export can proceed.
-var lifecycleTables = []string{"attachment_uploads", "workspace_usage", "workspace_budgets", "answer_match_jobs", "overseer_plans", "answer_proposals", "delivery_attempts", "provider_threads", "participants", "request_audience", "execution_intents", "messages", "attachments", "requests", "shared_answers", "conversations", "deliveries", "instances", "credentials", "destinations", "connections", "memberships", "role_bindings", "roles", "groups", "idempotency", "events", "provider_events", "principals"}
+var lifecycleTables = []string{"attachment_uploads", "workspace_usage", "workspace_budgets", "overseer_plans", "delivery_attempts", "provider_threads", "participants", "request_audience", "execution_intents", "messages", "attachments", "requests", "shared_answers", "conversations", "deliveries", "instances", "credentials", "destinations", "connections", "memberships", "role_bindings", "roles", "groups", "idempotency", "events", "provider_events", "principals"}
 
 type ErasureStatus struct {
 	Operation string     `json:"operation"`
@@ -88,7 +88,7 @@ func (s *Store) ReserveWorkspaceErasure(ctx context.Context, scope, operation st
 	if version <= current {
 		return Conflict("A newer workspace state is already applied.")
 	}
-	_, err = tx.Exec(ctx, `UPDATE scopes SET suspended=true,control_version=$2,erasure_operation=$3,erase_after=$4,automatic_answers=false,overseer_enabled=false WHERE id=$1`, scope, version, operation, due)
+	_, err = tx.Exec(ctx, `UPDATE scopes SET suspended=true,control_version=$2,erasure_operation=$3,erase_after=$4,overseer_enabled=false WHERE id=$1`, scope, version, operation, due)
 	if err != nil {
 		return err
 	}

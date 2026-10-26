@@ -27,11 +27,8 @@ type Store struct {
 	providerTransport    http.RoundTripper
 	assistanceTransports []*http.Transport
 
-	AttachmentsRoot   string
-	AttachmentObjects AttachmentObjectStore
-
-	Matcher            Matcher
-	AutomaticMatcher   AutomaticMatcher
+	AttachmentsRoot    string
+	AttachmentObjects  AttachmentObjectStore
 	OverseerPlanner    OverseerPlanner
 	OverseerSummarizer OverseerSummarizer
 

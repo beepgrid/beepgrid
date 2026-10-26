@@ -58,15 +58,13 @@ Incoming `/integrations/webhook/CONNECTION_ID` uses the same signature headers a
 
 Provider URLs are HTTPS and publicly routable outside local development. DNS is validated again at connect, addresses are pinned by the dialer, redirects are refused and responses are bounded. Definite temporary rejection receives bounded retry with Retry-After and jitter. Unknown sends require reconciliation, not automatic fallback.
 
-## Shared questions and optional judge
+## Exact shared questions and Coordinator
 
 An explicit `shared_key` identifies a resource/policy/version domain. Exact matching includes title, body and choices. Compatible pending informational questions are stacked in the web inbox, and redundant external attention waits behind the oldest matching open question for that person. Every requester retains its own ID, private conversation and cancellation/expiry state. When a leading question ends, the next independent question can become visible externally.
 
 Answering one question does not silently answer the others. An authorized publisher may explicitly answer/share with the displayed audience for 24 hours, atomically, or publish an existing informational answer with a chosen audience/expiry. Approval permissions are never merged. Reuse preserves provenance; invalidation stops future reuse and signals historical consumers.
 
-For reviewed paraphrase suggestions, configure `NOTIF_MATCHER_URL` and optionally `NOTIF_MATCHER_TOKEN` for a customer-operated judge. It receives `{request:{title,body,scope_key},candidates:[{id,question,scope_key}],instructions}` and returns `{suggestions:[{answer_id,reason}]}`. Only authorized candidate IDs may become review proposals. The engine imposes time, concurrency, size and call-count limits. Failure leaves the ordinary question active. The core needs no model key or model subscription.
-
-Fleet status collects permitted structured progress and timestamps. It reports partial coverage and never blindly adds overlapping counts. The initial overseer is read-only; direct messages and structured tasks already support explicit group contact. Natural-language fleet commands remain deferred.
+Fleet status collects permitted structured progress and timestamps. It reports partial coverage and never blindly adds overlapping counts. Coordinator is a separate opt-in private conversation that prepares bounded messages, questions and tasks for explicit confirmation. Ordinary group conversations never invoke it silently. See [ASSISTANCE.md](ASSISTANCE.md).
 
 A group-target grant also matches its current members for individual contact. Removing membership removes that path immediately, including sensitive responses to pending requests. `$self` in a role target means the authenticated identity's own ID, so a launcher can grant a future worker authority to propose its own action without knowing the generated agent ID. A separate Ask grant still controls the human/group it may contact. The local seed command grants only owner contact plus self-proposal; it does not grant authority over other agents.
 

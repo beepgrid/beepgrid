@@ -139,8 +139,6 @@ def object_schema(properties):
 
 
 schemas = {
-    "automatic_answer_match": object_schema({"answer_id": {"type": "string"}, "equivalent": {"type": "boolean"},
-                                              "confidence": {"type": "number"}, "reason": {"type": "string"}}),
     "overseer_plan": object_schema({"operation": {"type": "string", "enum": ["status", "question", "message", "task"]},
                                    "agent_ids": {"type": "array", "items": {"type": "string"}},
                                    "body": {"type": "string"}, "summary": {"type": "string"}}),
@@ -203,8 +201,7 @@ engine_env = dict(environment, NOTIF_DATABASE_URL=database, NOTIF_SCHEMA=schema_
                   NOTIF_WORKSPACE="Coordinator qualification", NOTIF_COMPANY="25 real agents",
                   NOTIF_BOOTSTRAP_TOKEN=secrets.token_hex(32), NOTIF_SECRET_KEY=secrets.token_hex(32),
                   NOTIF_ADDR="127.0.0.1:4050", NOTIF_PUBLIC_URL=url,
-                  NOTIF_OVERSEER_URL="http://127.0.0.1:4051", NOTIF_OVERSEER_TOKEN=provider_token,
-                  NOTIF_AUTOMATIC_ANSWER_URL="http://127.0.0.1:4051", NOTIF_AUTOMATIC_ANSWER_TOKEN=provider_token)
+                  NOTIF_OVERSEER_URL="http://127.0.0.1:4051", NOTIF_OVERSEER_TOKEN=provider_token)
 subprocess.run([str(binary), "migrate"], cwd=local, env=engine_env, check=True)
 stop = threading.Event()
 workers = []
@@ -315,7 +312,7 @@ with (local / "server.log").open("w") as log:
             preview = owner.dispatch_preview([{"kind": "group", "id": group["id"]}], "message")
             assert preview["count"] == count
         passed("Exact direct group previews include 1, 3 and 25 permitted recipients without model calls")
-        owner.update_assistance(automatic_answers=True, overseer=True)
+        owner.update_assistance(overseer=True)
         (local / "ready.json").write_text(json.dumps({"url": url, "groups": groups, "agents": ids}))
         print("READY:", local, flush=True)
         if not args.ui:
@@ -369,7 +366,7 @@ with (local / "server.log").open("w") as log:
             assert error.status >= 400
         assert len(owner.overseer_plans()) == len(plans)
         passed("Judge outage creates no accepted plan or dispatch; ordinary engine remains available")
-        owner.update_assistance(automatic_answers=False, overseer=False)
+        owner.update_assistance(overseer=False)
         assert not owner.assistance()["overseer"]
         passed("Optional features disabled after test; original workspace untouched")
         lags = sorted(d["lag_ms"] for d in report["deliveries"] if d["lag_ms"] is not None)

@@ -105,7 +105,7 @@ export function NotifRequest({
           {r.response?.source_answer_id && (
             <p role="status">
               {r.response.reuse_method === "automatic"
-                ? "Automatically answered from a shared answer."
+                ? "Answered from a published source."
                 : "Answered from a shared answer."}{" "}
               {r.response.reuse_reason}
             </p>

@@ -26,18 +26,6 @@ type PublishInput struct {
 	Audience   []string  `json:"audience"`
 	ValidUntil time.Time `json:"valid_until"`
 }
-type MatchSuggestion struct {
-	AnswerID string `json:"answer_id"`
-	Reason   string `json:"reason"`
-}
-type Proposal struct {
-	ID        string       `json:"id"`
-	RequestID string       `json:"request_id"`
-	Answer    SharedAnswer `json:"answer"`
-	Reason    string       `json:"reason"`
-	State     string       `json:"state"`
-}
-type Matcher func(context.Context, Request, []SharedAnswer) ([]MatchSuggestion, error)
 
 func contextHash(key, title, body string, choices []string) string {
 	return Digest(string(JSON([]any{key, title, body, choices})))
@@ -189,8 +177,8 @@ func (s *Store) publishTx(ctx context.Context, tx pgx.Tx, a Actor, in PublishInp
 }
 func (s *Store) resolveFromAnswer(ctx context.Context, db DB, a Actor, r Request, answer SharedAnswer) (bool, error) {
 	// Publication grants an explicit reuse audience, never another person's
-	// response authority. Exact matching must enforce the same current boundary
-	// as semantic reuse, including original group membership and contact rights.
+	// response authority. Exact matching enforces current original group membership, contact rights
+	// and responder eligibility.
 	author, err := principal(ctx, db, a.Scope, answer.AuthorID)
 	if err != nil {
 		if ErrorStatus(err) == 404 {
@@ -322,102 +310,6 @@ func (s *Store) InvalidateAnswer(ctx context.Context, a Actor, id string) error 
 		}
 		return nil
 	})
-}
-func (s *Store) SuggestAnswers(ctx context.Context, a Actor, id string) ([]Proposal, error) {
-	r, e := s.Request(ctx, a, id)
-	if e != nil {
-		return nil, e
-	}
-	if r.Kind != "question" || r.State != "open" {
-		return nil, Bad("Only open informational questions may receive suggestions.")
-	}
-	answers, e := s.Answers(ctx, a)
-	if e != nil {
-		return nil, e
-	}
-	candidates := []SharedAnswer{}
-	for _, v := range answers {
-		if contains(v.Audience, r.RequesterID) {
-			candidates = append(candidates, v)
-			if len(candidates) >= 8 {
-				break
-			}
-		}
-	}
-	if s.Matcher == nil || len(candidates) == 0 {
-		return []Proposal{}, nil
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	suggestions, e := s.Matcher(ctx, r, candidates)
-	if e != nil {
-		return []Proposal{}, nil
-	}
-	out := []Proposal{}
-	e = s.tx(ctx, a, func(tx pgx.Tx) error {
-		current, e := s.request(ctx, tx, a, id)
-		if e != nil {
-			return e
-		}
-		if current.State != "open" {
-			return Conflict("Question is no longer open.")
-		}
-		for _, v := range suggestions {
-			if len(out) >= 5 {
-				break
-			}
-			for _, candidate := range candidates {
-				if candidate.ID != v.AnswerID || !ValidText(v.Reason, 1000) {
-					continue
-				}
-				fresh, err := scanAnswer(tx.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2 AND NOT invalidated AND valid_until>now()`, a.Scope, candidate.ID))
-				if err != nil || !contains(fresh.Audience, current.RequesterID) || !s.publisherCurrent(ctx, tx, a.Scope, fresh) {
-					continue
-				}
-				p := Proposal{ID: ID("match"), RequestID: id, Answer: candidate, Reason: v.Reason, State: "proposed"}
-				if _, e := tx.Exec(ctx, `INSERT INTO answer_proposals(id,scope,request_id,answer_id,reviewer_id,reason) VALUES($1,$2,$3,$4,$5,$6)`, p.ID, a.Scope, id, candidate.ID, a.ID, v.Reason); e != nil {
-					return e
-				}
-				out = append(out, p)
-			}
-		}
-		return nil
-	})
-	return out, e
-}
-func (s *Store) DecideProposal(ctx context.Context, a Actor, id string, accept bool) (Request, error) {
-	var out Request
-	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		var answerID, requestID, reviewer, state string
-		if e := tx.QueryRow(ctx, `SELECT request_id,answer_id,reviewer_id,state FROM answer_proposals WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&requestID, &answerID, &reviewer, &state); e != nil {
-			return Missing()
-		}
-		if reviewer != a.ID || state != "proposed" {
-			return Denied()
-		}
-		r, e := s.request(ctx, tx, a, requestID)
-		if e != nil {
-			return e
-		}
-		out = r
-		next := "rejected"
-		if accept {
-			answer, e := scanAnswer(tx.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2 AND NOT invalidated AND valid_until>now()`, a.Scope, answerID))
-			if e != nil || !contains(answer.Audience, r.RequesterID) || !(a.Admin || a.ID == answer.PublisherID || contains(answer.Audience, a.ID)) || !s.publisherCurrent(ctx, tx, a.Scope, answer) {
-				return Denied()
-			}
-			if r.Kind != "question" {
-				return Denied()
-			}
-			if e = s.respondTx(ctx, tx, a, requestID, Response{Outcome: "answered", Answer: answer.Answer, Version: r.Version, SourceAnswerID: answer.ID}, &out); e != nil {
-				return e
-			}
-			next = "accepted"
-		}
-		_, e = tx.Exec(ctx, `UPDATE answer_proposals SET state=$3 WHERE scope=$1 AND id=$2`, a.Scope, id, next)
-		return e
-	})
-	return out, err
 }
 
 func (s *Store) RespondAndShare(ctx context.Context, a Actor, id string, in Response, audience []string) (Request, error) {
