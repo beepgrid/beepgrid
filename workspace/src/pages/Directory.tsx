@@ -218,7 +218,16 @@ export default function Directory({ section }: { section: string }) {
               <IdentityIcon id={item.id} kind={item.kind} label={item.name} />
               <div>
                 <strong>{item.name}</strong>
-                <p>{String(item.metadata?.description || item.external_id)}</p>
+                <p>
+                  {String(
+                    item.kind === "person"
+                      ? item.metadata?.email ||
+                          (item.external_id.startsWith("oidc/")
+                            ? "Verified account"
+                            : item.external_id)
+                      : item.metadata?.description || item.external_id,
+                  )}
+                </p>
               </div>
             </div>
             <div>
