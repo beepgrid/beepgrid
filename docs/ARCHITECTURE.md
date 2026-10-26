@@ -2,6 +2,8 @@
 
 The product has a Go modular monolith, a React web app embedded into its binary, three language clients, an MCP stdio adapter and React/headless embeds. Channel adapters and optional Coordinator assistance are modules of the same engine. A PostgreSQL database is the only required stateful service. Mailpit is a local test aid.
 
+The community workspace and engine share this repository but have independent [build targets](PACKAGING.md). Normal builds embed the workspace; `-tags headless` excludes its handler and assets. `serve --no-ui` or `runtime.Config.DisableUI` disables browser pages at runtime. Both compositions retain the same authenticated API, workers and database. The CLI, MCP and SDKs are thin clients, and private enterprise code stays outside the public module.
+
 ```mermaid
 flowchart LR
     P[People: browser or messaging account] --> H[Authenticated HTTP API]

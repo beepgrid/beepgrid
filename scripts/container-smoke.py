@@ -23,6 +23,7 @@ if parsed.hostname in ('localhost', '127.0.0.1', '::1'):
 suffix = secrets.token_hex(6)
 schema, name = 'container_test_'+suffix, 'notif-smoke-'+suffix
 image = os.environ.get('NOTIF_TEST_IMAGE', 'notif:local-review')
+headless = os.environ.get('NOTIF_TEST_HEADLESS') == '1'
 token = secrets.token_hex(32)
 port = int(os.environ.get('NOTIF_CONTAINER_TEST_PORT', '4013'))
 url = 'http://localhost:'+str(port)
@@ -53,15 +54,24 @@ try:
                     if r.status == 200: break
             except OSError: time.sleep(.1)
         else: raise RuntimeError('Container did not become ready')
-        with urllib.request.urlopen(url,timeout=5) as r:
-            assert b'root' in r.read(), 'Embedded application is missing'
+        if headless:
+            for path in ('/', '/agents', '/assets/not-real.js'):
+                try:
+                    urllib.request.urlopen(url+path, timeout=5)
+                except urllib.error.HTTPError as error:
+                    assert error.code == 404
+                else:
+                    raise AssertionError('Headless image serves workspace pages')
+        else:
+            with urllib.request.urlopen(url,timeout=5) as r:
+                assert b'root' in r.read(), 'Embedded application is missing'
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         login = urllib.request.Request(url+'/api/v1/auth/login',json.dumps({'token':token}).encode(),{'Content-Type':'application/json','Origin':url})
         with opener.open(login,timeout=5) as r: assert r.status == 200
         with opener.open(url+'/api/v1/me',timeout=5) as r:
             me = json.load(r)
             assert me['identity_type']=='person' and me['admin']
-        print('Non-root image: migrate, fresh serve, embedded UI, cookie login and separate Person identity passed')
+        print('Non-root image: migrate, fresh serve, '+('no UI' if headless else 'embedded UI')+', cookie login and separate Person identity passed')
 finally:
     if started: docker(['rm','-f',name])
     subprocess.run(['psql',database,'-v','ON_ERROR_STOP=1','-c','DROP SCHEMA IF EXISTS '+schema+' CASCADE'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

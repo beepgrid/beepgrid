@@ -17,8 +17,12 @@ npm --prefix workspace run build
 npm --prefix workspace run embed
 go vet ./...
 go test -race ./... -count=1
+go test -race -tags headless ./... -count=1
 python3 scripts/sdk-integration.py
 python3 -m unittest discover -s scripts -p test_codex_capacity.py
 python3 scripts/release-audit.py
 GOFLAGS=-buildvcs=false go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 go build -buildvcs=false -trimpath -o .local/notif ./cmd/notif
+go build -buildvcs=false -trimpath -tags headless -o .local/notif-headless ./cmd/notif
+python3 scripts/headless-build.py
+python3 scripts/cli-smoke.py

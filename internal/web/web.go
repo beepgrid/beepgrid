@@ -1,3 +1,5 @@
+//go:build !headless
+
 package web
 
 import (
@@ -16,6 +18,8 @@ import (
 
 //go:embed dist/*
 var assets embed.FS
+
+const Available = true
 
 func Handler() http.Handler {
 	root, _ := fs.Sub(assets, "dist")

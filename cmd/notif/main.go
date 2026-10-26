@@ -34,13 +34,22 @@ func env(k, fallback string) string {
 }
 func main() {
 	if e := run(); e != nil {
-		slog.Error("command failed", "error", e)
-		os.Exit(1)
+		var api *notif.APIError
+		code := "command_failed"
+		status := 0
+		if errors.As(e, &api) {
+			code, status = api.Code, api.Status
+		}
+		_ = json.NewEncoder(os.Stderr).Encode(map[string]any{"error": code, "message": e.Error(), "status": status, "exit_code": clientExitCode(e)})
+		os.Exit(clientExitCode(e))
 	}
 }
 func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	if handled, err := runClientCommand(ctx, os.Args[1:], os.Stdin, os.Stdout); handled {
+		return err
+	}
 	command := "serve"
 	if len(os.Args) > 1 {
 		command = os.Args[1]
@@ -96,7 +105,10 @@ func run() error {
 	case "serve":
 		return serve(ctx, os.Args[2:])
 	case "mcp":
-		c := notif.New(env("NOTIF_URL", "http://localhost:4010"), os.Getenv("NOTIF_TOKEN"))
+		c, err := clientFromEnv()
+		if err != nil {
+			return err
+		}
 		if id := os.Getenv("NOTIF_AGENT_ID"); id != "" {
 			worker, _, e := c.Enroll(ctx, notif.EnrollInput{Agent: id, Name: env("NOTIF_AGENT_NAME", id), Capabilities: []string{"message", "request"}})
 			if e != nil {
@@ -107,16 +119,6 @@ func run() error {
 		return mcp.Serve(ctx, c, os.Stdin, os.Stdout)
 	case "demo":
 		return demo(ctx, os.Args[2:])
-	case "send":
-		if len(os.Args) < 5 {
-			return fmt.Errorf("usage: notif send agent|person|group ID MESSAGE")
-		}
-		c := notif.New(env("NOTIF_URL", "http://localhost:4010"), os.Getenv("NOTIF_TOKEN"))
-		r, e := c.Send(ctx, notif.SendInput{Target: notif.Target{Kind: os.Args[2], ID: os.Args[3]}, Body: strings.Join(os.Args[4:], " ")}, "")
-		if e != nil {
-			return e
-		}
-		return json.NewEncoder(os.Stdout).Encode(r)
 	case "diagnose":
 		c, e := operatorClient()
 		if e != nil {
@@ -163,6 +165,7 @@ func localSecret(path string, n int) (string, error) {
 func serve(ctx context.Context, args []string) error {
 	f := flag.NewFlagSet("serve", flag.ContinueOnError)
 	dev := f.Bool("dev", false, "Generate local credentials and allow local provider connections; localhost only")
+	noUI := f.Bool("no-ui", false, "Disable workspace browser pages; keep the authenticated API and workers")
 	if e := f.Parse(args); e != nil {
 		return e
 	}
@@ -228,7 +231,11 @@ func serve(ctx context.Context, args []string) error {
 		return e
 	}
 	_ = owner
-	handler := httpapi.New(store, public, web.Handler())
+	var ui http.Handler
+	if !*noUI {
+		ui = web.Handler()
+	}
+	handler := httpapi.New(store, public, ui)
 	if e = handler.ConfigureOIDC(ctx, owner.Scope, os.Getenv("NOTIF_OIDC_ISSUER"), os.Getenv("NOTIF_OIDC_CLIENT_ID"), os.Getenv("NOTIF_OIDC_CLIENT_SECRET")); e != nil {
 		return e
 	}

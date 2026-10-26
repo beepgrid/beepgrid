@@ -8,17 +8,12 @@ import (
 	"github.com/notif-dev/notif/sdk/go/notif"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func operatorClient() (*notif.Client, error) {
-	token := os.Getenv("NOTIF_TOKEN")
-	if token == "" {
-		raw, e := os.ReadFile(".local/owner-token")
-		if e != nil {
-			return nil, fmt.Errorf("NOTIF_TOKEN or local owner credential is required")
-		}
-		token = strings.TrimSpace(string(raw))
+	token, err := clientToken(true)
+	if err != nil {
+		return nil, err
 	}
 	return notif.New(env("NOTIF_URL", "http://localhost:4010"), token), nil
 }

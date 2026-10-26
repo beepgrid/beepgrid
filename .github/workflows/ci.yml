@@ -35,3 +35,5 @@ jobs:
           NOTIF_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
       - run: docker build -t notif:ci .
       - run: NOTIF_TEST_IMAGE=notif:ci python3 scripts/container-smoke.py
+      - run: docker build --target headless -t notif:ci-headless .
+      - run: NOTIF_TEST_IMAGE=notif:ci-headless NOTIF_TEST_HEADLESS=1 python3 scripts/container-smoke.py

@@ -1,4 +1,4 @@
-// Package runtime composes the public engine, embedded UI and background workers.
+// Package runtime composes the public engine, optional UI and background workers.
 // Managed deployments can use it without importing Go internal packages or
 // introducing commercial dependencies into the self-hosted binary.
 package runtime
@@ -36,6 +36,9 @@ type Config struct {
 	Attachments                                    AttachmentObjectStore
 	AllowLocal                                     bool
 	AI                                             AIConfig
+	// DisableUI leaves the authenticated HTTP API and workers available. The
+	// headless build tag also omits embedded assets from the resulting binary.
+	DisableUI bool
 }
 
 type Service struct {
@@ -75,7 +78,11 @@ func Open(ctx context.Context, c Config) (*Service, error) {
 		s.Close()
 		return nil, fmt.Errorf("invalid deployment kind")
 	}
-	api := httpapi.New(s, c.PublicURL, web.Handler())
+	var ui http.Handler
+	if !c.DisableUI {
+		ui = web.Handler()
+	}
+	api := httpapi.New(s, c.PublicURL, ui)
 	api.Deployment = deployment
 	api.AccountReader = c.AccountReader
 	return &Service{store: s, api: api, public: c.PublicURL}, nil

@@ -6,6 +6,10 @@ Connect your agents once, see them immediately, communicate with them individual
 
 Beep Grid is an Apache-2.0 Go engine with PostgreSQL and an embedded self-hosted web application. It connects your existing runtimes; it does not host models. People, agents and software services have separate APIs and management flows.
 
+The workspace is optional: `make build` includes it; `make build-headless` builds the same engine without frontend assets. Both use the same API and database. See [build targets and headless operation](docs/PACKAGING.md).
+
+Use [CLI and MCP workflows](docs/CLI.md) to enroll, communicate and answer requests without a browser. Our workspace remains the default integrated experience.
+
 ## Run the local playground
 
 Requirements: Docker Compose, Go 1.26.10 or automatic Go toolchain download, Python 3.10+. Node 24 is needed only when developing/rebuilding the web packages. The committed web bundle makes a Go source build usable without a separate frontend server.
@@ -89,4 +93,4 @@ python3 scripts/recovery-drill.py
 
 The verification command requires a real PostgreSQL database, runs the Go race suite and SDK/UI tests, builds the web packages, scans tracked files for credential patterns and checks Go vulnerabilities. The restore drill creates and drops only randomly named test databases in the local PostgreSQL container. CI is configured to run the same checks; a remote CI run requires publishing this repository.
 
-Managed hosting, maintained enterprise directory reconciliation, billing, marketing/signup and commercial administration are separate workstreams built on this engine. Basic authentication, authorization, reliability and the usable self-hosted UI remain open source. [Optional assistance](docs/ASSISTANCE.md) supports explicit model configuration or custom gateways for answer reuse and confirmed overseer commands. SQLite and additional channel integrations remain outside this release. See the coverage matrix for live-provider and scale validation limits.
+Managed hosting, maintained enterprise directory reconciliation, billing, marketing/signup and commercial administration are separate workstreams built on this engine. Basic authentication, authorization, reliability and the usable self-hosted UI remain open source. [Optional assistance](docs/ASSISTANCE.md) supports explicit model configuration or custom gateways for confirmed Coordinator commands. SQLite and additional channel integrations remain outside this release. See the coverage matrix for live-provider and scale validation limits.
