@@ -42,6 +42,17 @@ func TestVerifiedPersonCompositionCannotReplaceOwnerOrCrossWorkspace(t *testing.
 	if err = s.CheckProgrammaticCredential(ctx, bootstrap); err != nil {
 		t.Fatal("bootstrap rejected", err)
 	}
+	principal, err := s.ProgrammaticCredentialIdentity(ctx, bootstrap)
+	if err != nil || principal.Scope != "identity_a/production" || principal.Kind != "person" || principal.ID != a.PersonID {
+		t.Fatal("authenticated host principal", principal, err)
+	}
+	if _, err = s.ProgrammaticCredentialIdentity(ctx, a.Token); err == nil {
+		t.Fatal("browser identity escaped programmatic fence")
+	}
+	if _, err = s.ProgrammaticCredentialIdentity(ctx, "invalid-token"); err == nil {
+		t.Fatal("invalid credential resolved")
+	}
+
 	server := httptest.NewServer(s.Handler())
 	defer server.Close()
 	var me struct {

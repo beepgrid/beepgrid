@@ -76,16 +76,25 @@ func (s *Service) RevokePersonSession(ctx context.Context, token string) error {
 	return s.store.Logout(ctx, a)
 }
 
-// CheckProgrammaticCredential prevents a trusted host from exposing its browser
-// session credentials through an unbound SDK API route. Ordinary engine handlers
-// still perform their full authorization checks after this admission fence.
-func (s *Service) CheckProgrammaticCredential(ctx context.Context, token string) error {
+// CredentialIdentity is the authenticated principal and scope, without tokens,
+// grants or claims supplied by the caller. Hosts can apply their own admission
+// policy before passing the request to the engine's full authorization checks.
+type CredentialIdentity struct{ Scope, Kind, ID string }
+
+func (s *Service) ProgrammaticCredentialIdentity(ctx context.Context, token string) (CredentialIdentity, error) {
 	a, err := s.store.Authenticate(ctx, token)
 	if err != nil {
-		return err
+		return CredentialIdentity{}, err
 	}
 	if a.CredentialKind == "browser" {
-		return engine.Denied()
+		return CredentialIdentity{}, engine.Denied()
 	}
-	return nil
+	return CredentialIdentity{Scope: a.Scope, Kind: a.Kind, ID: a.ID}, nil
+}
+
+// CheckProgrammaticCredential retains the boolean admission fence for hosts
+// that do not need authenticated principal information.
+func (s *Service) CheckProgrammaticCredential(ctx context.Context, token string) error {
+	_, err := s.ProgrammaticCredentialIdentity(ctx, token)
+	return err
 }
