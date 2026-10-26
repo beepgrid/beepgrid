@@ -190,6 +190,8 @@ export type FleetSource = {
   fresh: boolean;
 };
 export type Plan = {
+  previous_plan_id?: string;
+  target?: Target;
   id: string;
   prompt: string;
   operation: string;

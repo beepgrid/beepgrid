@@ -20,7 +20,7 @@ export function applyLiveEvent(
 ) {
   const kind = event.kind;
   if (
-    /(role|binding|group\.saved|membership|disabled|credential|status_changed|recovery|suspend)/.test(
+    /(role|binding|group\.saved|membership|disabled|credential|status_changed|recovery|suspend|assistance\.)/.test(
       kind,
     )
   ) {
@@ -95,6 +95,8 @@ export function applyLiveEvent(
     families.add("deliveries");
     families.add("delivery_attempts");
   }
+  if (/overseer|request|response|answer/.test(kind))
+    families.add("overseer_plans");
   if (/execution/.test(kind)) families.add("executions");
   void query.invalidateQueries({
     predicate: (q) => {

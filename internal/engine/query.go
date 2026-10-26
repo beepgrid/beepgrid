@@ -72,12 +72,20 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	where := "t.scope=$1" + source.extra + " AND t.id>$2"
 	// Messages use a chronological, stable key while retaining a single opaque cursor.
 	key := "t.id"
-	if in.Collection == "messages" || in.Collection == "delivery_attempts" {
+	if in.Collection == "messages" || in.Collection == "delivery_attempts" || in.Collection == "overseer_plans" {
 		out.Order = "created_at_id_ascending"
 		key = "(to_char(t.created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US')||'/'||t.id)"
 		where = "t.scope=$1 AND " + key + ">$2"
 	}
-	where += " AND ($3='' OR strpos(lower(concat_ws(' ',to_jsonb(t)->>'id',to_jsonb(t)->>'name',to_jsonb(t)->>'title',to_jsonb(t)->>'body',to_jsonb(t)->>'question',to_jsonb(t)->>'external_id',to_jsonb(t)->'metadata'->>'department',to_jsonb(t)->'metadata'->>'email')),lower($3))>0)"
+	direction := ""
+	if in.Collection == "overseer_plans" {
+		out.Order = "created_at_id_descending"
+		direction = " DESC"
+		where = "t.scope=$1 AND ($2='' OR " + key + "<$2)"
+		args = append(args, a.ID)
+		where += " AND t.person_id=$4"
+	}
+	where += " AND ($3='' OR strpos(lower(concat_ws(' ',to_jsonb(t)->>'id',to_jsonb(t)->>'name',to_jsonb(t)->>'title',to_jsonb(t)->>'body',to_jsonb(t)->>'question',to_jsonb(t)->>'external_id',to_jsonb(t)->'plan'->>'prompt',to_jsonb(t)->'metadata'->>'department',to_jsonb(t)->'metadata'->>'email')),lower($3))>0)"
 	for name, value := range in.Filters {
 		expression := ""
 		switch name {
@@ -203,7 +211,7 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	ctx = withPolicySnapshot(ctx)
 	// Read candidate IDs only. No private payload or secret enters the response
 	// until the per-resource reader has enforced current visibility.
-	rows, e := s.Pool.Query(ctx, "SELECT t.id,"+key+" FROM "+source.table+" t WHERE "+where+" ORDER BY "+key+" LIMIT 501", args...)
+	rows, e := s.Pool.Query(ctx, "SELECT t.id,"+key+" FROM "+source.table+" t WHERE "+where+" ORDER BY "+key+direction+" LIMIT 501", args...)
 	if e != nil {
 		return out, e
 	}

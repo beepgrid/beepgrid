@@ -20,8 +20,9 @@ type AssistanceUpdate struct {
 	Overseer         *bool `json:"overseer,omitempty"`
 }
 type OverseerInput struct {
-	Prompt string  `json:"prompt"`
-	Target *Target `json:"target,omitempty"`
+	PreviousPlanID string  `json:"previous_plan_id,omitempty"`
+	Prompt         string  `json:"prompt"`
+	Target         *Target `json:"target,omitempty"`
 }
 type Instance struct {
 	ID           string         `json:"id"`
@@ -42,6 +43,8 @@ type OverseerDispatch struct {
 	RequestID      string `json:"request_id,omitempty"`
 }
 type OverseerPlan struct {
+	PreviousPlanID       string             `json:"previous_plan_id,omitempty"`
+	Target               *Target            `json:"target,omitempty"`
 	ID                   string             `json:"id"`
 	Prompt               string             `json:"prompt"`
 	ContextIDs           []string           `json:"context_agent_ids"`
@@ -68,9 +71,9 @@ func (c *Client) UpdateAssistance(ctx context.Context, in AssistanceUpdate) (Ass
 	err := c.Do(ctx, "POST", "/api/v1/assistance/settings", in, &out, "")
 	return out, err
 }
-func (c *Client) PlanOverseer(ctx context.Context, in OverseerInput) (OverseerPlan, error) {
+func (c *Client) PlanOverseer(ctx context.Context, in OverseerInput, keys ...string) (OverseerPlan, error) {
 	var out OverseerPlan
-	err := c.assistanceDo(ctx, "/api/v1/fleet/plan", in, &out)
+	err := c.assistanceDo(ctx, "/api/v1/fleet/plan", in, &out, keys...)
 	return out, err
 }
 func (c *Client) OverseerPlans(ctx context.Context) ([]OverseerPlan, error) {
@@ -94,7 +97,7 @@ func (c *Client) SummarizeOverseer(ctx context.Context, id string) (OverseerPlan
 	return out, err
 }
 
-func (c *Client) assistanceDo(ctx context.Context, path string, in, out any) error {
+func (c *Client) assistanceDo(ctx context.Context, path string, in, out any, keys ...string) error {
 	timeout := c.AssistanceTimeout
 	if timeout <= 0 {
 		timeout = 40 * time.Second
@@ -109,5 +112,9 @@ func (c *Client) assistanceDo(ctx context.Context, path string, in, out any) err
 	copyHTTP := *transportClient
 	copyHTTP.Timeout = timeout
 	copyClient.HTTP = &copyHTTP
-	return copyClient.Do(bounded, "POST", path, in, out, "")
+	key := ""
+	if len(keys) > 0 {
+		key = keys[0]
+	}
+	return copyClient.Do(bounded, "POST", path, in, out, key)
 }

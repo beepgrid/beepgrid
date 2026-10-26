@@ -497,7 +497,7 @@ function Assistance() {
             <div>
               <h3>
                 {key === "overseer"
-                  ? "Fleet overseer"
+                  ? "Coordinator"
                   : "Automatic informational answers"}
               </h3>
               <p>
@@ -542,7 +542,7 @@ function Assistance() {
       </small>
       {pending ? (
         <Modal
-          title={`${s[pending] ? "Disable" : "Enable"} ${pending.replaceAll("_", " ")}?`}
+          title={`${s[pending] ? "Disable" : "Enable"} ${pending === "overseer" ? "Coordinator" : pending.replaceAll("_", " ")}?`}
           onClose={() => setPending(null)}
         >
           <div className="form">

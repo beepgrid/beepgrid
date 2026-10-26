@@ -46,6 +46,8 @@ class ClientTests(unittest.TestCase):
             call.assert_called_with("POST", "/api/v1/assistance/settings", {"overseer": True})
             c.plan_overseer("Ask Scout")
             call.assert_called_with("POST", "/api/v1/fleet/plan", {"prompt": "Ask Scout"}, timeout=40)
+            c.plan_overseer("Follow up", previous_plan_id="ovr_1", key="turn-2")
+            call.assert_called_with("POST", "/api/v1/fleet/plan", {"prompt": "Follow up", "previous_plan_id": "ovr_1"}, timeout=40, key="turn-2")
             c.confirm_overseer("ovr_1")
             call.assert_called_with("POST", "/api/v1/fleet/command", {"plan_id": "ovr_1"})
             c.overseer_plan("a/b")

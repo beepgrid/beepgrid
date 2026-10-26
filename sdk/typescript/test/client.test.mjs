@@ -149,19 +149,21 @@ test("lost response body retries with the original operation key", async () => {
 test("optional assistance helpers retain server authority and cancellation", async () => {
   const calls = [];
   const c = new Client("http://localhost", "person-token", async (url, opts) => {
-    calls.push({url, body:opts.body ? JSON.parse(opts.body):undefined, signal:opts.signal});
+    calls.push({url, body:opts.body ? JSON.parse(opts.body):undefined, signal:opts.signal, key:opts.headers["Idempotency-Key"]});
     return new Response(JSON.stringify({id:"ovr_1", automatic_answers:false, overseer:false}));
   });
   const abort = new AbortController();
   const settings=await c.assistance(abort.signal);
   assert.equal(settings.overseer,false);
   await c.updateAssistance({overseer:true});
-  await c.planOverseer({prompt:"Ask Scout", target:{kind:"agent",id:"agt_1"}},abort.signal);
+  await c.planOverseer({prompt:"Ask Scout", target:{kind:"agent",id:"agt_1"},previous_plan_id:"ovr_previous"},abort.signal,"turn-2");
   await c.confirmOverseer("ovr_1");
   await c.overseerPlan("a/b",abort.signal);
   await c.overseerPlans(abort.signal);
   await c.summarizeOverseer("a/b",abort.signal);
   assert.deepEqual(calls[1].body,{overseer:true});
+  assert.equal(calls[2].body.previous_plan_id,"ovr_previous");
+  assert.equal(calls[2].key,"turn-2");
   assert.deepEqual(calls[3].body,{plan_id:"ovr_1"});
   assert.ok(calls[4].url.endsWith("/fleet/plans/a%2Fb"));
   assert.ok(calls[6].url.endsWith("/fleet/plans/a%2Fb/summary"));

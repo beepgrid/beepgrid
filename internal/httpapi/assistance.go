@@ -24,7 +24,7 @@ func (s *Server) assistanceRoutes() {
 		if e := decode(r, &in); e != nil {
 			return e
 		}
-		x, e := s.Store.PlanOverseer(r.Context(), actor(r), in)
+		x, e := s.Store.PlanOverseer(r.Context(), actor(r), in, r.Header.Get("Idempotency-Key"))
 		return ok(w, x, e)
 	}))
 	m.HandleFunc("GET /api/v1/fleet/plans", s.protect(func(w http.ResponseWriter, r *http.Request) error {

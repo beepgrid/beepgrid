@@ -153,6 +153,7 @@ export function useOperation(recoveryName?: string) {
   }
   return {
     run,
+    previous: <T,>(path: string) => op.current.previous<T>(path),
     pending: pending || uncertain,
     uncertain,
     error,

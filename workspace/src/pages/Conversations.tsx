@@ -38,6 +38,9 @@ import {
   unavailable,
 } from "../ui";
 
+import Overseer from "./Overseer";
+import { OverseerEntry } from "../OverseerEntry";
+
 export default function Conversations() {
   const route = useRoute(),
     me = useSession();
@@ -71,6 +74,9 @@ export default function Conversations() {
             onChange={setSearch}
             placeholder="Find a conversation"
           />
+          {!search || "overseer".includes(search.toLowerCase()) ? (
+            <OverseerEntry selected={route.id === "overseer"} />
+          ) : null}
           <QueryState query={q} empty="No permitted conversations">
             {q.items.map((c) => (
               <button
@@ -107,7 +113,11 @@ export default function Conversations() {
           </QueryState>
         </aside>
         {route.id ? (
-          <Chat key={route.id} id={route.id} />
+          route.id === "overseer" ? (
+            <Overseer />
+          ) : (
+            <Chat key={route.id} id={route.id} />
+          )
         ) : (
           <Empty title="Choose a conversation" icon="conversations">
             Messages stay with their authorized participants.

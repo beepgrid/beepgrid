@@ -468,14 +468,20 @@ export function Modal({
 export function Details({
   value,
   label = "Technical details",
+  defer = false,
 }: {
   value: unknown;
   label?: string;
+  defer?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <details className="details">
+    <details
+      className="details"
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+    >
       <summary>{label}</summary>
-      <pre>{readable(value)}</pre>
+      {!defer || open ? <pre>{readable(value)}</pre> : null}
     </details>
   );
 }

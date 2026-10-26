@@ -116,11 +116,14 @@ class Client:
                     "overseer": overseer, "version": version}.items() if value is not None}
         return self.call("POST", "/api/v1/assistance/settings", settings)
 
-    def plan_overseer(self, prompt: str, target: dict[str, str] | None = None) -> dict[str, Any]:
+    def plan_overseer(self, prompt: str, target: dict[str, str] | None = None, *, previous_plan_id: str | None = None, key: str | None = None) -> dict[str, Any]:
         data: dict[str, Any] = {"prompt": prompt}
         if target is not None:
             data["target"] = target
-        return self.call("POST", "/api/v1/fleet/plan", data, timeout=max(40, self.timeout))
+        if previous_plan_id is not None:
+            data["previous_plan_id"] = previous_plan_id
+        options = {"key": key} if key is not None else {}
+        return self.call("POST", "/api/v1/fleet/plan", data, timeout=max(40, self.timeout), **options)
 
     def overseer_plans(self) -> list[dict[str, Any]]:
         return self.call("GET", "/api/v1/fleet/plans")

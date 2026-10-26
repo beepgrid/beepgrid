@@ -94,6 +94,14 @@ export class Operation {
         }
       } catch {}
   }
+  previous<T>(path: string): T | undefined {
+    try {
+      const [savedPath, body] = JSON.parse(this.signature);
+      return savedPath === path ? (body as T) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
   async send<T>(path: string, body: unknown) {
     const signature = JSON.stringify([path, body]);
     if (signature !== this.signature) {

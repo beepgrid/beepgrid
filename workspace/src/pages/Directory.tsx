@@ -27,6 +27,7 @@ import {
   Status,
 } from "../ui";
 import Fleet from "./Fleet";
+import { OverseerEntry } from "../OverseerEntry";
 
 export default function Directory({ section }: { section: string }) {
   const agents = section === "agents";
@@ -82,6 +83,13 @@ export default function Directory({ section }: { section: string }) {
           </>
         }
       />
+      {agents &&
+      !value &&
+      !filter &&
+      !presence &&
+      (!search || "overseer".includes(search.toLowerCase())) ? (
+        <OverseerEntry />
+      ) : null}
       <div className="toolbar">
         <div className="filters">
           <select

@@ -115,7 +115,7 @@ export type AssistanceSettings = {
   matcher_configured: boolean;
   overseer_configured: boolean;
 };
-export type OverseerInput = { prompt: string; target?: Target };
+export type OverseerInput = { prompt: string; target?: Target; previous_plan_id?: string };
 export type FleetAgent = {
   agent: Agent;
   fresh: boolean;
@@ -129,6 +129,7 @@ export type FleetAgent = {
   }[];
 };
 export type OverseerPlan = {
+  previous_plan_id?: string;
   id: string;
   prompt: string;
   context_agent_ids: string[];
@@ -333,9 +334,9 @@ export class Client {
       settings,
     );
   }
-  planOverseer(input: OverseerInput, signal?: AbortSignal) {
+  planOverseer(input: OverseerInput, signal?: AbortSignal, key?: string) {
     return this.call<OverseerPlan>("POST", "/api/v1/fleet/plan", input, {
-      signal,
+      key, signal,
     });
   }
   overseerPlans(signal?: AbortSignal) {

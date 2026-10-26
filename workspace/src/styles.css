@@ -205,7 +205,12 @@ hr {
   margin: 24px 0;
 }
 .brand {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   font-size: 13px;
   line-height: normal;
   -webkit-font-smoothing: antialiased;
@@ -675,20 +680,27 @@ main#main {
 .mark-geometry {
   display: none;
 }
-:root:is([data-agent-icons="lucide-tint"], [data-agent-icons="phosphor-duotone"]) .identity-agent {
+:root:is(
+    [data-agent-icons="lucide-tint"],
+    [data-agent-icons="phosphor-duotone"]
+  )
+  .identity-agent {
   color: var(--identity-color);
   background: color-mix(in srgb, var(--identity-color) 12%, var(--surface));
   border-color: color-mix(in srgb, var(--identity-color) 22%, var(--line));
 }
 :root[data-agent-icons="phosphor-duotone"] .mark-outline,
-:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"]) .mark-outline {
+:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"])
+  .mark-outline {
   display: none;
 }
 :root[data-agent-icons="phosphor-duotone"] .mark-duotone,
-:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"]) .mark-geometry {
+:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"])
+  .mark-geometry {
   display: initial;
 }
-:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"]) .identity-agent {
+:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"])
+  .identity-agent {
   color: #fff;
   background: var(--agent-face);
   border-color: var(--agent-face);
@@ -2064,4 +2076,34 @@ dialog {
 }
 .message-view:has(.chat-head .details[open]) {
   min-height: 560px;
+}
+
+.overseer-entry {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  width: 100%;
+  text-align: left;
+}
+.conversation-list .overseer-entry {
+  border-radius: 0;
+  border-inline-end: 0;
+  margin: 0;
+}
+.overseer-entry > svg {
+  flex-shrink: 0;
+  color: var(--sub);
+}
+.overseer-mark {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.message-view:has(.overseer-chat) {
+  min-height: 580px;
+}
+.overseer-chat .message-meta {
+  flex-wrap: wrap;
 }

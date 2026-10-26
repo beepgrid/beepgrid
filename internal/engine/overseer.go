@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/jackc/pgx/v5"
 	"strings"
 	"time"
@@ -10,9 +11,23 @@ import (
 
 type assistanceActorKey struct{}
 
+type overseerHistoryKey struct{}
+
+// OverseerTurn is bounded, person-authorized conversation context, never authority.
+type OverseerTurn struct {
+	Prompt       string          `json:"prompt"`
+	Summary      string          `json:"summary"`
+	Operation    string          `json:"operation"`
+	Body         string          `json:"body,omitempty"`
+	Dispatched   bool            `json:"dispatched"`
+	ReplySummary string          `json:"reply_summary,omitempty"`
+	Replies      []OverseerReply `json:"replies"`
+}
+
 type OverseerInput struct {
-	Prompt string  `json:"prompt"`
-	Target *Target `json:"target,omitempty"`
+	PreviousPlanID string  `json:"previous_plan_id,omitempty"`
+	Prompt         string  `json:"prompt"`
+	Target         *Target `json:"target,omitempty"`
 }
 type OverseerDecision struct {
 	Operation string   `json:"operation"`
@@ -35,21 +50,25 @@ type OverseerDispatch struct {
 	RequestID      string `json:"request_id,omitempty"`
 }
 type OverseerPlan struct {
-	ID                   string             `json:"id"`
-	Prompt               string             `json:"prompt"`
-	ContextIDs           []string           `json:"context_agent_ids"`
-	Target               *Target            `json:"target,omitempty"`
-	Operation            string             `json:"operation"`
-	Summary              string             `json:"summary"`
-	Body                 string             `json:"body,omitempty"`
-	Sources              []FleetStatus      `json:"sources"`
-	RequiresConfirmation bool               `json:"requires_confirmation"`
-	CreatedAt            time.Time          `json:"created_at"`
-	ExpiresAt            time.Time          `json:"expires_at"`
-	Dispatches           []OverseerDispatch `json:"dispatches"`
-	ReplySummary         string             `json:"reply_summary,omitempty"`
-	ReplyDigest          string             `json:"reply_digest,omitempty"`
-	Replies              []Request          `json:"replies"`
+	ScopeAgentIDs        []string            `json:"scope_agent_ids,omitempty"`
+	ContextGroups        map[string][]string `json:"context_groups,omitempty"`
+	ContextRequestIDs    []string            `json:"context_request_ids,omitempty"`
+	PreviousPlanID       string              `json:"previous_plan_id,omitempty"`
+	ID                   string              `json:"id"`
+	Prompt               string              `json:"prompt"`
+	ContextIDs           []string            `json:"context_agent_ids"`
+	Target               *Target             `json:"target,omitempty"`
+	Operation            string              `json:"operation"`
+	Summary              string              `json:"summary"`
+	Body                 string              `json:"body,omitempty"`
+	Sources              []FleetStatus       `json:"sources"`
+	RequiresConfirmation bool                `json:"requires_confirmation"`
+	CreatedAt            time.Time           `json:"created_at"`
+	ExpiresAt            time.Time           `json:"expires_at"`
+	Dispatches           []OverseerDispatch  `json:"dispatches"`
+	ReplySummary         string              `json:"reply_summary,omitempty"`
+	ReplyDigest          string              `json:"reply_digest,omitempty"`
+	Replies              []Request           `json:"replies"`
 }
 
 func featureDisabled() error {
@@ -72,9 +91,9 @@ func (s *Store) overseerAccess(ctx context.Context, db DB, a Actor) (AssistanceS
 
 // PlanOverseer exposes only permitted structured fleet information to the provider.
 // Providers propose bounded operations; they never receive credentials or execute tools.
-func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput) (OverseerPlan, error) {
+func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, keys ...string) (OverseerPlan, error) {
 	var out OverseerPlan
-	if !ValidText(in.Prompt, 4000) {
+	if !ValidText(in.Prompt, 4000) || len(in.PreviousPlanID) > 200 {
 		return out, Bad("Ask a question or describe an instruction in at most 4000 bytes.")
 	}
 	if s.OverseerPlanner == nil {
@@ -82,9 +101,41 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput) (Ov
 	}
 	var settings AssistanceSettings
 	var sources []FleetStatus
+	var history []OverseerTurn
+	key := ""
+	if len(keys) > 0 && keys[0] != "" {
+		key = keys[0]
+		if !ValidText(key, 200) {
+			return out, Bad("Invalid Idempotency-Key.")
+		}
+	}
+	replay := false
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
 		var err error
 		settings, err = s.overseerAccess(ctx, tx, a)
+		if err != nil {
+			return err
+		}
+		if key != "" {
+			var hash string
+			var receipt []byte
+			e := tx.QueryRow(ctx, `SELECT input_hash,output FROM idempotency WHERE scope=$1 AND principal_id=$2 AND operation='overseer_plan' AND key=$3`, a.Scope, a.ID, key).Scan(&hash, &receipt)
+			if e == nil {
+				if hash != Digest(string(JSON(in))) {
+					return Conflict("The idempotency key was already used with different input.")
+				}
+				if e = json.Unmarshal(receipt, &out); e != nil {
+					return e
+				}
+				out, e = s.overseerPlan(ctx, tx, a, out.ID)
+				replay = e == nil
+				return e
+			}
+			if !errors.Is(e, pgx.ErrNoRows) {
+				return e
+			}
+		}
+		history, err = s.overseerHistory(ctx, tx, a, in.PreviousPlanID)
 		if err != nil {
 			return err
 		}
@@ -101,13 +152,24 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput) (Ov
 	if err != nil {
 		return out, err
 	}
+	if replay {
+		return out, nil
+	}
 	if len(sources) == 0 {
 		return out, Missing()
 	}
 	if len(JSON(sources)) > 24576 {
 		return out, Bad("Select a smaller fleet for this question.")
 	}
-	bounded, cancel := context.WithTimeout(context.WithValue(ctx, assistanceActorKey{}, a.Scope+"/"+a.ID), 30*time.Second)
+	historyDigest := Digest(string(JSON(history)))
+	// Leave room for gateway instructions and envelope fields inside its 32 KiB bound.
+	for len(JSON(sources))+len(JSON(in.Prompt))+len(JSON(history)) > 30000 && len(history) > 1 {
+		history = history[1:]
+	}
+	if len(JSON(sources))+len(JSON(in.Prompt))+len(JSON(history)) > 30000 {
+		return out, Bad("Select a smaller fleet or start a new topic for this follow-up.")
+	}
+	bounded, cancel := context.WithTimeout(context.WithValue(context.WithValue(ctx, assistanceActorKey{}, a.Scope+"/"+a.ID), overseerHistoryKey{}, history), 30*time.Second)
 	defer cancel()
 	decision, err := s.OverseerPlanner(bounded, in.Prompt, sources)
 	if err != nil {
@@ -146,8 +208,61 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput) (Ov
 	}
 	out = OverseerPlan{ID: ID("ovr"), Prompt: in.Prompt, Operation: decision.Operation, Summary: decision.Summary, Body: decision.Body, Sources: selected, RequiresConfirmation: decision.Operation != "status", CreatedAt: time.Now(), ExpiresAt: time.Now().Add(10 * time.Minute), Dispatches: []OverseerDispatch{}, Replies: []Request{}}
 	out.Target = in.Target
+	out.PreviousPlanID = in.PreviousPlanID
 	for _, source := range sources {
 		out.ContextIDs = append(out.ContextIDs, source.Agent.ID)
+		out.ScopeAgentIDs = append(out.ScopeAgentIDs, source.Agent.ID)
+	}
+	if in.PreviousPlanID != "" {
+		parent, e := s.OverseerPlan(ctx, a, in.PreviousPlanID)
+		if e != nil {
+			return OverseerPlan{}, e
+		}
+		known := map[string]bool{}
+		for _, id := range out.ContextIDs {
+			known[id] = true
+		}
+		for _, id := range parent.ContextIDs {
+			if !known[id] {
+				out.ContextIDs = append(out.ContextIDs, id)
+				known[id] = true
+			}
+		}
+		out.ContextGroups = parent.ContextGroups
+		if out.ContextGroups == nil {
+			out.ContextGroups = map[string][]string{}
+		}
+		if parent.Target != nil && parent.Target.Kind == "group" {
+			ids := parent.ScopeAgentIDs
+			if len(ids) == 0 {
+				ids = parent.ContextIDs
+			}
+			out.ContextGroups[parent.Target.ID] = append(out.ContextGroups[parent.Target.ID], ids...)
+		}
+		out.ContextRequestIDs = append(out.ContextRequestIDs, parent.ContextRequestIDs...)
+		for _, reply := range parent.Replies {
+			out.ContextRequestIDs = append(out.ContextRequestIDs, reply.ID)
+		}
+		unique := func(ids []string) []string {
+			seen := map[string]bool{}
+			result := []string{}
+			for _, id := range ids {
+				if !seen[id] {
+					seen[id] = true
+					result = append(result, id)
+				}
+			}
+			return result
+		}
+		out.ContextRequestIDs = unique(out.ContextRequestIDs)
+		for group, ids := range out.ContextGroups {
+			out.ContextGroups[group] = unique(ids)
+		}
+		// Bound accumulated provenance too. A fresh topic starts without inherited context.
+		if len(out.ContextIDs) > 200 || len(out.ContextGroups) > 16 || len(out.ContextRequestIDs) > 100 {
+			return OverseerPlan{}, Bad("Start a new topic to keep conversation context bounded.")
+		}
+
 	}
 	err = s.tx(ctx, a, func(tx pgx.Tx) error {
 		current, err := s.overseerAccess(ctx, tx, a)
@@ -179,12 +294,75 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput) (Ov
 		if err = s.validateOverseerContext(ctx, tx, a, out); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO overseer_plans(id,scope,person_id,version,plan,expires_at) VALUES($1,$2,$3,$4,$5,$6)`, out.ID, a.Scope, a.ID, current.Version, JSON(out), out.ExpiresAt); err != nil {
+		freshHistory, err := s.overseerHistory(ctx, tx, a, in.PreviousPlanID)
+		if err != nil {
 			return err
 		}
-		return event(ctx, tx, a, "overseer.planned", "", a.ID, map[string]any{"id": out.ID, "operation": out.Operation, "agent_count": len(selected)})
+		if historyDigest != Digest(string(JSON(freshHistory))) {
+			return Conflict("Conversation context changed. Ask again.")
+		}
+		save := func() error {
+			if _, err = tx.Exec(ctx, `INSERT INTO overseer_plans(id,scope,person_id,version,plan,expires_at) VALUES($1,$2,$3,$4,$5,$6)`, out.ID, a.Scope, a.ID, current.Version, JSON(out), out.ExpiresAt); err != nil {
+				return err
+			}
+			return event(ctx, tx, a, "overseer.planned", "", a.ID, map[string]any{"id": out.ID, "operation": out.Operation, "agent_count": len(selected)})
+		}
+		if key != "" {
+			return idempotent(ctx, tx, a, "overseer_plan", key, in, &out, save)
+		}
+		return save()
 	})
-	return out, err
+	if err != nil {
+		return OverseerPlan{}, err
+	}
+	return s.OverseerPlan(ctx, a, out.ID)
+}
+
+// Read a short chain using the same private, current-policy reader as the UI.
+func (s *Store) overseerHistory(ctx context.Context, db DB, a Actor, id string) ([]OverseerTurn, error) {
+	turns := []OverseerTurn{}
+	seen := map[string]bool{}
+	for id != "" && len(turns) < 6 {
+		if seen[id] {
+			return nil, Bad("Invalid conversation context.")
+		}
+		seen[id] = true
+		p, err := s.overseerPlan(ctx, db, a, id)
+		if err != nil {
+			return nil, err
+		}
+		turn := OverseerTurn{Prompt: p.Prompt, Summary: p.Summary, Operation: p.Operation, Body: p.Body, Dispatched: len(p.Dispatches) > 0, ReplySummary: p.ReplySummary, Replies: []OverseerReply{}}
+		for _, r := range p.Replies {
+			reply := OverseerReply{State: r.State}
+			for _, d := range p.Dispatches {
+				if d.RequestID == r.ID {
+					reply.AgentID = d.AgentID
+				}
+			}
+			for _, source := range p.Sources {
+				if source.Agent.ID == reply.AgentID {
+					reply.Name = source.Agent.Name
+				}
+			}
+			if r.Response != nil {
+				reply.Outcome = r.Response.Outcome
+				reply.Answer = r.Response.Answer
+			}
+			turn.Replies = append(turn.Replies, reply)
+		}
+		if len(JSON(append(turns, turn))) > 12288 {
+			if len(turns) == 0 {
+				return nil, Bad("This reply is too large for follow-up context. Start a new topic.")
+			}
+			break
+		}
+		turns = append(turns, turn)
+		id = p.PreviousPlanID
+	}
+	for i, j := 0, len(turns)-1; i < j; i, j = i+1, j-1 {
+		turns[i], turns[j] = turns[j], turns[i]
+	}
+	return turns, nil
 }
 
 func (s *Store) readOverseerPlan(ctx context.Context, db DB, a Actor, id string) (OverseerPlan, int64, bool, error) {
@@ -212,6 +390,26 @@ func (s *Store) readOverseerPlan(ctx context.Context, db DB, a Actor, id string)
 	return out, version, committed, nil
 }
 func (s *Store) validateOverseerContext(ctx context.Context, db DB, a Actor, out OverseerPlan) error {
+	for _, id := range out.ContextRequestIDs {
+		if _, err := s.request(ctx, db, a, id); err != nil {
+			return Missing()
+		}
+	}
+	for group, ids := range out.ContextGroups {
+		current, err := s.resolve(ctx, db, a, Target{"group", group}, "view", "")
+		if err != nil {
+			return Missing()
+		}
+		members := map[string]bool{}
+		for _, member := range current {
+			members[member.ID] = true
+		}
+		for _, id := range ids {
+			if !members[id] {
+				return Missing()
+			}
+		}
+	}
 	for _, id := range out.ContextIDs {
 		if _, err := s.resolve(ctx, db, a, Target{"agent", id}, "view", ""); err != nil {
 			return Missing()
@@ -226,7 +424,11 @@ func (s *Store) validateOverseerContext(ctx context.Context, db DB, a Actor, out
 		for _, member := range current {
 			members[member.ID] = true
 		}
-		for _, sourceID := range out.ContextIDs {
+		ids := out.ScopeAgentIDs
+		if len(ids) == 0 {
+			ids = out.ContextIDs
+		}
+		for _, sourceID := range ids {
 			if !members[sourceID] {
 				return Missing()
 			}
@@ -416,13 +618,13 @@ func (s *Store) ConfirmOverseer(ctx context.Context, a Actor, id string) (Overse
 			delivery := OverseerDispatch{AgentID: target.ID}
 			if out.Operation == "message" {
 				var sent SendResult
-				if err = s.sendTx(ctx, tx, a, SendInput{Target: target, Title: "Overseer: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: out.Body}, out.ID+"/"+target.ID, &sent); err != nil {
+				if err = s.sendTx(ctx, tx, a, SendInput{Target: target, Title: "Coordinator: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: out.Body}, out.ID+"/"+target.ID, &sent); err != nil {
 					return err
 				}
 				delivery.ConversationID = sent.ConversationID
 			} else {
 				var request Request
-				if err = s.askTx(ctx, tx, a, AskInput{Target: target, Kind: out.Operation, Title: "Overseer: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: out.Body}, out.ID+"/"+target.ID, &request); err != nil {
+				if err = s.askTx(ctx, tx, a, AskInput{Target: target, Kind: out.Operation, Title: "Coordinator: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: out.Body}, out.ID+"/"+target.ID, &request); err != nil {
 					return err
 				}
 				delivery.RequestID = request.ID
