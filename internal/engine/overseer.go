@@ -97,7 +97,7 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 		return out, Bad("Ask a question or describe an instruction in at most 4000 bytes.")
 	}
 	if s.OverseerPlanner == nil {
-		return out, Conflict("The overseer provider is unavailable.")
+		return out, Conflict("The Coordinator provider is unavailable.")
 	}
 	var settings AssistanceSettings
 	var sources []FleetStatus
@@ -173,13 +173,13 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 	defer cancel()
 	decision, err := s.OverseerPlanner(bounded, in.Prompt, sources)
 	if err != nil {
-		return out, &Error{"ASSISTANCE_UNAVAILABLE", "The overseer could not prepare an answer. No instructions were sent.", 503}
+		return out, &Error{"ASSISTANCE_UNAVAILABLE", "Coordinator could not prepare an answer. No instructions were sent.", 503}
 	}
 	if decision.Operation != "status" && decision.Operation != "message" && decision.Operation != "question" && decision.Operation != "task" {
-		return out, Bad("The overseer proposed an unsupported operation.")
+		return out, Bad("Coordinator proposed an unsupported operation.")
 	}
 	if !ValidText(decision.Summary, 4000) || len(decision.AgentIDs) > 100 {
-		return out, Bad("The overseer response exceeds its bounds.")
+		return out, Bad("The Coordinator response exceeds its bounds.")
 	}
 	if decision.Operation != "status" && (!ValidText(decision.Body, 4000) || len(decision.AgentIDs) == 0) {
 		return out, Bad("An outbound plan requires explicit agents and a bounded message.")
@@ -532,7 +532,7 @@ func (s *Store) SummarizeOverseer(ctx context.Context, a Actor, id string) (Over
 		return out, nil
 	}
 	if s.OverseerSummarizer == nil {
-		return out, Conflict("The overseer provider is unavailable.")
+		return out, Conflict("The Coordinator provider is unavailable.")
 	}
 	replies := []OverseerReply{}
 	for i, r := range out.Replies {

@@ -46,6 +46,45 @@ afterEach(() => {
   history.replaceState(null, "", "/agents");
 });
 
+it("keeps a 25-agent result compact and reveals canonical per-agent details on demand", async () => {
+  const large = plan();
+  large.dispatches = Array.from({ length: 25 }, (_, i) => ({
+    agent_id: `agt_${i}`,
+    conversation_id: `con_${i}`,
+    request_id: `req_${i}`,
+  }));
+  large.replies = Array.from({ length: 25 }, (_, i) => ({
+    id: `req_${i}`,
+    state: i < 3 ? "resolved" : "open",
+    title: `Agent ${i}`,
+    response:
+      i < 3 ? { answer: `Result ${i}`, outcome: "answered" } : undefined,
+  })) as Plan["replies"];
+  const fetcher = vi.fn(async (path: string, init?: RequestInit) =>
+    path.endsWith("/assistance/settings")
+      ? json(settings)
+      : path.endsWith("/query")
+        ? json({
+            items:
+              requestBody(init).collection === "overseer_plans" ? [large] : [],
+          })
+        : json({}),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const { Wrapper } = harness();
+  render(<Overseer />, { wrapper: Wrapper });
+  const summary = await screen.findByText(
+    "25 agents · 3 of 25 results settled · Individual results",
+  );
+  expect(screen.queryByText("Result 0")).not.toBeInTheDocument();
+  fireEvent.click(summary);
+  await screen.findByText("Result 0");
+  expect(
+    screen.getAllByRole("button", { name: "Conversation" }),
+  ).toHaveLength(25);
+  expect(screen.getAllByText("Awaiting an authorized reply")).toHaveLength(22);
+});
+
 it("opens the explicit assistant without enrolling it or querying a fake identity", async () => {
   const fetcher = vi.fn(async (_path: string) => json(settings));
   vi.stubGlobal("fetch", fetcher);

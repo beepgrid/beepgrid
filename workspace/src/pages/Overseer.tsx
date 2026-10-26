@@ -24,6 +24,77 @@ import {
   unavailable,
 } from "../ui";
 
+function CoordinatorResults({ turn }: { turn: Plan }) {
+  const [open, setOpen] = useState(false);
+  const count = turn.dispatches?.length || 0;
+  const settled =
+    turn.replies?.filter(
+      (r) => r.state !== "open" && r.state !== "clarification",
+    ).length || 0;
+  const results = () => (
+    <>
+      {turn.dispatches?.map((d) => (
+        <div className="actions" key={d.agent_id}>
+          <strong>
+            {turn.sources.find((s) => s.agent.id === d.agent_id)?.agent.name ||
+              d.agent_id}
+          </strong>
+          <Button
+            onClick={() => navigate("/conversations/" + d.conversation_id)}
+          >
+            Conversation
+          </Button>
+          {d.request_id ? (
+            <Button onClick={() => navigate("/requests/" + d.request_id)}>
+              Request
+            </Button>
+          ) : (
+            <Badge>Message accepted</Badge>
+          )}
+        </div>
+      ))}
+      {turn.replies?.map((r) => (
+        <section className="section" key={r.id}>
+          <Badge>{r.state}</Badge>{" "}
+          <strong>
+            {turn.sources.find(
+              (s) =>
+                turn.dispatches.find((d) => d.request_id === r.id)?.agent_id ===
+                s.agent.id,
+            )?.agent.name || r.title}
+          </strong>
+          <p>
+            {r.response
+              ? readable(r.response.answer ?? r.response.outcome)
+              : "Awaiting an authorized reply"}
+          </p>
+          {r.resolved_at ? (
+            <small>
+              Resolved <DateValue value={r.resolved_at} />
+            </small>
+          ) : null}
+        </section>
+      ))}
+    </>
+  );
+  if (count <= 5) return results();
+  return (
+    <details
+      className="details"
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+    >
+      <summary>
+        {count} agents ·{" "}
+        {turn.replies?.length
+          ? `${settled} of ${turn.replies.length} results settled`
+          : "messages accepted"}{" "}
+        · Individual results
+      </summary>
+      {open ? results() : null}
+    </details>
+  );
+}
+
 export default function Overseer() {
   const me = useSession();
   const settings = useResource<AssistanceSettings>("/assistance/settings");
@@ -293,54 +364,7 @@ export default function Overseer() {
                         ) : null}
                       </section>
                     ) : null}
-                    {turn.dispatches?.map((d) => (
-                      <div className="actions" key={d.agent_id}>
-                        <strong>
-                          {turn.sources.find((s) => s.agent.id === d.agent_id)
-                            ?.agent.name || d.agent_id}
-                        </strong>
-                        <Button
-                          onClick={() =>
-                            navigate("/conversations/" + d.conversation_id)
-                          }
-                        >
-                          Conversation
-                        </Button>
-                        {d.request_id ? (
-                          <Button
-                            onClick={() =>
-                              navigate("/requests/" + d.request_id)
-                            }
-                          >
-                            Request
-                          </Button>
-                        ) : (
-                          <Badge>Message accepted</Badge>
-                        )}
-                      </div>
-                    ))}
-                    {turn.replies?.map((r) => (
-                      <section className="section" key={r.id}>
-                        <Badge>{r.state}</Badge>{" "}
-                        <strong>
-                          {turn.sources.find(
-                            (s) =>
-                              turn.dispatches.find((d) => d.request_id === r.id)
-                                ?.agent_id === s.agent.id,
-                          )?.agent.name || r.title}
-                        </strong>
-                        <p>
-                          {r.response
-                            ? readable(r.response.answer ?? r.response.outcome)
-                            : "Awaiting an authorized reply"}
-                        </p>
-                        {r.resolved_at ? (
-                          <small>
-                            Resolved <DateValue value={r.resolved_at} />
-                          </small>
-                        ) : null}
-                      </section>
-                    ))}
+                    <CoordinatorResults turn={turn} />
                     {turn.replies?.length ? (
                       <Button
                         disabled={

@@ -149,7 +149,83 @@ it("uses the batch contract and presents each independent receipt", async () => 
   expect(body.request).not.toHaveProperty("target");
   expect(body.request).not.toHaveProperty("conversation_id");
   expect(body.request).not.toHaveProperty("preview_token");
-  expect(screen.getAllByRole("button", { name: "Open request" })).toHaveLength(
-    2,
+  expect(
+    screen.getAllByRole("button", { name: /^Open request for / }),
+  ).toHaveLength(2);
+});
+
+it("opens the selected group category and labels fan-out receipts from authorized conversations, not preview order", async () => {
+  const group = {
+    id: "grp_team",
+    name: "Engineering",
+    members: [agent.id, "agt_two"],
+  };
+  const fetcher = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.endsWith("/query")) {
+      const collection = requestBody(init).collection;
+      return json({
+        items:
+          collection === "groups"
+            ? [group]
+            : collection === "conversations"
+              ? [
+                  {
+                    id: "con_two",
+                    participants: [
+                      me.person,
+                      { ...agent, id: "agt_two", name: "Builder" },
+                    ],
+                  },
+                  { id: "con_one", participants: [me.person, agent] },
+                ]
+              : [],
+      });
+    }
+    if (path.endsWith("/dispatch-preview"))
+      return json({ ...preview, count: 3 });
+    return json({
+      messages: [
+        { conversation_id: "con_one" },
+        { conversation_id: "con_two" },
+        { conversation_id: "con_not_on_page" },
+      ],
+    });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const { Wrapper } = harness();
+  render(
+    <Compose initial={[{ kind: "group", id: group.id }]} onClose={vi.fn()} />,
+    { wrapper: Wrapper },
   );
+  expect(screen.getByRole("combobox", { name: "Recipient type" })).toHaveValue(
+    "group",
+  );
+  await screen.findByRole("radio", { name: /Engineering/ });
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+    target: { value: "Report progress" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Review recipients" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Confirm and send" }),
+  );
+  await screen.findByRole("button", {
+    name: "Open conversation with Research assistant",
+  });
+  expect(
+    screen.getByRole("button", { name: "Open conversation with Builder" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", {
+      name: "Open conversation with Conversation · _on_page",
+    }),
+  ).toBeInTheDocument();
+  const queries = fetcher.mock.calls.filter(
+    ([path, init]) =>
+      path.endsWith("/query") &&
+      requestBody(init).collection === "conversations",
+  );
+  expect(queries).toHaveLength(1);
+  expect(
+    fetcher.mock.calls.some(([path]) => /\/conversations\//.test(path)),
+  ).toBe(false);
 });

@@ -16,7 +16,12 @@ export function TargetPicker({
   allowGroups?: boolean;
   allowInstances?: boolean;
 }) {
-  const [kind, setKind] = useState<Kind>("agent"),
+  const [kind, setKind] = useState<Kind>(() => {
+      const initial = value[0]?.kind;
+      if (initial === "group" && (!allowGroups || multiple)) return "agent";
+      if (initial === "instance" && !allowInstances) return "agent";
+      return initial ?? "agent";
+    }),
     [search, setSearch] = useState("");
   const deferred = useDeferredValue(search);
   const collection = {
@@ -39,6 +44,13 @@ export function TargetPicker({
           ? []
           : [target],
     );
+  }
+  function label(target: Target) {
+    const item =
+      target.kind === kind
+        ? q.items.find((item) => item.id === target.id)
+        : undefined;
+    return item && "name" in item ? item.name : target.id.slice(0, 18);
   }
   return (
     <div className="form">
@@ -71,7 +83,7 @@ export function TargetPicker({
         <div className="actions">
           {value.map((t) => (
             <Badge key={t.kind + t.id}>
-              {t.kind} · {t.id.slice(0, 18)}{" "}
+              {t.kind} · {label(t)}{" "}
               <button
                 type="button"
                 onClick={() => onChange(value.filter((x) => x !== t))}

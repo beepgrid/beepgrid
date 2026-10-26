@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, bytes } from "./client";
-import { useDraft, useOperation, useSession } from "./data";
+import { useCollection, useDraft, useOperation, useSession } from "./data";
 import type {
   Action,
   Capability,
@@ -42,6 +42,81 @@ const action: Action = {
   arguments: {},
   operation_key: "",
 };
+type Receipt = {
+  target?: Target;
+  conversation_id?: string;
+  request_id?: string;
+};
+
+function DispatchReceipt({
+  receipt,
+  onClose,
+}: {
+  receipt: Receipt[];
+  onClose: () => void;
+}) {
+  const me = useSession();
+  // Reuse the authorized, cached directory instead of fetching every conversation.
+  // A page may not contain an older receipt: retain its unique reference as fallback.
+  const conversations = useCollection<Conversation>("conversations");
+  return (
+    <Modal title="Dispatch accepted" wide onClose={onClose}>
+      <p>
+        {receipt.length} independent recipient records were accepted. Delivery
+        and replies remain separate.
+      </p>
+      {receipt.map((item, i) => {
+        const conversation = conversations.items.find(
+          (c) => c.id === item.conversation_id,
+        );
+        const name = conversation?.participants
+          .filter((p) => p.id !== me.person.id)
+          .map((p) => p.name)
+          .join(", ");
+        const label =
+          name ||
+          (item.target
+            ? item.target.kind + " · " + item.target.id
+            : "Conversation · " + item.conversation_id?.slice(-8));
+        return (
+          <section
+            className="section"
+            key={item.conversation_id || item.request_id || i}
+          >
+            <p>{label}</p>
+            <div className="actions">
+              {item.conversation_id ? (
+                <Button
+                  aria-label={`Open conversation with ${label}`}
+                  onClick={() => {
+                    onClose();
+                    navigate("/conversations/" + item.conversation_id);
+                  }}
+                >
+                  Open conversation
+                </Button>
+              ) : null}
+              {item.request_id ? (
+                <Button
+                  aria-label={`Open request for ${label}`}
+                  onClick={() => {
+                    onClose();
+                    navigate("/requests/" + item.request_id);
+                  }}
+                >
+                  Open request
+                </Button>
+              ) : null}
+            </div>
+          </section>
+        );
+      })}
+      <Button primary onClick={onClose}>
+        Done
+      </Button>
+    </Modal>
+  );
+}
 export function Compose({
   onClose,
   initial = [],
@@ -56,9 +131,7 @@ export function Compose({
   conversation?: string;
 }) {
   const me = useSession();
-  const [receipt, setReceipt] = useState<
-    { target?: Target; conversation_id?: string; request_id?: string }[] | null
-  >(null);
+  const [receipt, setReceipt] = useState<Receipt[] | null>(null);
   const [saved, setSaved] = useDraft(
     "compose:" +
       mode +
@@ -286,49 +359,7 @@ export function Compose({
       setError(e as Error);
     }
   }
-  if (receipt)
-    return (
-      <Modal title="Dispatch accepted" wide onClose={onClose}>
-        <p>
-          {receipt.length} independent recipient records were accepted. Delivery
-          and replies remain separate.
-        </p>
-        {receipt.map((item, i) => (
-          <section className="section" key={i}>
-            <p>
-              {item.target
-                ? item.target.kind + " · " + item.target.id
-                : "Private recipient conversation"}
-            </p>
-            <div className="actions">
-              {item.conversation_id ? (
-                <Button
-                  onClick={() => {
-                    onClose();
-                    navigate("/conversations/" + item.conversation_id);
-                  }}
-                >
-                  Open conversation
-                </Button>
-              ) : null}
-              {item.request_id ? (
-                <Button
-                  onClick={() => {
-                    onClose();
-                    navigate("/requests/" + item.request_id);
-                  }}
-                >
-                  Open request
-                </Button>
-              ) : null}
-            </div>
-          </section>
-        ))}
-        <Button primary onClick={onClose}>
-          Done
-        </Button>
-      </Modal>
-    );
+  if (receipt) return <DispatchReceipt receipt={receipt} onClose={onClose} />;
   return (
     <Modal
       title={
