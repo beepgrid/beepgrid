@@ -306,6 +306,8 @@ func (s *Store) Heartbeat(ctx context.Context, a Actor, progress map[string]any)
 }
 
 func (s *Store) Agents(ctx context.Context, a Actor) ([]Agent, error) {
+	// Identity filtering and runtime visibility belong to the same bounded read.
+	ctx = withPolicySnapshot(ctx)
 	principals, e := s.ListPrincipals(ctx, a, "agent")
 	if e != nil {
 		return nil, e
