@@ -18,12 +18,7 @@ func (s *Store) instancesForAgentsDB(ctx context.Context, db DB, scope string, i
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, e := db.Query(ctx, `SELECT id,agent_id,capabilities,progress,last_seen,presence FROM (
- SELECT i.id,i.agent_id,i.capabilities,i.progress,i.last_seen,
- CASE WHEN c.revoked OR c.expires_at<=now() OR p.disabled THEN 'offline' WHEN i.last_seen>now()-interval '45 seconds' THEN 'connected' WHEN i.last_seen>now()-interval '2 minutes' THEN 'stale' ELSE 'offline' END AS presence,
- row_number() OVER(PARTITION BY i.agent_id ORDER BY i.created_at DESC,i.id DESC) AS position
- FROM instances i JOIN credentials c ON c.id=i.credential_id AND c.scope=i.scope JOIN principals p ON p.id=i.agent_id AND p.scope=i.scope WHERE i.scope=$1 AND i.agent_id=ANY($2::text[])
- ) selected WHERE position<=1000 ORDER BY agent_id,position`, scope, ids)
+	rows, e := db.Query(ctx, agentInstancesSQL, scope, ids)
 	if e != nil {
 		return nil, e
 	}
@@ -40,3 +35,15 @@ func (s *Store) instancesForAgentsDB(ctx context.Context, db DB, scope string, i
 	}
 	return out, rows.Err()
 }
+
+const agentInstancesSQL = `SELECT i.id,i.agent_id,i.capabilities,i.progress,i.last_seen,
+ CASE WHEN c.revoked OR c.expires_at<=now() OR p.disabled THEN 'offline' WHEN i.last_seen>now()-interval '45 seconds' THEN 'connected' WHEN i.last_seen>now()-interval '2 minutes' THEN 'stale' ELSE 'offline' END AS presence
+ FROM (SELECT DISTINCT unnest($2::text[]) AS agent_id) wanted
+ CROSS JOIN LATERAL (
+ SELECT id,agent_id,credential_id,capabilities,progress,last_seen,created_at
+ FROM instances WHERE scope=$1 AND agent_id=wanted.agent_id
+ ORDER BY created_at DESC,id DESC LIMIT 1000
+ ) i
+ CROSS JOIN LATERAL (SELECT revoked,expires_at FROM credentials WHERE id=i.credential_id AND scope=$1 LIMIT 1) c
+ JOIN principals p ON p.id=i.agent_id AND p.scope=$1
+ ORDER BY i.agent_id,i.created_at DESC,i.id DESC`

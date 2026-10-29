@@ -48,6 +48,7 @@ func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInp
 	type record struct {
 		ConversationID string    `json:"conversation_id"`
 		RecipientID    string    `json:"recipient_id"`
+		ExactInstance  string    `json:"exact_instance"`
 		DeliveryID     string    `json:"delivery_id"`
 		MessageID      string    `json:"message_id"`
 		CreatedAt      time.Time `json:"created_at"`
@@ -58,7 +59,7 @@ func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInp
 	items := make([]record, 0, len(rs))
 	for _, r := range rs {
 		m := Message{ID: ID("msg"), ConversationID: ID("con"), SenderID: a.ID, InstanceID: a.InstanceID, Body: in.Body, CreatedAt: time.Now()}
-		item := record{ConversationID: m.ConversationID, RecipientID: r.ID, DeliveryID: ID("del"), MessageID: m.ID, CreatedAt: m.CreatedAt, PolicyTarget: r.PolicyTarget,
+		item := record{ConversationID: m.ConversationID, RecipientID: r.ID, ExactInstance: r.ExactInstance, DeliveryID: ID("del"), MessageID: m.ID, CreatedAt: m.CreatedAt, PolicyTarget: r.PolicyTarget,
 			Native: s.allowed(ctx, tx, a, "message", r.PolicyTarget, "", "")}
 		for _, d := range routes[r.ID] {
 			if s.allowed(ctx, tx, a, "message", r.PolicyTarget, d.ConnectionID, "") {

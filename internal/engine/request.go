@@ -80,11 +80,10 @@ func (s *Store) Requests(ctx context.Context, a Actor) ([]Request, error) {
 		if !a.Admin && a.ID != r.RequesterID && !s.allowed(ctx, s.Pool, a, "view", Target{x.kind, r.RequesterID}, "", "") {
 			continue
 		}
-		if r.Response != nil && r.Response.SourceAnswerID != "" {
-			answer, e := scanAnswer(s.Pool.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2`, a.Scope, r.Response.SourceAnswerID))
-			r.Response.SourceInvalidated = e != nil || answer.Invalidated || answer.ValidUntil.Before(time.Now()) || !s.publisherCurrent(ctx, s.Pool, a.Scope, answer)
-		}
 		out = append(out, r)
+	}
+	if e = s.markAnswerSources(ctx, s.Pool, a.Scope, out); e != nil {
+		return nil, e
 	}
 	return out, nil
 }
@@ -170,24 +169,30 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 		if _, e = tx.Exec(ctx, `INSERT INTO requests(id,scope,requester_id,requester_instance,conversation_id,kind,title,body,choices,action,expires_at,shared_key) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12)`, out.ID, a.Scope, a.ID, a.InstanceID, conv, in.Kind, in.Title, in.Body, JSON(in.Choices), JSON(in.Action), in.ExpiresAt, in.SharedKey); e != nil {
 			return e
 		}
-		for _, r := range rs {
-			projection := conv
-			if in.ConversationID == "" && len(rs) > 1 {
-				projection, e = newConversation(ctx, tx, a, in.Title, r.ID)
-				if e != nil {
+		if in.ConversationID == "" && in.SharedKey == "" {
+			if e = s.newRequestAudience(ctx, tx, a, *out, rs); e != nil {
+				return e
+			}
+		} else {
+			for _, r := range rs {
+				projection := conv
+				if in.ConversationID == "" && len(rs) > 1 {
+					projection, e = newConversation(ctx, tx, a, in.Title, r.ID)
+					if e != nil {
+						return e
+					}
+				}
+				if _, e = tx.Exec(ctx, `INSERT INTO request_audience(scope,request_id,principal_id,conversation_id,policy_target) VALUES($1,$2,$3,$4,$5)`, a.Scope, out.ID, r.ID, projection, JSON(r.PolicyTarget)); e != nil {
 					return e
 				}
-			}
-			if _, e = tx.Exec(ctx, `INSERT INTO request_audience(scope,request_id,principal_id,conversation_id,policy_target) VALUES($1,$2,$3,$4,$5)`, a.Scope, out.ID, r.ID, projection, JSON(r.PolicyTarget)); e != nil {
-				return e
-			}
-			view := *out
-			view.ConversationID = projection
-			if e = event(ctx, tx, a, "request.created", projection, r.ID, view); e != nil {
-				return e
-			}
-			if e = s.enqueue(ctx, tx, a, r, out.ID, projection, "ask", map[string]any{"type": "request", "request": view}, in.ExpiresAt); e != nil {
-				return e
+				view := *out
+				view.ConversationID = projection
+				if e = event(ctx, tx, a, "request.created", projection, r.ID, view); e != nil {
+					return e
+				}
+				if e = s.enqueue(ctx, tx, a, r, out.ID, projection, "ask", map[string]any{"type": "request", "request": view}, in.ExpiresAt); e != nil {
+					return e
+				}
 			}
 		}
 		if e = event(ctx, tx, a, "request.created", conv, a.ID, out); e != nil {
@@ -272,36 +277,18 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	return e
 }
 func (s *Store) requestEvent(ctx context.Context, db DB, a Actor, r Request, kind string) error {
-	if e := event(ctx, db, a, kind, r.ConversationID, r.RequesterID, r); e != nil {
-		return e
-	}
-	rows, e := db.Query(ctx, `SELECT principal_id,conversation_id FROM request_audience WHERE scope=$1 AND request_id=$2`, a.Scope, r.ID)
-	if e != nil {
-		return e
-	}
-	type view struct{ pid, conv string }
-	all := []view{}
-	for rows.Next() {
-		var v view
-		if e = rows.Scan(&v.pid, &v.conv); e != nil {
-			rows.Close()
-			return e
-		}
-		all = append(all, v)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return e
-	}
-	for _, v := range all {
-		copy := r
-		copy.ConversationID = v.conv
-		if e = event(ctx, db, a, kind, v.conv, v.pid, copy); e != nil {
-			return e
-		}
-	}
-	return nil
+	// Reserve a contiguous range under the existing workspace fence. Every
+	// audience still receives only its private projection; event/worker hints
+	// commit with the canonical state and never precede it.
+	_, err := db.Exec(ctx, `WITH targets AS MATERIALIZED (
+ SELECT $3::text recipient_id,$4::text conversation_id,0::bigint ordinal
+ UNION ALL SELECT principal_id,conversation_id,row_number() OVER(ORDER BY principal_id) FROM request_audience WHERE scope=$1 AND request_id=$2
+ ), reservation AS (UPDATE scopes SET sequence=sequence+(SELECT count(*) FROM targets) WHERE id=$1 RETURNING sequence),
+ emitted AS (INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data)
+ SELECT $1,r.sequence-(SELECT count(*) FROM targets)+t.ordinal+1,$5,$6,t.conversation_id,t.recipient_id,jsonb_set($7::jsonb,'{conversation_id}',to_jsonb(t.conversation_id))
+ FROM targets t CROSS JOIN reservation r RETURNING sequence)
+ SELECT pg_notify('notif_events',$1),pg_notify('notif_work',json_build_array($1::text,t.recipient_id)::text) FROM targets t`, a.Scope, r.ID, r.RequesterID, r.ConversationID, kind, a.ID, JSON(r))
+	return err
 }
 func (s *Store) EndRequest(ctx context.Context, a Actor, id, state string, version int) (Request, error) {
 	var out Request

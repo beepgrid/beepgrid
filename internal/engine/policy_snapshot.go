@@ -13,13 +13,47 @@ type policySnapshot struct {
 	mu          sync.Mutex
 	rules       map[string][]Rule
 	memberships map[string]map[string]bool
+	assigned    map[string]map[string]bool
 }
 
 func withPolicySnapshot(ctx context.Context) context.Context {
 	if ctx.Value(policySnapshotKey{}) != nil {
 		return ctx
 	}
-	return context.WithValue(ctx, policySnapshotKey{}, &policySnapshot{rules: map[string][]Rule{}, memberships: map[string]map[string]bool{}})
+	return context.WithValue(ctx, policySnapshotKey{}, &policySnapshot{rules: map[string][]Rule{}, memberships: map[string]map[string]bool{}, assigned: map[string]map[string]bool{}})
+}
+
+func assignedRoles(ctx context.Context, db DB, a Actor) (map[string]bool, error) {
+	snapshot, _ := ctx.Value(policySnapshotKey{}).(*policySnapshot)
+	key := a.Scope + "\x00" + a.ID
+	if snapshot != nil {
+		snapshot.mu.Lock()
+		defer snapshot.mu.Unlock()
+		if roles, ok := snapshot.assigned[key]; ok {
+			return roles, nil
+		}
+	}
+	rows, err := db.Query(ctx, `SELECT role_id FROM role_bindings WHERE scope=$1 AND subject_kind='principal' AND subject_id=$2
+ UNION ALL SELECT b.role_id FROM memberships m JOIN role_bindings b ON b.scope=m.scope AND b.subject_kind='group' AND b.subject_id=m.group_id WHERE m.scope=$1 AND m.principal_id=$2`, a.Scope, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	if snapshot != nil {
+		snapshot.assigned[key] = out
+	}
+	return out, nil
 }
 func roleRules(ctx context.Context, db DB, a Actor) ([]Rule, error) {
 	snapshot, _ := ctx.Value(policySnapshotKey{}).(*policySnapshot)
@@ -31,7 +65,7 @@ func roleRules(ctx context.Context, db DB, a Actor) ([]Rule, error) {
 			return rules, nil
 		}
 	}
-	rows, e := db.Query(ctx, `SELECT r.rules FROM roles r JOIN role_bindings b ON b.role_id=r.id AND b.scope=r.scope WHERE r.scope=$1 AND ((b.subject_kind='principal' AND b.subject_id=$2) OR (b.subject_kind='group' AND EXISTS(SELECT 1 FROM memberships m WHERE m.scope=b.scope AND m.group_id=b.subject_id AND m.principal_id=$2)))`, a.Scope, a.ID)
+	rows, e := db.Query(ctx, roleRulesSQL, a.Scope, a.ID)
 	if e != nil {
 		return nil, e
 	}
@@ -88,3 +122,10 @@ func targetGroupMember(ctx context.Context, db DB, scope, group, person string) 
 	}
 	return members[person]
 }
+
+const roleRulesSQL = `SELECT r.rules FROM (
+ SELECT role_id FROM role_bindings WHERE scope=$1 AND subject_kind='principal' AND subject_id=$2
+ UNION ALL
+ SELECT b.role_id FROM memberships m JOIN role_bindings b ON b.scope=m.scope AND b.subject_kind='group' AND b.subject_id=m.group_id
+ WHERE m.scope=$1 AND m.principal_id=$2
+ ) effective JOIN roles r ON r.scope=$1 AND r.id=effective.role_id`

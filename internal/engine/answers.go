@@ -62,7 +62,105 @@ func (s *Store) publisherCurrent(ctx context.Context, db DB, scope string, answe
 	_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, scope, p.ID).Scan(&a.Admin)
 	return s.canPublish(ctx, db, a)
 }
+
+// Current publication authority is proved once per distinct publisher in this
+// read, including direct/group roles and live administrator credentials. No
+// proof survives into another request or is used to authorize a mutation.
+func (s *Store) currentPublishers(ctx context.Context, db DB, scope string, ids []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := db.Query(ctx, `SELECT p.id,p.kind,p.disabled,
+ EXISTS(SELECT 1 FROM credentials c WHERE c.scope=p.scope AND c.principal_id=p.id AND c.kind='admin' AND NOT c.revoked AND (c.expires_at IS NULL OR c.expires_at>now())),
+ COALESCE(grants.rules,'[]') FROM principals p
+ LEFT JOIN LATERAL (SELECT jsonb_agg(r.rules) rules FROM (
+ SELECT role_id FROM role_bindings WHERE scope=p.scope AND subject_kind='principal' AND subject_id=p.id
+ UNION ALL SELECT b.role_id FROM memberships m JOIN role_bindings b ON b.scope=m.scope AND b.subject_kind='group' AND b.subject_id=m.group_id WHERE m.scope=p.scope AND m.principal_id=p.id
+ ) effective JOIN roles r ON r.scope=p.scope AND r.id=effective.role_id) grants ON true
+ WHERE p.scope=$1 AND p.id=ANY($2::text[])`, scope, distinctIDs(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var a Actor
+		var raw []byte
+		if err = rows.Scan(&a.ID, &a.Kind, &a.Disabled, &a.Admin, &raw); err != nil {
+			return nil, err
+		}
+		a.Scope = scope
+		if a.Disabled {
+			continue
+		}
+		if a.Admin {
+			out[a.ID] = true
+			continue
+		}
+		var groups [][]Rule
+		if err = json.Unmarshal(raw, &groups); err != nil {
+			return nil, err
+		}
+		for _, rules := range groups {
+			for _, r := range rules {
+				if s.ruleAllows(ctx, db, a, r, "manage", Target{"answer", a.ID}, "", "") {
+					out[a.ID] = true
+				}
+			}
+		}
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) markAnswerSources(ctx context.Context, db DB, scope string, requests []Request) error {
+	ids := []string{}
+	for _, r := range requests {
+		if r.Response != nil && r.Response.SourceAnswerID != "" {
+			ids = append(ids, r.Response.SourceAnswerID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := db.Query(ctx, `SELECT id,publisher_id,invalidated OR valid_until<=now() FROM shared_answers WHERE scope=$1 AND id=ANY($2::text[])`, scope, ids)
+	if err != nil {
+		return err
+	}
+	type source struct {
+		publisher string
+		invalid   bool
+	}
+	sources := map[string]source{}
+	publishers := []string{}
+	for rows.Next() {
+		var id string
+		var x source
+		if err = rows.Scan(&id, &x.publisher, &x.invalid); err != nil {
+			rows.Close()
+			return err
+		}
+		sources[id] = x
+		publishers = append(publishers, x.publisher)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	current, err := s.currentPublishers(ctx, db, scope, publishers)
+	if err != nil {
+		return err
+	}
+	for _, r := range requests {
+		if r.Response != nil && r.Response.SourceAnswerID != "" {
+			x, ok := sources[r.Response.SourceAnswerID]
+			r.Response.SourceInvalidated = !ok || x.invalid || !current[x.publisher]
+		}
+	}
+	return nil
+}
 func (s *Store) Answers(ctx context.Context, a Actor) ([]SharedAnswer, error) {
+	ctx = withPolicySnapshot(ctx)
 	rules, err := roleRules(ctx, s.Pool, a)
 	if err != nil {
 		return nil, err
@@ -93,8 +191,16 @@ func (s *Store) Answers(ctx context.Context, a Actor) ([]SharedAnswer, error) {
 		return nil, e
 	}
 	out := []SharedAnswer{}
+	ids := []string{}
 	for _, v := range all {
-		if (a.Admin || v.PublisherID == a.ID || contains(v.Audience, a.ID) || s.manages(ctx, s.Pool, a, "answer", v.ID)) && s.publisherCurrent(ctx, s.Pool, a.Scope, v) {
+		ids = append(ids, v.PublisherID)
+	}
+	current, err := s.currentPublishers(ctx, s.Pool, a.Scope, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range all {
+		if (a.Admin || v.PublisherID == a.ID || contains(v.Audience, a.ID) || s.manages(ctx, s.Pool, a, "answer", v.ID)) && current[v.PublisherID] {
 			out = append(out, v)
 		}
 	}
@@ -135,9 +241,13 @@ func (s *Store) publishTx(ctx context.Context, tx pgx.Tx, a Actor, in PublishInp
 	if r.SharedKey != "" && key != r.SharedKey {
 		return Conflict("The source question already has a different shared key.")
 	}
+	people, e := principalsByIDs(ctx, tx, a.Scope, in.Audience)
+	if e != nil {
+		return e
+	}
 	for _, pid := range in.Audience {
-		p, e := principal(ctx, tx, a.Scope, pid)
-		if e != nil || p.Disabled {
+		p, ok := people[pid]
+		if !ok || p.Disabled {
 			return Bad("Every reuse audience member must be active in this workspace.")
 		}
 	}

@@ -42,6 +42,7 @@ func (s *Store) PreviewRole(ctx context.Context, a Actor, in RolePreviewInput) (
 		return out, Bad("At most 100 policy checks are permitted.")
 	}
 	e := s.tx(ctx, a, func(db pgx.Tx) error {
+		ctx := withPolicySnapshot(ctx)
 		if !s.mayEditRole(ctx, db, a, in.Role) {
 			return Denied()
 		}
@@ -70,6 +71,11 @@ func (s *Store) PreviewRole(ctx context.Context, a Actor, in RolePreviewInput) (
 				return e
 			}
 		}
+		type preparedSubject struct {
+			person        Principal
+			before, after []Rule
+		}
+		subjects := map[string]preparedSubject{}
 		for _, check := range in.Checks {
 			switch check.Action {
 			case "view", "message", "ask", "decide", "manage":
@@ -84,47 +90,55 @@ func (s *Store) PreviewRole(ctx context.Context, a Actor, in RolePreviewInput) (
 					return e
 				}
 			}
-			p, e := principal(ctx, db, a.Scope, check.SubjectID)
-			if e != nil {
-				return e
-			}
-			if !s.inspectAccess(ctx, db, a, p) && !s.mayAssign(ctx, db, a, in.Role.ID, Target{p.Kind, p.ID}) {
-				return Denied()
-			}
-			subject := Actor{Principal: p, Scope: a.Scope}
-			before, e := roleRules(ctx, db, subject)
-			if e != nil {
-				return e
-			}
-			after := []Rule{}
-			// Read the other roles independently so a duplicate matching rule is not
-			// accidentally subtracted when only this role changes.
-			rows, e := db.Query(ctx, `SELECT DISTINCT r.id,r.rules FROM roles r JOIN role_bindings b ON b.scope=r.scope AND b.role_id=r.id WHERE r.scope=$1 AND r.id<>$3 AND ((b.subject_kind='principal' AND b.subject_id=$2) OR (b.subject_kind='group' AND EXISTS(SELECT 1 FROM memberships m WHERE m.scope=b.scope AND m.group_id=b.subject_id AND m.principal_id=$2)))`, a.Scope, p.ID, in.Role.ID)
-			if e != nil {
-				return e
-			}
-			for rows.Next() {
-				var id string
-				var raw []byte
-				if e = rows.Scan(&id, &raw); e != nil {
-					rows.Close()
-					return e
-				}
-				rules, e := decodeRules(raw)
+			prepared, ok := subjects[check.SubjectID]
+			if !ok {
+				p, e := principal(ctx, db, a.Scope, check.SubjectID)
 				if e != nil {
-					rows.Close()
 					return e
 				}
-				after = append(after, rules...)
+				if !s.inspectAccess(ctx, db, a, p) && !s.mayAssign(ctx, db, a, in.Role.ID, Target{p.Kind, p.ID}) {
+					return Denied()
+				}
+				subject := Actor{Principal: p, Scope: a.Scope}
+				before, e := roleRules(ctx, db, subject)
+				if e != nil {
+					return e
+				}
+				after := []Rule{}
+				// Read the other roles independently so a duplicate matching rule is not
+				// accidentally subtracted when only this role changes.
+				rows, e := db.Query(ctx, `SELECT DISTINCT r.id,r.rules FROM roles r JOIN role_bindings b ON b.scope=r.scope AND b.role_id=r.id WHERE r.scope=$1 AND r.id<>$3 AND ((b.subject_kind='principal' AND b.subject_id=$2) OR (b.subject_kind='group' AND EXISTS(SELECT 1 FROM memberships m WHERE m.scope=b.scope AND m.group_id=b.subject_id AND m.principal_id=$2)))`, a.Scope, p.ID, in.Role.ID)
+				if e != nil {
+					return e
+				}
+				for rows.Next() {
+					var id string
+					var raw []byte
+					if e = rows.Scan(&id, &raw); e != nil {
+						rows.Close()
+						return e
+					}
+					rules, e := decodeRules(raw)
+					if e != nil {
+						rows.Close()
+						return e
+					}
+					after = append(after, rules...)
+				}
+				e = rows.Err()
+				rows.Close()
+				if e != nil {
+					return e
+				}
+				if in.Role.ID != "" && s.roleAssignedTo(ctx, db, subject, in.Role.ID) {
+					after = append(after, in.Role.Rules...)
+				}
+				prepared = preparedSubject{p, before, after}
+				subjects[check.SubjectID] = prepared
 			}
-			e = rows.Err()
-			rows.Close()
-			if e != nil {
-				return e
-			}
-			if in.Role.ID != "" && s.roleAssignedTo(ctx, db, subject, in.Role.ID) {
-				after = append(after, in.Role.Rules...)
-			}
+			p := prepared.person
+			subject := Actor{Principal: p, Scope: a.Scope}
+			before, after := prepared.before, prepared.after
 			comparison := PolicyComparison{Check: check}
 			if !p.Disabled {
 				for _, r := range before {

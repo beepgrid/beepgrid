@@ -230,10 +230,25 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	if e != nil {
 		return out, e
 	}
+	var bulk map[string]queryItem
+	batchEnd := 0
 	scanned := 0
-	for _, c := range all {
+	for index, c := range all {
 		if scanned == 500 || len(out.Items) == in.Limit {
 			break
+		}
+		// Avoid hydrating all 500 candidates for a small, mostly visible page.
+		// Hidden windows still advance the cursor and never exceed its scan cap.
+		if index >= batchEnd {
+			batchEnd = min(index+max(32, in.Limit), len(all), 500)
+			ids := make([]string, 0, batchEnd-index)
+			for _, candidate := range all[index:batchEnd] {
+				ids = append(ids, candidate.id)
+			}
+			bulk, e = s.queryRecords(ctx, a, in.Collection, ids)
+			if e != nil {
+				return out, e
+			}
 		}
 		scanned++
 		last = c.key
@@ -246,7 +261,17 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 				continue
 			}
 		}
-		item, e := s.queryRecord(ctx, a, in.Collection, c.id)
+		var item any
+		var e error
+		if bulk != nil {
+			v, ok := bulk[c.id]
+			if !ok {
+				continue
+			}
+			item, e = v.value, v.err
+		} else {
+			item, e = s.queryRecord(ctx, a, in.Collection, c.id)
+		}
 		if e != nil {
 			if ErrorStatus(e) == 403 || ErrorStatus(e) == 404 {
 				continue

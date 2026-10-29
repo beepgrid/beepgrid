@@ -390,6 +390,7 @@ func (s *Store) readOverseerPlan(ctx context.Context, db DB, a Actor, id string)
 	return out, version, committed, nil
 }
 func (s *Store) validateOverseerContext(ctx context.Context, db DB, a Actor, out OverseerPlan) error {
+	ctx = withPolicySnapshot(ctx)
 	for _, id := range out.ContextRequestIDs {
 		if _, err := s.request(ctx, db, a, id); err != nil {
 			return Missing()
@@ -410,8 +411,15 @@ func (s *Store) validateOverseerContext(ctx context.Context, db DB, a Actor, out
 			}
 		}
 	}
+	// Context IDs are canonical IDs generated from the current fleet, never
+	// external aliases. Load that exact bounded set and still recheck each grant.
+	people, err := principalsByIDs(ctx, db, a.Scope, out.ContextIDs)
+	if err != nil {
+		return err
+	}
 	for _, id := range out.ContextIDs {
-		if _, err := s.resolve(ctx, db, a, Target{"agent", id}, "view", ""); err != nil {
+		p, ok := people[id]
+		if !ok || p.Kind != "agent" || p.Disabled || !s.allowed(ctx, db, a, "view", Target{"agent", id}, "*", "") {
 			return Missing()
 		}
 	}

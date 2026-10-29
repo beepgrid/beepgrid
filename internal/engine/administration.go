@@ -87,6 +87,10 @@ func (s *Store) mayAssign(ctx context.Context, db DB, a Actor, role string, targ
 	return s.manages(ctx, db, a, "role_binding", role) && s.manages(ctx, db, a, target.Kind, target.ID) && (target.Kind == "group" || !s.protectedIdentity(ctx, db, a, target.ID))
 }
 func (s *Store) roleAssignedTo(ctx context.Context, db DB, a Actor, role string) bool {
+	if ctx.Value(policySnapshotKey{}) != nil {
+		roles, err := assignedRoles(ctx, db, a)
+		return err == nil && roles[role]
+	}
 	var yes bool
 	e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM role_bindings b WHERE b.scope=$1 AND b.role_id=$2 AND ((b.subject_kind='principal' AND b.subject_id=$3) OR (b.subject_kind='group' AND EXISTS(SELECT 1 FROM memberships m WHERE m.scope=b.scope AND m.group_id=b.subject_id AND m.principal_id=$3))))`, a.Scope, role, a.ID).Scan(&yes)
 	return e == nil && yes

@@ -99,7 +99,7 @@ func (s *Store) Explain(ctx context.Context, a Actor, action string, target Targ
 	return map[string]any{"allowed": allowed, "action": action, "target": target, "reason": map[bool]string{true: "An effective role or administrator credential permits this operation.", false: "No effective permission permits this operation."}[allowed]}, nil
 }
 func (s *Store) Roles(ctx context.Context, a Actor) ([]Role, error) {
-
+	ctx = withPolicySnapshot(ctx)
 	rows, e := s.Pool.Query(ctx, `SELECT id,name,rules,version FROM roles WHERE scope=$1 ORDER BY name`, a.Scope)
 	if e != nil {
 		return nil, e
@@ -203,6 +203,7 @@ func (s *Store) BindRole(ctx context.Context, a Actor, b Binding, remove bool) e
 	})
 }
 func (s *Store) Bindings(ctx context.Context, a Actor) ([]Binding, error) {
+	ctx = withPolicySnapshot(ctx)
 	rows, e := s.Pool.Query(ctx, `SELECT role_id,subject_kind,subject_id FROM role_bindings WHERE scope=$1`, a.Scope)
 	if e != nil {
 		return nil, e
@@ -221,13 +222,7 @@ func (s *Store) Bindings(ctx context.Context, a Actor) ([]Binding, error) {
 	if e != nil {
 		return nil, e
 	}
-	visible := []Binding{}
-	for _, b := range out {
-		if s.bindingVisible(ctx, s.Pool, a, b) {
-			visible = append(visible, b)
-		}
-	}
-	return visible, nil
+	return s.visibleBindings(ctx, a, out)
 }
 func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	ctx = withPolicySnapshot(ctx)
@@ -251,23 +246,7 @@ func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	if e != nil {
 		return nil, e
 	}
-	visible := []Group{}
-	for _, g := range all {
-		if a.Admin || s.allowed(ctx, s.Pool, a, "view", Target{"group", g.ID}, "", "") || s.manages(ctx, s.Pool, a, "group", g.ID) || contains(g.Members, a.ID) {
-			members := []string{}
-			for _, id := range g.Members {
-				p, e := principal(ctx, s.Pool, a.Scope, id)
-				if e == nil && s.inspectIdentity(ctx, s.Pool, a, p) {
-					members = append(members, id)
-				}
-			}
-			g.Member = contains(g.Members, a.ID)
-			g.MembersComplete = len(members) == len(g.Members)
-			g.Members = members
-			visible = append(visible, g)
-		}
-	}
-	return visible, nil
+	return s.visibleGroupMembers(ctx, a, all)
 }
 func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) {
 	// Omitting members on an existing group is a name-only edit. An explicit
@@ -328,10 +307,8 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 		if _, e = tx.Exec(ctx, `DELETE FROM memberships WHERE scope=$1 AND group_id=$2`, a.Scope, g.ID); e != nil {
 			return e
 		}
-		for _, id := range g.Members {
-			if _, e = tx.Exec(ctx, `INSERT INTO memberships(scope,group_id,principal_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, a.Scope, g.ID, id); e != nil {
-				return e
-			}
+		if _, e = tx.Exec(ctx, `INSERT INTO memberships(scope,group_id,principal_id) SELECT $1,$2,id FROM unnest($3::text[]) member(id) ON CONFLICT DO NOTHING`, a.Scope, g.ID, g.Members); e != nil {
+			return e
 		}
 		if e = tx.QueryRow(ctx, `SELECT version,created_by FROM groups WHERE scope=$1 AND id=$2`, a.Scope, g.ID).Scan(&g.Version, &g.CreatedBy); e != nil {
 			return e

@@ -26,6 +26,7 @@ type CapabilityResult struct {
 func (s *Store) Capabilities(ctx context.Context, a Actor, in CapabilityInput) (CapabilityResult, error) {
 	out := CapabilityResult{ObservedAt: time.Now().UTC(), Operations: map[string]bool{}, Outcomes: []string{}}
 	err := s.tx(ctx, a, func(db pgx.Tx) error {
+		ctx := withPolicySnapshot(ctx)
 		if in.RequestID != "" {
 			r, e := s.request(ctx, db, a, in.RequestID)
 			if e != nil {

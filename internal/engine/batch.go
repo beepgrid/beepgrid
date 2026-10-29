@@ -96,6 +96,7 @@ func previewInputDigest(in DispatchPreviewInput) string {
 	return Digest(string(JSON(copy)))
 }
 func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in DispatchPreviewInput) (DispatchPreview, string, error) {
+	ctx = withPolicySnapshot(ctx)
 	out := DispatchPreview{Recipients: []PreviewRecipient{}, ExpiresAt: time.Now().UTC().Add(10 * time.Minute)}
 	rs, e := s.dispatchRecipients(ctx, db, a, in)
 	if e != nil {
@@ -113,6 +114,35 @@ func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in Dispatch
 	if in.Descriptor != nil {
 		name = in.Descriptor.Name
 	}
+	ids := []string{}
+	for _, r := range rs {
+		ids = append(ids, r.ID)
+	}
+	type destination struct {
+		did, mode, address, cid, kind string
+		dv, cv                        int64
+		priority                      int
+		enabled                       bool
+	}
+	byRecipient := map[string][]destination{}
+	rows, e := db.Query(ctx, `SELECT d.principal_id,d.id,d.version,d.mode,d.priority,d.address,c.id,c.version,c.kind,c.enabled FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) ORDER BY d.priority,d.id`, a.Scope, ids)
+	if e != nil {
+		return out, "", e
+	}
+	for rows.Next() {
+		var id string
+		var d destination
+		if e = rows.Scan(&id, &d.did, &d.dv, &d.mode, &d.priority, &d.address, &d.cid, &d.cv, &d.kind, &d.enabled); e != nil {
+			rows.Close()
+			return out, "", e
+		}
+		byRecipient[id] = append(byRecipient[id], d)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return out, "", e
+	}
 	for _, r := range rs {
 		p := PreviewRecipient{Target: Target{r.Kind, r.ID}, Name: r.Name, Routes: []PreviewRoute{}}
 		if r.ExactInstance != "" {
@@ -121,30 +151,7 @@ func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in Dispatch
 		native := s.allowed(ctx, db, a, in.Operation, r.PolicyTarget, "", name, in.Descriptor)
 		p.Routes = append(p.Routes, PreviewRoute{Kind: "native", Mode: "primary", Enabled: true, Permitted: native, Reason: map[bool]string{true: "Current contact permission permits the durable inbox.", false: "Contact permission does not permit the native inbox."}[native]})
 		fingerprint = append(fingerprint, []any{r.ID, r.ExactInstance, native})
-		rows, e := db.Query(ctx, `SELECT d.id,d.version,d.mode,d.priority,d.address,c.id,c.version,c.kind,c.enabled FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=$2 ORDER BY d.priority,d.id`, a.Scope, r.ID)
-		if e != nil {
-			return out, "", e
-		}
-		type destination struct {
-			did, mode, address, cid, kind string
-			dv, cv                        int64
-			priority                      int
-			enabled                       bool
-		}
-		dests := []destination{}
-		for rows.Next() {
-			var d destination
-			if e = rows.Scan(&d.did, &d.dv, &d.mode, &d.priority, &d.address, &d.cid, &d.cv, &d.kind, &d.enabled); e != nil {
-				rows.Close()
-				return out, "", e
-			}
-			dests = append(dests, d)
-		}
-		e = rows.Err()
-		rows.Close()
-		if e != nil {
-			return out, "", e
-		}
+		dests := byRecipient[r.ID]
 		for _, d := range dests {
 			allowed := s.allowed(ctx, db, a, in.Operation, r.PolicyTarget, d.cid, name, in.Descriptor)
 			reason := "Eligible in addition to canonical history; provider acceptance has not been tested."

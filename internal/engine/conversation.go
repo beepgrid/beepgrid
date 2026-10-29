@@ -174,32 +174,12 @@ func conversationListSQL(admin bool) string {
 }
 
 func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversation, error) {
-	var c Conversation
-	if !s.canRead(ctx, s.Pool, a, id) {
-		return c, Missing()
-	}
-	if e := s.Pool.QueryRow(ctx, `SELECT id,title,created_by,created_at FROM conversations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt); e != nil {
-		return c, normalize(e)
-	}
-	rows, e := s.Pool.Query(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at FROM participants cp JOIN principals p ON p.id=cp.principal_id AND p.scope=cp.scope WHERE cp.scope=$1 AND cp.conversation_id=$2 ORDER BY p.id`, a.Scope, id)
+	ctx = withPolicySnapshot(ctx)
+	c, e := s.readConversationParticipants(ctx, s.Pool, a, id)
 	if e != nil {
-		return c, e
+		return Conversation{}, e
 	}
-	c.Participants = []Principal{}
-	for rows.Next() {
-		p, e := scanPrincipal(rows)
-		if e != nil {
-			rows.Close()
-			return c, e
-		}
-		c.Participants = append(c.Participants, p)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return c, e
-	}
-	rows, e = s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id)
+	rows, e := s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id)
 	if e != nil {
 		return c, e
 	}
@@ -214,34 +194,77 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	}
 	return c, rows.Err()
 }
+
+// Load membership, current identities and conversation metadata together.
+// Bodies are read only after current View checks pass. Keep even disabled
+// historical participants in those checks, matching canRead's authority.
+func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor, id string) (Conversation, error) {
+	var c Conversation
+	rows, e := db.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,
+ COALESCE(p.id,''),COALESCE(p.kind,''),COALESCE(p.external_id,''),COALESCE(p.name,''),COALESCE(p.metadata,'{}'::jsonb),COALESCE(p.disabled,false),COALESCE(p.created_at,c.created_at)
+ FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id
+ LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id
+ WHERE c.scope=$1 AND c.id=$2 ORDER BY p.id`, a.Scope, id)
+	if e != nil {
+		return c, e
+	}
+	c.Participants = []Principal{}
+	member := false
+	for rows.Next() {
+		var p Principal
+		var meta []byte
+		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &p.ID, &p.Kind, &p.ExternalID, &p.Name, &meta, &p.Disabled, &p.CreatedAt); e != nil {
+			rows.Close()
+			return Conversation{}, e
+		}
+		if p.ID != "" {
+			if e = json.Unmarshal(meta, &p.Metadata); e != nil {
+				rows.Close()
+				return Conversation{}, e
+			}
+			member = member || p.ID == a.ID
+			c.Participants = append(c.Participants, p)
+		}
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return Conversation{}, e
+	}
+	if c.ID == "" || (!a.Admin && (!member || a.CredentialKind == "enrollment")) {
+		return Conversation{}, Missing()
+	}
+	if !a.Admin {
+		others := 0
+		for _, p := range c.Participants {
+			if p.ID == a.ID {
+				continue
+			}
+			others++
+			if !s.allowed(ctx, db, a, "view", Target{p.Kind, p.ID}, "", "") {
+				return Conversation{}, Missing()
+			}
+		}
+		if others == 0 {
+			return Conversation{}, Missing()
+		}
+	}
+	return c, nil
+}
 func (s *Store) conversationRecipients(ctx context.Context, db DB, a Actor, id, action string, descriptor ...*Action) ([]recipient, error) {
 	actionName := ""
 	if len(descriptor) > 0 && descriptor[0] != nil {
 		actionName = descriptor[0].Name
 	}
-	if !s.canRead(ctx, db, a, id) {
-		return nil, Missing()
-	}
-	rows, e := db.Query(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at FROM participants cp JOIN principals p ON p.id=cp.principal_id AND p.scope=cp.scope WHERE cp.scope=$1 AND cp.conversation_id=$2 AND p.id<>$3 AND NOT p.disabled`, a.Scope, id, a.ID)
-	if e != nil {
-		return nil, e
-	}
-	all := []Principal{}
-	for rows.Next() {
-		p, e := scanPrincipal(rows)
-		if e != nil {
-			rows.Close()
-			return nil, e
-		}
-		all = append(all, p)
-	}
-	e = rows.Err()
-	rows.Close()
+	c, e := s.readConversationParticipants(ctx, db, a, id)
 	if e != nil {
 		return nil, e
 	}
 	out := []recipient{}
-	for _, p := range all {
+	for _, p := range c.Participants {
+		if p.ID == a.ID || p.Disabled {
+			continue
+		}
 		if !s.allowed(ctx, db, a, action, Target{p.Kind, p.ID}, "*", actionName, descriptor...) {
 			return nil, Denied()
 		}
@@ -378,42 +401,16 @@ func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, ke
 			return e
 		}
 		out.Messages = []Message{}
-		if in.ConversationID == "" && len(rs) > 1 {
-			if handled, e := s.nativeFanout(ctx, tx, a, in, rs, out); handled || e != nil {
-				return e
-			}
+		if in.ConversationID == "" {
+			_, e := s.nativeFanout(ctx, tx, a, in, rs, out)
+			return e
 		}
-		if in.ConversationID != "" {
-			m, e := insertMessage(ctx, tx, a, in.ConversationID, in.Body)
-			if e != nil {
-				return e
-			}
-			out.Messages = append(out.Messages, m)
-			out.ConversationID = in.ConversationID
-			for _, r := range rs {
-				if e = s.enqueue(ctx, tx, a, r, m.ID, m.ConversationID, "message", map[string]any{"type": "message", "message": m}, time.Now().Add(7*24*time.Hour)); e != nil {
-					return e
-				}
-			}
-			return nil
+		m, e := s.appendConversationMessage(ctx, tx, a, in.ConversationID, in.Body, rs)
+		if e != nil {
+			return e
 		}
-		for _, r := range rs {
-			conv, e := newConversation(ctx, tx, a, in.Title, r.ID)
-			if e != nil {
-				return e
-			}
-			m, e := insertMessage(ctx, tx, a, conv, in.Body)
-			if e != nil {
-				return e
-			}
-			if out.ConversationID == "" {
-				out.ConversationID = conv
-			}
-			out.Messages = append(out.Messages, m)
-			if e = s.enqueue(ctx, tx, a, r, m.ID, conv, "message", map[string]any{"type": "message", "message": m}, time.Now().Add(7*24*time.Hour)); e != nil {
-				return e
-			}
-		}
+		out.Messages = append(out.Messages, m)
+		out.ConversationID = in.ConversationID
 		return nil
 	})
 }
