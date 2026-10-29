@@ -125,7 +125,7 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 	if !ValidText(c.Name, 100) || len(JSON(c.Config)) > 8192 {
 		return c, Bad("A name and bounded configuration are required.")
 	}
-	if c.Kind != "webhook" && c.Kind != "slack" && c.Kind != "email" {
+	if c.Kind != "webhook" && c.Kind != "slack" && c.Kind != "email" && c.Kind != "telegram" {
 		return c, Bad("Unsupported connection type.")
 	}
 	if c.Kind == "webhook" {
@@ -135,6 +135,16 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 	}
 	if c.Kind == "slack" && c.Config["team_id"] == "" {
 		return c, Bad("Slack team_id is required.")
+	}
+	if c.Kind == "telegram" {
+		if !telegramID(c.Config["bot_id"]) {
+			return c, Bad("Telegram requires an immutable positive bot_id.")
+		}
+		if c.Secret != "" {
+			if _, err := parseTelegramSecret(c.Secret, c.Config["bot_id"]); err != nil {
+				return c, err
+			}
+		}
 	}
 	if c.Kind == "email" {
 		if _, e := mail.ParseAddress(c.Config["from"]); e != nil {
@@ -198,6 +208,41 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 				return Bad("SMTP password is required when a username is configured.")
 			}
 		}
+		if c.Kind == "telegram" {
+			plain, err := s.unseal(encrypted)
+			if err != nil {
+				return err
+			}
+			if _, err = parseTelegramSecret(string(plain), c.Config["bot_id"]); err != nil {
+				return err
+			}
+			var oldConfig, oldSecret []byte
+			var oldEnabled bool
+			err = tx.QueryRow(ctx, `SELECT config,secret,enabled FROM connections WHERE scope=$1 AND id=$2`, a.Scope, c.ID).Scan(&oldConfig, &oldSecret, &oldEnabled)
+			if err != nil && err != pgx.ErrNoRows {
+				return err
+			}
+			if err == nil {
+				var config map[string]string
+				if err = json.Unmarshal(oldConfig, &config); err != nil {
+					return err
+				}
+				if config["bot_id"] != c.Config["bot_id"] {
+					return Conflict("Create a new installation for a different Telegram bot.")
+				}
+				if !oldEnabled && c.Enabled {
+					previous, err := s.unseal(oldSecret)
+					if err != nil {
+						return err
+					}
+					oldAuth, _ := parseTelegramSecret(string(previous), c.Config["bot_id"])
+					newAuth, _ := parseTelegramSecret(string(plain), c.Config["bot_id"])
+					if oldAuth.WebhookSecret == newAuth.WebhookSecret {
+						return Conflict("Rotate the Telegram webhook secret before reconnecting a disabled installation.")
+					}
+				}
+			}
+		}
 		tag, e := tx.Exec(ctx, `INSERT INTO connections(id,scope,name,kind,config,secret,enabled) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,config=EXCLUDED.config,secret=EXCLUDED.secret,enabled=EXCLUDED.enabled,version=connections.version+1 WHERE connections.scope=EXCLUDED.scope AND connections.kind=EXCLUDED.kind`, c.ID, a.Scope, c.Name, c.Kind, JSON(c.Config), encrypted, c.Enabled)
 		if e != nil {
 			return e
@@ -241,6 +286,9 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 			if _, e := mail.ParseAddress(d.Address); e != nil {
 				return Bad("Invalid email destination.")
 			}
+		}
+		if kind == "telegram" && !s.telegramDestination(ctx, tx, a.Scope, d.ConnectionID, d.PrincipalID, d.Address) {
+			return Bad("Telegram destinations must match the Person's currently linked private user ID and this bot.")
 		}
 		if d.Mode == "primary" && !a.Admin {
 			var previous string
@@ -598,6 +646,13 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 		}
 		return nil, worked, e
 	}
+	if c.Kind == "telegram" && !s.telegramDestination(ctx, tx, scope, c.ID, d.RecipientID, d.Address) {
+		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Telegram identity link changed' WHERE id=$1`, d.ID)
+		if e == nil {
+			e = tx.Commit(ctx)
+		}
+		return nil, worked, e
+	}
 	secret, e := s.unseal(encrypted)
 	if e != nil {
 		_, updateErr := tx.Exec(ctx, `UPDATE deliveries SET state='failed',last_error='Provider secret cannot be decrypted; verify encryption key' WHERE id=$1`, d.ID)
@@ -679,6 +734,9 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 	}
 	if c.Kind == "email" {
 		return s.sendMail(ctx, c, d.Address, text)
+	}
+	if c.Kind == "telegram" {
+		return s.deliverTelegram(ctx, c, d, text)
 	}
 	destination := c.Config["url"]
 	body := JSON(d.Payload)
@@ -776,7 +834,7 @@ func (s *Store) InboundConnection(ctx context.Context, id string) (Connection, s
 	var c Connection
 	var raw, encrypted []byte
 	var scope string
-	e := s.Pool.QueryRow(ctx, `SELECT id,scope,name,kind,config,secret,enabled FROM connections WHERE id=$1 AND enabled`, id).Scan(&c.ID, &scope, &c.Name, &c.Kind, &raw, &encrypted, &c.Enabled)
+	e := s.Pool.QueryRow(ctx, `SELECT id,scope,name,kind,config,secret,enabled,version FROM connections WHERE id=$1 AND enabled`, id).Scan(&c.ID, &scope, &c.Name, &c.Kind, &raw, &encrypted, &c.Enabled, &c.Version)
 	if e != nil {
 		return c, "", Missing()
 	}

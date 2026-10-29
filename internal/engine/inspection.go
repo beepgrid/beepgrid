@@ -153,6 +153,7 @@ func ProviderCatalog() []ProviderCapability {
 		{Kind: "webhook", Fields: []ProviderField{{"url", true, false}, {"secret", true, true}, {"inbound_sender_id", false, false}}, InboundMessages: true, WebContinuation: true},
 		{Kind: "slack", Fields: []ProviderField{{"team_id", true, false}, {"bot_token", true, true}, {"signing_secret", true, true}, {"default_agent_id", false, false}}, InboundMessages: true, NativeApprovals: true, WebContinuation: true},
 		{Kind: "email", Fields: []ProviderField{{"smtp_addr", true, false}, {"from", true, false}, {"username", false, false}, {"secret", false, true}}, WebContinuation: true},
+		{Kind: "telegram", Fields: []ProviderField{{"bot_id", true, false}, {"bot_token", true, true}, {"webhook_secret", true, true}, {"default_agent_id", false, false}}, InboundMessages: true, NativeApprovals: true, WebContinuation: true},
 	}
 	for i := range out {
 		p := &out[i]
@@ -175,6 +176,10 @@ func ProviderCatalog() []ProviderCapability {
 			p.Constraints = []string{"DMs and app mentions only", "No native file upload", "Replies are messages; final decisions use approval buttons or the workspace"}
 		case "email":
 			p.Constraints = []string{"Outbound SMTP only", "Reply and decide in the authenticated workspace", "No inbound email or native file transfer"}
+		case "telegram":
+			p.SetupModes = []string{"byo_webhook"}
+			p.Identity = "admin_linked_bot_and_user"
+			p.Constraints = []string{"Private bot chats only", "Reply to a mapped message to continue a conversation", "No native files or long polling", "Text replies are messages; final approvals use versioned buttons or the workspace"}
 		case "webhook":
 			p.Identity = "bounded_service"
 			p.Constraints = []string{"Inbound sender is a configured Service", "Signed payloads do not grant contact or decision authority", "No native file transfer"}
@@ -184,15 +189,25 @@ func ProviderCatalog() []ProviderCapability {
 }
 
 type ConnectionDiagnostic struct {
-	ConnectionID       string   `json:"connection_id"`
-	Version            int64    `json:"version"`
-	Enabled            bool     `json:"enabled"`
-	ConfigurationValid bool     `json:"configuration_valid"`
-	Issues             []string `json:"issues"`
-	ProviderAcceptance string   `json:"provider_acceptance"`
-	Sends              bool     `json:"sends"`
-	State              string   `json:"state"`
-	Qualification      string   `json:"qualification"`
+	ConnectionID       string                  `json:"connection_id"`
+	Version            int64                   `json:"version"`
+	Enabled            bool                    `json:"enabled"`
+	ConfigurationValid bool                    `json:"configuration_valid"`
+	Issues             []string                `json:"issues"`
+	ProviderAcceptance string                  `json:"provider_acceptance"`
+	Sends              bool                    `json:"sends"`
+	State              string                  `json:"state"`
+	Qualification      string                  `json:"qualification"`
+	LastTest           *ConnectionTestEvidence `json:"last_test,omitempty"`
+}
+
+type ConnectionTestEvidence struct {
+	DeliveryID     string    `json:"delivery_id"`
+	ConversationID string    `json:"conversation_id"`
+	State          string    `json:"state"`
+	Detail         string    `json:"detail"`
+	CreatedAt      time.Time `json:"created_at"`
+	InboundReply   bool      `json:"inbound_reply"`
 }
 
 func (s *Store) DiagnoseConnection(ctx context.Context, a Actor, id string) (ConnectionDiagnostic, error) {
@@ -235,12 +250,48 @@ func (s *Store) DiagnoseConnection(ctx context.Context, a Actor, id string) (Con
 		out.Issues = append(out.Issues, "Webhook signing secret is unavailable.")
 	} else if c.Kind == "email" && c.Config["username"] != "" && len(plain) == 0 {
 		out.Issues = append(out.Issues, "Authenticated SMTP requires a password.")
+	} else if c.Kind == "telegram" {
+		if _, err := parseTelegramSecret(string(plain), c.Config["bot_id"]); err != nil {
+			out.Issues = append(out.Issues, "Telegram requires this bot's token and a bounded webhook secret.")
+		}
 	}
 	out.ConfigurationValid = len(out.Issues) == 0
+	var test ConnectionTestEvidence
+	e = s.Pool.QueryRow(ctx, `SELECT id,payload->>'conversation_id',state,last_error,created_at FROM deliveries WHERE scope=$1 AND connection_id=$2 AND payload->>'diagnostic'='true' AND created_at>=COALESCE((SELECT max(created_at) FROM events WHERE scope=$1 AND kind='connection.saved' AND data->>'id'=$2),'epoch') ORDER BY created_at DESC,id DESC LIMIT 1`, a.Scope, id).Scan(&test.DeliveryID, &test.ConversationID, &test.State, &test.Detail, &test.CreatedAt)
+	if e != nil && e != pgx.ErrNoRows {
+		return out, e
+	}
+	if e == nil {
+		out.LastTest = &test
+		if e = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM provider_events WHERE scope=$1 AND connection_id=$2 AND created_at>=$3 AND response->>'conversation_id'=$4)`, a.Scope, id, test.CreatedAt, test.ConversationID).Scan(&test.InboundReply); e != nil {
+			return out, e
+		}
+		if test.State == "provider_accepted" {
+			out.ProviderAcceptance = "observed"
+			out.Qualification = "provider_acceptance_observed"
+		}
+		if test.State == "provider_accepted" && test.InboundReply {
+			out.Qualification = "engine_round_trip_observed"
+		}
+	}
 	if !c.Enabled {
 		out.State = "disconnected"
 	} else if out.ConfigurationValid {
 		out.State = "configured"
+		if out.LastTest != nil {
+			switch test.State {
+			case "queued", "leased":
+				out.State = "verifying"
+			case "failed", "unknown", "cancelled":
+				out.State = "action_needed"
+			case "provider_accepted":
+				if test.InboundReply {
+					out.State = "connected"
+				} else {
+					out.State = "verifying"
+				}
+			}
+		}
 	}
 	return out, nil
 }

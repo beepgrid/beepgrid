@@ -11,6 +11,20 @@ import (
 
 func (s *Server) channelRoutes() {
 	m := s.mux
+	m.HandleFunc("POST /integrations/telegram/{id}", s.telegramEvents)
+	m.HandleFunc("POST /api/v1/people/{id}/telegram-account/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		return ok(w, map[string]bool{"removed": true}, s.Store.UnlinkTelegramAccount(r.Context(), actor(r), r.PathValue("id")))
+	}))
+	m.HandleFunc("POST /api/v1/people/{id}/telegram-account", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			BotID  string `json:"bot_id"`
+			UserID string `json:"user_id"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		return ok(w, map[string]bool{"linked": true}, s.Store.LinkTelegramAccount(r.Context(), actor(r), r.PathValue("id"), in.BotID, in.UserID))
+	}))
 	m.HandleFunc("GET /api/v1/connections/{id}/setup", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.ConnectionSetup(r.Context(), actor(r), r.PathValue("id"), s.PublicURL)
 		return ok(w, x, e)

@@ -43,6 +43,10 @@ func BuildProviderSetup(c Connection, publicURL string) (ProviderSetup, error) {
 	}
 	base := strings.TrimRight(publicURL, "/")
 	switch c.Kind {
+	case "telegram":
+		out.Mode = "byo_webhook"
+		out.Callbacks["inbound"] = base + "/integrations/telegram/" + url.PathEscape(c.ID)
+		out.Steps = []string{"Use a dedicated bot. Save its immutable bot_id and encrypted secret JSON containing bot_token and webhook_secret. The token prefix must match bot_id.", "Inspect getWebhookInfo yourself before registering the callback. If a webhook already exists elsewhere, stop and use a dedicated bot. Beep Grid never calls setWebhook or deletes an existing webhook.", "Register the HTTPS inbound callback with your webhook_secret, allowed_updates [message, callback_query], and drop_pending_updates=false. Do not run getUpdates while this webhook is active.", "Have the Person start the bot. An authorized administrator links immutable bot_id and user_id with POST /api/v1/people/{id}/telegram-account, then adds the matching private user ID as the destination. Usernames and group chats are unsupported.", "Choose an authorized default_agent_id for new inbound chats. Queue a destination test, reply to that exact bot message, and verify Person attribution and canonical history. Plain text is a clarification/message; approvals require the versioned Approve or Deny button or authenticated workspace.", "Disable the installation to reject old callbacks and queued sends. Rotate the provider token/webhook secret separately when needed, then save and repeat qualification. Do not drop pending updates during recovery."}
 	case "slack":
 		out.Mode = "byo_manifest"
 		out.Callbacks["events"] = base + "/integrations/slack/" + url.PathEscape(c.ID) + "/events"
