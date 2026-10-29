@@ -80,7 +80,7 @@ class ClientTests(unittest.TestCase):
         def transport(request, **kwargs):
             calls.append(request.get_header("Idempotency-key"))
             return Response(len(calls)==1)
-        with patch("urllib.request.urlopen", side_effect=transport):
+        with patch("notif._open", side_effect=transport):
             self.assertEqual(Client("http://localhost","token").ask(target={"kind":"person","id":"p"},title="Continue?",key="saved-key")["id"],"request-1")
         self.assertEqual(calls,["saved-key","saved-key"])
 
@@ -147,3 +147,49 @@ class ClientTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class FileJourneyTests(unittest.TestCase):
+    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    def test_files_events_and_current_isolation(self):
+        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        worker, session = owner.connect("sdk/python-files-" + str(uuid.uuid4()), "Python file worker")
+        person = owner.call("GET", "/api/v1/me")["person"]["id"]
+        role = owner.call("POST", "/api/v1/roles", {"name": "File reader " + str(uuid.uuid4()), "rules": [{"action": "view", "target_kind": "person", "target_id": person}]})
+        owner.call("POST", "/api/v1/role-bindings", {"role_id": role["id"], "subject_kind": "principal", "subject_id": session["agent"]["id"]})
+        other, _ = owner.connect("sdk/python-isolated-" + str(uuid.uuid4()), "Isolated worker")
+        sent = owner.send(target={"kind": "agent", "id": session["agent"]["id"]}, body="Please review this PDF")
+        file = owner.upload_attachment(sent["conversation_id"], "brief.pdf", "application/pdf", b"%PDF-1.4\nfixture")
+        self.assertEqual(worker.attachments(sent["conversation_id"])[0]["id"], file["id"])
+        self.assertEqual(worker.download_attachment(file["id"]), b"%PDF-1.4\nfixture")
+        with self.assertRaises(NotifError): other.download_attachment(file["id"])
+        self.assertGreaterEqual(len(owner.directory("person")["items"]), 1)
+        stream = worker.events()
+        try:
+            for event in stream:
+                if event["kind"] == "message.created" and event["conversation_id"] == sent["conversation_id"]:
+                    self.assertEqual(event["data"]["body"], "Please review this PDF")
+                    break
+        finally:
+            stream.close()
+
+class StartChatTests(unittest.TestCase):
+    def test_start_chat_preserves_codepoint_offsets_choices_and_approval(self):
+        client = Client("http://localhost", "fixture")
+        mentions = [{"principal_id": "a", "start": 2, "end": 13}]
+        with patch.object(client, "call", return_value={"conversation_id": "shared_1"}) as call:
+            client.start_chat(targets=[{"kind":"agent","id":"a"}], body="👋 @Reviewer 2 please review", approval=True,
+                              choices=["Yes","No"], mentions=mentions, key="shared-1")
+            call.assert_called_once_with("POST", "/api/v1/conversations", {"targets":[{"kind":"agent","id":"a"}],
+                "body":"👋 @Reviewer 2 please review","approval":True,"choices":["Yes","No"],"mentions":mentions}, key="shared-1")
+
+    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL") and os.getenv("NOTIF_SDK_EXPECT_START_CHAT_MENTIONS"), "Requires integrated StartChat mention engine")
+    def test_real_start_chat_mentions(self):
+        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        worker, session = owner.connect("sdk/python-shared-" + str(uuid.uuid4()), "Reviewer 2")
+        person = owner.call("GET", "/api/v1/me")["person"]["id"]
+        role = owner.call("POST", "/api/v1/roles", {"name":"Shared reader " + str(uuid.uuid4()), "rules":[{"action":"view","target_kind":"person","target_id":person}]})
+        owner.call("POST", "/api/v1/role-bindings", {"role_id":role["id"],"subject_kind":"principal","subject_id":session["agent"]["id"]})
+        mentions = [{"principal_id":session["agent"]["id"],"start":2,"end":13}]
+        sent = owner.start_chat(targets=[{"kind":"agent","id":session["agent"]["id"]}],body="👋 @Reviewer 2 please review",mentions=mentions,key=str(uuid.uuid4()))
+        self.assertEqual(sent["messages"][0]["mentions"], mentions)
+        self.assertTrue(any(d["payload"].get("message", {}).get("body") == "👋 @Reviewer 2 please review" for d in worker.inbox()))

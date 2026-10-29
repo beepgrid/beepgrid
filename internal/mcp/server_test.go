@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/notif-dev/notif/sdk/go/notif"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -103,5 +105,50 @@ func TestExecutionToolsPreserveScopeAndExactAction(t *testing.T) {
 	}
 	if _, e := call(context.Background(), c, "report_execution", json.RawMessage(`{"id":"execution-1","state":"succeeded","result":{"reported":true}}`)); e != nil {
 		t.Fatal(e)
+	}
+}
+
+func TestFileToolsPreserveBytesAndRejectOversizedInputs(t *testing.T) {
+	calls := 0
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Header.Get("Authorization") != "Bearer scoped" {
+			t.Error("missing credential")
+		}
+		if r.Method == "POST" {
+			if err := r.ParseMultipartForm(65536); err != nil {
+				t.Error(err)
+				return
+			}
+			defer r.MultipartForm.RemoveAll()
+			file, _, err := r.FormFile("file")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer file.Close()
+			raw, _ := io.ReadAll(file)
+			if string(raw) != "file bytes" {
+				t.Error(string(raw))
+			}
+			fmt.Fprint(w, `{"id":"att_1"}`)
+		} else {
+			fmt.Fprint(w, "file bytes")
+		}
+	}))
+	defer backend.Close()
+	c := notif.New(backend.URL, "scoped")
+	if _, err := call(context.Background(), c, "upload_attachment", json.RawMessage(`{"conversation_id":"conv","file_name":"brief.pdf","media_type":"application/pdf","base64":"ZmlsZSBieXRlcw=="}`)); err != nil {
+		t.Fatal(err)
+	}
+	result, err := call(context.Background(), c, "download_attachment", json.RawMessage(`{"id":"att_1"}`))
+	if err != nil || result.(map[string]any)["base64"] != "ZmlsZSBieXRlcw==" {
+		t.Fatal(result, err)
+	}
+	if _, err = call(context.Background(), c, "upload_attachment", json.RawMessage(`{"base64":"`+strings.Repeat("A", 87385)+`"}`)); err == nil || calls != 2 {
+		t.Fatal("oversized upload reached API", calls, err)
+	}
+	if _, err = call(context.Background(), c, "list_directory", json.RawMessage(`{"kind":"principal"}`)); err == nil {
+		t.Fatal("mixed identity accepted")
 	}
 }

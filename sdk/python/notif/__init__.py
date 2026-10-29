@@ -16,6 +16,16 @@ class NotifError(Exception):
         self.code, self.message, self.status = code, message, status
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _open(request, *, timeout):
+    # A bearer credential must never follow a redirect to another origin.
+    return urllib.request.build_opener(_NoRedirect()).open(request, timeout=timeout)
+
+
 class Client:
     def __init__(self, base_url: str, token: str, timeout: float = 20):
         parsed = urllib.parse.urlsplit(base_url)
@@ -36,7 +46,7 @@ class Client:
         for attempt in range(3):
             req = urllib.request.Request(self.base_url + path, raw, headers, method=method)
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout if timeout is None else timeout) as response:
+                with _open(req, timeout=self.timeout if timeout is None else timeout) as response:
                     return json.load(response)
             except urllib.error.HTTPError as error:
                 try:
@@ -50,6 +60,70 @@ class Client:
                     raise
                 time.sleep(.2 * (attempt + 1))
         raise RuntimeError("Request attempts exhausted")
+
+    def events(self, **options: Any):
+        """Yield canonical events. Save sequence only after applying each event."""
+        from .events import read_events
+        return read_events(self, **options)
+
+    def start_chat(self, *, targets: list[dict[str, str]], body: str, title: str = "", approval: bool = False,
+                   choices: list[str] | None = None, mentions: list[dict[str, Any]] | None = None,
+                   key: str | None = None) -> dict[str, Any]:
+        """Start shared history. Mention offsets are code points; all members receive it."""
+        data: dict[str, Any] = {"targets": targets, "body": body}
+        if title: data["title"] = title
+        if approval: data["approval"] = True
+        if choices is not None: data["choices"] = choices
+        if mentions is not None: data["mentions"] = mentions
+        return self.call("POST", "/api/v1/conversations", data, key=key or str(uuid.uuid4()))
+
+    def attachments(self, conversation_id: str) -> list[dict[str, Any]]:
+        return self.call("GET", "/api/v1/conversations/" + urllib.parse.quote(conversation_id, safe="") + "/attachments")
+
+    def upload_attachment(self, conversation_id: str, name: str, media: str, data: bytes) -> dict[str, Any]:
+        """No automatic retry: list attachments after an unknown upload outcome."""
+        if not data or len(data) > 5 * 1024 * 1024 or any(ch in name + media for ch in "\r\n"):
+            raise ValueError("Invalid attachment or size exceeds 5 MiB")
+        boundary = "beepgrid-" + uuid.uuid4().hex
+        escaped = name.replace("\\", "\\\\").replace('"', '\\"')
+        header = ('--' + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="' + escaped + '"\r\nContent-Type: ' + media + '\r\n\r\n').encode()
+        raw = header + data + ("\r\n--" + boundary + "--\r\n").encode()
+        path = "/api/v1/conversations/" + urllib.parse.quote(conversation_id, safe="") + "/attachments"
+        return json.loads(self._file_request("POST", path, raw, "multipart/form-data; boundary=" + boundary))
+
+    def download_attachment(self, attachment_id: str) -> bytes:
+        return self._file_request("GET", "/api/v1/attachments/" + urllib.parse.quote(attachment_id, safe=""))
+
+    def _file_request(self, method: str, path: str, data=None, content_type="") -> bytes:
+        headers = {"Authorization": "Bearer " + self._token, "User-Agent": "NotifPython/0.1"}
+        if content_type: headers["Content-Type"] = content_type
+        req = urllib.request.Request(self.base_url + path, data=data, headers=headers, method=method)
+        try:
+            with _open(req, timeout=self.timeout) as response:
+                raw = response.read(5 * 1024 * 1024 + 1)
+                if len(raw) > 5 * 1024 * 1024: raise ValueError("Attachment response exceeds 5 MiB")
+                return raw
+        except urllib.error.HTTPError as error:
+            with error:
+                try: detail = json.loads(error.read(65536)).get("error", {})
+                except (ValueError, AttributeError): detail = {}
+            raise NotifError(detail.get("code", "HTTP_ERROR"), detail.get("message", "Attachment request rejected"), error.code) from error
+
+    def directory(self, kind: str, search: str = "") -> dict[str, Any]:
+        if kind not in ("agent", "person", "service"): raise ValueError("Invalid identity kind")
+        return self.query("people" if kind == "person" else kind + "s", search=search)
+
+    def conversation(self, conversation_id: str) -> dict[str, Any]:
+        return self.call("GET", "/api/v1/conversations/" + urllib.parse.quote(conversation_id, safe=""))
+
+    def provider_catalog(self) -> list[dict[str, Any]]:
+        return self.call("GET", "/api/v1/integrations/catalog")
+
+    def connection_setup(self, connection_id: str) -> dict[str, Any]:
+        return self.call("GET", "/api/v1/connections/" + urllib.parse.quote(connection_id, safe="") + "/setup")
+
+    def cancel(self, request_id: str, version: int) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/cancel", {"version": version})
 
     def query(self, collection: str, **options: Any) -> dict[str, Any]:
         return self.call("POST", "/api/v1/query", {"collection": collection, **options})

@@ -170,7 +170,7 @@ func Key() string {
 	return hex.EncodeToString(b)
 }
 func New(baseURL, token string) *Client {
-	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), Token: token, HTTP: &http.Client{Timeout: 20 * time.Second}}
+	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), Token: token, HTTP: &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 }
 func (c *Client) Do(ctx context.Context, method, path string, in, out any, key string) error {
 	return c.do(ctx, method, path, in, out, key, false)

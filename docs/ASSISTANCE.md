@@ -54,7 +54,7 @@ The gateway accepts JSON POST requests and returns JSON with HTTP 200. Model I/O
 
 Informational answers can be explicitly published for an audience, scoped key and validity period. Reuse requires identical context, compatible choices and current requester, publisher and original responder authority. Publication does not grant the original answerer permission to answer another person's question. Invalidating a publication stops future reuse and marks historical consumers. This deterministic path does not call a model or delay alerts.
 
-## Overseer
+## Explicit Coordinator review
 
 The enabled Agents page offers a natural-language interface and saved recent requests. It can read structured progress from permitted agents, prepare messages, ask fresh questions or request tasks. Reports remain labeled as worker-reported, with freshness and source details. It never infers completion from an acknowledgement or adds potentially overlapping counters.
 
@@ -68,7 +68,7 @@ Supported operations are `status`, `message`, `question`, and `task`. The engine
 
 `GET /api/v1/fleet/plans` lists the person's recent permitted plans. `GET /api/v1/fleet/plans/{id}` reloads one plan and its canonical replies. Agent replies separately require current permission to reply to the person. The person's permission to ask does not grant an agent permission to respond.
 
-`POST /api/v1/fleet/plans/{id}/summary` sends authorized replies to the gateway with `task: overseer_summary`, `prompt`, `replies` and engine instructions. Each reply includes `agent_id`, `name`, `state`, optional `outcome` and `answer`. The only response field is `summary`. The UI offers an explicit summary action for settled replies, retains individual replies and leaves retries to the person after a provider failure. A digest caches summaries and prevents committing a summary when replies changed during the model call.
+`POST /api/v1/fleet/plans/{id}/summary` sends authorized replies to the gateway with `task: overseer_summary`, `prompt`, `replies` and engine instructions. Each reply includes `agent_id`, `name`, `state`, optional `outcome` and `answer`. The only response field is `summary`. The explicit review flow can request a summary of settled replies; automatic coordination uses durable synthesis jobs described below. Both retain individual replies and expose provider failures. A digest caches summaries and prevents committing a summary when replies changed during the model call.
 
 Every read, confirmation and summary is scoped to the original workspace and person. All context sources are rechecked, including sources that influenced the model but were not selected for outbound messages. Revocation, disabled people/agents, credential expiry, group changes, feature toggles and recovery holds fail closed. An already displayed response cannot be erased from a person's memory, but subsequent reads and actions enforce current authority. New assistance decisions are disabled during backup restore reconciliation.
 
@@ -87,3 +87,9 @@ The workspace presents the optional assistant explicitly in Agents and Conversat
 `POST /api/v1/fleet/plan` accepts optional `previous_plan_id` to continue that Person's conversation. The configured planning adapter receives a `history` array containing at most six authorized turns and 12 KiB of prompt/interpretation/proposal/reply context. Proposals retain their confirmed/unconfirmed distinction. Current fleet sources alone determine eligible outgoing targets. Historical context cannot expand authority. Follow-up results retain inherited agent, group-membership and reply provenance, and recheck it on read, model completion and confirmation. Oversized accumulated provenance requires a new topic. No database migration is needed.
 
 An optional `Idempotency-Key` gives browser planning submissions a durable retry identity. Replays return the same canonical turn after current authorization checks; changed input with the same key conflicts. Existing unkeyed SDK callers remain supported. `POST /api/v1/query` with `collection: "overseer_plans"` provides newest-first, person-bound chronological paging and prompt search. Opaque cursors are account/query scoped. The legacy recent-plan array retains its shape and limit.
+
+## Automatic Coordinator dispatch and durable synthesis
+
+`POST /api/v1/fleet/coordinate` is the default automatic coordination path. It accepts `prompt`, optional `target` and `previous_plan_id`, plus an optional stable Idempotency-Key. The bounded plan can contain different instructions per agent. The engine saves the turn, dispatches permitted ordinary messages/questions/tasks as the Person, collects canonical replies and uses durable summary jobs to synthesize the authorized results. Read the same saved plan to observe dispatches, individual replies, partial/failure state, `reply_summary` and `summary_error`. A provider failure does not fabricate completion or remove the individual results.
+
+The earlier `/fleet/plan` and `/fleet/command` endpoints remain the explicit review path. Manual `/summary` remains an available retry/read path; automatic coordinate turns no longer require a person to press it after every result. Both paths retain current Person authority, source visibility, group provenance and revocation checks. No Coordinator service principal or business-tool execution authority is added. Hosted inference must be configured and independently qualified; local protocol fixtures and subscription-backed test harnesses do not prove a managed production provider is enabled.

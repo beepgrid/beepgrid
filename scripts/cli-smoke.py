@@ -138,6 +138,27 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
             sent = cli(['send', '--key', 'hello/v1', 'person', person, 'Ready'], credential=worker)
             with browser.open(url+'/api/v1/conversations/'+sent['conversation_id'], timeout=5) as response:
                 assert 'Ready' in json.dumps(json.load(response))
+            source_file = directory / 'upload.pdf'
+            source_file.write_bytes(b'%PDF-1.4\nCLI fixture')
+            uploaded_cli = cli(['file-upload', '--conversation', sent['conversation_id'], '--media', 'application/pdf', str(source_file)], credential=worker)
+            assert cli(['files', sent['conversation_id']], credential=worker)[0]['id'] == uploaded_cli['id']
+            downloaded_file = directory / 'download.pdf'
+            cli(['file-download', '--out', str(downloaded_file), uploaded_cli['id']], credential=worker)
+            assert downloaded_file.read_bytes() == source_file.read_bytes()
+            assert downloaded_file.stat().st_mode & 0o777 == 0o600
+            # File tools use canonical current access and never read arbitrary host paths.
+            def mcp_call(name, arguments):
+                request = {'jsonrpc':'2.0','id':100,'method':'tools/call','params':{'name':name,'arguments':arguments}}
+                result = subprocess.run([str(headless), 'mcp'], input=json.dumps(request)+'\n',
+                    env={**environment, 'NOTIF_TOKEN_FILE':str(worker)}, cwd=directory, text=True, capture_output=True, timeout=10)
+                assert result.returncode == 0, result.stderr
+                reply = json.loads(result.stdout)['result']
+                assert not reply.get('isError'), reply
+                return json.loads(reply['content'][0]['text'])
+            uploaded = mcp_call('upload_attachment', {'conversation_id':sent['conversation_id'], 'file_name':'brief.pdf',
+                'media_type':'application/pdf', 'base64':'JVBERi0xLjQKZml4dHVyZQ=='})
+            assert uploaded['id'] in [item['id'] for item in mcp_call('list_attachments', {'conversation_id':sent['conversation_id']})]
+            assert mcp_call('download_attachment', {'id':uploaded['id']})['base64'] == 'JVBERi0xLjQKZml4dHVyZQ=='
             # The stdio MCP adapter is also part of the headless binary.
             messages = [{'jsonrpc':'2.0','id':1,'method':'initialize'},
                         {'jsonrpc':'2.0','method':'notifications/initialized'},

@@ -28,7 +28,7 @@ export async function* readEvents(base: string, token: string, transport: typeof
       let received = false;
       try {
         const response = await transport(`${base}/api/v1/events?stream=1&after=${cursor}${options.summary ? "&summary=1" : ""}`, {
-          headers: { Authorization: `Bearer ${token}`, "Last-Event-ID": String(cursor) }, signal: control.signal,
+          redirect: "error", headers: { Authorization: `Bearer ${token}`, "Last-Event-ID": String(cursor) }, signal: control.signal,
         });
         if (!response.ok) {
           // Do not retry revoked credentials or a policy denial indefinitely.

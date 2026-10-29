@@ -92,6 +92,8 @@ export type Message = {
   instance_id?: string;
   body: string;
 };
+export type StartChatInput = { targets:Target[]; body:string; title?:string; approval?:boolean; choices?:string[]; mentions?:Mention[] };
+export type Attachment = { id:string; conversation_id:string; message_id?:string; file_name:string; media_type:string; size:number; sha256:string; created_at:string };
 export type SendInput = {
  mentions?:Mention[];
  reuse_direct?:boolean;
@@ -206,6 +208,7 @@ export class Client {
       try {
         response = await this.transport(this.baseURL + path, {
           method,
+          redirect: "error",
           headers,
           body: raw,
           signal: options.signal ?? AbortSignal.timeout(20000),
@@ -252,6 +255,27 @@ export class Client {
   requestTrace(id:string,cursor=""){return this.call<unknown>("GET","/api/v1/requests/"+encodeURIComponent(id)+"/trace?delivery_cursor="+encodeURIComponent(cursor));}
   workspace(){return this.call<unknown>("GET","/api/v1/workspace");}
   account(){return this.call<unknown>("GET","/api/v1/workspace/account");}
+  startChat(input:StartChatInput,key:string=crypto.randomUUID()) { return this.call<{conversation_id:string;messages:Message[]}>("POST","/api/v1/conversations",input,{key}); }
+  attachments(conversationId:string) { return this.call<Attachment[]>("GET",`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`); }
+  async uploadAttachment(conversationId:string, file:Blob, name:string, signal?:AbortSignal):Promise<Attachment> {
+    if (!file.size || file.size>5*1024*1024) throw new Error("Attachments must be between 1 byte and 5 MiB");
+    const form=new FormData(); form.append("file",file,name);
+    const response=await this.transport(`${this.baseURL}/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`,{method:"POST",headers:{Authorization:`Bearer ${this.token}`},body:form,signal:signal??AbortSignal.timeout(20000),redirect:"error"});
+    const value=await response.json(); if(!response.ok) throw new NotifError(value.error?.code??"HTTP_ERROR",value.error?.message??"Attachment upload rejected",response.status);
+    return value as Attachment;
+  }
+  async downloadAttachment(id:string,signal?:AbortSignal):Promise<Blob> {
+    const response=await this.transport(`${this.baseURL}/api/v1/attachments/${encodeURIComponent(id)}`,{headers:{Authorization:`Bearer ${this.token}`},signal:signal??AbortSignal.timeout(20000),redirect:"error"});
+    if(!response.ok) { let value:any;try{value=await response.json();}catch{} throw new NotifError(value?.error?.code??"HTTP_ERROR",value?.error?.message??"Attachment download rejected",response.status); }
+    if (Number(response.headers.get("Content-Length"))>5*1024*1024) { await response.body?.cancel();throw new Error("Attachment exceeds 5 MiB"); }
+    const reader=response.body?.getReader();const chunks:Uint8Array<ArrayBuffer>[]=[];let size=0;
+    if(reader) try {for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>5*1024*1024)throw new Error("Attachment exceeds 5 MiB");chunks.push(new Uint8Array(value));}}finally{await reader.cancel();reader.releaseLock();}
+    return new Blob(chunks,{type:response.headers.get("Content-Type")??"application/octet-stream"});
+  }
+  directory(kind:"agent"|"person"|"service",search="") { return this.query<Agent|Person>({collection:kind==="person"?"people":kind+"s",search}); }
+  conversation(id:string) { return this.call<{id:string;title:string;messages:Message[];participants:unknown[]}>("GET",`/api/v1/conversations/${encodeURIComponent(id)}`); }
+  providerCatalog() { return this.call<unknown[]>("GET","/api/v1/integrations/catalog"); }
+  connectionSetup(id:string) { return this.call<unknown>("GET",`/api/v1/connections/${encodeURIComponent(id)}/setup`); }
   async connect(
     agent: string,
     name: string,

@@ -29,6 +29,9 @@ Clients (flags before positional arguments):
   list [--limit 50] [--cursor CURSOR] [--search TEXT] COLLECTION
   api [--input file|-] [--key KEY] [--out FILE] METHOD /api/v1/PATH
   enroll --input file|- --out TOKEN_FILE
+	files CONVERSATION_ID
+	file-upload --conversation CONVERSATION_ID [--media MIME] FILE
+	file-download --out FILE ATTACHMENT_ID
   mcp, trace REQUEST_ID, version
 
 Clients use NOTIF_URL and NOTIF_TOKEN_FILE (or NOTIF_TOKEN).
@@ -136,7 +139,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		return true, err
 	}
 	switch command {
-	case "send", "ask", "approve", "task", "respond", "wait", "list", "api", "enroll":
+	case "send", "ask", "approve", "task", "respond", "wait", "list", "api", "enroll", "files", "file-upload", "file-download":
 	default:
 		return false, nil
 	}
@@ -148,6 +151,8 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 	limit := f.Int("limit", 50, "Query page size")
 	cursor := f.String("cursor", "", "Query continuation cursor")
 	search := f.String("search", "", "Query search text")
+	conversation := f.String("conversation", "", "Existing conversation for file upload")
+	media := f.String("media", "application/octet-stream", "File media type")
 	defaultTimeout := 30 * time.Second
 	if command == "wait" {
 		defaultTimeout = 5 * time.Minute
@@ -191,6 +196,43 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		return nil
 	}
 	switch command {
+	case "files":
+		if err = need(1); err == nil {
+			result, err = c.Attachments(ctx, pos[0])
+		}
+	case "file-upload":
+		if err = need(1); err != nil {
+			break
+		}
+		if *conversation == "" {
+			err = usageError{fmt.Errorf("file-upload requires --conversation")}
+			break
+		}
+		var file *os.File
+		file, err = os.Open(pos[0])
+		if err != nil {
+			break
+		}
+		var data []byte
+		data, err = io.ReadAll(io.LimitReader(file, notif.MaxAttachmentBytes+1))
+		file.Close()
+		if err == nil {
+			result, err = c.UploadAttachment(ctx, *conversation, filepath.Base(pos[0]), *media, data)
+		}
+	case "file-download":
+		if err = need(1); err != nil {
+			break
+		}
+		if output == nil {
+			err = usageError{fmt.Errorf("file-download requires --out FILE; bytes are never printed to the terminal")}
+			break
+		}
+		var data []byte
+		data, err = c.DownloadAttachment(ctx, pos[0])
+		if err == nil {
+			_, err = output.Write(data)
+		}
+		result = map[string]any{"output_file": *out, "bytes": len(data)}
 	case "send":
 		var in notif.SendInput
 		if *input != "" {
@@ -283,7 +325,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		return true, err
 	}
 	if output != nil {
-		if command != "enroll" {
+		if command != "enroll" && command != "file-download" {
 			err = json.NewEncoder(output).Encode(result)
 		}
 		if err == nil {
@@ -292,7 +334,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		if err != nil {
 			return true, err
 		}
-		if command != "enroll" {
+		if command != "enroll" && command != "file-download" {
 			result = map[string]string{"output_file": *out}
 		}
 	}

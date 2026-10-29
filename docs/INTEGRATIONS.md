@@ -6,7 +6,7 @@ The machine-readable contract is [api/openapi.json](../api/openapi.json), also s
 
 Use a service API credential for a conventional application. Use a namespace-restricted enrollment credential only in a trusted launcher. The first `connect`/`Enroll` creates/binds a logical Agent and returns a separate instance credential; workers use that credential thereafter. People and agents are never created through the same public collection. `/me` returns `person`, `agent` or `service` according to the authenticated kind.
 
-A new `POST /api/v1/messages` with a target creates a conversation. Reply with the returned `conversation_id`. Repeating the same participants does not force the same conversation. `POST /api/v1/requests` creates a question, approval or task. SDK `wait` polls the same durable handle; cancellation of waiting is local. An advisory question can become blocking simply by waiting later.
+A new `POST /api/v1/messages` with a target normally creates a conversation. Set `reuse_direct: true` only when intentionally continuing the authorized direct thread, or reply with the returned `conversation_id`. Shared chats and private fanout remain distinct. `POST /api/v1/requests` creates a question, approval or task. SDK `wait` polls the same durable handle; cancellation of waiting is local. Waiting does not declare a blocking dependency. Use the explicit `blocking` field or request blocking endpoint only when one agent cannot continue until one other agent answers.
 
 Supply a stable `Idempotency-Key` for message/request creation. Retry the same key with the same body after uncertain network results. A conflicting body returns 409. Persist keys/handles with the runtime's job checkpoint. Generated SDK defaults protect a single network operation's retries, but a process restart needs an application-stable key.
 
@@ -28,13 +28,13 @@ The React package offers authenticated request/conversation components and a hea
 
 ## MCP
 
-Run `notif mcp` as an stdio server with `NOTIF_URL` and `NOTIF_TOKEN`. A worker token acts as that instance. Alternatively supply a launcher token plus `NOTIF_AGENT_ID`/`NOTIF_AGENT_NAME` for startup enrollment. Stdout is JSON-RPC only; logs go to stderr.
+Run `notif mcp` as a stdio server with `NOTIF_URL` and a protected `NOTIF_TOKEN_FILE` (or `NOTIF_TOKEN`). A worker token acts as that instance. Alternatively supply a launcher token plus `NOTIF_AGENT_ID`/`NOTIF_AGENT_NAME` for startup enrollment. Stdout is JSON-RPC only; logs go to stderr.
 
-Tools include `list_agents`, `send`, `ask`, `get_request`, `reply`, `request_status`, `receive`, `acknowledge` and `report_progress`. Calls use the caller's existing permissions. The legacy initialize handshake advertises protocol `2025-11-25`; tool calls also work without a handshake. Remote Streamable HTTP MCP is outside this release. A host must call receive/poll or provide a listener; the stdio adapter cannot wake an arbitrary dormant model by itself.
+Tools include `list_agents`, `send`, `ask`, `get_request`, `reply`, `request_status`, `receive`, `acknowledge` and `report_progress`. Calls use the caller's existing permissions. The legacy initialize handshake advertises protocol `2025-11-25`; tool calls also work without a handshake. Scoped directory/history/file tools are also available; MCP byte transfer is bounded to 64 KiB, with 5 MiB through SDKs. See [local host recipes](LOCAL-MCP.md). Remote Streamable HTTP MCP is outside this release. A host must call receive/poll or provide a listener; the stdio adapter cannot wake an arbitrary dormant model by itself.
 
 ## Slack
 
-1. Create a Slack application/installation and obtain the bot token and signing secret. Grant only the provider scopes needed for the chosen channels and subscriptions.
+1. Create a dedicated Slack app and obtain its signing secret. Save a connection with team_id and secret JSON containing signing_secret; bot_token can be added after installation. Read `GET /api/v1/connections/{id}/setup` to obtain the manifest and exact callbacks. Import that manifest, then install and save bot_token. Grant only the provider scopes needed for the chosen channels and subscriptions.
 2. Add a Slack connection with its immutable `team_id`. The UI stores bot/signing secrets encrypted. Set an optional `default_agent_id` for human-initiated conversations.
 3. Configure Slack interactivity to `/integrations/slack/CONNECTION_ID`. Configure events to `/integrations/slack/CONNECTION_ID/events`; the endpoint handles signed URL verification. Subscribe to the relevant app mentions and direct messages.
 4. Link immutable Slack user+team IDs to People using `POST /people/{id}/slack-account`. Email matching is never automatic. Assign View/Message/Decide roles separately.
@@ -64,7 +64,7 @@ An explicit `shared_key` identifies a resource/policy/version domain. Exact matc
 
 Answering one question does not silently answer the others. An authorized publisher may explicitly answer/share with the displayed audience for 24 hours, atomically, or publish an existing informational answer with a chosen audience/expiry. Approval permissions are never merged. Reuse preserves provenance; invalidation stops future reuse and signals historical consumers.
 
-Fleet status collects permitted structured progress and timestamps. It reports partial coverage and never blindly adds overlapping counts. Coordinator is a separate opt-in private conversation that prepares bounded messages, questions and tasks for explicit confirmation. Ordinary group conversations never invoke it silently. See [ASSISTANCE.md](ASSISTANCE.md).
+Fleet status collects permitted structured progress and timestamps. It reports partial coverage and never blindly adds overlapping counts. Coordinator is a separate opt-in private conversation. `/fleet/coordinate` automatically dispatches distinct bounded messages/questions/tasks and durably collects/summarizes replies. The `/fleet/plan` plus `/fleet/command` path retains explicit review when selected. Ordinary group conversations never invoke it silently. See [ASSISTANCE.md](ASSISTANCE.md).
 
 A group-target grant also matches its current members for individual contact. Removing membership removes that path immediately, including sensitive responses to pending requests. `$self` in a role target means the authenticated identity's own ID, so a launcher can grant a future worker authority to propose its own action without knowing the generated agent ID. A separate Ask grant still controls the human/group it may contact. The local seed command grants only owner contact plus self-proposal; it does not grant authority over other agents.
 
@@ -79,3 +79,7 @@ The paged `POST /api/v1/query` endpoint accepts `conversation_id` for `requests`
 For `POST /api/v1/groups`, omitting `members` (or sending null) on an existing versioned group changes only its name and preserves its current roster. Send an explicit empty array to request removing all members, subject to current membership and role-assignment checks. A name-only edit returns the caller's filtered roster, with `members_complete=false` when appropriate. Keep the observed positive `version` to prevent stale writes.
 
 `POST /api/v1/auth/logout` can revoke a valid Person browser session during workspace suspension. This exception provides no business-data or account-status access. Normal workspace admission checks continue to apply to other routes; account status retains its separate explicit authorization.
+
+## Provider setup and qualification
+
+Catalog descriptors declare directions, replies, native approvals, file mode, identity and setup modes. Authorized installation managers read `GET /api/v1/connections/{id}/setup` for credential-free setup steps and Slack manifests. Diagnostics distinguish saved configuration, queued/verifying, action needed, disconnected and correlated engine-observed round trip. Configuration changes reset the diagnostic test evidence. Live production qualification is recorded separately from these observations and protocol fixtures. See [Telegram](TELEGRAM.md), [SDK coverage](SDK-COVERAGE.md) and [artifact preparation](SDK-RELEASE.md).

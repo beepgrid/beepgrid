@@ -1565,7 +1565,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object"
+                    "$ref": "#/components/schemas/ProviderCapability"
                   }
                 }
               }
@@ -1638,14 +1638,14 @@
     "/api/v1/connections/{id}/diagnostics": {
       "get": {
         "operationId": "get_api_v1_connections_id_diagnostics",
-        "description": "Non-sending configuration/credential checks for a scoped installation manager. Provider acceptance remains not_tested; no external network request is made.",
+        "description": "Non-sending credential checks and correlated diagnostic transport evidence. Configuration changes reset test evidence. Provider acceptance is distinct from attributed reply and independent live qualification.",
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectionDiagnostic"
                 }
               }
             }
@@ -4056,7 +4056,7 @@
     "/api/v1/conversations": {
       "post": {
         "operationId": "post_api_v1_conversations",
-        "description": "Start an explicit shared chat with a durable first message and optional structured mentions. Individual recipients only; all members must have current mutual view permission. Mentions identify current participants without excluding observers. Every later send checks current contact access. Idempotent; private broadcast contracts are unchanged.",
+        "description": "Start an explicit shared chat with a durable first message. Individual recipients only; all members must have current mutual view permission. Every later send checks current contact access. Idempotent; private broadcast contracts are unchanged.",
         "responses": {
           "200": {
             "description": "Success",
@@ -4162,7 +4162,8 @@
                     "type": "array",
                     "items": {
                       "$ref": "#/components/schemas/Mention"
-                    }
+                    },
+                    "maxItems": 20
                   }
                 },
                 "required": [
@@ -6589,7 +6590,7 @@
       },
       "post": {
         "operationId": "post_api_v1_assistance_settings",
-        "description": "Owner-controlled optional assistance. Both features default off. Enabling requires a configured provider.",
+        "description": "Owner-controlled optional assistance. Enabling requires a configured provider. Coordinator supports automatic dispatch and a separate explicit review flow.",
         "responses": {
           "200": {
             "description": "Success",
@@ -8776,6 +8777,59 @@
         "security": []
       }
     },
+    "/api/v1/requests/{id}/blocking": {
+      "post": {
+        "operationId": "setRequestBlocking",
+        "description": "Only the requesting agent may declare or clear its own open single-agent blocking dependency. Does not cancel the request.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "blocking"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "blocking": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not the requesting agent"
+          },
+          "409": {
+            "description": "Request is no longer open"
+          }
+        }
+      }
+    },
     "/api/v1/fleet/coordinate": {
       "post": {
         "operationId": "coordinate",
@@ -8865,17 +8919,105 @@
         }
       }
     },
-    "/api/v1/requests/{id}/blocking": {
-      "post": {
-        "operationId": "setRequestBlocking",
-        "description": "Only the requesting agent may declare or clear its own open single-agent blocking dependency. Does not cancel the request.",
+    "/api/v1/connections/{id}/setup": {
+      "get": {
+        "operationId": "get_api_v1_connections_id_setup",
+        "description": "Authorized credential-free setup steps and generated BYO manifest. Never contacts providers or changes registrations.",
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Request"
+                  "$ref": "#/components/schemas/ProviderSetup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/people/{id}/telegram-account": {
+      "post": {
+        "operationId": "post_api_v1_people_id_telegram_account",
+        "description": "Administrator-attested immutable private Telegram identity. Grants no contact or decision authority.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
                 }
               }
             }
@@ -8958,12 +9100,16 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "blocking": {
-                    "type": "boolean"
+                  "bot_id": {
+                    "type": "string"
+                  },
+                  "user_id": {
+                    "type": "string"
                   }
                 },
                 "required": [
-                  "blocking"
+                  "bot_id",
+                  "user_id"
                 ],
                 "additionalProperties": false
               }
@@ -8972,312 +9118,10 @@
         }
       }
     },
-    "/api/v1/connections/{id}/setup": {
-      "get": {
-        "operationId": "connectionSetup",
-        "description": "Non-sending configuration/credential checks for a scoped installation manager. Provider acceptance remains not_tested; no external network request is made.",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "summary": "Read credential-free provider setup and generated BYO manifest"
-      }
-    },
-    "/integrations/telegram/{id}": {
-      "post": {
-        "operationId": "telegramEvents",
-        "description": "Telegram private bot channel. See docs/TELEGRAM.md for immutable identity, secret header, durable updates and qualification limits.",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Slack-Request-Timestamp",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Slack-Signature",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
-    "/api/v1/people/{id}/telegram-account": {
-      "post": {
-        "operationId": "linkTelegramAccount",
-        "description": "Telegram private bot channel. See docs/TELEGRAM.md for immutable identity, secret header, durable updates and qualification limits.",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/people/{id}/telegram-account/remove": {
       "post": {
-        "operationId": "unlinkTelegramAccount",
-        "description": "/api/v1/people/{id}/slack-account",
+        "operationId": "post_api_v1_people_id_telegram_account_remove",
+        "description": "Unlink the Person Telegram identity under current account-link authority. Old destinations and callbacks lose authority.",
         "responses": {
           "200": {
             "description": "Success",
@@ -9360,6 +9204,129 @@
             }
           }
         ]
+      }
+    },
+    "/integrations/telegram/{id}": {
+      "post": {
+        "operationId": "post_integrations_telegram_id",
+        "description": "Secret-authenticated private bot updates. Canonical message/decision, thread and dedup receipt commit before success. Same ID with changed content conflicts. See docs/TELEGRAM.md.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Telegram-Bot-Api-Secret-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "update_id": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "message": {
+                    "type": "object"
+                  },
+                  "callback_query": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "update_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": []
       }
     }
   },
@@ -9626,29 +9593,6 @@
           "operation_key"
         ],
         "additionalProperties": false
-      },
-      "Mention": {
-        "type": "object",
-        "properties": {
-          "principal_id": {
-            "type": "string"
-          },
-          "start": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "end": {
-            "type": "integer",
-            "minimum": 1
-          }
-        },
-        "required": [
-          "principal_id",
-          "start",
-          "end"
-        ],
-        "additionalProperties": false,
-        "description": "Stable explicit addressee. start/end are Unicode code-point offsets for the exact @name token. Must be a current visible conversation participant. All members receive the original message and may contribute."
       },
       "SendInput": {
         "type": "object",
@@ -10146,7 +10090,8 @@
             "enum": [
               "webhook",
               "slack",
-              "email"
+              "email",
+              "telegram"
             ]
           },
           "config": {
@@ -10485,6 +10430,11 @@
             "type": "array",
             "items": {
               "type": "object",
+              "required": [
+                "agent_id",
+                "operation",
+                "body"
+              ],
               "properties": {
                 "agent_id": {
                   "type": "string"
@@ -10499,13 +10449,7 @@
                 "body": {
                   "type": "string"
                 }
-              },
-              "required": [
-                "agent_id",
-                "operation",
-                "body"
-              ],
-              "additionalProperties": false
+              }
             }
           },
           "automatic": {
@@ -10567,6 +10511,222 @@
         "required": [
           "error"
         ],
+        "additionalProperties": false
+      },
+      "Mention": {
+        "type": "object",
+        "required": [
+          "principal_id",
+          "start",
+          "end"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "principal_id": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "description": "Stable explicit addressee. start/end are Unicode code-point offsets for the exact @name token. Must be a current visible conversation participant. All members receive the original message and may contribute."
+      },
+      "ProviderField": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "secret": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "ProviderCapability": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderField"
+            }
+          },
+          "inbound_messages": {
+            "type": "boolean"
+          },
+          "native_approvals": {
+            "type": "boolean"
+          },
+          "web_continuation": {
+            "type": "boolean"
+          },
+          "attachments": {
+            "type": "boolean"
+          },
+          "builtin": {
+            "type": "boolean"
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "replies": {
+            "type": "boolean"
+          },
+          "file_mode": {
+            "enum": [
+              "native",
+              "workspace_link"
+            ]
+          },
+          "setup_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "identity": {
+            "type": "string"
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "ConnectionTestEvidence": {
+        "type": "object",
+        "properties": {
+          "delivery_id": {
+            "type": "string"
+          },
+          "conversation_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "inbound_reply": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "ConnectionDiagnostic": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "configuration_valid": {
+            "type": "boolean"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provider_acceptance": {
+            "enum": [
+              "not_tested",
+              "observed"
+            ]
+          },
+          "sends": {
+            "const": false
+          },
+          "state": {
+            "enum": [
+              "configured",
+              "setup_incomplete",
+              "disconnected",
+              "verifying",
+              "action_needed",
+              "connected"
+            ]
+          },
+          "qualification": {
+            "enum": [
+              "not_verified",
+              "provider_acceptance_observed",
+              "engine_round_trip_observed"
+            ]
+          },
+          "last_test": {
+            "$ref": "#/components/schemas/ConnectionTestEvidence"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "ProviderSetup": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "callbacks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "manifest": {
+            "type": "object"
+          },
+          "diagnostic": {
+            "$ref": "#/components/schemas/ConnectionDiagnostic"
+          }
+        },
+        "required": [],
         "additionalProperties": false
       }
     },

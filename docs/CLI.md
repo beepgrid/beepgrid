@@ -81,3 +81,7 @@ NOTIF_TOKEN_FILE=.local/owner-token .local/notif respond --input response.json R
 Configure an MCP stdio server with executable `.local/notif`, argument `mcp`, and environment `NOTIF_URL` plus `NOTIF_TOKEN_FILE` pointing at a scoped worker token. There is no model billing or hosted account prerequisite for this adapter. Tools use the same engine authorization as HTTP/CLI/workspace operations.
 
 Alternatively, use a namespace-scoped enrollment credential plus `NOTIF_AGENT_ID` and optionally `NOTIF_AGENT_NAME` to enroll when MCP starts. This creates a fresh instance per start. Persisted worker credentials are preferable when the caller needs explicit instance lifecycle control. See [examples](../examples/README.md) for delivery checkpoints and the integration contract for request/response semantics.
+
+## Workspace files
+
+`notif files CONVERSATION_ID` lists current visible files. `notif file-upload --conversation CONVERSATION_ID --media application/pdf ./brief.pdf` uploads chosen bytes to an existing conversation. `notif file-download --out ./brief-copy.pdf ATTACHMENT_ID` writes a new owner-only file and returns a JSON receipt; it refuses to overwrite an existing path. Flags precede positional arguments. Transfers are bounded to 5 MiB. Upload does not automatically retry an unknown response; inspect the file list before repeating. All operations enforce current conversation/history access, and file content remains untrusted.

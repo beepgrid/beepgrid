@@ -3,6 +3,7 @@ package notif
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"time"
 )
@@ -64,6 +65,26 @@ type AskBatchItem struct {
 	Request Request `json:"request"`
 }
 
+// Mentions address existing participants. Offsets count Unicode code points,
+// and never narrow the shared audience or grant contact/decision authority.
+type StartChatInput struct {
+	Targets  []Target  `json:"targets"`
+	Body     string    `json:"body"`
+	Title    string    `json:"title,omitempty"`
+	Approval bool      `json:"approval,omitempty"`
+	Choices  []string  `json:"choices,omitempty"`
+	Mentions []Mention `json:"mentions,omitempty"`
+}
+
+func (c *Client) StartChat(ctx context.Context, in StartChatInput, key string) (SendResult, error) {
+	if key == "" {
+		key = Key()
+	}
+	var out SendResult
+	err := c.Do(ctx, "POST", "/api/v1/conversations", in, &out, key)
+	return out, err
+}
+
 func (c *Client) Query(ctx context.Context, in QueryInput) (QueryPage, error) {
 	var out QueryPage
 	e := c.Do(ctx, "POST", "/api/v1/query", in, &out, "")
@@ -108,4 +129,36 @@ func (c *Client) Account(ctx context.Context) (json.RawMessage, error) {
 	var out json.RawMessage
 	e := c.Do(ctx, "GET", "/api/v1/workspace/account", nil, &out, "")
 	return out, e
+}
+
+// Directory keeps people, agents and services explicit and permission filtered.
+func (c *Client) Directory(ctx context.Context, kind, search string) (QueryPage, error) {
+	if kind != "person" && kind != "agent" && kind != "service" {
+		return QueryPage{}, fmt.Errorf("invalid identity kind")
+	}
+	collection := kind + "s"
+	if kind == "person" {
+		collection = "people"
+	}
+	return c.Query(ctx, QueryInput{Collection: collection, Search: search})
+}
+func (c *Client) Conversation(ctx context.Context, id string) (json.RawMessage, error) {
+	var out json.RawMessage
+	err := c.Do(ctx, "GET", "/api/v1/conversations/"+url.PathEscape(id), nil, &out, "")
+	return out, err
+}
+func (c *Client) ProviderCatalog(ctx context.Context) (json.RawMessage, error) {
+	var out json.RawMessage
+	err := c.Do(ctx, "GET", "/api/v1/integrations/catalog", nil, &out, "")
+	return out, err
+}
+func (c *Client) ConnectionSetup(ctx context.Context, id string) (json.RawMessage, error) {
+	var out json.RawMessage
+	err := c.Do(ctx, "GET", "/api/v1/connections/"+url.PathEscape(id)+"/setup", nil, &out, "")
+	return out, err
+}
+func (c *Client) Cancel(ctx context.Context, id string, version int) (Request, error) {
+	var out Request
+	err := c.Do(ctx, "POST", "/api/v1/requests/"+url.PathEscape(id)+"/cancel", map[string]int{"version": version}, &out, "")
+	return out, err
 }

@@ -1,0 +1,27 @@
+name: prepare SDK artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.26.10'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Build and install in clean consumers without publishing
+        run: |
+          python3 -m venv .local/package-tools
+          .local/package-tools/bin/python -m pip install 'setuptools>=77' wheel
+          NOTIF_PACKAGE_PYTHON="$PWD/.local/package-tools/bin/python" python3 scripts/sdk-package-check.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdk-development-artifacts
+          path: .local/sdk-release
+          retention-days: 14
+          include-hidden-files: true

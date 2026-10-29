@@ -733,6 +733,9 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 		text += "\n" + publicURL + "/requests/" + fmt.Sprint(q["id"])
 	}
 	if c.Kind == "email" {
+		if conv, ok := d.Payload["conversation_id"].(string); ok && conv != "" {
+			text += "\n" + strings.TrimRight(publicURL, "/") + "/conversations/" + conv
+		}
 		return s.sendMail(ctx, c, d.Address, text)
 	}
 	if c.Kind == "telegram" {
