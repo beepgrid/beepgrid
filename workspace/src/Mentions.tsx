@@ -103,12 +103,16 @@ export function MentionEditor({
   function locate(text: string, cursor: number) {
     const prefix = text.slice(0, cursor);
     const match = prefix.match(/(?:^|\s)@([^@\n]{0,60})$/);
-    setAnchor(
-      match
-        ? { start: cursor - match[1].length - 1, end: cursor, term: match[1] }
-        : null,
-    );
-    setActive(0);
+    const next = match
+      ? { start: cursor - match[1].length - 1, end: cursor, term: match[1] }
+      : null;
+    if (
+      next?.start !== anchor?.start ||
+      next?.term !== anchor?.term ||
+      next?.end !== anchor?.end
+    )
+      setActive(0);
+    setAnchor(next);
   }
   function choose(p: Identity) {
     if (!anchor) return;

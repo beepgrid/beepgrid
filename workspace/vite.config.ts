@@ -9,6 +9,9 @@ export default defineConfig({
     proxy: {
       "/api": "http://127.0.0.1:4010",
       "/auth": "http://127.0.0.1:4010",
+      "/integrations/slack/": "http://127.0.0.1:4010",
+      "/integrations/telegram/": "http://127.0.0.1:4010",
+      "/integrations/webhook/": "http://127.0.0.1:4010",
     },
   },
   build: {

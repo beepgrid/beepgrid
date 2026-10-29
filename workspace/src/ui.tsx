@@ -11,9 +11,11 @@ import type { Identity } from "./contracts";
 import { AgentMark, identitySeed } from "./AgentMark";
 
 const paths: Record<string, string> = {
+  send: "m22 2-7 20-4-9-9-4z M22 2 11 13",
   mail: "M3 5h18v14H3z m0 0 9 7 9-7",
   slack: "M9 3v12 M3 9h12 M15 21V9 M21 15H9 M5 4h1 M18 4v2 M20 18h-2 M4 18v2",
-  webhook: "M7 5a4 4 0 1 0 5 6 M8 17a4 4 0 1 0-1 4 M17 12a4 4 0 1 0 4 4 M8 8l5 8 M8 18h9 M17 8l-4 8",
+  webhook:
+    "M7 5a4 4 0 1 0 5 6 M8 17a4 4 0 1 0-1 4 M17 12a4 4 0 1 0 4 4 M8 8l5 8 M8 18h9 M17 8l-4 8",
   inbox: "M4 4h16v16H4z M4 13h5l2 3h2l2-3h5",
   conversations: "M4 4h16v13H9l-5 4z",
   agents: "m12 3 8 5v8l-8 5-8-5V8z M4 8l8 5 8-5 M12 13v8",

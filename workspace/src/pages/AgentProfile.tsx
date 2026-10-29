@@ -153,7 +153,7 @@ function Profile({
           <Badge key={g.id}>{g.name}</Badge>
         ))}
         {!roles.isPending && !roles.items.length ? (
-          <span className="muted">None assigned</span>
+          <span className="muted">No visible roles</span>
         ) : null}
         {global.data?.operations.create_group ? (
           <button className="text-action" onClick={() => setEditRoles(true)}>
@@ -523,7 +523,7 @@ function ProfileChannels({ agent }: { agent: Identity }) {
       <div className="profile-channel-row">
         <Icon name="agents" size={21} />
         <div>
-          <strong>Connected agent runtime</strong>
+          <strong>Agent runtime</strong>
           <p>
             Messages are saved in Beepgrid and received by this agent’s runtime.
           </p>

@@ -55,6 +55,8 @@ it("selects a named participant with spaces, distinguishing duplicate names", ()
   });
   expect(screen.getAllByRole("option")).toHaveLength(2);
   fireEvent.keyDown(input, { key: "ArrowDown" });
+  // A native selection notification must not reset keyboard navigation.
+  fireEvent.select(input);
   fireEvent.keyDown(input, { key: "Enter" });
   expect(input).toHaveValue("🙂 @DevOps Agent 2 ");
   expect(screen.getByRole("status")).toHaveTextContent(

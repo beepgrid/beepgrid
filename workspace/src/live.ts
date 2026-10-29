@@ -12,6 +12,8 @@ export function useLive(conversation: string) {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let source: EventSource | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let delay = 3000;
     const key = "beepgrid:workspace:cursor:" + scope;
     let cursor = "";
     try {
@@ -36,12 +38,27 @@ export function useLive(conversation: string) {
             : ""),
       );
       source.onopen = () => {
+        delay = 3000;
         setStatus("Live");
         reconcile();
       };
       source.onerror = () => {
         setStatus(navigator.onLine ? "Reconnecting" : "Offline");
         reconcile();
+        // Native EventSource retries transient failures itself. A closed stream
+        // needs a fresh connection after a proxy restart or terminal response.
+        if (
+          source?.readyState === EventSource.CLOSED &&
+          !retry &&
+          navigator.onLine
+        ) {
+          retry = setTimeout(() => {
+            retry = undefined;
+            source?.close();
+            connect();
+          }, delay);
+          delay = Math.min(delay * 2, 30000);
+        }
       };
       source.addEventListener("cursor", (e) => {
         cursor = nextCursor(cursor, (e as MessageEvent).lastEventId);
@@ -69,6 +86,11 @@ export function useLive(conversation: string) {
     const online = () => {
       setStatus(navigator.onLine ? "Reconnecting" : "Offline");
       reconcile();
+      if (navigator.onLine && source?.readyState === EventSource.CLOSED) {
+        clearTimeout(retry);
+        retry = undefined;
+        connect();
+      }
     };
     window.addEventListener("online", online);
     window.addEventListener("offline", online);
@@ -76,6 +98,7 @@ export function useLive(conversation: string) {
       disposed = true;
       source?.close();
       clearTimeout(timer);
+      clearTimeout(retry);
       clearInterval(safety);
       window.removeEventListener("online", online);
       window.removeEventListener("offline", online);

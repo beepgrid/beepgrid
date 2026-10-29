@@ -7,9 +7,11 @@ import {
 } from "../data";
 import type { Connection, Destination, Target, Identity } from "../contracts";
 import { TargetPicker } from "../TargetPicker";
+import { navigate } from "../navigation";
 import {
   Badge,
   Button,
+  Copy,
   Details,
   ErrorView,
   Field,
@@ -23,7 +25,7 @@ import {
   Tabs,
 } from "../ui";
 
-type Provider = {
+export type Provider = {
   kind: string;
   fields: { name: string; required: boolean; secret: boolean }[];
   inbound_messages: boolean;
@@ -31,11 +33,38 @@ type Provider = {
   web_continuation: boolean;
   attachments: boolean;
   builtin: boolean;
+  constraints?: string[];
+};
+type Diagnostic = {
+  issues: string[];
+  state: string;
+  qualification: string;
+  configuration_valid: boolean;
+  last_test?: {
+    state: string;
+    detail: string;
+    conversation_id: string;
+    inbound_reply: boolean;
+  };
+};
+type Setup = {
+  steps: string[];
+  callbacks: Record<string, string>;
+  manifest?: Record<string, unknown>;
+};
+const states: Record<string, string> = {
+  configured: "Configured",
+  setup_incomplete: "Finish setup",
+  disconnected: "Disconnected",
+  verifying: "Awaiting verification",
+  connected: "Connected",
+  action_needed: "Needs attention",
 };
 const names: Record<string, string> = {
-  native: "Beep Grid",
+  native: "Beepgrid",
   webhook: "Webhooks",
   slack: "Slack",
+  telegram: "Telegram",
   email: "Email (SMTP)",
 };
 const descriptions: Record<string, string> = {
@@ -43,12 +72,15 @@ const descriptions: Record<string, string> = {
   webhook: "Signed inbound and outbound HTTP messages.",
   slack: "Messages, threads and verified interactive responses.",
   email: "Send messages by email. Continue the conversation in your workspace.",
+  telegram: "Private bot messages, replies and in-chat approvals.",
 };
 const labels: Record<string, string> = {
   url: "Endpoint URL",
   inbound_sender_id: "Inbound service identity ID",
   team_id: "Slack team ID",
   bot_token: "Bot token",
+  bot_id: "Bot ID",
+  webhook_secret: "Webhook secret",
   signing_secret: "Signing secret",
   default_agent_id: "Default agent ID",
   smtp_addr: "SMTP host:port",
@@ -71,7 +103,7 @@ export default function Integrations() {
         onChange={setTab}
         options={[
           { id: "catalog", label: "Browse" },
-          { id: "connections", label: "Connected" },
+          { id: "connections", label: "Connections" },
           { id: "destinations", label: "Delivery preferences" },
         ]}
       />
@@ -85,7 +117,20 @@ export default function Integrations() {
               .map((p) => (
                 <article className="provider" key={p.kind}>
                   <header>
-                    <span className="provider-mark" data-kind={p.kind}><Icon name={p.kind === "email" ? "mail" : p.kind === "slack" ? "slack" : "webhook"} size={21}/></span>
+                    <span className="provider-mark" data-kind={p.kind}>
+                      <Icon
+                        name={
+                          p.kind === "email"
+                            ? "mail"
+                            : p.kind === "slack"
+                              ? "slack"
+                              : p.kind === "telegram"
+                                ? "send"
+                                : "webhook"
+                        }
+                        size={21}
+                      />
+                    </span>
                     <h3>{names[p.kind] || p.kind}</h3>
                     {p.builtin ? <Badge>Built in</Badge> : null}
                   </header>
@@ -119,8 +164,7 @@ export default function Integrations() {
               <tr>
                 <th>Connection</th>
                 <th>Provider</th>
-                <th>Access</th>
-                <th>Secret</th>
+                <th>Setup</th>
                 <th />
               </tr>
             </thead>
@@ -130,10 +174,7 @@ export default function Integrations() {
                   <td>{c.name}</td>
                   <td>{names[c.kind] || c.kind}</td>
                   <td>
-                    <Badge>{c.enabled ? "Enabled" : "Disabled"}</Badge>
-                  </td>
-                  <td>
-                    {c.secret_configured ? "Configured" : "Not configured"}
+                    <ConnectionState connection={c} />
                   </td>
                   <td>
                     <Button onClick={() => setSelected(c)}>Manage</Button>
@@ -146,7 +187,11 @@ export default function Integrations() {
       ) : null}
       {tab === "destinations" ? <Destinations /> : null}
       {provider ? (
-        <ConnectionForm provider={provider} onClose={() => setProvider(null)} />
+        <ConnectionForm
+          provider={provider}
+          onClose={() => setProvider(null)}
+          onSaved={setSelected}
+        />
       ) : null}
       {selected ? (
         <ConnectionDetail
@@ -167,7 +212,7 @@ export function ConnectionForm({
   provider: Provider;
   connection?: Connection;
   onClose: () => void;
-  onSaved?: () => void;
+  onSaved?: (connection: Connection) => void;
 }) {
   const [name, setName] = useState(c?.name || names[p.kind] || p.kind),
     [config, setConfig] = useState<Record<string, string>>(c?.config || {}),
@@ -176,11 +221,14 @@ export function ConnectionForm({
     [rotate, setRotate] = useState(!c);
   const op = useOperation();
   const secret = rotate
-    ? p.kind === "slack"
-      ? JSON.stringify({
-          bot_token: secrets.bot_token || "",
-          signing_secret: secrets.signing_secret || "",
-        })
+    ? ["slack", "telegram"].includes(p.kind)
+      ? JSON.stringify(
+          Object.fromEntries(
+            p.fields
+              .filter((f) => f.secret)
+              .map((f) => [f.name, secrets[f.name] || ""]),
+          ),
+        )
       : secrets.secret || ""
     : undefined;
   return (
@@ -191,7 +239,7 @@ export function ConnectionForm({
       <Form
         onSubmit={() =>
           void op
-            .run("/connections", {
+            .run<Connection>("/connections", {
               ...(c ? { id: c.id, version: c.version } : {}),
               name,
               kind: p.kind,
@@ -203,7 +251,7 @@ export function ConnectionForm({
               if (r) {
                 setSecrets({});
                 onClose();
-                onSaved?.();
+                onSaved?.(r);
               }
             })
         }
@@ -226,6 +274,12 @@ export function ConnectionForm({
             >
               Open Slack app settings ↗
             </a>
+          </p>
+        ) : p.kind === "telegram" ? (
+          <p className="help">
+            Use a dedicated bot from BotFather. Its numeric ID is the part
+            before the colon in its token. Save to get the webhook setup
+            instructions.
           </p>
         ) : p.kind === "email" ? (
           <p className="help">
@@ -312,7 +366,15 @@ export function ConnectionForm({
               >
                 <input
                   type="password"
-                  required={f.required}
+                  required={
+                    f.required &&
+                    !(p.kind === "slack" && f.name === "bot_token")
+                  }
+                  placeholder={
+                    p.kind === "slack" && f.name === "bot_token"
+                      ? "Add after installing your Slack app"
+                      : undefined
+                  }
                   autoComplete="new-password"
                   value={secrets[f.name] || ""}
                   onChange={(e) =>
@@ -343,7 +405,29 @@ export function ConnectionForm({
     </Modal>
   );
 }
-function ConnectionDetail({
+function ConnectionState({ connection: c }: { connection: Connection }) {
+  const cap = useCapabilities({ kind: "connection", id: c.id });
+  const q = useResource<Diagnostic>(
+    `/connections/${c.id}/diagnostics`,
+    cap.data?.operations.manage === true,
+  );
+  const state = !c.enabled ? "disconnected" : q.data?.state;
+  return (
+    <Badge
+      tone={
+        state === "connected"
+          ? "good"
+          : state === "action_needed" || state === "setup_incomplete"
+            ? "warn"
+            : "neutral"
+      }
+    >
+      {state ? states[state] || state : c.enabled ? "Enabled" : "Disconnected"}
+    </Badge>
+  );
+}
+
+export function ConnectionDetail({
   connection: c,
   provider,
   onClose,
@@ -352,108 +436,145 @@ function ConnectionDetail({
   provider?: Provider;
   onClose: () => void;
 }) {
-  const cap = useCapabilities({ kind: "connection", id: c.id }),
-    diagnostics = useResource<{
-      issues: string[];
-      configuration_valid: boolean;
-      provider_acceptance: string;
-    }>(
-      "/connections/" + c.id + "/diagnostics",
-      cap.data?.operations.manage === true,
-    ),
-    destinations = useCollection<Destination>("destinations", "", {
-      connection_id: c.id,
-    }),
-    [edit, setEdit] = useState(false),
+  const cap = useCapabilities({ kind: "connection", id: c.id });
+  const canManage = cap.data?.operations.manage === true;
+  const diagnostics = useResource<Diagnostic>(
+    `/connections/${c.id}/diagnostics`,
+    canManage,
+  );
+  const setup = useResource<Setup>(`/connections/${c.id}/setup`, canManage);
+  const destinations = useCollection<Destination>("destinations", "", {
+    connection_id: c.id,
+  });
+  const [edit, setEdit] = useState(false),
+    [adding, setAdding] = useState(false),
     [destination, setDestination] = useState(""),
     [confirm, setConfirm] = useState(false),
-    [result, setResult] = useState<unknown>(null),
+    [queued, setQueued] = useState(false),
     op = useOperation();
+  const diagnostic = diagnostics.data;
   if (cap.error || cap.isPending)
     return (
-      <Modal title="Connection unavailable" onClose={onClose}>
+      <Modal title="Connection" onClose={onClose}>
         <ErrorView error={cap.error} />
         {cap.isPending ? <Loading label="Checking connection access" /> : null}
       </Modal>
     );
   return (
     <Modal title={c.name} wide onClose={onClose}>
-      <div className="intro">
-        <IdentityIcon id={c.id} kind="service" label={c.name} />
-        <div>
-          <h2>{c.name}</h2>
-          <p>
-            {names[c.kind]} · {c.id} · Revision {c.version}
-          </p>
-        </div>
-        <Badge>{c.enabled ? "Enabled" : "Disabled"}</Badge>
-      </div>
-      <ErrorView error={cap.error || diagnostics.error || op.error} />
-      {cap.data?.operations.manage ? (
-        <>
+      <div className="actions">
+        <Badge>{names[c.kind] || c.kind}</Badge>
+        <Badge tone={diagnostic?.state === "connected" ? "good" : "neutral"}>
+          {diagnostic
+            ? states[diagnostic.state] || diagnostic.state
+            : c.enabled
+              ? "Checking setup"
+              : "Disconnected"}
+        </Badge>
+        {canManage ? (
           <Button onClick={() => setEdit(true)}>Edit connection</Button>
+        ) : null}
+      </div>
+      <ErrorView error={diagnostics.error || setup.error || op.error} />
+      {canManage ? (
+        <>
           <section className="section">
-            <h3>Configuration readiness</h3>
-            {diagnostics.isPending ? (
-              <Loading />
-            ) : diagnostics.data ? (
-              <>
-                <Badge
-                  tone={diagnostics.data.configuration_valid ? "good" : "warn"}
-                >
-                  {diagnostics.data.configuration_valid
-                    ? "Configuration valid"
-                    : "Needs attention"}
-                </Badge>
-                {diagnostics.data.issues.map((issue) => (
-                  <p key={issue}>{issue}</p>
-                ))}
-                <p>
-                  <small>
-                    Provider acceptance: {diagnostics.data.provider_acceptance}.
-                    These checks send nothing.
-                  </small>
+            <h3>Complete setup</h3>
+            {diagnostic?.issues.map((issue) => (
+              <p key={issue}>{issue}</p>
+            ))}
+            {setup.isPending ? <Loading /> : null}
+            {setup.data?.manifest ? (
+              <div className="field">
+                <strong>Slack app manifest</strong>
+                <p className="help">
+                  Import this into a dedicated Slack app, install it, then add
+                  its bot token in Edit connection.
                 </p>
-              </>
+                <Copy value={JSON.stringify(setup.data.manifest, null, 2)} />
+              </div>
+            ) : null}
+            {Object.entries(setup.data?.callbacks || {}).map(
+              ([name, value]) => (
+                <div className="field" key={name}>
+                  <label htmlFor={"callback-" + name}>
+                    {name === "interactivity"
+                      ? "Interactive actions URL"
+                      : name === "events"
+                        ? "Events URL"
+                        : "Inbound webhook URL"}
+                  </label>
+                  <div className="actions">
+                    <input id={"callback-" + name} readOnly value={value} />
+                    <Copy value={value} />
+                  </div>
+                </div>
+              ),
+            )}
+            {setup.data ? (
+              <details>
+                <summary>Provider setup instructions</summary>
+                <ol>
+                  {setup.data.steps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+              </details>
+            ) : null}
+            {provider?.constraints?.length ? (
+              <details>
+                <summary>Supported capabilities</summary>
+                <ul>
+                  {provider.constraints.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </details>
             ) : null}
           </section>
           <section className="section">
-            <h3>Send a connection test</h3>
-            <p>
-              Explicitly sends a real test message to the selected configured
-              destination. Current management and message permissions apply.
-            </p>
-            <Field label="Destination">
-              <select
-                value={destination}
-                onChange={(e) => {
-                  setDestination(e.target.value);
-                  setConfirm(false);
-                }}
-              >
-                <option value="">Choose destination</option>
-                {destinations.items.map((d) => (
-                  <option value={d.id} key={d.id}>
-                    {d.address} · {d.principal_id}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <ErrorView error={destinations.error} />
+            <div className="actions">
+              <h3>Recipients</h3>
+              <Button icon="plus" onClick={() => setAdding(true)}>
+                Add recipient
+              </Button>
+            </div>
+            <QueryState
+              query={destinations}
+              empty="Add a recipient to test this connection."
+            >
+              <Field label="Test recipient">
+                <select
+                  value={destination}
+                  onChange={(e) => {
+                    setDestination(e.target.value);
+                    setConfirm(false);
+                    setQueued(false);
+                  }}
+                >
+                  <option value="">Choose a recipient</option>
+                  {destinations.items.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.address}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </QueryState>
             {destinations.hasNextPage ? (
               <Button onClick={() => void destinations.fetchNextPage()}>
-                Load more destinations
+                Load more recipients
               </Button>
             ) : null}
             {confirm ? (
               <div className="approval">
                 <p>
-                  Send a real message through {c.name} to{" "}
+                  Send a test message to{" "}
                   {
                     destinations.items.find((d) => d.id === destination)
                       ?.address
-                  }
-                  ?
+                  }{" "}
+                  through {c.name}?
                 </p>
                 <div className="actions">
                   <Button onClick={() => setConfirm(false)}>Cancel</Button>
@@ -462,12 +583,12 @@ function ConnectionDetail({
                     disabled={op.pending}
                     onClick={() =>
                       void op
-                        .run("/connections/" + c.id + "/test", {
+                        .run(`/connections/${c.id}/test`, {
                           destination_id: destination,
                         })
                         .then((r) => {
                           if (r) {
-                            setResult(r);
+                            setQueued(true);
                             setConfirm(false);
                           }
                         })
@@ -482,19 +603,43 @@ function ConnectionDetail({
                 disabled={!destination || !c.enabled}
                 onClick={() => setConfirm(true)}
               >
-                Review test
+                Test connection
               </Button>
             )}
-            {result ? (
-              <Details
-                value={result}
-                label="Accepted test delivery (not proof of receipt)"
-              />
+            {queued && !diagnostic?.last_test ? (
+              <p role="status">Test queued. Waiting for provider acceptance.</p>
+            ) : null}
+            {diagnostic?.last_test ? (
+              <div className="prose">
+                <p role="status">
+                  {diagnostic.qualification === "engine_round_trip_observed"
+                    ? "A reply to the test was received and attributed in Beepgrid."
+                    : diagnostic.qualification ===
+                        "provider_acceptance_observed"
+                      ? c.kind === "email"
+                        ? "The mail server accepted the test. Check the recipient’s inbox and workspace link."
+                        : "The provider accepted the test. Reply to that message to verify the return path."
+                      : `Test ${diagnostic.last_test.state.replaceAll("_", " ")}.`}
+                </p>
+                {diagnostic.last_test.detail ? (
+                  <p>{diagnostic.last_test.detail}</p>
+                ) : null}
+                <Button
+                  onClick={() => {
+                    onClose();
+                    navigate(
+                      "/conversations/" + diagnostic.last_test!.conversation_id,
+                    );
+                  }}
+                >
+                  Open test conversation
+                </Button>
+              </div>
             ) : null}
           </section>
         </>
       ) : null}
-      <Details value={c.config} label="Permitted connection configuration" />
+      <Details value={c.config} label="Connection details" />
       {edit && provider ? (
         <ConnectionForm
           provider={provider}
@@ -502,6 +647,9 @@ function ConnectionDetail({
           onClose={() => setEdit(false)}
           onSaved={onClose}
         />
+      ) : null}
+      {adding ? (
+        <DestinationForm connection={c} onClose={() => setAdding(false)} />
       ) : null}
     </Modal>
   );
@@ -628,22 +776,46 @@ function DestinationRow({
     </tr>
   );
 }
-function DestinationForm({
+export function DestinationForm({
+  connection: initialConnection,
   destination: d,
   recipientName,
   onClose,
 }: {
   destination?: Destination;
+  connection?: Connection;
   recipientName?: string;
   onClose: () => void;
 }) {
   const connections = useCollection<Connection>("connections"),
     [target, setTarget] = useState<Target[]>([]),
-    [connection, setConnection] = useState(d?.connection_id || ""),
+    [connection, setConnection] = useState(
+      d?.connection_id || initialConnection?.id || "",
+    ),
     [address, setAddress] = useState(d?.address || ""),
     [mode, setMode] = useState(d?.mode || "primary"),
     [priority, setPriority] = useState(d?.priority || 0),
     op = useOperation();
+  const selectedConnection =
+    connections.items.find((c) => c.id === connection) ||
+    (initialConnection?.id === connection ? initialConnection : undefined);
+  const personID = d?.principal_id || target[0]?.id || "";
+  const person = useCollection<Identity>(
+    "people",
+    "",
+    { id: personID },
+    !!personID,
+  );
+  const linkCap = useCapabilities({ kind: "person", id: personID });
+  const [linking, setLinking] = useState(false);
+  const linkedAccount =
+    !!selectedConnection &&
+    !!person.items[0]?.metadata?.[selectedConnection.kind + "_user_id"] &&
+    (selectedConnection.kind === "telegram"
+      ? person.items[0]?.metadata?.telegram_bot_id ===
+        selectedConnection.config.bot_id
+      : person.items[0]?.metadata?.slack_team_id ===
+        selectedConnection.config.team_id);
   const recipient = useCapabilities(
     d ? { kind: "destination", id: d.id } : target[0],
     undefined,
@@ -675,7 +847,11 @@ function DestinationForm({
           <select
             required
             value={connection}
-            onChange={(e) => setConnection(e.target.value)}
+            onChange={(e) => {
+              setConnection(e.target.value);
+              if (!d) setTarget([]);
+              setAddress("");
+            }}
           >
             <option value="">Choose connection</option>
             {connections.items.map((c) => (
@@ -697,15 +873,41 @@ function DestinationForm({
           </p>
         ) : (
           <TargetPicker
+            key={selectedConnection?.kind || "all"}
             value={target}
             onChange={setTarget}
             allowGroups={false}
             allowInstances={false}
+            peopleOnly={
+              !!selectedConnection &&
+              ["slack", "telegram"].includes(selectedConnection.kind)
+            }
           />
         )}
+        {selectedConnection &&
+        ["slack", "telegram"].includes(selectedConnection.kind) &&
+        person.items[0] ? (
+          <div className="section">
+            <strong>{names[selectedConnection.kind]} account</strong>
+            <p>
+              {linkedAccount
+                ? "Account linked"
+                : "Link this person’s account before saving their destination."}
+            </p>
+            {linkCap.data?.operations.link_account ? (
+              <Button onClick={() => setLinking(true)}>Link account</Button>
+            ) : null}
+          </div>
+        ) : null}
         <Field
           label="Provider address"
-          hint="Shared external channels may expose messages to their external members. Beep Grid permission checks still govern responses."
+          hint={
+            selectedConnection?.kind === "telegram"
+              ? "Use the linked person’s numeric Telegram user ID. Private bot chats only."
+              : selectedConnection?.kind === "slack"
+                ? "Use their Slack DM channel ID."
+                : undefined
+          }
         >
           <input
             required
@@ -714,6 +916,18 @@ function DestinationForm({
             onChange={(e) => setAddress(e.target.value)}
           />
         </Field>
+        {selectedConnection?.kind === "telegram" && linkedAccount ? (
+          <Button
+            onClick={() =>
+              setAddress(
+                String(person.items[0]?.metadata?.telegram_user_id || ""),
+              )
+            }
+          >
+            Use linked account
+          </Button>
+        ) : null}
+
         <div className="form-grid">
           <Field label="Mode">
             <select value={mode} onChange={(e) => setMode(e.target.value)}>
@@ -750,6 +964,69 @@ function DestinationForm({
             type="submit"
           >
             Save destination
+          </Button>
+        </div>
+      </Form>
+      {linking && selectedConnection && person.items[0] ? (
+        <AccountLink
+          person={person.items[0]}
+          connection={selectedConnection}
+          onClose={() => setLinking(false)}
+        />
+      ) : null}
+    </Modal>
+  );
+}
+
+function AccountLink({
+  person,
+  connection,
+  onClose,
+}: {
+  person: Identity;
+  connection: Connection;
+  onClose: () => void;
+}) {
+  const kind = connection.kind;
+  const [user, setUser] = useState(
+    String(person.metadata?.[kind + "_user_id"] || ""),
+  );
+  const op = useOperation();
+  return (
+    <Modal title={`Link ${person.name} to ${names[kind]}`} onClose={onClose}>
+      <Form
+        onSubmit={() =>
+          void op
+            .run(`/people/${person.id}/${kind}-account`, {
+              user_id: user,
+              ...(kind === "telegram"
+                ? { bot_id: connection.config.bot_id }
+                : { team_id: connection.config.team_id }),
+            })
+            .then((r) => {
+              if (r !== undefined) onClose();
+            })
+        }
+      >
+        <p className="help">
+          Confirm this immutable account ID belongs to {person.name}. Linking
+          does not grant message or approval permissions.
+        </p>
+        <Field
+          label={kind === "telegram" ? "Telegram user ID" : "Slack member ID"}
+        >
+          <input
+            required
+            value={user}
+            onChange={(e) => setUser(e.target.value)}
+            autoComplete="off"
+          />
+        </Field>
+        <ErrorView error={op.error} />
+        <div className="form-actions">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button primary type="submit" disabled={op.pending || !user.trim()}>
+            Link account
           </Button>
         </div>
       </Form>

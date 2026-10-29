@@ -82,7 +82,7 @@ export function RequestCard({
                 : r.response?.outcome === "approved"
                   ? "Approved"
                   : r.response?.outcome === "answered"
-                    ? String(r.response.answer ?? "Answered")
+                    ? "Answered"
                     : r.state}
             </Badge>
           ) : caps.data?.operations.respond ? (

@@ -12,6 +12,7 @@ import type {
   Target,
   FleetSource,
   Group,
+  Message,
 } from "../contracts";
 import { navigate, useRoute } from "../navigation";
 import { Compose } from "../Compose";
@@ -29,6 +30,7 @@ import {
   QueryState,
   Search,
   Status,
+  Tabs,
 } from "../ui";
 import { OverseerEntry } from "../OverseerEntry";
 import Groups from "./Groups";
@@ -511,8 +513,29 @@ export function Connect({
       agent: Identity;
       instance_id: string;
     } | null>(null),
-    [contact, setContact] = useState(true);
+    [contact, setContact] = useState(true),
+    [runtime, setRuntime] = useState("python"),
+    [testConversation, setTestConversation] = useState("");
   const base = location.origin;
+  const replies = useCollection<Message>(
+    "messages",
+    "",
+    { conversation_id: testConversation },
+    !!testConversation,
+  );
+  const replied =
+    !!session &&
+    replies.items.some(
+      (m) =>
+        m.sender_id === session.agent.id &&
+        m.instance_id === session.instance_id,
+    );
+  const command =
+    runtime === "python"
+      ? "PYTHONPATH=sdk/python python3 examples/python-worker/main.py"
+      : runtime === "go"
+        ? "go run -buildvcs=false ./examples/go-worker"
+        : "node examples/typescript-worker/main.mjs";
   async function prepare() {
     const result = await op.run<{
       token: string;
@@ -543,8 +566,11 @@ export function Connect({
     >
       {session ? (
         <div className="form">
-          <h3>Connect from your agent</h3>
-          <p>Use this session in your runtime. It expires in 24 hours.</p>
+          <h3>Run your worker</h3>
+          <p>
+            Save this 24-hour token in an owner-only file. It is shown only
+            here.
+          </p>
           <Field label="API URL">
             <input readOnly value={base} />
           </Field>
@@ -552,11 +578,68 @@ export function Connect({
             <strong>Session token</strong>
             <Copy value={session.token} />
           </div>
-          <pre className="code-example">{`curl '${base}/api/v1/worker/inbox?wait_ms=20000' \\\n  -H 'Authorization: Bearer YOUR_SESSION_TOKEN'`}</pre>
+          <Tabs
+            value={runtime}
+            onChange={setRuntime}
+            options={[
+              { id: "python", label: "Python" },
+              { id: "typescript", label: "TypeScript" },
+              { id: "go", label: "Go" },
+            ]}
+          />
           <p className="help">
-            Keep the token in your runtime’s secret store. Use the SDK or worker
-            API to receive messages and reply.
+            From your Beepgrid source checkout. Replace the token-file path
+            below.
+            {runtime === "typescript"
+              ? " First run npm --prefix sdk/typescript ci and npm --prefix sdk/typescript run build."
+              : ""}
           </p>
+          <pre className="code-example">
+            {[
+              "NOTIF_URL=" + shellQuote(base) + " \\",
+              "NOTIF_TOKEN_FILE='/path/to/worker-token' \\",
+              command,
+            ].join("\n")}
+          </pre>
+          <p className="help">
+            The starter receives messages and sends an attributed reply. Add
+            your own agent logic in its handler.
+          </p>
+          {testConversation ? (
+            <div role="status">
+              <Status value={replied ? "connected" : "waiting"} />
+              <p>
+                {replied
+                  ? "Reply received from " + session.agent.name + "."
+                  : "Waiting for your worker’s reply..."}
+              </p>
+              <Button
+                onClick={() => {
+                  onClose();
+                  navigate("/conversations/" + testConversation);
+                }}
+              >
+                Open test conversation
+              </Button>
+            </div>
+          ) : (
+            <Button
+              disabled={op.pending}
+              onClick={() =>
+                void op
+                  .run<{ conversation_id: string }>("/messages", {
+                    target: { kind: "instance", id: session.instance_id },
+                    body: "Beepgrid connection check. Please reply to this message.",
+                  })
+                  .then((r) => {
+                    if (r) setTestConversation(r.conversation_id);
+                  })
+              }
+            >
+              Send a test message
+            </Button>
+          )}
+          <ErrorView error={replies.error} />
           <ErrorView error={op.error} />
           <Button
             onClick={() => {
@@ -602,4 +685,8 @@ export function Connect({
       )}
     </Modal>
   );
+}
+
+function shellQuote(value: string) {
+  return "'" + value.replaceAll("'", "'\\''") + "'";
 }
