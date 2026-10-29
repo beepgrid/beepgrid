@@ -103,8 +103,11 @@ func (s *Store) Inbox(ctx context.Context, a Actor) ([]Delivery, error) {
 	if !mutate {
 		return out, nil
 	}
-	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		if _, e := tx.Exec(ctx, `UPDATE instances SET last_seen=now() WHERE scope=$1 AND id=$2 AND last_seen<now()-interval '10 seconds'`, a.Scope, a.InstanceID); e != nil {
+	err := s.mutation(ctx, a, true, func(tx pgx.Tx) error {
+		// Serialize repeated polls of this exact runtime, not every worker in
+		// the workspace. Keep the original no-write fresh-heartbeat behavior.
+		if _, e := tx.Exec(ctx, `WITH locked AS MATERIALIZED (SELECT last_seen FROM instances WHERE scope=$1 AND id=$2 FOR UPDATE)
+ UPDATE instances i SET last_seen=now() FROM locked l WHERE i.scope=$1 AND i.id=$2 AND l.last_seen<now()-interval '10 seconds'`, a.Scope, a.InstanceID); e != nil {
 			return e
 		}
 		rows, e := tx.Query(ctx, `SELECT `+deliveryFields+` FROM deliveries WHERE scope=$1 AND recipient_id=$2 AND connection_id='' AND expires_at>now() AND (exact_instance='' OR exact_instance=$3) AND ((state='queued' AND next_at<=now()) OR (state='leased' AND (lease_until<now() OR owner_instance=$3))) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`, a.Scope, a.ID, a.InstanceID)
@@ -147,10 +150,11 @@ func (s *Store) Ack(ctx context.Context, a Actor, id string, generation int64) e
 	if a.InstanceID == "" {
 		return Denied()
 	}
-	return s.tx(ctx, a, func(tx pgx.Tx) error {
+	return s.mutation(ctx, a, true, func(tx pgx.Tx) error {
 		var state, owner string
 		var gen int64
-		e := tx.QueryRow(ctx, `SELECT state,owner_instance,generation FROM deliveries WHERE scope=$1 AND id=$2 AND recipient_id=$3 AND connection_id=''`, a.Scope, id, a.ID).Scan(&state, &owner, &gen)
+		var valid bool
+		e := tx.QueryRow(ctx, `SELECT state,owner_instance,generation,COALESCE(lease_until>now(),false) FROM deliveries WHERE scope=$1 AND id=$2 AND recipient_id=$3 AND connection_id='' FOR UPDATE`, a.Scope, id, a.ID).Scan(&state, &owner, &gen, &valid)
 		if e != nil {
 			return e
 		}
@@ -160,8 +164,6 @@ func (s *Store) Ack(ctx context.Context, a Actor, id string, generation int64) e
 		if state == "received" {
 			return nil
 		}
-		var valid bool
-		_ = tx.QueryRow(ctx, `SELECT lease_until>now() FROM deliveries WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&valid)
 		if state != "leased" || !valid {
 			return Conflict("The delivery lease expired.")
 		}

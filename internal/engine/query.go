@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -51,7 +52,7 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	// Binding includes filters and limit. An opaque cursor is never permission.
 	stable := in
 	stable.Cursor = ""
-	hash := Digest(string(JSON(stable)))
+	hash := digestJSON(stable)
 	last := ""
 	if in.Cursor != "" {
 		raw, e := base64.RawURLEncoding.DecodeString(in.Cursor)
@@ -72,18 +73,34 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	where := "t.scope=$1" + source.extra + " AND t.id>$2"
 	// Messages use a chronological, stable key while retaining a single opaque cursor.
 	key := "t.id"
+	order := key
 	if in.Collection == "messages" || in.Collection == "delivery_attempts" || in.Collection == "overseer_plans" {
 		out.Order = "created_at_id_ascending"
 		key = "(to_char(t.created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US')||'/'||t.id)"
-		where = "t.scope=$1 AND " + key + ">$2"
+		order = "t.created_at,t.id"
+		comparison := ">"
+		if in.Collection == "overseer_plans" {
+			out.Order = "created_at_id_descending"
+			order = "t.created_at DESC,t.id DESC"
+			comparison = "<"
+		}
+		// Keep the existing sealed cursor's wire format. Only the SQL seek and
+		// ordering change: format the bounded result, not every retained row.
+		where = "t.scope=$1 AND $2::text=''"
+		if last != "" {
+			stamp, id, ok := strings.Cut(last, "/")
+			created, err := time.Parse("2006-01-02T15:04:05.000000", stamp)
+			if !ok || err != nil || id == "" {
+				return out, Bad("Invalid chronological cursor.")
+			}
+			args[1] = created.UTC()
+			args = append(args, id)
+			where = "t.scope=$1 AND (t.created_at,t.id)" + comparison + "($2::timestamptz,$4::text)"
+		}
 	}
-	direction := ""
 	if in.Collection == "overseer_plans" {
-		out.Order = "created_at_id_descending"
-		direction = " DESC"
-		where = "t.scope=$1 AND ($2='' OR " + key + "<$2)"
 		args = append(args, a.ID)
-		where += " AND t.person_id=$4"
+		where += " AND t.person_id=$" + strconv.Itoa(len(args))
 	}
 	where += " AND ($3='' OR strpos(lower(concat_ws(' ',to_jsonb(t)->>'id',to_jsonb(t)->>'name',to_jsonb(t)->>'title',to_jsonb(t)->>'body',to_jsonb(t)->>'question',to_jsonb(t)->>'external_id',to_jsonb(t)->'plan'->>'prompt',to_jsonb(t)->'metadata'->>'department',to_jsonb(t)->'metadata'->>'email')),lower($3))>0)"
 	for name, value := range in.Filters {
@@ -211,7 +228,7 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	ctx = withPolicySnapshot(ctx)
 	// Read candidate IDs only. No private payload or secret enters the response
 	// until the per-resource reader has enforced current visibility.
-	rows, e := s.Pool.Query(ctx, "SELECT t.id,"+key+" FROM "+source.table+" t WHERE "+where+" ORDER BY "+key+direction+" LIMIT 501", args...)
+	rows, e := s.Pool.Query(ctx, "SELECT t.id,"+key+" FROM "+source.table+" t WHERE "+where+" ORDER BY "+order+" LIMIT 501", args...)
 	if e != nil {
 		return out, e
 	}

@@ -7,8 +7,9 @@ WITH input AS MATERIALIZED (
  UPDATE scopes SET sequence=sequence+1 WHERE id=$1 RETURNING sequence
 ), written AS (
  INSERT INTO messages(id,scope,conversation_id,sender_id,instance_id,body,created_at)
- VALUES($2::jsonb->>'id',$1,$2::jsonb->>'conversation_id',$2::jsonb->>'sender_id',
-        NULLIF($2::jsonb->>'instance_id',''),$2::jsonb->>'body',($2::jsonb->>'created_at')::timestamptz)
+ SELECT $2::jsonb->>'id',$1,$2::jsonb->>'conversation_id',$2::jsonb->>'sender_id',
+        NULLIF($2::jsonb->>'instance_id',''),$2::jsonb->>'body',($2::jsonb->>'created_at')::timestamptz
+ FROM reservation
  RETURNING id
 ), emitted AS (
  INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data)

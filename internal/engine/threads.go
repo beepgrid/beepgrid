@@ -23,7 +23,7 @@ func (s *Store) recordThread(ctx context.Context, db DB, scope, connection, chan
 func (s *Store) SlackMessage(ctx context.Context, a Actor, c Connection, channel, thread, body, eventID string) (SendResult, error) {
 	var result SendResult
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
-		hash := Digest(string(JSON([]string{a.ID, channel, thread, body})))
+		hash := digestJSON([]string{a.ID, channel, thread, body})
 		key := "message/" + eventID
 		var previous string
 		var raw []byte

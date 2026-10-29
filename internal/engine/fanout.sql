@@ -17,7 +17,7 @@ WITH input AS MATERIALIZED (
  WHERE id=$1 RETURNING sequence
 ), created AS (
  INSERT INTO conversations(id,scope,title,created_by)
- SELECT conversation_id,$1,$3,$4 FROM input RETURNING id
+ SELECT conversation_id,$1,$3,$4 FROM input CROSS JOIN reservation RETURNING id
 ), members AS (
  INSERT INTO participants(scope,conversation_id,principal_id)
  SELECT $1,i.conversation_id,i.recipient_id FROM input i JOIN created c ON c.id=i.conversation_id

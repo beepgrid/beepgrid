@@ -93,7 +93,7 @@ func previewInputDigest(in DispatchPreviewInput) string {
 	for _, key := range ordered {
 		copy.Targets = append(copy.Targets, keys[key])
 	}
-	return Digest(string(JSON(copy)))
+	return digestJSON(copy)
 }
 func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in DispatchPreviewInput) (DispatchPreview, string, error) {
 	ctx = withPolicySnapshot(ctx)
@@ -172,7 +172,7 @@ func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in Dispatch
 			out.HiddenRecipients++
 		}
 	}
-	return out, Digest(string(JSON(fingerprint))), nil
+	return out, digestJSON(fingerprint), nil
 }
 func (s *Store) DispatchPreview(ctx context.Context, a Actor, in DispatchPreviewInput) (DispatchPreview, error) {
 	var out DispatchPreview

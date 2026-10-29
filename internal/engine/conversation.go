@@ -13,6 +13,8 @@ type recipient struct {
 	PolicyTarget  Target
 }
 
+type concurrentMessageKey struct{}
+
 func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, action, actionName string, descriptor ...*Action) ([]recipient, error) {
 	if len(descriptor) > 0 && descriptor[0] != nil {
 		actionName = descriptor[0].Name
@@ -200,11 +202,17 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 // historical participants in those checks, matching canRead's authority.
 func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor, id string) (Conversation, error) {
 	var c Conversation
+	lock := ""
+	if ctx.Value(concurrentMessageKey{}) != nil {
+		// Preserve one conversation's message order without serializing other
+		// conversations. Acquire this before creating the message timestamp.
+		lock = " FOR UPDATE OF c"
+	}
 	rows, e := db.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,
  COALESCE(p.id,''),COALESCE(p.kind,''),COALESCE(p.external_id,''),COALESCE(p.name,''),COALESCE(p.metadata,'{}'::jsonb),COALESCE(p.disabled,false),COALESCE(p.created_at,c.created_at)
  FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id
  LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id
- WHERE c.scope=$1 AND c.id=$2 ORDER BY p.id`, a.Scope, id)
+ WHERE c.scope=$1 AND c.id=$2 ORDER BY p.id`+lock, a.Scope, id)
 	if e != nil {
 		return c, e
 	}
@@ -368,7 +376,8 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 }
 func (s *Store) Send(ctx context.Context, a Actor, in SendInput, key string) (SendResult, error) {
 	var out SendResult
-	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.sendTx(ctx, tx, a, in, key, &out) })
+	ctx = context.WithValue(ctx, concurrentMessageKey{}, true)
+	err := s.mutation(ctx, a, true, func(tx pgx.Tx) error { return s.sendTx(ctx, tx, a, in, key, &out) })
 	return out, err
 }
 func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, key string, out *SendResult) error {

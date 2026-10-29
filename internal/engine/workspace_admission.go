@@ -38,6 +38,10 @@ func (l workspaceLease) release() { <-l.entry.token; l.g.drop(l.scope, l.entry) 
 // using several database connections to wait on one workspace's existing row
 // lock, leaving the shared pool available to unrelated workspaces.
 func (g *workspaceAdmission) acquire(ctx context.Context, scope string) (workspaceLease, error) {
+	return g.acquireCapacity(ctx, scope, max(1, g.capacity))
+}
+
+func (g *workspaceAdmission) acquireCapacity(ctx context.Context, scope string, capacity int) (workspaceLease, error) {
 	if e := ctx.Err(); e != nil {
 		return workspaceLease{}, e
 	}
@@ -52,7 +56,7 @@ func (g *workspaceAdmission) acquire(ctx context.Context, scope string) (workspa
 		} else {
 			entry = &workspaceWaiter{token: make(chan struct{}, 1)}
 		}
-		if capacity := max(1, g.capacity); cap(entry.token) != capacity {
+		if cap(entry.token) != capacity {
 			entry.token = make(chan struct{}, capacity)
 		}
 		g.active[scope] = entry

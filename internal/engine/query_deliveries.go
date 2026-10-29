@@ -152,7 +152,7 @@ func (s *Store) queryDeliveryRecords(ctx context.Context, a Actor, ids []string)
 			last[id] = key
 		} else if x.Attempts.NextCursor == "" {
 			in := QueryInput{Collection: "delivery_attempts", Filters: map[string]string{"delivery_id": id}, Limit: 10}
-			raw, e := s.seal(JSON(queryCursor{a.Scope, a.ID, Digest(string(JSON(in))), last[id], time.Now().Add(24 * time.Hour).Unix()}))
+			raw, e := s.seal(JSON(queryCursor{a.Scope, a.ID, digestJSON(in), last[id], time.Now().Add(24 * time.Hour).Unix()}))
 			if e != nil {
 				return nil, e
 			}

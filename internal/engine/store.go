@@ -19,6 +19,7 @@ type DB interface {
 }
 type Store struct {
 	workspaceAdmission   workspaceAdmission
+	independentAdmission workspaceAdmission
 	wakes                wakeHub
 	eventWakes           wakeHub
 	providerWakes        wakeHub
@@ -52,7 +53,24 @@ func (s *Store) Close() {
 	s.Pool.Close()
 }
 func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
-	release, err := s.workspaceAdmission.acquire(ctx, a.Scope)
+	return s.mutation(ctx, a, false, fn)
+}
+
+// Sends and worker leases may operate on unrelated records concurrently. Policy
+// mutations take FOR UPDATE, which conflicts with their FOR KEY SHARE. The
+// non-key event counter update is deliberately late and remains commit ordered.
+// No delivery or acknowledgement can escape the transaction before commit.
+func (s *Store) mutation(ctx context.Context, a Actor, independent bool, fn func(pgx.Tx) error) error {
+	gate := &s.workspaceAdmission
+	capacity := max(1, gate.capacity)
+	lock := " FOR UPDATE"
+	if independent {
+		gate = &s.independentAdmission
+		// Leave pool headroom for readers, control operations and other tenants.
+		capacity = max(1, min(4, int(s.Pool.Config().MaxConns)/2))
+		lock = " FOR KEY SHARE"
+	}
+	release, err := gate.acquireCapacity(ctx, a.Scope, capacity)
 	if err != nil {
 		return err
 	}
@@ -62,9 +80,8 @@ func (s *Store) tx(ctx context.Context, a Actor, fn func(pgx.Tx) error) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	// One short workspace lock makes commit order and event cursors agree. Network calls never hold it.
 	var held, suspended bool
-	if err = tx.QueryRow(ctx, `SELECT recovery_hold,(suspended OR (access_until IS NOT NULL AND access_until<=now())) FROM scopes WHERE id=$1 FOR UPDATE`, a.Scope).Scan(&held, &suspended); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT recovery_hold,(suspended OR (access_until IS NOT NULL AND access_until<=now())) FROM scopes WHERE id=$1`+lock, a.Scope).Scan(&held, &suspended); err != nil {
 		return err
 	}
 	if held {
@@ -145,7 +162,25 @@ func idempotent(ctx context.Context, db DB, a Actor, op, key string, input, outp
 	if !ValidText(key, 200) {
 		return Bad("Idempotency-Key is required (maximum 200 characters).")
 	}
-	h := Digest(string(JSON(input)))
+	h := digestJSON(input)
+	if ctx.Value(concurrentMessageKey{}) != nil && op == "send" {
+		// Reserve a new key inside this transaction before touching canonical
+		// data. Its unique index coordinates replicas without an extra advisory
+		// round trip. An incomplete receipt is never committed or acknowledged.
+		tag, err := db.Exec(ctx, `INSERT INTO idempotency(scope,principal_id,operation,key,input_hash,output) VALUES($1,$2,$3,$4,$5,'null'::jsonb) ON CONFLICT DO NOTHING`, a.Scope, a.ID, op, key, h)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() > 0 {
+			if err = fn(); err != nil {
+				return err
+			}
+			_, err = db.Exec(ctx, `UPDATE idempotency SET output=$5 WHERE scope=$1 AND principal_id=$2 AND operation=$3 AND key=$4`, a.Scope, a.ID, op, key, encodeReceipt(op, output))
+			return err
+		}
+		// INSERT may have waited for another replica. The separate SELECT
+		// below must use a fresh command snapshot to see that winner's receipt.
+	}
 	var oldHash string
 	var old []byte
 	err := db.QueryRow(ctx, `SELECT input_hash,output FROM idempotency WHERE scope=$1 AND principal_id=$2 AND operation=$3 AND key=$4`, a.Scope, a.ID, op, key).Scan(&oldHash, &old)

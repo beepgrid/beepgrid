@@ -121,7 +121,7 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 			var receipt []byte
 			e := tx.QueryRow(ctx, `SELECT input_hash,output FROM idempotency WHERE scope=$1 AND principal_id=$2 AND operation='overseer_plan' AND key=$3`, a.Scope, a.ID, key).Scan(&hash, &receipt)
 			if e == nil {
-				if hash != Digest(string(JSON(in))) {
+				if hash != digestJSON(in) {
 					return Conflict("The idempotency key was already used with different input.")
 				}
 				if e = json.Unmarshal(receipt, &out); e != nil {
@@ -161,7 +161,7 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 	if len(JSON(sources)) > 24576 {
 		return out, Bad("Select a smaller fleet for this question.")
 	}
-	historyDigest := Digest(string(JSON(history)))
+	historyDigest := digestJSON(history)
 	// Leave room for gateway instructions and envelope fields inside its 32 KiB bound.
 	for len(JSON(sources))+len(JSON(in.Prompt))+len(JSON(history)) > 30000 && len(history) > 1 {
 		history = history[1:]
@@ -298,7 +298,7 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 		if err != nil {
 			return err
 		}
-		if historyDigest != Digest(string(JSON(freshHistory))) {
+		if historyDigest != digestJSON(freshHistory) {
 			return Conflict("Conversation context changed. Ask again.")
 		}
 		save := func() error {
@@ -465,7 +465,7 @@ func (s *Store) overseerPlan(ctx context.Context, db DB, a Actor, id string) (Ov
 	if err = db.QueryRow(ctx, `SELECT reply_summary,reply_digest FROM overseer_plans WHERE scope=$1 AND id=$2 AND person_id=$3`, a.Scope, id, a.ID).Scan(&out.ReplySummary, &out.ReplyDigest); err != nil {
 		return OverseerPlan{}, err
 	}
-	if out.ReplyDigest != Digest(string(JSON(out.Replies))) {
+	if out.ReplyDigest != digestJSON(out.Replies) {
 		out.ReplySummary = ""
 		out.ReplyDigest = ""
 	}
@@ -559,7 +559,7 @@ func (s *Store) SummarizeOverseer(ctx context.Context, a Actor, id string) (Over
 	if len(JSON(replies)) > 24576 {
 		return out, Bad("The replies exceed the summary context limit. Read the individual responses.")
 	}
-	digest := Digest(string(JSON(out.Replies)))
+	digest := digestJSON(out.Replies)
 	bounded, cancel := context.WithTimeout(context.WithValue(ctx, assistanceActorKey{}, a.Scope+"/"+a.ID), 30*time.Second)
 	defer cancel()
 	summary, err := s.OverseerSummarizer(bounded, out.Prompt, replies)
@@ -581,7 +581,7 @@ func (s *Store) SummarizeOverseer(ctx context.Context, a Actor, id string) (Over
 		if err != nil {
 			return err
 		}
-		if digest != Digest(string(JSON(out.Replies))) {
+		if digest != digestJSON(out.Replies) {
 			return Conflict("Agent replies changed. Refresh before summarizing.")
 		}
 		if _, err = tx.Exec(ctx, `UPDATE overseer_plans SET reply_summary=$4,reply_digest=$5 WHERE scope=$1 AND id=$2 AND person_id=$3`, a.Scope, id, a.ID, summary, digest); err != nil {

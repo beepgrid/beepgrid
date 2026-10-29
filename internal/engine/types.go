@@ -38,6 +38,13 @@ func ID(prefix string) string {
 }
 func Secret() string         { return ID("ntf") + ID("") }
 func Digest(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+// Hash the canonical bytes directly. Converting a large JSON value through a
+// string and back adds payload-sized copies without changing the digest.
+func digestJSON(v any) string {
+	h := sha256.Sum256(JSON(v))
+	return hex.EncodeToString(h[:])
+}
 func JSON(v any) []byte {
 	b, err := json.Marshal(v)
 	if err != nil {

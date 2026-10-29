@@ -28,7 +28,7 @@ type PublishInput struct {
 }
 
 func contextHash(key, title, body string, choices []string) string {
-	return Digest(string(JSON([]any{key, title, body, choices})))
+	return digestJSON([]any{key, title, body, choices})
 }
 
 const answerFields = `id,key,context_hash,question,answer,author_id,publisher_id,audience,valid_until,invalidated,source_request`
