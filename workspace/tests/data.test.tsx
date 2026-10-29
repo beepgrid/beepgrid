@@ -77,6 +77,43 @@ it("never converts a policy failure into an empty successful collection", async 
   expect(result.current.error).toMatchObject({ status: 403 });
   expect(result.current.isSuccess).toBe(false);
 });
+it("deduplicates a record that moves between recency pages, keeping its freshest projection", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [{ id: "chat", title: "Fresh" }],
+            next_cursor: "page2",
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              { id: "chat", title: "Older" },
+              { id: "second", title: "Other" },
+            ],
+          }),
+        ),
+      ),
+  );
+  const { result } = renderHook(
+    () => useCollection<{ id: string; title: string }>("conversations"),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.hasNextPage).toBe(true));
+  await act(() => result.current.fetchNextPage());
+  await waitFor(() =>
+    expect(result.current.items).toEqual([
+      { id: "chat", title: "Fresh" },
+      { id: "second", title: "Other" },
+    ]),
+  );
+});
 it("fences repeated submits while one mutation is pending", async () => {
   let resolve!: (r: Response) => void;
   const fetcher = vi

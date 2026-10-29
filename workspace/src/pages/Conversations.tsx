@@ -2,9 +2,9 @@ import { memo, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   usePostResource,
+  clearConversationDrafts,
+  accessUnavailable,
   useCollection,
-  useDraft,
-  useOperation,
   useResource,
   useSession,
 } from "../data";
@@ -13,57 +13,64 @@ import type {
   Attachment,
   Conversation,
   Message,
+  Identity,
   Request,
 } from "../contracts";
-import { bytes, relative, timestamp, upload } from "../client";
+import { relative, timestamp, upload } from "../client";
 import { navigate, useRoute, workspaceURL } from "../navigation";
-import { Compose } from "../Compose";
+import { MentionText } from "../Mentions";
+import { RequestCard } from "../RequestCard";
+import { Compose, MessageComposer } from "../Compose";
 import {
   Button,
   ConversationAvatar,
   conversationPeers,
   conversationLabel,
-  DateValue,
-  Details,
   Empty,
   ErrorView,
-  Field,
-  Form,
   Icon,
   IdentityIcon,
   Loading,
   PageHeader,
   QueryState,
   Search,
-  unavailable,
 } from "../ui";
 
 import Overseer from "./Overseer";
 import { OverseerEntry } from "../OverseerEntry";
+import { groupQuestions } from "../request-groups";
 
 export default function Conversations() {
   const route = useRoute(),
     me = useSession();
   const [search, setSearch] = useState(""),
-    [compose, setCompose] = useState(false);
+    [compose, setCompose] = useState(false),
+    [view, setView] = useState("all");
   const q = useCollection<Conversation>(
     "conversations",
     useDeferredValue(search),
+    { participant_id: me.person.id },
+  );
+  const attention = useCollection<Request>(
+    "requests",
+    "",
+    { recipient_id: me.person.id, state: "open" },
+    view === "attention",
   );
   return (
     <>
       <PageHeader
-        title="Conversations"
+        title="Messages"
         actions={
           <Button primary icon="plus" onClick={() => setCompose(true)}>
-            New conversation
+            New message
           </Button>
         }
       />
       {route.id ? (
         <div className="mobile-chat-back">
           <Button onClick={() => navigate("/conversations")}>
-            All conversations
+            All messages
           </Button>
         </div>
       ) : null}
@@ -72,45 +79,95 @@ export default function Conversations() {
           <Search
             value={search}
             onChange={setSearch}
-            placeholder="Find a conversation"
+            placeholder="Search messages"
           />
+          <div className="message-filters">
+            <button
+              aria-pressed={view === "all"}
+              onClick={() => setView("all")}
+            >
+              All messages
+            </button>
+            <button
+              aria-pressed={view === "attention"}
+              onClick={() => setView("attention")}
+            >
+              Needs attention
+            </button>
+          </div>
           {!search || "overseer".includes(search.toLowerCase()) ? (
             <OverseerEntry selected={route.id === "overseer"} />
           ) : null}
-          <QueryState query={q} empty="No permitted conversations">
-            {q.items.map((c) => (
-              <button
-                className="conversation-row conversation-preview"
-                key={c.id}
-                aria-current={route.id === c.id}
-                onClick={() => navigate("/conversations/" + c.id)}
-              >
-                <ConversationAvatar
-                  participants={c.participants || []}
-                  currentId={me.person.id}
-                />
-                <div className="conversation-copy">
-                  <strong>{c.title || "Untitled conversation"}</strong>
-                  <p>
-                    {conversationPeers(c.participants || [], me.person.id)
-                      .map((p) => p.name)
-                      .join(", ") || "Conversation"}
-                  </p>
-                  <div className="conversation-meta">
-                    <span>
-                      {conversationLabel(c.participants || [], me.person.id)}
-                    </span>
-                    <time
-                      dateTime={c.created_at}
-                      title={timestamp(c.created_at)}
-                    >
-                      Started {relative(c.created_at)}
-                    </time>
+          {view === "attention" ? (
+            <QueryState query={attention} empty="You’re all caught up">
+              {groupQuestions(attention.items).map((group) => {
+                const r = group[0];
+                return (
+                  <button
+                    className="conversation-row"
+                    key={r.id}
+                    onClick={() =>
+                      navigate("/conversations/" + r.conversation_id)
+                    }
+                  >
+                    <strong>{r.body || r.title}</strong>
+                    <p>
+                      {r.kind === "approval"
+                        ? "Approval requested"
+                        : "Waiting for your reply"}
+                      {group.length > 1 ? (
+                        <span> · {group.length} matching questions</span>
+                      ) : null}
+                    </p>
+                  </button>
+                );
+              })}
+            </QueryState>
+          ) : (
+            <QueryState query={q} empty="Your conversations will appear here">
+              {q.items.map((c) => (
+                <button
+                  className="conversation-row conversation-preview"
+                  key={c.id}
+                  aria-current={route.id === c.id}
+                  onClick={() => navigate("/conversations/" + c.id)}
+                >
+                  <ConversationAvatar
+                    participants={c.participants || []}
+                    currentId={me.person.id}
+                  />
+                  <div className="conversation-copy">
+                    <strong>
+                      {conversationPeers(c.participants || [], me.person.id)
+                        .length === 1
+                        ? conversationPeers(
+                            c.participants || [],
+                            me.person.id,
+                          )[0].name
+                        : c.title || "Group chat"}
+                    </strong>
+                    <p>
+                      {c.last_preview ||
+                        (c.title === "Conversation"
+                          ? "Start a conversation"
+                          : c.title)}
+                    </p>
+                    <div className="conversation-meta">
+                      <span>
+                        {conversationLabel(c.participants || [], me.person.id)}
+                      </span>
+                      <time
+                        dateTime={c.last_activity_at || c.created_at}
+                        title={timestamp(c.last_activity_at || c.created_at)}
+                      >
+                        {relative(c.last_activity_at || c.created_at)}
+                      </time>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
-          </QueryState>
+                </button>
+              ))}
+            </QueryState>
+          )}
         </aside>
         {route.id ? (
           route.id === "overseer" ? (
@@ -120,7 +177,7 @@ export default function Conversations() {
           )
         ) : (
           <Empty title="Choose a conversation" icon="conversations">
-            Messages stay with their authorized participants.
+            Start a message with a person, an agent or a group of recipients.
           </Empty>
         )}
       </div>
@@ -132,13 +189,10 @@ function Chat({ id }: { id: string }) {
   const me = useSession(),
     q = useResource<Conversation>("/conversations/" + id),
     cache = useQueryClient();
-  const [body, setBody] = useDraft("conversation:" + id),
-    [error, setError] = useState<Error | null>(null),
+  const [error, setError] = useState<Error | null>(null),
     [uploading, setUploading] = useState(false),
-    [history, setHistory] = useState(false),
-    [ask, setAsk] = useState(false);
-  const op = useOperation("conversation:" + id),
-    end = useRef<HTMLDivElement>(null),
+    [history, setHistory] = useState(false);
+  const end = useRef<HTMLDivElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     pinned = useRef(true),
     fileInput = useRef<HTMLInputElement>(null);
@@ -172,36 +226,17 @@ function Chat({ id }: { id: string }) {
     { conversation_id: id },
     !!q.data && !q.error,
   );
-  const [showRequests, setShowRequests] = useState(false);
   useEffect(() => {
     if (pinned.current) end.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, id]);
+  }, [messages.length, related.items.length, id]);
   useEffect(() => {
     if (
-      unavailable(q.error) ||
-      unavailable(caps.error) ||
+      accessUnavailable(q.error) ||
+      accessUnavailable(caps.error) ||
       (caps.data && !caps.data.operations.message)
-    ) {
-      setBody("");
-      op.forget();
-    }
-  }, [q.error, caps.error, caps.data, setBody, op.forget]);
-  async function send() {
-    setError(null);
-    if (!destination || !body.trim()) return;
-    if (bytes(body) > 32768) {
-      setError(Error("Messages can contain at most 32,768 UTF-8 bytes."));
-      return;
-    }
-    const result = await op.run<{
-      messages: Message[];
-      conversation_id: string;
-    }>("/messages", { target: destination, conversation_id: id, body });
-    if (result) {
-      setBody("");
-      pinned.current = true;
-    }
-  }
+    )
+      clearConversationDrafts(id);
+  }, [q.error, caps.error, caps.data, id]);
   async function attach(file?: File) {
     if (!file) return;
     setError(null);
@@ -234,7 +269,7 @@ function Chat({ id }: { id: string }) {
     }
   }
   if (q.isPending) return <Loading label="Opening conversation" />;
-  if (q.error)
+  if (!q.data)
     return <ErrorView error={q.error} retry={() => void q.refetch()} />;
   const c = q.data!;
   return (
@@ -245,48 +280,14 @@ function Chat({ id }: { id: string }) {
           currentId={me.person.id}
         />
         <div className="chat-heading">
-          <strong>{c.title || "Conversation"}</strong>
+          <strong>
+            {participants.length === 1
+              ? participants[0].name
+              : c.title || "Group chat"}
+          </strong>
           <p>{c.participants.map((p) => p.name).join(", ")}</p>
         </div>
-        {caps.data?.operations.ask ? (
-          <Button onClick={() => setAsk(true)}>New request</Button>
-        ) : null}
-        <Button onClick={() => setShowRequests((x) => !x)}>Requests</Button>
-        <Details
-          value={{
-            id: c.id,
-            participants: c.participants.map((p) => ({
-              kind: p.kind,
-              name: p.name,
-              id: p.id,
-            })),
-            created_at: c.created_at,
-          }}
-          label="Context"
-        />
       </header>
-      {showRequests ? (
-        <section className="conversation-requests">
-          <h3>Related requests</h3>
-          <QueryState
-            query={related}
-            empty="No readable requests in this conversation"
-          >
-            {related.items.map((r) => (
-              <button
-                key={r.id}
-                className="conversation-row"
-                onClick={() => navigate("/requests/" + r.id)}
-              >
-                <strong>{r.title}</strong>
-                <p>
-                  {r.kind} · {r.response?.outcome || r.state} · {r.id}
-                </p>
-              </button>
-            ))}
-          </QueryState>
-        </section>
-      ) : null}
       <div
         className="messages"
         ref={scroll}
@@ -297,60 +298,128 @@ function Chat({ id }: { id: string }) {
         }}
       >
         {history ? (
-          <QueryState query={all} empty="No readable messages">
-            {messages.map((m) => (
+          <Button
+            onClick={() => void all.fetchNextPage()}
+            disabled={!all.hasNextPage || all.isFetchingNextPage}
+          >
+            Earlier messages
+          </Button>
+        ) : messages.length >= 500 ? (
+          <Button
+            onClick={() => {
+              pinned.current = false;
+              setHistory(true);
+            }}
+          >
+            Earlier messages
+          </Button>
+        ) : null}
+        {[
+          ...messages.map((m) => ({
+            kind: "message" as const,
+            at: m.created_at,
+            id: m.id,
+            value: m,
+          })),
+          ...related.items.map((r) => ({
+            kind: "request" as const,
+            at: r.created_at,
+            id: r.id,
+            value: r,
+          })),
+          ...related.items
+            .filter((r) => r.response && r.resolved_at)
+            .map((r) => ({
+              kind: "decision" as const,
+              at: r.resolved_at!,
+              id: r.id + "/decision",
+              value: r,
+            })),
+        ]
+          .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+          .map((item) =>
+            item.kind === "message" ? (
               <ChatMessage
-                key={m.id}
-                message={m}
+                key={item.id}
+                message={item.value}
+                participants={c.participants}
                 name={
-                  c.participants.find((p) => p.id === m.sender_id)?.name ||
-                  m.sender_id
+                  c.participants.find((p) => p.id === item.value.sender_id)
+                    ?.name || "Participant"
                 }
                 kind={
-                  c.participants.find((p) => p.id === m.sender_id)?.kind ||
-                  "agent"
+                  c.participants.find((p) => p.id === item.value.sender_id)
+                    ?.kind || "agent"
                 }
               />
-            ))}
-          </QueryState>
-        ) : (
-          <>
-            <div style={{ textAlign: "center", marginBottom: 25 }}>
-              <Button
-                onClick={() => {
-                  pinned.current = false;
-                  setHistory(true);
-                }}
-              >
-                Browse complete paged history
-              </Button>
-              <p>
-                <small>
-                  Recent messages shown, up to 500. History uses your current
-                  access.
-                </small>
-              </p>
-            </div>
-            {messages.length === 0 ? (
-              <Empty title="No messages yet" icon="conversations" />
-            ) : (
-              messages.map((m) => (
-                <ChatMessage
-                  key={m.id}
-                  message={m}
-                  name={
-                    c.participants.find((p) => p.id === m.sender_id)?.name ||
-                    m.sender_id
-                  }
+            ) : item.kind === "decision" ? (
+              <article key={item.id} className="message">
+                <IdentityIcon
                   kind={
-                    c.participants.find((p) => p.id === m.sender_id)?.kind ||
-                    "agent"
+                    c.participants.find((p) => p.id === item.value.resolved_by)
+                      ?.kind || "person"
+                  }
+                  id={item.value.resolved_by}
+                  label={
+                    c.participants.find((p) => p.id === item.value.resolved_by)
+                      ?.name
                   }
                 />
-              ))
-            )}
-          </>
-        )}
+                <div className="message-body">
+                  <div className="message-meta">
+                    <strong>
+                      {c.participants.find(
+                        (p) => p.id === item.value.resolved_by,
+                      )?.name || "Participant"}
+                    </strong>
+                    <time>
+                      {new Date(item.at).toLocaleTimeString(undefined, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </div>
+                  <p
+                    className={
+                      item.value.response?.outcome === "approved"
+                        ? "approved-reply"
+                        : ""
+                    }
+                  >
+                    {item.value.response?.outcome === "approved"
+                      ? "Approved"
+                      : item.value.response?.outcome === "denied"
+                        ? "Declined"
+                        : typeof item.value.response?.answer === "string"
+                          ? item.value.response.answer
+                          : item.value.response?.outcome}
+                  </p>
+                </div>
+              </article>
+            ) : (
+              <RequestCard
+                key={item.id}
+                request={item.value}
+                participants={c.participants}
+                sender={c.participants.find(
+                  (p) => p.id === item.value.requester_id,
+                )}
+                onFollowUp={() =>
+                  document
+                    .querySelector<HTMLTextAreaElement>(".composer textarea")
+                    ?.focus()
+                }
+              />
+            ),
+          )}
+        {!messages.length && !related.items.length ? (
+          <Empty title="Start the conversation" icon="conversations" />
+        ) : null}
+        {related.hasNextPage ? (
+          <Button onClick={() => void related.fetchNextPage()}>
+            More decisions
+          </Button>
+        ) : null}
         <div ref={end} />
       </div>
       {attachments.error ? <ErrorView error={attachments.error} /> : null}
@@ -366,10 +435,6 @@ function Chat({ id }: { id: string }) {
               <Icon name="file" size={14} />
               {a.file_name}
               <small>{(a.size / 1024).toFixed(1)} KiB</small>
-              <span className="attachment-meta">
-                {a.media_type} · {timestamp(a.created_at)} · {a.id} · SHA256{" "}
-                {a.sha256}
-              </span>
             </a>
           ))}
           {attachments.hasNextPage ? (
@@ -380,31 +445,18 @@ function Chat({ id }: { id: string }) {
         </div>
       ) : null}
       <div className="composer">
-        <ErrorView error={error || op.error || caps.error} />
-        {caps.data?.operations.message ? (
-          <Form onSubmit={() => void send()}>
-            {participants.length > 1 ? (
-              <p className="help">
-                Reply goes to the current conversation participants:{" "}
-                {participants.map((p) => p.name).join(", ")}. Current permission
-                is checked for each recipient.
-              </p>
-            ) : null}
-            <textarea
-              aria-label="Message"
-              placeholder="Write a message…"
-              rows={3}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
-            />
-            <div className="actions">
-              <div className="actions">
+        <ErrorView error={error} />
+        {caps.data?.operations.message && destination ? (
+          <MessageComposer
+            conversation={id}
+            participants={c.participants}
+            targets={[destination]}
+            canAsk={!!caps.data.operations.ask}
+            onSent={() => {
+              pinned.current = true;
+            }}
+            tools={
+              <>
                 <button
                   className="icon-button"
                   type="button"
@@ -421,34 +473,14 @@ function Chat({ id }: { id: string }) {
                   accept=".txt,.json,.pdf,.png,.jpg,.jpeg,.webp"
                   onChange={(e) => void attach(e.target.files?.[0])}
                 />
-                <small>
-                  {uploading
-                    ? "Uploading attachment"
-                    : "⌘ / Ctrl + Enter to send"}
-                </small>
-              </div>
-              <Button
-                primary
-                type="submit"
-                icon="arrow"
-                disabled={op.pending || uploading || !body.trim()}
-              >
-                {op.pending ? "Sending" : "Send"}
-              </Button>
-            </div>
-          </Form>
+                {uploading ? <small>Uploading...</small> : null}
+              </>
+            }
+          />
         ) : (
-          <p>Messaging is unavailable under your current permissions.</p>
+          <p>Messaging is unavailable for this conversation.</p>
         )}
       </div>
-      {ask && destination ? (
-        <Compose
-          mode="question"
-          initial={[destination]}
-          conversation={id}
-          onClose={() => setAsk(false)}
-        />
-      ) : null}
     </section>
   );
 }
@@ -456,7 +488,9 @@ const ChatMessage = memo(function ChatMessage({
   message: m,
   name,
   kind,
+  participants,
 }: {
+  participants: Identity[];
   message: Message;
   name: string;
   kind: string;
@@ -474,17 +508,13 @@ const ChatMessage = memo(function ChatMessage({
             })}
           </time>
         </div>
-        <p>{m.body}</p>
-        {m.instance_id ? (
-          <Details
-            value={{
-              sender_id: m.sender_id,
-              instance_id: m.instance_id,
-              created_at: m.created_at,
-            }}
-            label="Authenticated runtime"
+        <p>
+          <MentionText
+            body={m.body}
+            mentions={m.mentions}
+            participants={participants}
           />
-        ) : null}
+        </p>
       </div>
     </article>
   );

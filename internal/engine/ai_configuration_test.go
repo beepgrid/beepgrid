@@ -82,7 +82,7 @@ func TestNativeAIEndToEnd(t *testing.T) {
 				}
 				switch task {
 				case "overseer_plan":
-					return map[string]any{"operation": "question", "agent_ids": []string{worker.ID}, "body": "Report progress", "summary": "Ask the permitted agent for current progress"}
+					return map[string]any{"instructions": []any{}, "operation": "question", "agent_ids": []string{worker.ID}, "body": "Report progress", "summary": "Ask the permitted agent for current progress"}
 				case "overseer_summary":
 					return map[string]any{"summary": "The permitted agent reports seven pages complete"}
 				}
@@ -157,7 +157,7 @@ func TestNativeAIRechecksAuthorityAfterModelCall(t *testing.T) {
 							t.Error(err)
 						}
 					}
-					return map[string]any{"operation": "question", "agent_ids": []string{id}, "body": "Report progress", "summary": "A bounded proposal"}
+					return map[string]any{"instructions": []any{}, "operation": "question", "agent_ids": []string{id}, "body": "Report progress", "summary": "A bounded proposal"}
 				})
 				enableAssistance(t, s, owner, true)
 				if _, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Ask my agent"}); ErrorStatus(err) != 403 {

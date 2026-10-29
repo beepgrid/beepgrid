@@ -16,7 +16,7 @@ import (
 
 var providers = []string{"openai", "anthropic", "google", "openai-compatible"}
 var answers = map[string]string{
-	"overseer_plan":    `{"operation":"status","agent_ids":["agt_1"],"body":"","summary":"One permitted agent"}`,
+	"overseer_plan":    `{"instructions":[],"operation":"status","agent_ids":["agt_1"],"body":"","summary":"One permitted agent"}`,
 	"overseer_summary": `{"summary":"The permitted agent reports completion"}`,
 }
 

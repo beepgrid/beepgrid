@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-
 type FleetStatus struct {
 	Agent     Principal  `json:"agent"`
 	Instances []Instance `json:"instances"`
@@ -74,5 +73,9 @@ func (s *Store) fleetStatus(ctx context.Context, db DB, a Actor, target *Target)
 		}
 		out = append(out, FleetStatus{p, instances, isFresh})
 	}
-	return map[string]any{"agents": out, "total": len(out), "fresh": fresh, "missing_or_stale": len(out) - fresh, "as_of": time.Now(), "summary": fmt.Sprintf("%d of %d permitted agents have a recently connected instance. Progress is worker-reported; overlapping counts are not added.", fresh, len(out)), "mode": "read_only", "commands_supported": false}, nil
+	cycles, err := s.deadlocks(ctx, db, a, allowed)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"deadlocks": cycles, "agents": out, "total": len(out), "fresh": fresh, "missing_or_stale": len(out) - fresh, "as_of": time.Now(), "summary": fmt.Sprintf("%d of %d permitted agents have a recently connected instance. Progress is worker-reported; overlapping counts are not added.", fresh, len(out)), "mode": "read_only", "commands_supported": false}, nil
 }

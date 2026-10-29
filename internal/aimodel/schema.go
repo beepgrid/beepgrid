@@ -74,7 +74,7 @@ func value(d *json.Decoder, depth int) (any, error) {
 func object(properties map[string]any) map[string]any {
 	keys := make([]string, 0, len(properties))
 	// Stable order avoids sending a different schema on each model call.
-	for _, key := range []string{"operation", "agent_ids", "body", "summary"} {
+	for _, key := range []string{"operation", "agent_ids", "body", "summary", "instructions", "agent_id"} {
 		if _, ok := properties[key]; ok {
 			keys = append(keys, key)
 		}
@@ -86,7 +86,7 @@ func taskSchema(task string) (map[string]any, error) {
 	text := map[string]any{"type": "string"}
 	switch task {
 	case "overseer_plan":
-		return object(map[string]any{"operation": map[string]any{"type": "string", "enum": []string{"status", "message", "question", "task"}}, "agent_ids": map[string]any{"type": "array", "items": text}, "body": text, "summary": text}), nil
+		return object(map[string]any{"operation": map[string]any{"type": "string", "enum": []string{"status", "message", "question", "task"}}, "agent_ids": map[string]any{"type": "array", "items": text}, "body": text, "summary": text, "instructions": map[string]any{"type": "array", "items": object(map[string]any{"agent_id": text, "operation": map[string]any{"type": "string", "enum": []string{"message", "question", "task"}}, "body": text})}}), nil
 	case "overseer_summary":
 		return object(map[string]any{"summary": text}), nil
 	default:

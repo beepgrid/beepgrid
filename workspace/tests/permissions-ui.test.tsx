@@ -45,9 +45,9 @@ it("view-only discovery does not offer messaging, requests or management", async
   const { Wrapper } = harness();
   render(<Directory section="agents" />, { wrapper: Wrapper });
   fireEvent.click(
-    await screen.findByRole("button", { name: /Select Research assistant/ }),
+    await screen.findByRole("button", { name: /Research assistant/ }),
   );
-  await screen.findByRole("button", { name: "Access" });
+  await screen.findByRole("tab", { name: "Access" });
   expect(
     screen.queryByRole("button", { name: "Message" }),
   ).not.toBeInTheDocument();
@@ -84,7 +84,7 @@ it("a delegated nonadmin can edit a scoped person without editing external ident
   const { Wrapper } = harness();
   render(<Directory section="people" />, { wrapper: Wrapper });
   fireEvent.click(
-    await screen.findByRole("button", { name: /Select Managed teammate/ }),
+    await screen.findByRole("button", { name: /Managed teammate/ }),
   );
   fireEvent.click(await screen.findByRole("button", { name: "Edit profile" }));
   await screen.findByRole("heading", { name: "Edit person" });
@@ -102,6 +102,7 @@ it("a partial group roster offers only a safe name edit", async () => {
   const group = {
     id: "grp_one",
     name: "Product",
+    purpose: "team",
     version: 8,
     member: true,
     members: ["per_self"],
@@ -119,10 +120,10 @@ it("a partial group roster offers only a safe name edit", async () => {
   );
   const { Wrapper } = harness();
   render(<Groups />, { wrapper: Wrapper });
-  fireEvent.click(await screen.findByRole("button", { name: "Open" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Edit group" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Product/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Edit team" }));
   expect(
-    await screen.findByRole("button", { name: "Save group" }),
+    await screen.findByRole("button", { name: "Save team" }),
   ).toBeEnabled();
   expect(
     screen.queryByRole("combobox", { name: "Recipient type" }),
@@ -227,12 +228,60 @@ it("approval content is escaped and no decision appears without eligibility", as
   );
   const { Wrapper } = harness();
   render(<Inbox />, { wrapper: Wrapper });
-  await screen.findByText("release/42");
-  expect(screen.getByText("sha-123")).toBeVisible();
-  expect(screen.getByText("release-once")).toBeVisible();
+  await screen.findByText("<script>unsafe()</script>");
   expect(screen.getByText("<script>unsafe()</script>")).toBeVisible();
   expect(document.querySelector("script")).toBeNull();
   expect(
-    screen.queryByRole("button", { name: "Approve action" }),
+    screen.queryByRole("button", { name: "Approve" }),
   ).not.toBeInTheDocument();
+});
+
+it("does not present a restricted policy grant as unrestricted contact access", async () => {
+  history.replaceState(null, "", "/settings/contacts");
+  const policy = {
+    id: "rol_limited",
+    name: "Staging only",
+    version: 1,
+    rules: [
+      {
+        action: "ask",
+        target_kind: "agent",
+        target_id: agent.id,
+        action_name: "deploy",
+        conditions: { resource: "staging" },
+      },
+    ],
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (path.includes("/access?"))
+        return json({
+          subject: { id: "per_self", name: "Taylor", kind: "person" },
+          basis: "role",
+          roles: [
+            { role: policy, subject_kind: "principal", subject_id: "per_self" },
+          ],
+        });
+      if (path.endsWith("/role-bindings")) return json([]);
+      if (path.endsWith("/query"))
+        return json(
+          collection(
+            body.collection === "roles"
+              ? [policy]
+              : body.collection === "agents"
+                ? [agent]
+                : [],
+          ),
+        );
+      return json({ operations: {}, outcomes: [] });
+    }),
+  );
+  const { default: Permissions } = await import("../src/pages/Permissions");
+  const { Wrapper } = harness();
+  render(<Permissions />, { wrapper: Wrapper });
+  expect(await screen.findByText("Limited")).toBeInTheDocument();
+  expect(screen.getByText("Research assistant")).toBeInTheDocument();
+  expect(screen.queryByText("agt_scout")).not.toBeInTheDocument();
 });

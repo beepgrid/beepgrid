@@ -12,8 +12,16 @@ import (
 // and provider delivery together. The caller still holds the workspace fence,
 // revalidates current credentials and commits the idempotency receipt before ack.
 // Requests retain their separate approval/coalescing enqueue path.
-func (s *Store) appendConversationMessage(ctx context.Context, tx pgx.Tx, a Actor, conv, body string, rs []recipient) (Message, error) {
+func (s *Store) appendConversationMessage(ctx context.Context, tx pgx.Tx, a Actor, conv, body string, rs []recipient, addressed ...[]Mention) (Message, error) {
 	m := Message{ID: ID("msg"), ConversationID: conv, SenderID: a.ID, InstanceID: a.InstanceID, Body: body, CreatedAt: time.Now()}
+	if len(addressed) > 0 {
+		m.Mentions = addressed[0]
+	}
+	if len(m.Mentions) > 0 {
+		if err := s.validateMentions(ctx, tx, a, conv, body, m.Mentions); err != nil {
+			return m, err
+		}
+	}
 	ids := make([]string, 0, len(rs))
 	for _, r := range rs {
 		ids = append(ids, r.ID)

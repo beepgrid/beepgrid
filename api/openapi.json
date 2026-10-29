@@ -4054,6 +4054,127 @@
       }
     },
     "/api/v1/conversations": {
+      "post": {
+        "operationId": "post_api_v1_conversations",
+        "description": "Start an explicit shared chat with a durable first message and optional structured mentions. Individual recipients only; all members must have current mutual view permission. Mentions identify current participants without excluding observers. Every later send checks current contact access. Idempotent; private broadcast contracts are unchanged.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Target"
+                    }
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "approval": {
+                    "type": "boolean"
+                  },
+                  "choices": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mentions": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Mention"
+                    }
+                  }
+                },
+                "required": [
+                  "targets",
+                  "body"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
       "get": {
         "operationId": "get_api_v1_conversations",
         "description": "/api/v1/conversations",
@@ -4133,6 +4254,115 @@
           }
         },
         "parameters": []
+      }
+    },
+    "/api/v1/contact-permissions": {
+      "post": {
+        "operationId": "post_api_v1_contact_permissions",
+        "description": "Atomically save and assign a dedicated contact-access policy. Only view, message, ask and decide toward exact contacts. Existing delegation ceilings and observed-version checks apply. Inherited policies remain effective.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "$ref": "#/components/schemas/Target"
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Rule"
+                    }
+                  },
+                  "version": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "subject",
+                  "rules",
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/conversations/{id}": {
@@ -8545,6 +8775,202 @@
         },
         "security": []
       }
+    },
+    "/api/v1/fleet/coordinate": {
+      "post": {
+        "operationId": "coordinate",
+        "description": "Plan and dispatch distinct ordinary communications under current permissions, then durably collect and summarize settled replies. Idempotent recovery. Does not grant business execution authority. Use /fleet/plan and /fleet/command for explicit review.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverseerPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverseerInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/requests/{id}/blocking": {
+      "post": {
+        "operationId": "setRequestBlocking",
+        "description": "Only the requesting agent may declare or clear its own open single-agent blocking dependency. Does not cancel the request.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Request"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "blocking": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "blocking"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8811,6 +9237,29 @@
         ],
         "additionalProperties": false
       },
+      "Mention": {
+        "type": "object",
+        "properties": {
+          "principal_id": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "principal_id",
+          "start",
+          "end"
+        ],
+        "additionalProperties": false,
+        "description": "Stable explicit addressee. start/end are Unicode code-point offsets for the exact @name token. Must be a current visible conversation participant. All members receive the original message and may contribute."
+      },
       "SendInput": {
         "type": "object",
         "properties": {
@@ -8829,6 +9278,17 @@
           },
           "title": {
             "type": "string"
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mention"
+            },
+            "maxItems": 20
+          },
+          "reuse_direct": {
+            "type": "boolean",
+            "description": "Reuse authorized exact two-principal history. Defaults to false. Does not merge shared group chats."
           }
         },
         "required": [
@@ -8856,6 +9316,13 @@
           },
           "created_at": {
             "type": "string"
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mention"
+            },
+            "maxItems": 20
           }
         },
         "required": [],
@@ -8917,6 +9384,13 @@
             "items": {
               "$ref": "#/components/schemas/Message"
             }
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_preview": {
+            "type": "string"
           }
         },
         "required": [],
@@ -8961,11 +9435,24 @@
           },
           "shared_key": {
             "type": "string"
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mention"
+            },
+            "maxItems": 20
+          },
+          "reuse_direct": {
+            "type": "boolean",
+            "description": "Reuse authorized exact two-principal history. Defaults to false. Does not merge shared group chats."
+          },
+          "blocking": {
+            "type": "boolean",
+            "description": "Explicit agent-to-individual-agent dependency. Ordinary open requests are not deadlocks."
           }
         },
-        "required": [
-          "title"
-        ],
+        "required": [],
         "additionalProperties": false
       },
       "ResponseInput": {
@@ -9083,6 +9570,17 @@
           },
           "shared_key": {
             "type": "string"
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mention"
+            },
+            "maxItems": 20
+          },
+          "blocking": {
+            "type": "boolean",
+            "description": "Explicit agent-to-individual-agent dependency. Ordinary open requests are not deadlocks."
           }
         },
         "required": [],
@@ -9173,6 +9671,13 @@
       "Group": {
         "type": "object",
         "properties": {
+          "purpose": {
+            "enum": [
+              "contacts",
+              "team",
+              "agent_role"
+            ]
+          },
           "created_by": {
             "type": "string",
             "readOnly": true
@@ -9495,6 +10000,9 @@
           },
           "target": {
             "$ref": "#/components/schemas/Target"
+          },
+          "previous_plan_id": {
+            "type": "string"
           }
         },
         "required": [
@@ -9581,6 +10089,39 @@
             "type": "string"
           },
           "reply_digest": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "agent_id": {
+                  "type": "string"
+                },
+                "operation": {
+                  "enum": [
+                    "message",
+                    "question",
+                    "task"
+                  ]
+                },
+                "body": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "agent_id",
+                "operation",
+                "body"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "automatic": {
+            "type": "boolean"
+          },
+          "summary_error": {
             "type": "string"
           }
         },

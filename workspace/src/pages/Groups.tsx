@@ -1,25 +1,11 @@
 import { useDeferredValue, useState } from "react";
-import {
-  useCapabilities,
-  useCollection,
-  useOperation,
-  usePostResource,
-  useResource,
-} from "../data";
-import type {
-  Binding,
-  Group,
-  Target,
-  Identity,
-  Page,
-  Role,
-} from "../contracts";
-import { Compose } from "../Compose";
+import { useCapabilities, useCollection, useOperation } from "../data";
+import type { Group, Identity, Target } from "../contracts";
 import { TargetPicker } from "../TargetPicker";
+import { navigate } from "../navigation";
 import {
   Badge,
   Button,
-  Details,
   ErrorView,
   Field,
   Form,
@@ -29,90 +15,80 @@ import {
   QueryState,
   Search,
 } from "../ui";
-
-export default function Groups() {
+export default function Groups({
+  purpose = "team",
+  embedded = false,
+}: {
+  purpose?: "team" | "agent_role" | "contacts";
+  embedded?: boolean;
+  section?: string;
+}) {
   const [search, setSearch] = useState(""),
     [selected, setSelected] = useState<Group | null>(null),
-    [create, setCreate] = useState(false),
-    [compose, setCompose] = useState<Target[] | null>(null);
-  const q = useCollection<Group>("groups", useDeferredValue(search)),
+    [create, setCreate] = useState(false);
+  const q = useCollection<Group>("groups", useDeferredValue(search), {
+      purpose,
+    }),
     caps = useCapabilities();
+  const label =
+    purpose === "agent_role"
+      ? "Agent roles"
+      : purpose === "team"
+        ? "Teams"
+        : "Contact groups";
   return (
     <>
-      <PageHeader
-        title="Groups"
-        description="Membership, audiences and delegated teams."
-        actions={
-          caps.data?.operations.create_group ? (
-            <Button primary icon="plus" onClick={() => setCreate(true)}>
-              Create group
-            </Button>
-          ) : null
-        }
-      />
+      {!embedded ? <PageHeader title={label} /> : null}
       <div className="toolbar">
         <Search
           value={search}
           onChange={setSearch}
-          placeholder="Search groups"
+          placeholder={`Search ${label.toLowerCase()}`}
         />
+        {caps.data?.operations.create_group ? (
+          <Button primary icon="plus" onClick={() => setCreate(true)}>
+            Create{" "}
+            {purpose === "agent_role"
+              ? "agent role"
+              : purpose === "team"
+                ? "team"
+                : "contact group"}
+          </Button>
+        ) : null}
       </div>
-      <QueryState query={q} empty="No permitted groups">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Group</th>
-                <th>Your membership</th>
-                <th>Visible members</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {q.items.map((g) => (
-                <tr key={g.id}>
-                  <td>
-                    <div className="identity">
-                      <IdentityIcon id={g.id} kind="group" label={g.name} />
-                      <div>
-                        <strong>{g.name}</strong>
-                        <small>{g.id}</small>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    {g.member ? (
-                      <Badge>Member</Badge>
-                    ) : (
-                      <span className="muted">Outside group</span>
-                    )}
-                  </td>
-                  <td>
-                    {g.members.length}
-                    {!g.members_complete ? " visible (partial)" : ""}
-                  </td>
-                  <td>
-                    <Button onClick={() => setSelected(g)}>Open</Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <QueryState query={q} empty={`No ${label.toLowerCase()} yet`}>
+        <div className="contact-directory">
+          {q.items.map((g) => (
+            <button
+              className="contact-row"
+              key={g.id}
+              onClick={() => setSelected(g)}
+            >
+              <IdentityIcon kind="group" id={g.id} label={g.name} />
+              <div className="contact-name">
+                <strong>{g.name}</strong>
+                <small>
+                  {g.members.length}
+                  {g.members_complete ? "" : " visible"}{" "}
+                  {purpose === "agent_role" ? "agents" : "members"}
+                </small>
+              </div>
+              <Badge>
+                {purpose === "agent_role"
+                  ? "Agent role"
+                  : purpose === "team"
+                    ? "Team"
+                    : "Contact group"}
+              </Badge>
+            </button>
+          ))}
         </div>
       </QueryState>
       {selected ? (
-        <GroupDetail
-          group={q.items.find((g) => g.id === selected.id) || selected}
-          onClose={() => setSelected(null)}
-          onCompose={() => {
-            setCompose([{ kind: "group", id: selected.id }]);
-            setSelected(null);
-          }}
-        />
+        <GroupDetail group={selected} onClose={() => setSelected(null)} />
       ) : null}
-      {create ? <GroupForm onClose={() => setCreate(false)} /> : null}
-      {compose ? (
-        <Compose initial={compose} onClose={() => setCompose(null)} />
+      {create ? (
+        <GroupForm purpose={purpose} onClose={() => setCreate(false)} />
       ) : null}
     </>
   );
@@ -120,149 +96,120 @@ export default function Groups() {
 function GroupDetail({
   group: g,
   onClose,
-  onCompose,
 }: {
   group: Group;
   onClose: () => void;
-  onCompose: () => void;
 }) {
-  const caps = useCapabilities({ kind: "group", id: g.id });
   const [edit, setEdit] = useState(false);
-  if (caps.isPending)
-    return (
-      <Modal title="Group" onClose={onClose}>
-        <p>Checking current access.</p>
-      </Modal>
-    );
-  if (caps.error)
-    return (
-      <Modal title="Group unavailable" onClose={onClose}>
-        <ErrorView error={caps.error} />
-      </Modal>
+  const caps = useCapabilities({ kind: "group", id: g.id }),
+    people = useCollection<Identity>(
+      g.purpose === "agent_role" ? "agents" : "people",
+      "",
+      { group_id: g.id },
+    ),
+    agents = useCollection<Identity>(
+      "agents",
+      "",
+      { group_id: g.id },
+      g.purpose === "contacts",
+    ),
+    services = useCollection<Identity>(
+      "services",
+      "",
+      { group_id: g.id },
+      g.purpose === "contacts",
     );
   return (
-    <Modal title={g.name} wide onClose={onClose}>
-      <div className="intro">
-        <IdentityIcon id={g.id} kind="group" label={g.name} />
-        <div>
-          <h2>{g.name}</h2>
-          <p>
-            {g.id} · Revision {g.version}
-          </p>
-        </div>
-      </div>
+    <Modal title={g.name} onClose={onClose}>
       <div className="actions">
-        {caps.data?.operations.message || caps.data?.operations.ask ? (
-          <Button primary onClick={onCompose}>
-            Communicate
+        {caps.data?.operations.manage ? (
+          <Button onClick={() => setEdit(true)}>
+            Edit{" "}
+            {g.purpose === "agent_role"
+              ? "agent role"
+              : g.purpose === "team"
+                ? "team"
+                : "contact group"}
           </Button>
         ) : null}
-        {caps.data?.operations.manage ? (
-          <Button onClick={() => setEdit(true)}>Edit group</Button>
-        ) : null}
+        <Button
+          onClick={() => {
+            onClose();
+            navigate("/permissions/" + g.id);
+          }}
+        >
+          Permissions
+        </Button>
       </div>
       <section className="section">
-        <h3>Membership</h3>
+        <h3>Members</h3>
+        {[people, ...(g.purpose === "contacts" ? [agents, services] : [])].map(
+          (q, i) => (
+            <QueryState key={i} query={q} empty="">
+              {q.items.map((p) => (
+                <div className="team-member" key={p.id}>
+                  <IdentityIcon kind={p.kind} id={p.id} label={p.name} />
+                  <strong>{p.name}</strong>
+                </div>
+              ))}
+            </QueryState>
+          ),
+        )}
         {!g.members_complete ? (
-          <p className="help">
-            Some member identities are outside your visibility. This is a
-            partial roster. It cannot be replaced from this view.
-          </p>
+          <p className="help">Only members you can see are shown.</p>
         ) : null}
-        {g.members.map((id) => (
-          <MemberIdentity key={id} id={id} />
-        ))}
       </section>
-      <AssignedRoles groupId={g.id} />
-      <Details
-        value={{
-          member: g.member,
-          created_by: g.created_by,
-          version: g.version,
-        }}
-        label="Group context"
-      />
       {edit ? (
-        <GroupForm group={g} onClose={() => setEdit(false)} onSaved={onClose} />
+        <GroupForm
+          group={g}
+          purpose={g.purpose || "contacts"}
+          onClose={() => setEdit(false)}
+          onSaved={onClose}
+        />
       ) : null}
     </Modal>
   );
 }
-function AssignedRoles({ groupId }: { groupId: string }) {
-  const bindings = useResource<Binding[]>("/role-bindings");
-  const own = bindings.data?.filter(
-    (b) => b.subject_kind === "group" && b.subject_id === groupId,
-  );
-  return (
-    <section className="section">
-      <h3>Assigned roles</h3>
-      <ErrorView error={bindings.error} />
-      {own?.length === 0 ? (
-        <p className="help">
-          No role assignments are visible to you for this group.
-        </p>
-      ) : null}
-      {own?.map((b) => (
-        <AssignedRole key={b.role_id} id={b.role_id} />
-      ))}
-      <p className="help">
-        Membership and role assignment are separate. Editing a roster does not
-        bypass role assignment bounds.
-      </p>
-    </section>
-  );
-}
-function AssignedRole({ id }: { id: string }) {
-  const role = usePostResource<Page<Role>>("/query", {
-    collection: "roles",
-    filters: { id },
-    limit: 1,
-  });
-  return (
-    <>
-      <ErrorView error={role.error} />
-      {role.data?.items.map((r) => (
-        <Details
-          key={r.id}
-          label={r.name}
-          value={{ id: r.id, rules: r.rules, version: r.version }}
-        />
-      ))}
-    </>
-  );
-}
-function GroupForm({
-  group,
+export function GroupForm({
+  group: g,
+  purpose,
   onClose,
   onSaved,
 }: {
   group?: Group;
+  purpose: "team" | "agent_role" | "contacts";
   onClose: () => void;
   onSaved?: () => void;
 }) {
-  const [name, setName] = useState(group?.name || ""),
+  const [name, setName] = useState(g?.name || ""),
     [members, setMembers] = useState<Target[]>(
-      (group?.members || []).map((id) => ({
-        kind: id.startsWith("per_")
-          ? "person"
-          : id.startsWith("svc_")
-            ? "service"
-            : "agent",
+      (g?.members || []).map((id) => ({
+        kind:
+          purpose === "agent_role" ||
+          (purpose === "contacts" && id.startsWith("agt_"))
+            ? "agent"
+            : purpose === "contacts" && id.startsWith("svc_")
+              ? "service"
+              : "person",
         id,
       })),
     );
   const op = useOperation();
   return (
-    <Modal title={group ? "Edit group" : "Create group"} wide onClose={onClose}>
+    <Modal
+      title={`${g ? "Edit" : "Create"} ${purpose === "agent_role" ? "agent role" : purpose === "team" ? "team" : "contact group"}`}
+      onClose={onClose}
+    >
       <Form
         onSubmit={() =>
           void op
             .run("/groups", {
-              ...(group ? { id: group.id, version: group.version } : {}),
+              ...(g ? { id: g.id, version: g.version } : {}),
               name,
-              ...(!group || group.members_complete
-                ? { members: members.map((t) => t.id) }
-                : { members: undefined }),
+              purpose,
+              ...(g && !g.members_complete
+                ? {}
+                : { members: members.map((t) => t.id) }),
             })
             .then((r) => {
               if (r) {
@@ -272,75 +219,47 @@ function GroupForm({
             })
         }
       >
-        <Field label="Group name">
+        <Field label="Name">
           <input
             required
             maxLength={100}
+            placeholder={purpose === "agent_role" ? "Builders" : "Engineering"}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </Field>
-        {!group || group.members_complete ? (
-          <>
-            <h3>Explicit members</h3>
+        {!g || g.members_complete ? (
+          <div className="field">
+            <span>Members</span>
             <TargetPicker
               value={members}
               onChange={setMembers}
               multiple
               allowGroups={false}
               allowInstances={false}
+              peopleOnly={purpose === "team"}
+              agentsOnly={purpose === "agent_role"}
             />
-            <p className="help">
-              Membership changes are checked against your delegated boundary and
-              any roles assigned to this group.
-            </p>
-          </>
+          </div>
         ) : (
-          <p className="help">
-            The full roster is not visible. Membership replacement is disabled
-            to protect hidden members.
+          <p>
+            Your full roster is not visible. You can safely change the name
+            here.
           </p>
         )}
         <ErrorView error={op.error} />
         <div className="form-actions">
           <Button onClick={onClose}>Cancel</Button>
           <Button primary type="submit" disabled={op.pending}>
-            Save group
+            Save{" "}
+            {purpose === "agent_role"
+              ? "agent role"
+              : purpose === "team"
+                ? "team"
+                : "group"}
           </Button>
         </div>
       </Form>
     </Modal>
-  );
-}
-
-function identityKind(id: string): "person" | "agent" | "service" {
-  return id.startsWith("agt_")
-    ? "agent"
-    : id.startsWith("svc_")
-      ? "service"
-      : "person";
-}
-function MemberIdentity({ id }: { id: string }) {
-  const kind = identityKind(id);
-  const query = usePostResource<Page<Identity>>("/query", {
-    collection: { person: "people", agent: "agents", service: "services" }[
-      kind
-    ],
-    filters: { id },
-    limit: 1,
-  });
-  const identity = query.data?.items[0];
-  return (
-    <div className="pick-row">
-      <IdentityIcon id={identity?.id} kind={kind} label={identity?.name} />
-      <span>
-        {identity?.name || "Member"}
-        <br />
-        <small>
-          {kind === "service" ? "Software service" : kind} · {id}
-        </small>
-      </span>
-      <ErrorView error={query.error} />
-    </div>
   );
 }

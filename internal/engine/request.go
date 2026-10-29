@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-const requestFields = `r.id,r.requester_id,COALESCE(r.requester_instance,''),r.conversation_id,r.kind,r.title,r.body,r.choices,r.action,CASE WHEN r.state='open' AND r.expires_at<=now() THEN 'expired' ELSE r.state END,r.version,r.response,r.resolved_by,r.resolved_at,r.expires_at,r.created_at,r.shared_key`
+const requestFields = `r.id,r.requester_id,COALESCE(r.requester_instance,''),r.conversation_id,r.kind,r.title,r.body,r.choices,r.action,CASE WHEN r.state='open' AND r.expires_at<=now() THEN 'expired' ELSE r.state END,r.version,r.response,r.resolved_by,r.resolved_at,r.expires_at,r.created_at,r.shared_key,r.blocking,r.mentions`
 
 func scanRequest(row pgx.Row, extra ...any) (Request, error) {
 	var r Request
 	var choices, action, response []byte
-	targets := []any{&r.ID, &r.RequesterID, &r.RequesterInstanceID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey}
+	targets := []any{&r.ID, &r.RequesterID, &r.RequesterInstanceID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey, &r.Blocking, &r.Mentions}
 	e := row.Scan(append(targets, extra...)...)
 	_ = json.Unmarshal(choices, &r.Choices)
 	if len(action) > 0 && string(action) != "null" {
@@ -104,17 +104,32 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 	if in.Kind != "question" && in.Kind != "approval" && in.Kind != "task" {
 		return Bad("kind must be question, approval or task.")
 	}
+	if in.Title == "" {
+		in.Title = messageTitle(in.Body)
+	}
 	if !ValidText(in.Title, 200) || len(in.Body) > 32768 || len(in.Choices) > 20 {
-		return Bad("A title and bounded body/choices are required.")
+		return Bad("A message or title is required, with at most 20 choices.")
+	}
+	for _, choice := range in.Choices {
+		if !ValidText(choice, 500) {
+			return Bad("Choices must contain 1 to 500 bytes.")
+		}
 	}
 	if in.ExpiresAt.IsZero() {
-		in.ExpiresAt = time.Now().UTC().Add(7 * 24 * time.Hour).Truncate(time.Second)
+		if in.Action != nil {
+			in.ExpiresAt = time.Now().UTC().Add(7 * 24 * time.Hour).Truncate(time.Second)
+		} else {
+			// Communication decisions have no implicit deadline. Use a finite
+			// PostgreSQL timestamp so existing clients can still parse the field.
+			in.ExpiresAt = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+		}
+	} else if in.ExpiresAt.Before(time.Now()) || in.ExpiresAt.After(time.Now().Add(90*24*time.Hour)) {
+		return Bad("Explicit expiry must be within 90 days.")
 	}
-	if in.ExpiresAt.Before(time.Now()) || in.ExpiresAt.After(time.Now().Add(90*24*time.Hour)) {
-		return Bad("Expiry must be within 90 days.")
-	}
-	if in.Kind == "approval" && (in.Action == nil || !ValidText(in.Action.Name, 120) || in.Action.ExecutorID == "" || in.Action.Resource == "" || in.Action.ResourceVersion == "" || in.Action.OperationKey == "") {
-		return Bad("An approval requires an exact action, executor, resource version and operation key.")
+	// A decision without an execution descriptor is communication only and
+	// cannot be redeemed. Bound approvals retain their exact-match guarantees.
+	if in.Kind == "approval" && in.Action != nil && (!ValidText(in.Action.Name, 120) || in.Action.ExecutorID == "" || in.Action.Resource == "" || in.Action.ResourceVersion == "" || in.Action.OperationKey == "") {
+		return Bad("A bound approval requires an exact action, executor, resource version and operation key.")
 	}
 	if in.Kind != "approval" && in.Action != nil {
 		return Bad("Only approvals may carry an execution descriptor.")
@@ -145,6 +160,17 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 		if e != nil {
 			return e
 		}
+		if in.Blocking && (a.Kind != "agent" || len(rs) != 1 || rs[0].Kind != "agent") {
+			return Bad("Blocking dependencies require one individual agent recipient and an agent requester.")
+		}
+		if len(in.Mentions) > 0 {
+			if in.ConversationID == "" {
+				return Bad("Mentions require an existing shared conversation.")
+			}
+			if e = s.validateMentions(ctx, tx, a, in.ConversationID, in.Body, in.Mentions); e != nil {
+				return e
+			}
+		}
 		if in.Action != nil {
 			executor, e := principal(ctx, tx, a.Scope, in.Action.ExecutorID)
 			if e != nil || executor.Disabled {
@@ -155,6 +181,12 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 			}
 		}
 		conv := in.ConversationID
+		if in.ReuseDirect && conv == "" && len(rs) == 1 && rs[0].ExactInstance == "" {
+			conv, e = s.existingDirect(ctx, tx, a, rs[0].Principal)
+			if e != nil {
+				return e
+			}
+		}
 		if conv == "" {
 			if len(rs) == 1 {
 				conv, e = newConversation(ctx, tx, a, in.Title, rs[0].ID)
@@ -165,8 +197,8 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 				return e
 			}
 		}
-		*out = Request{RequesterInstanceID: a.InstanceID, ID: ID("req"), RequesterID: a.ID, ConversationID: conv, Kind: in.Kind, Title: in.Title, Body: in.Body, Choices: in.Choices, Action: in.Action, State: "open", Version: 1, ExpiresAt: in.ExpiresAt, CreatedAt: time.Now(), SharedKey: in.SharedKey}
-		if _, e = tx.Exec(ctx, `INSERT INTO requests(id,scope,requester_id,requester_instance,conversation_id,kind,title,body,choices,action,expires_at,shared_key) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12)`, out.ID, a.Scope, a.ID, a.InstanceID, conv, in.Kind, in.Title, in.Body, JSON(in.Choices), JSON(in.Action), in.ExpiresAt, in.SharedKey); e != nil {
+		*out = Request{Mentions: in.Mentions, Blocking: in.Blocking, RequesterInstanceID: a.InstanceID, ID: ID("req"), RequesterID: a.ID, ConversationID: conv, Kind: in.Kind, Title: in.Title, Body: in.Body, Choices: in.Choices, Action: in.Action, State: "open", Version: 1, ExpiresAt: in.ExpiresAt, CreatedAt: time.Now(), SharedKey: in.SharedKey}
+		if _, e = tx.Exec(ctx, `INSERT INTO requests(id,scope,requester_id,requester_instance,conversation_id,kind,title,body,choices,action,expires_at,shared_key,blocking,mentions) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, out.ID, a.Scope, a.ID, a.InstanceID, conv, in.Kind, in.Title, in.Body, JSON(in.Choices), JSON(in.Action), in.ExpiresAt, in.SharedKey, in.Blocking, JSON(in.Mentions)); e != nil {
 			return e
 		}
 		if in.ConversationID == "" && in.SharedKey == "" {

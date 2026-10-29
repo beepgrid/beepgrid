@@ -16,7 +16,7 @@ export function workspaceURL(path: string) {
 const snapshot = () => location.pathname;
 export function useRoute() {
   const path = useSyncExternalStore(listen, snapshot);
-  const [page = "agents", id = ""] = (
+  const [page = "conversations", id = ""] = (
     base && path.startsWith(base + "/") ? path.slice(base.length) : path
   )
     .split("/")

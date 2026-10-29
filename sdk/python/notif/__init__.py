@@ -85,8 +85,12 @@ class Client:
         return Client(self.base_url, session["token"], self.timeout), session
 
     def send(self, *, body: str, target: dict[str, str] | None = None, conversation_id: str = "",
-             title: str = "", key: str | None = None, minimal: bool = False, preview_token: str = "") -> dict[str, Any]:
+             title: str = "", key: str | None = None, minimal: bool = False, preview_token: str = "", mentions: list[dict[str, Any]] | None = None, reuse_direct: bool = False) -> dict[str, Any]:
         data: dict[str, Any] = {"body": body, "conversation_id": conversation_id, "title": title}
+        if mentions:
+            data["mentions"] = mentions
+        if reuse_direct:
+            data["reuse_direct"] = True
         if target:
             data["target"] = target
         if preview_token:
@@ -97,8 +101,14 @@ class Client:
         """Durable acceptance only. send with the same input/key recovers the full receipt."""
         return self.send(**{**options, "minimal": True})
 
-    def ask(self, *, target: dict[str, str], title: str, key: str | None = None, **options: Any) -> dict[str, Any]:
+    def ask(self, *, target: dict[str, str], title: str = "", key: str | None = None, **options: Any) -> dict[str, Any]:
         return self.call("POST", "/api/v1/requests", {"target": target, "title": title, **options}, key=key or str(uuid.uuid4()))
+
+    def set_request_blocking(self, request_id: str, blocking: bool) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/blocking", {"blocking": blocking})
+
+    def coordinate(self, prompt: str, *, key: str | None = None, **options: Any) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/fleet/coordinate", {"prompt": prompt, **options}, key=key or str(uuid.uuid4()), timeout=max(40, self.timeout))
 
     def get_request(self, request_id: str) -> dict[str, Any]:
         return self.call("GET", "/api/v1/requests/" + urllib.parse.quote(request_id, safe=""))
@@ -187,3 +197,13 @@ class Client:
 
 
 __all__ = ["Client", "NotifError"]
+
+
+def mention_context(message: dict[str, Any], recipient: str) -> str:
+    """An addressing hint. Other room participants may still contribute."""
+    mentions = message.get("mentions", [])
+    if not mentions:
+        return ""
+    if any(m.get("principal_id") == recipient for m in mentions):
+        return "You are explicitly addressed. Other participants may contribute relevant context."
+    return "Other participants are explicitly addressed. You may contribute relevant context."

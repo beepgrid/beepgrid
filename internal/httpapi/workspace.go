@@ -54,6 +54,16 @@ func (s *Server) workspaceRoutes() {
 		x, e := s.Store.DispatchPreview(r.Context(), actor(r), in)
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/requests/{id}/blocking", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			Blocking bool `json:"blocking"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		out, e := s.Store.SetRequestBlocking(r.Context(), actor(r), r.PathValue("id"), in.Blocking)
+		return ok(w, out, e)
+	}))
 	m.HandleFunc("POST /api/v1/message-batches", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in engine.SendBatchInput
 		if e := decode(r, &in); e != nil {

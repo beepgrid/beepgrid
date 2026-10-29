@@ -19,14 +19,18 @@ func schema(required []string, properties map[string]any) any {
 	return map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false}
 }
 func textType() any { return map[string]string{"type": "string"} }
+func mentionsType() any {
+	return map[string]any{"type": "array", "maxItems": 20, "items": schema([]string{"principal_id", "start", "end"}, map[string]any{"principal_id": textType(), "start": map[string]any{"type": "integer", "minimum": 0}, "end": map[string]any{"type": "integer", "minimum": 1}})}
+}
 func Tools() any {
 	return []tool{
 		{"receive", "Receive pending agent work over an outbound connection. Acknowledge only after durably handling it.", schema(nil, map[string]any{})},
 		{"acknowledge", "Acknowledge a delivery with its current lease generation.", schema([]string{"id", "generation"}, map[string]any{"id": textType(), "generation": map[string]string{"type": "integer"}})},
 		{"report_progress", "Publish bounded worker-reported structured progress.", schema(nil, map[string]any{"progress": map[string]string{"type": "object"}})},
 		{"list_agents", "List agents visible to the authenticated caller.", schema(nil, map[string]any{})},
-		{"send", "Send conversation text to a person, agent or group. This never answers or resolves a durable request, approves an action or completes a task. Use reply for a request decision.", schema([]string{"body"}, map[string]any{"body": textType(), "target": map[string]any{"type": "object", "properties": map[string]any{"kind": textType(), "id": textType()}, "required": []string{"kind", "id"}}, "conversation_id": textType(), "title": textType(), "idempotency_key": textType()})},
-		{"ask", "Create a durable question or approval and return its handle. The caller may continue working.", schema([]string{"target", "title"}, map[string]any{"target": map[string]any{"type": "object"}, "title": textType(), "body": textType(), "kind": textType(), "choices": map[string]any{"type": "array", "items": textType()}, "action": map[string]any{"type": "object"}, "shared_key": textType(), "conversation_id": textType(), "idempotency_key": textType()})},
+		{"send", "Send conversation text to a person, agent or group. This never answers or resolves a durable request, approves an action or completes a task. Use reply for a request decision.", schema([]string{"body"}, map[string]any{"body": textType(), "target": map[string]any{"type": "object", "properties": map[string]any{"kind": textType(), "id": textType()}, "required": []string{"kind", "id"}}, "conversation_id": textType(), "title": textType(), "idempotency_key": textType(), "mentions": mentionsType(), "reuse_direct": map[string]string{"type": "boolean"}})},
+		{"ask", "Request a reply, choices or an approval decision. Ordinary information and follow-ups use send. A title is optional. An approval without an action descriptor only communicates a decision and cannot be redeemed. The caller may continue working. Set blocking only when this agent cannot continue until one individual agent answers. Mentions address current conversation participants; all members receive the original message and may contribute.", schema(nil, map[string]any{"target": map[string]any{"type": "object"}, "title": textType(), "body": textType(), "kind": textType(), "choices": map[string]any{"type": "array", "items": textType()}, "action": map[string]any{"type": "object"}, "shared_key": textType(), "conversation_id": textType(), "idempotency_key": textType(), "mentions": mentionsType(), "blocking": map[string]string{"type": "boolean"}, "reuse_direct": map[string]string{"type": "boolean"}})},
+		{"set_blocking", "Declare or clear an explicit blocking dependency on your own open request. Only use this when you cannot continue until that individual agent answers. Ordinary waiting and offline state do not imply deadlock.", schema([]string{"id", "blocking"}, map[string]any{"id": textType(), "blocking": map[string]string{"type": "boolean"}})},
 		{"get_request", "Read the current result of a request without cancelling it.", schema([]string{"id"}, map[string]any{"id": textType()})},
 		{"reply", "Resolve an eligible durable request using its request ID, current version and typed outcome. Use this tool to answer a question, approve or deny an approval, or report a task outcome. Sending chat text, including JSON that resembles a response, never resolves a request. Current permissions are enforced.", schema([]string{"id", "outcome", "version"}, map[string]any{"id": textType(), "outcome": textType(), "version": map[string]string{"type": "integer"}, "answer": map[string]any{}})},
 		{"redeem_approval", "Recheck an exact approved action and obtain its durable execution intent. This does not execute the action; the business tool must enforce operation and resource-version fences.", schema([]string{"id", "action"}, map[string]any{"id": textType(), "action": map[string]string{"type": "object"}})},
@@ -181,6 +185,15 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 			return nil, e
 		}
 		return c.ReportExecution(ctx, in.ID, in.State, in.Result)
+	case "set_blocking":
+		var in struct {
+			ID       string `json:"id"`
+			Blocking bool   `json:"blocking"`
+		}
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		return c.SetRequestBlocking(ctx, in.ID, in.Blocking)
 	case "get_request":
 		var in struct {
 			ID string `json:"id"`

@@ -20,18 +20,19 @@ schemas={
 'Enrollment':obj({'agent':S,'name':S,'parent_id':S,'capabilities':array(S),'metadata':{'type':'object'}},['agent','name']),
 'Session':obj({'token':{'type':'string','writeOnly':False},'agent':ref('Agent'),'instance_id':S,'expires_at':S}),
 'Action':obj({'name':S,'executor_id':S,'resource':S,'resource_version':S,'operation_key':S,'arguments':{'type':'object'}},['name','executor_id','resource','resource_version','operation_key']),
-'SendInput':obj({'preview_token':S,'target':ref('Target'),'conversation_id':S,'body':{'type':'string','maxLength':32768},'title':S},['body']),
-'Message':obj({'id':S,'conversation_id':S,'sender_id':S,'instance_id':S,'body':S,'created_at':S}),
+'Mention':obj({'principal_id':S,'start':{'type':'integer','minimum':0},'end':{'type':'integer','minimum':1}},['principal_id','start','end']),
+'SendInput':obj({'preview_token':S,'target':ref('Target'),'conversation_id':S,'body':{'type':'string','maxLength':32768},'title':S,'mentions':array(ref('Mention'))},['body']),
+'Message':obj({'id':S,'conversation_id':S,'sender_id':S,'instance_id':S,'body':S,'created_at':S,'mentions':array(ref('Mention'))}),
 'SendResult':obj({'conversation_id':S,'messages':array(ref('Message'))}),
 'SendReceipt':obj({'conversation_id':S,'message_count':{'type':'integer','minimum':1}}),
 'Conversation':obj({'id':S,'title':S,'created_by':S,'created_at':S,'participants':array({'type':'object'}),'messages':array(ref('Message'))}),
-'AskInput':obj({'preview_token':S,'target':ref('Target'),'conversation_id':S,'kind':{'enum':['question','approval','task']},'title':S,'body':S,'choices':array(S),'action':ref('Action'),'expires_at':S,'shared_key':S},['title']),
+'AskInput':obj({'preview_token':S,'target':ref('Target'),'conversation_id':S,'kind':{'enum':['question','approval','task']},'title':S,'body':S,'choices':array(S),'action':ref('Action'),'expires_at':S,'shared_key':S,'mentions':array(ref('Mention'))}),
 'ResponseInput':obj({'outcome':{'enum':['answered','approved','denied','completed','failed','rejected']},'answer':{},'version':{'type':'integer'}},['outcome','version']),
 'Response':obj({'responder_instance_id':S,'outcome':S,'answer':{},'version':{'type':'integer'},'source_answer_id':S,'source_invalidated':{'type':'boolean'},'reuse_method':S,'reuse_reason':S}),
 'Request':obj({'requester_instance_id':S,'id':S,'requester_id':S,'conversation_id':S,'kind':S,'title':S,'body':S,'choices':array(S),'action':ref('Action'),'state':{'enum':['open','resolved','cancelled','expired','superseded']},'version':{'type':'integer'},'response':ref('Response'),'resolved_by':S,'resolved_at':S,'expires_at':S,'created_at':S,'shared_key':S}),
 'Rule':obj({'action':{'enum':['view','message','ask','decide','manage','*']},'target_kind':S,'target_id':S,'connection_id':S,'action_name':S,'conditions':obj({'resource':S,'resource_version':S,'currency':S,'max_amount_minor':{'type':'integer','minimum':0},'before':S})},['action','target_kind','target_id']),
 'Role':obj({'version':{'type':'integer','minimum':0},'id':S,'name':S,'rules':array(ref('Rule'))},['name','rules']),
-'Group':obj({'created_by':{'type':'string','readOnly':True},'version':{'type':'integer','minimum':0},'member':{'type':'boolean','readOnly':True},'members_complete':{'type':'boolean','readOnly':True},'id':S,'name':S,'members':array(S)},['name','members']),
+'Group':obj({'purpose':{'enum':['contacts','team','agent_role']},'created_by':{'type':'string','readOnly':True},'version':{'type':'integer','minimum':0},'member':{'type':'boolean','readOnly':True},'members_complete':{'type':'boolean','readOnly':True},'id':S,'name':S,'members':array(S)},['name','members']),
 'Binding':obj({'role_id':S,'subject_kind':{'enum':['principal','group']},'subject_id':S,'remove':{'type':'boolean'}},['role_id','subject_kind','subject_id']),
 'Connection':obj({'version':{'type':'integer','minimum':0},'id':S,'name':S,'kind':{'enum':['webhook','slack','email']},'config':{'type':'object','additionalProperties':S},'enabled':{'type':'boolean'},'secret_configured':{'type':'boolean'},'secret':{'type':'string','writeOnly':True}},['name','kind']),
 'Destination':obj({'version':{'type':'integer','minimum':0},'id':S,'connection_id':S,'principal_id':S,'address':S,'mode':{'enum':['primary','fallback','copy']},'priority':{'type':'integer'}},['connection_id','principal_id','address']),
@@ -48,6 +49,18 @@ schemas={
 'OverseerPlan':obj({'id':S,'prompt':S,'context_agent_ids':array(S),'target':ref('Target'),'operation':{'enum':['status','message','question','task']},'summary':S,'body':S,'sources':array(ref('FleetAgent')),'requires_confirmation':{'type':'boolean'},'created_at':S,'expires_at':S,'dispatches':array(ref('OverseerDispatch')),'replies':array(ref('Request')),'reply_summary':S,'reply_digest':S}),
 'Event':obj({'sequence':{'type':'integer'},'kind':S,'actor_id':S,'conversation_id':S,'recipient_id':S,'data':{},'created_at':S}),
 'Error':obj({'error':obj({'code':S,'message':S},['code','message'])},['error'])}
+# Keep the generator authoritative for the communication features shipped in
+# schema 29; regenerating must not erase routes or optional fields.
+schemas['Mention']['description']='Stable explicit addressee. start/end are Unicode code-point offsets for the exact @name token. Must be a current visible conversation participant. All members receive the original message and may contribute.'
+for name in ('SendInput','AskInput','Message','Request'):
+ schemas[name]['properties']['mentions']={**array(ref('Mention')),'maxItems':20}
+for name in ('SendInput','AskInput'):
+ schemas[name]['properties']['reuse_direct']={'type':'boolean','description':'Reuse authorized exact two-principal history. Defaults to false. Does not merge shared group chats.'}
+for name in ('AskInput','Request'):
+ schemas[name]['properties']['blocking']={'type':'boolean','description':'Explicit agent-to-individual-agent dependency. Ordinary open requests are not deadlocks.'}
+schemas['Conversation']['properties'].update({'last_activity_at':{'type':'string','format':'date-time'},'last_preview':S})
+schemas['OverseerPlan']['properties'].update({'instructions':array(obj({'agent_id':S,'operation':{'enum':['message','question','task']},'body':S},['agent_id','operation','body'])),'automatic':{'type':'boolean'},'summary_error':S})
+schemas['OverseerInput']['properties']['previous_plan_id']=S
 paths={}
 def add(method,path,body=None,result=None,description=''):
  op={'operationId':method.lower()+'_'+re.sub('[^A-Za-z0-9]+','_',path).strip('_'),'description':description or path,'responses':{'200':response(result or {'type':'object'}),'400':response(ref('Error')),'401':response(ref('Error')),'403':response(ref('Error')),'404':response(ref('Error')),'409':response(ref('Error')),'429':response(ref('Error'))},'parameters':[]}
@@ -90,6 +103,8 @@ add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','en
 add('POST','/api/v1/credentials/{id}/revoke',obj({}))
 add('POST','/api/v1/permissions/explain',obj({'subject_id':S,'action':S,'target':obj({'kind':S,'id':S},['kind','id']),'connection_id':S,'action_name':S,'descriptor':ref('Action')},['action','target']))
 add('POST','/api/v1/route-preview',obj({'target':ref('Target'),'action':S},['target','action']))
+add('POST','/api/v1/conversations',obj({'targets':array(ref('Target')),'body':S,'title':S,'approval':{'type':'boolean'},'choices':array(S),'mentions':array(ref('Mention'))},['targets','body']),ref('SendResult'),description='Start an explicit shared chat with a durable first message and optional structured mentions. Individual recipients only; all members must have current mutual view permission. Mentions identify current participants without excluding observers. Every later send checks current contact access. Idempotent; private broadcast contracts are unchanged.')
+add('POST','/api/v1/contact-permissions',obj({'subject':ref('Target'),'rules':array(ref('Rule')),'version':{'type':'integer'}},['subject','rules','version']),ref('Role'),description='Atomically save and assign a dedicated contact-access policy. Only view, message, ask and decide toward exact contacts. Existing delegation ceilings and observed-version checks apply. Inherited policies remain effective.')
 add('GET','/api/v1/conversations',result=array(ref('Conversation')))
 add('GET','/api/v1/conversations/{id}',result=ref('Conversation'))
 add('POST','/api/v1/messages',ref('SendInput'),ref('SendResult'))
@@ -147,6 +162,10 @@ for path in ('/integrations/webhook/{id}','/integrations/slack/{id}','/integrati
  for name in (['X-Notif-Timestamp','X-Notif-Signature','X-Notif-Event-ID'] if 'webhook' in path else ['X-Slack-Request-Timestamp','X-Slack-Signature']):paths[path]['post']['parameters'].append({'name':name,'in':'header','required':True,'schema':S})
 paths['/integrations/slack/{id}']['post']['requestBody']={'required':True,'content':{'application/x-www-form-urlencoded':{'schema':obj({'payload':S},['payload'])}}}
 for path in ('/auth/oidc/start','/auth/oidc/callback'):paths[path]['get']['responses']['303']={'description':'Redirect after verified login'}
+add('POST','/api/v1/fleet/coordinate',ref('OverseerInput'),ref('OverseerPlan'),description='Plan and dispatch distinct ordinary communications under current permissions, then durably collect and summarize settled replies. Idempotent recovery. Does not grant business execution authority. Use /fleet/plan and /fleet/command for explicit review.')
+paths['/api/v1/fleet/coordinate']['post']['operationId']='coordinate'
+add('POST','/api/v1/requests/{id}/blocking',obj({'blocking':{'type':'boolean'}},['blocking']),ref('Request'),description='Only the requesting agent may declare or clear its own open single-agent blocking dependency. Does not cancel the request.')
+paths['/api/v1/requests/{id}/blocking']['post']['operationId']='setRequestBlocking'
 spec={'openapi':'3.1.0','info':{'title':'Beep Grid open source API','version':'0.1.0-dev','license':{'name':'Apache-2.0'}},'servers':[{'url':'/'}], 'security':[{'bearer':[]},{'session':[]}], 'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'},'session':{'type':'apiKey','in':'cookie','name':'notif_session'}}}}
 (root/'api/openapi.json').write_text(json.dumps(spec,indent=2)+'\n')
 print(f'Generated {sum(len(p) for p in paths.values())} API operations.')

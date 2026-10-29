@@ -39,23 +39,31 @@ type OverseerDispatch struct {
 	ConversationID string `json:"conversation_id"`
 	RequestID      string `json:"request_id,omitempty"`
 }
+type OverseerInstruction struct {
+	AgentID   string `json:"agent_id"`
+	Operation string `json:"operation"`
+	Body      string `json:"body"`
+}
 type OverseerPlan struct {
-	PreviousPlanID       string             `json:"previous_plan_id,omitempty"`
-	Target               *Target            `json:"target,omitempty"`
-	ID                   string             `json:"id"`
-	Prompt               string             `json:"prompt"`
-	ContextIDs           []string           `json:"context_agent_ids"`
-	Operation            string             `json:"operation"`
-	Summary              string             `json:"summary"`
-	Body                 string             `json:"body,omitempty"`
-	Sources              []FleetAgent       `json:"sources"`
-	RequiresConfirmation bool               `json:"requires_confirmation"`
-	CreatedAt            time.Time          `json:"created_at"`
-	ExpiresAt            time.Time          `json:"expires_at"`
-	Dispatches           []OverseerDispatch `json:"dispatches"`
-	Replies              []Request          `json:"replies"`
-	ReplySummary         string             `json:"reply_summary,omitempty"`
-	ReplyDigest          string             `json:"reply_digest,omitempty"`
+	Automatic            bool                  `json:"automatic,omitempty"`
+	Instructions         []OverseerInstruction `json:"instructions,omitempty"`
+	SummaryError         string                `json:"summary_error,omitempty"`
+	PreviousPlanID       string                `json:"previous_plan_id,omitempty"`
+	Target               *Target               `json:"target,omitempty"`
+	ID                   string                `json:"id"`
+	Prompt               string                `json:"prompt"`
+	ContextIDs           []string              `json:"context_agent_ids"`
+	Operation            string                `json:"operation"`
+	Summary              string                `json:"summary"`
+	Body                 string                `json:"body,omitempty"`
+	Sources              []FleetAgent          `json:"sources"`
+	RequiresConfirmation bool                  `json:"requires_confirmation"`
+	CreatedAt            time.Time             `json:"created_at"`
+	ExpiresAt            time.Time             `json:"expires_at"`
+	Dispatches           []OverseerDispatch    `json:"dispatches"`
+	Replies              []Request             `json:"replies"`
+	ReplySummary         string                `json:"reply_summary,omitempty"`
+	ReplyDigest          string                `json:"reply_digest,omitempty"`
 }
 
 func (c *Client) Assistance(ctx context.Context) (AssistanceSettings, error) {
@@ -66,6 +74,11 @@ func (c *Client) Assistance(ctx context.Context) (AssistanceSettings, error) {
 func (c *Client) UpdateAssistance(ctx context.Context, in AssistanceUpdate) (AssistanceSettings, error) {
 	var out AssistanceSettings
 	err := c.Do(ctx, "POST", "/api/v1/assistance/settings", in, &out, "")
+	return out, err
+}
+func (c *Client) Coordinate(ctx context.Context, in OverseerInput, keys ...string) (OverseerPlan, error) {
+	var out OverseerPlan
+	err := c.assistanceDo(ctx, "/api/v1/fleet/coordinate", in, &out, keys...)
 	return out, err
 }
 func (c *Client) PlanOverseer(ctx context.Context, in OverseerInput, keys ...string) (OverseerPlan, error) {

@@ -19,6 +19,14 @@ func (s *Server) assistanceRoutes() {
 		x, e := s.Store.UpdateAssistance(r.Context(), actor(r), in)
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/fleet/coordinate", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.OverseerInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.Coordinate(r.Context(), actor(r), in, r.Header.Get("Idempotency-Key"))
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("POST /api/v1/fleet/plan", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in engine.OverseerInput
 		if e := decode(r, &in); e != nil {

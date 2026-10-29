@@ -36,7 +36,7 @@ func TestEmbeddedRuntimeAIConfigurationAndTenantBoundaries(t *testing.T) {
 			http.Error(w, "invalid", 400)
 			return
 		}
-		text, _ := json.Marshal(map[string]any{"operation": "status", "agent_ids": []string{payload.Sources[0].Agent.ID}, "body": "", "summary": "One agent in the current tenant"})
+		text, _ := json.Marshal(map[string]any{"instructions": []any{}, "operation": "status", "agent_ids": []string{payload.Sources[0].Agent.ID}, "body": "", "summary": "One agent in the current tenant"})
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"role": "assistant", "content": string(text)}}}})
 	}))
 	defer model.Close()

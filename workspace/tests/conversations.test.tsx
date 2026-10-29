@@ -66,11 +66,11 @@ it("retains a draft through a temporary read outage but clears it after authorit
   failure = 503;
   await act(() => query.invalidateQueries());
   await screen.findByRole("alert");
-  expect(
-    screen.queryByRole("textbox", { name: "Message" }),
-  ).not.toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue(
+    "Keep my unsent work",
+  );
   failure = 0;
-  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await act(() => query.invalidateQueries());
   await waitFor(() =>
     expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue(
       "Keep my unsent work",

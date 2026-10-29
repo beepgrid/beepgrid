@@ -36,6 +36,8 @@ export type Response = {
   version: number;
 };
 export type RequestItem = {
+ mentions?:Mention[];
+ blocking?:boolean;
   requester_instance_id?: string;
   id: string;
   requester_id: string;
@@ -67,9 +69,12 @@ export type Execution = {
   result: unknown;
 };
 export type AskInput = {
+ mentions?:Mention[];
+ blocking?:boolean;
+ reuse_direct?:boolean;
   preview_token?: string;
   target: Target;
-  title: string;
+  title?: string;
   body?: string;
   kind?: "question" | "approval" | "task";
   conversation_id?: string;
@@ -78,7 +83,9 @@ export type AskInput = {
   expires_at?: string;
   shared_key?: string;
 };
+export type Mention = {principal_id:string;start:number;end:number};
 export type Message = {
+ mentions?:Mention[];
   id: string;
   conversation_id: string;
   sender_id: string;
@@ -86,6 +93,8 @@ export type Message = {
   body: string;
 };
 export type SendInput = {
+ mentions?:Mention[];
+ reuse_direct?:boolean;
   preview_token?: string;
   target?: Target;
   conversation_id?: string;
@@ -127,6 +136,9 @@ export type FleetAgent = {
   }[];
 };
 export type OverseerPlan = {
+  automatic?: boolean;
+  instructions?: {agent_id:string;operation:"message"|"question"|"task";body:string}[];
+  summary_error?: string;
   previous_plan_id?: string;
   id: string;
   prompt: string;
@@ -332,6 +344,12 @@ export class Client {
       settings,
     );
   }
+  setRequestBlocking(id:string, blocking:boolean) {
+    return this.call<RequestItem>("POST", `/api/v1/requests/${encodeURIComponent(id)}/blocking`, {blocking});
+  }
+  coordinate(input:OverseerInput, signal?:AbortSignal, key?:string) {
+    return this.call<OverseerPlan>("POST", "/api/v1/fleet/coordinate", input, {key,signal});
+  }
   planOverseer(input: OverseerInput, signal?: AbortSignal, key?: string) {
     return this.call<OverseerPlan>("POST", "/api/v1/fleet/plan", input, {
       key, signal,
@@ -441,4 +459,10 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
     }, ms);
     signal?.addEventListener("abort", abort, { once: true });
   });
+}
+
+/** A mention identifies an explicit addressee. Observers may still contribute. */
+export function mentionContext(message:Message, recipient:string):string {
+ if(!message.mentions?.length)return "";
+ return message.mentions.some(m=>m.principal_id===recipient)?"You are explicitly addressed. Other participants may contribute relevant context.":"Other participants are explicitly addressed. You may contribute relevant context.";
 }

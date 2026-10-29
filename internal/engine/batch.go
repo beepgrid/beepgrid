@@ -221,6 +221,7 @@ func (s *Store) checkDispatchPreview(ctx context.Context, db DB, a Actor, in Dis
 }
 
 type SendBatchInput struct {
+	ReuseDirect  bool     `json:"reuse_direct,omitempty"`
 	Targets      []Target `json:"targets"`
 	Body         string   `json:"body"`
 	Title        string   `json:"title"`
@@ -258,7 +259,7 @@ func (s *Store) SendBatch(ctx context.Context, a Actor, in SendBatchInput, key s
 					t = Target{"instance", r.ExactInstance}
 				}
 				var result SendResult
-				if e = s.sendTx(ctx, db, a, SendInput{Target: t, Body: in.Body, Title: in.Title}, Digest(key+"/batch/"+r.ID), &result); e != nil {
+				if e = s.sendTx(ctx, db, a, SendInput{Target: t, Body: in.Body, Title: in.Title, ReuseDirect: in.ReuseDirect}, Digest(key+"/batch/"+r.ID), &result); e != nil {
 					return e
 				}
 				out = append(out, SendBatchItem{t, result})

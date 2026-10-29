@@ -144,7 +144,8 @@ func (s *Service) ApplyWorkspaceAccess(ctx context.Context, id string, version i
 // All tenants share the query pool, listener and durable work selectors.
 func (s *Service) RunWorkers(ctx context.Context) {
 	var workers sync.WaitGroup
-	workers.Add(2)
+	workers.Add(3)
+	go func() { defer workers.Done(); s.store.RunCoordinatorSummaries(ctx) }()
 	go func() {
 		defer workers.Done()
 		tick := time.NewTicker(5 * time.Second)

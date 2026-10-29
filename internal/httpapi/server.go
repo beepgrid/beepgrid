@@ -372,6 +372,22 @@ func (s *Server) routes() {
 		x, e := s.Store.Preview(r.Context(), actor(r), in.Target, in.Action)
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/conversations", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.StartChatInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.StartChat(r.Context(), actor(r), in, r.Header.Get("Idempotency-Key"))
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/contact-permissions", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.ContactPermissionsInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.SaveContactPermissions(r.Context(), actor(r), in)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("GET /api/v1/conversations", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.Conversations(r.Context(), actor(r))
 		return ok(w, x, e)
@@ -519,8 +535,6 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 	}
 	controller := http.NewResponseController(w)
 	defer controller.SetWriteDeadline(time.Time{})
-	timer := time.NewTimer(25 * time.Second)
-	defer timer.Stop()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	ready, release := s.Store.WatchEvents(actor(r))
@@ -568,8 +582,6 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 		case <-r.Context().Done():
 			return nil
 		case <-s.streamStop:
-			return nil
-		case <-timer.C:
 			return nil
 		case <-tick.C:
 			// Durable fallback also bounds revocation and missed-hint recovery.

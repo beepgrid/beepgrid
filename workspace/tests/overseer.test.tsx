@@ -72,14 +72,14 @@ it("keeps a 25-agent result compact and reveals canonical per-agent details on d
   const { Wrapper } = harness();
   render(<Overseer />, { wrapper: Wrapper });
   const summary = await screen.findByText(
-    "25 agents · 3 of 25 results settled · Individual results",
+    "25 agents · 3 of 25 replies received · Details",
   );
   expect(screen.queryByText("Result 0")).not.toBeInTheDocument();
   fireEvent.click(summary);
   await screen.findByText("Result 0");
-  expect(screen.getAllByRole("button", { name: "Conversation" })).toHaveLength(
-    25,
-  );
+  expect(
+    screen.getAllByRole("button", { name: "Open conversation" }),
+  ).toHaveLength(25);
   expect(screen.getAllByText("Awaiting an authorized reply")).toHaveLength(22);
 });
 
@@ -104,13 +104,39 @@ it("shows a truthful setup state with assistance off and makes no model/history 
   vi.stubGlobal("fetch", fetcher);
   const { Wrapper } = harness();
   render(<Overseer />, { wrapper: Wrapper });
-  await screen.findByText("Coordinator is not configured");
+  await screen.findByText(
+    "Ask a workspace administrator to enable Coordinator.",
+  );
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   expect(
     fetcher.mock.calls.every(
       ([path]) => path === "/api/v1/assistance/settings",
     ),
   ).toBe(true);
+});
+it("lets a Coordinator starter fill a draft without sending it", async () => {
+  const fetcher = vi.fn(async (path: string) =>
+    path.endsWith("/assistance/settings")
+      ? json(settings)
+      : json({ items: [] }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const { Wrapper } = harness();
+  render(<Overseer />, { wrapper: Wrapper });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Check release blockers" }),
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Message Coordinator" }),
+  ).toHaveValue(
+    "Find out which agents are waiting on release blockers and summarize what needs my attention.",
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Message Coordinator" }),
+  ).toHaveFocus();
+  expect(
+    fetcher.mock.calls.some(([path]) => path.endsWith("/fleet/coordinate")),
+  ).toBe(false);
 });
 it("reloads private chronological turns, sends bounded follow-up identity and clears only accepted drafts", async () => {
   let turns = [plan()];
@@ -125,9 +151,9 @@ it("reloads private chronological turns, sends bounded follow-up identity and cl
         items: body.collection === "groups" ? [] : turns,
         order: "created_at_id_descending",
       });
-    if (path.endsWith("/fleet/plan")) {
+    if (path.endsWith("/fleet/coordinate")) {
       const next = {
-        ...plan("ovr_follow"),
+        ...plan("ovr_follow_" + turns.length),
         prompt: body.prompt,
         previous_plan_id: body.previous_plan_id,
       };
@@ -148,7 +174,9 @@ it("reloads private chronological turns, sends bounded follow-up identity and cl
   );
   fireEvent.click(screen.getByRole("button", { name: "Send to Coordinator" }));
   await waitFor(() =>
-    expect(posts.find((p) => p.path.endsWith("/fleet/plan"))?.body).toEqual({
+    expect(
+      posts.find((p) => p.path.endsWith("/fleet/coordinate"))?.body,
+    ).toEqual({
       prompt: "Explain that",
       previous_plan_id: "ovr_first",
     }),
@@ -167,7 +195,7 @@ it("reloads private chronological turns, sends bounded follow-up identity and cl
   fireEvent.click(screen.getByRole("button", { name: "Send to Coordinator" }));
   await waitFor(() =>
     expect(
-      posts.filter((p) => p.path.endsWith("/fleet/plan")).at(-1)?.body,
+      posts.filter((p) => p.path.endsWith("/fleet/coordinate")).at(-1)?.body,
     ).toEqual({ prompt: "New question" }),
   );
   view.unmount();
@@ -224,7 +252,14 @@ it("keeps a proposed exact instruction separate from direct chat and requires ex
   expect(mutations).toEqual([
     { path: "/api/v1/fleet/command", body: { plan_id: "ovr_first" } },
   ]);
-  fireEvent.click(screen.getByRole("button", { name: "Conversation" }));
+  const details = screen
+    .getByText("1 agent · messages accepted · Details")
+    .closest("details")!;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Open conversation" }),
+  );
   expect(location.pathname).toBe("/conversations/con_direct");
 });
 it("removes saved content on current read failure or assistance disablement", async () => {
@@ -252,7 +287,9 @@ it("removes saved content on current read failure or assistance disablement", as
   ).not.toBeInTheDocument();
   enabled = false;
   await act(() => query.invalidateQueries());
-  await screen.findByText("Coordinator is turned off");
+  await screen.findByText(
+    "Ask a workspace administrator to enable Coordinator.",
+  );
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 });
 it("ordinary multi-agent conversation sends directly even with assistance enabled", async () => {
@@ -317,7 +354,7 @@ it("retries a lost planning response with its original context and key after ref
           items: body.collection === "groups" ? [] : turns,
           order: "created_at_id_descending",
         });
-      if (path.endsWith("/fleet/plan")) {
+      if (path.endsWith("/fleet/coordinate")) {
         attempts.push({
           body,
           key: (init?.headers as Record<string, string>)["Idempotency-Key"],
@@ -368,7 +405,7 @@ it("keeps an explicitly new topic across navigation instead of attaching an old 
           items: body.collection === "groups" ? [] : [plan()],
           order: "created_at_id_descending",
         });
-      if (path.endsWith("/fleet/plan")) {
+      if (path.endsWith("/fleet/coordinate")) {
         submitted.push(body);
         return json({ ...plan("new_topic"), prompt: body.prompt });
       }

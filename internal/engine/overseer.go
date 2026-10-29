@@ -15,25 +15,33 @@ type overseerHistoryKey struct{}
 
 // OverseerTurn is bounded, person-authorized conversation context, never authority.
 type OverseerTurn struct {
-	Prompt       string          `json:"prompt"`
-	Summary      string          `json:"summary"`
-	Operation    string          `json:"operation"`
-	Body         string          `json:"body,omitempty"`
-	Dispatched   bool            `json:"dispatched"`
-	ReplySummary string          `json:"reply_summary,omitempty"`
-	Replies      []OverseerReply `json:"replies"`
+	Instructions []OverseerInstruction `json:"instructions,omitempty"`
+	Prompt       string                `json:"prompt"`
+	Summary      string                `json:"summary"`
+	Operation    string                `json:"operation"`
+	Body         string                `json:"body,omitempty"`
+	Dispatched   bool                  `json:"dispatched"`
+	ReplySummary string                `json:"reply_summary,omitempty"`
+	Replies      []OverseerReply       `json:"replies"`
 }
 
 type OverseerInput struct {
+	Automatic      bool    `json:"automatic,omitempty"`
 	PreviousPlanID string  `json:"previous_plan_id,omitempty"`
 	Prompt         string  `json:"prompt"`
 	Target         *Target `json:"target,omitempty"`
 }
+type OverseerInstruction struct {
+	AgentID   string `json:"agent_id"`
+	Operation string `json:"operation"`
+	Body      string `json:"body"`
+}
 type OverseerDecision struct {
-	Operation string   `json:"operation"`
-	AgentIDs  []string `json:"agent_ids"`
-	Body      string   `json:"body,omitempty"`
-	Summary   string   `json:"summary"`
+	Instructions []OverseerInstruction `json:"instructions,omitempty"`
+	Operation    string                `json:"operation"`
+	AgentIDs     []string              `json:"agent_ids"`
+	Body         string                `json:"body,omitempty"`
+	Summary      string                `json:"summary"`
 }
 type OverseerPlanner func(context.Context, string, []FleetStatus) (OverseerDecision, error)
 type OverseerReply struct {
@@ -50,25 +58,28 @@ type OverseerDispatch struct {
 	RequestID      string `json:"request_id,omitempty"`
 }
 type OverseerPlan struct {
-	ScopeAgentIDs        []string            `json:"scope_agent_ids,omitempty"`
-	ContextGroups        map[string][]string `json:"context_groups,omitempty"`
-	ContextRequestIDs    []string            `json:"context_request_ids,omitempty"`
-	PreviousPlanID       string              `json:"previous_plan_id,omitempty"`
-	ID                   string              `json:"id"`
-	Prompt               string              `json:"prompt"`
-	ContextIDs           []string            `json:"context_agent_ids"`
-	Target               *Target             `json:"target,omitempty"`
-	Operation            string              `json:"operation"`
-	Summary              string              `json:"summary"`
-	Body                 string              `json:"body,omitempty"`
-	Sources              []FleetStatus       `json:"sources"`
-	RequiresConfirmation bool                `json:"requires_confirmation"`
-	CreatedAt            time.Time           `json:"created_at"`
-	ExpiresAt            time.Time           `json:"expires_at"`
-	Dispatches           []OverseerDispatch  `json:"dispatches"`
-	ReplySummary         string              `json:"reply_summary,omitempty"`
-	ReplyDigest          string              `json:"reply_digest,omitempty"`
-	Replies              []Request           `json:"replies"`
+	Automatic            bool                  `json:"automatic,omitempty"`
+	Instructions         []OverseerInstruction `json:"instructions,omitempty"`
+	SummaryError         string                `json:"summary_error,omitempty"`
+	ScopeAgentIDs        []string              `json:"scope_agent_ids,omitempty"`
+	ContextGroups        map[string][]string   `json:"context_groups,omitempty"`
+	ContextRequestIDs    []string              `json:"context_request_ids,omitempty"`
+	PreviousPlanID       string                `json:"previous_plan_id,omitempty"`
+	ID                   string                `json:"id"`
+	Prompt               string                `json:"prompt"`
+	ContextIDs           []string              `json:"context_agent_ids"`
+	Target               *Target               `json:"target,omitempty"`
+	Operation            string                `json:"operation"`
+	Summary              string                `json:"summary"`
+	Body                 string                `json:"body,omitempty"`
+	Sources              []FleetStatus         `json:"sources"`
+	RequiresConfirmation bool                  `json:"requires_confirmation"`
+	CreatedAt            time.Time             `json:"created_at"`
+	ExpiresAt            time.Time             `json:"expires_at"`
+	Dispatches           []OverseerDispatch    `json:"dispatches"`
+	ReplySummary         string                `json:"reply_summary,omitempty"`
+	ReplyDigest          string                `json:"reply_digest,omitempty"`
+	Replies              []Request             `json:"replies"`
 }
 
 func featureDisabled() error {
@@ -181,7 +192,29 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 	if !ValidText(decision.Summary, 4000) || len(decision.AgentIDs) > 100 {
 		return out, Bad("The Coordinator response exceeds its bounds.")
 	}
-	if decision.Operation != "status" && (!ValidText(decision.Body, 4000) || len(decision.AgentIDs) == 0) {
+	if len(decision.Instructions) > 0 {
+		if decision.Operation == "status" || len(decision.Instructions) > 100 || len(JSON(decision.Instructions)) > 24576 {
+			return out, Bad("Invalid specialist instructions.")
+		}
+		ids := []string{}
+		seen := map[string]bool{}
+		for _, instruction := range decision.Instructions {
+			if seen[instruction.AgentID] || !ValidText(instruction.Body, 4000) || (instruction.Operation != "message" && instruction.Operation != "question" && instruction.Operation != "task") {
+				return out, Bad("Each specialist requires one bounded communication instruction.")
+			}
+			seen[instruction.AgentID] = true
+			ids = append(ids, instruction.AgentID)
+		}
+		if len(decision.AgentIDs) > 0 {
+			for _, id := range decision.AgentIDs {
+				if !seen[id] {
+					return out, Bad("Selected specialists must match the instructions.")
+				}
+			}
+		}
+		decision.AgentIDs = ids
+	}
+	if decision.Operation != "status" && len(decision.Instructions) == 0 && (!ValidText(decision.Body, 4000) || len(decision.AgentIDs) == 0) {
 		return out, Bad("An outbound plan requires explicit agents and a bounded message.")
 	}
 	byID := map[string]FleetStatus{}
@@ -206,7 +239,7 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 			seen[id] = true
 		}
 	}
-	out = OverseerPlan{ID: ID("ovr"), Prompt: in.Prompt, Operation: decision.Operation, Summary: decision.Summary, Body: decision.Body, Sources: selected, RequiresConfirmation: decision.Operation != "status", CreatedAt: time.Now(), ExpiresAt: time.Now().Add(10 * time.Minute), Dispatches: []OverseerDispatch{}, Replies: []Request{}}
+	out = OverseerPlan{Automatic: in.Automatic, Instructions: decision.Instructions, ID: ID("ovr"), Prompt: in.Prompt, Operation: decision.Operation, Summary: decision.Summary, Body: decision.Body, Sources: selected, RequiresConfirmation: decision.Operation != "status", CreatedAt: time.Now(), ExpiresAt: time.Now().Add(10 * time.Minute), Dispatches: []OverseerDispatch{}, Replies: []Request{}}
 	out.Target = in.Target
 	out.PreviousPlanID = in.PreviousPlanID
 	for _, source := range sources {
@@ -283,7 +316,8 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 			}
 			if out.Operation != "status" {
 				action := "message"
-				if out.Operation != "message" {
+				operation, _ := out.instructionFor(source.Agent.ID)
+				if operation != "message" {
 					action = "ask"
 				}
 				if _, err = s.resolve(ctx, tx, a, Target{"agent", source.Agent.ID}, action, ""); err != nil {
@@ -302,7 +336,7 @@ func (s *Store) PlanOverseer(ctx context.Context, a Actor, in OverseerInput, key
 			return Conflict("Conversation context changed. Ask again.")
 		}
 		save := func() error {
-			if _, err = tx.Exec(ctx, `INSERT INTO overseer_plans(id,scope,person_id,version,plan,expires_at) VALUES($1,$2,$3,$4,$5,$6)`, out.ID, a.Scope, a.ID, current.Version, JSON(out), out.ExpiresAt); err != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO overseer_plans(id,scope,person_id,version,plan,expires_at,automatic,authority_credential) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, out.ID, a.Scope, a.ID, current.Version, JSON(out), out.ExpiresAt, in.Automatic, a.CredentialID); err != nil {
 				return err
 			}
 			return event(ctx, tx, a, "overseer.planned", "", a.ID, map[string]any{"id": out.ID, "operation": out.Operation, "agent_count": len(selected)})
@@ -331,7 +365,7 @@ func (s *Store) overseerHistory(ctx context.Context, db DB, a Actor, id string) 
 		if err != nil {
 			return nil, err
 		}
-		turn := OverseerTurn{Prompt: p.Prompt, Summary: p.Summary, Operation: p.Operation, Body: p.Body, Dispatched: len(p.Dispatches) > 0, ReplySummary: p.ReplySummary, Replies: []OverseerReply{}}
+		turn := OverseerTurn{Instructions: p.Instructions, Prompt: p.Prompt, Summary: p.Summary, Operation: p.Operation, Body: p.Body, Dispatched: len(p.Dispatches) > 0, ReplySummary: p.ReplySummary, Replies: []OverseerReply{}}
 		for _, r := range p.Replies {
 			reply := OverseerReply{State: r.State}
 			for _, d := range p.Dispatches {
@@ -462,7 +496,7 @@ func (s *Store) overseerPlan(ctx context.Context, db DB, a Actor, id string) (Ov
 			out.Replies = append(out.Replies, r)
 		}
 	}
-	if err = db.QueryRow(ctx, `SELECT reply_summary,reply_digest FROM overseer_plans WHERE scope=$1 AND id=$2 AND person_id=$3`, a.Scope, id, a.ID).Scan(&out.ReplySummary, &out.ReplyDigest); err != nil {
+	if err = db.QueryRow(ctx, `SELECT reply_summary,reply_digest,summary_error FROM overseer_plans WHERE scope=$1 AND id=$2 AND person_id=$3`, a.Scope, id, a.ID).Scan(&out.ReplySummary, &out.ReplyDigest, &out.SummaryError); err != nil {
 		return OverseerPlan{}, err
 	}
 	if out.ReplyDigest != digestJSON(out.Replies) {
@@ -584,7 +618,7 @@ func (s *Store) SummarizeOverseer(ctx context.Context, a Actor, id string) (Over
 		if digest != digestJSON(out.Replies) {
 			return Conflict("Agent replies changed. Refresh before summarizing.")
 		}
-		if _, err = tx.Exec(ctx, `UPDATE overseer_plans SET reply_summary=$4,reply_digest=$5 WHERE scope=$1 AND id=$2 AND person_id=$3`, a.Scope, id, a.ID, summary, digest); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE overseer_plans SET reply_summary=$4,reply_digest=$5,summary_error='' WHERE scope=$1 AND id=$2 AND person_id=$3`, a.Scope, id, a.ID, summary, digest); err != nil {
 			return err
 		}
 		out.ReplySummary = summary
@@ -624,15 +658,16 @@ func (s *Store) ConfirmOverseer(ctx context.Context, a Actor, id string) (Overse
 		for _, source := range out.Sources {
 			target := Target{"agent", source.Agent.ID}
 			delivery := OverseerDispatch{AgentID: target.ID}
-			if out.Operation == "message" {
+			operation, body := out.instructionFor(target.ID)
+			if operation == "message" {
 				var sent SendResult
-				if err = s.sendTx(ctx, tx, a, SendInput{Target: target, Title: "Coordinator: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: out.Body}, out.ID+"/"+target.ID, &sent); err != nil {
+				if err = s.sendTx(ctx, tx, a, SendInput{Target: target, Title: "Coordinator: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: body}, out.ID+"/"+target.ID, &sent); err != nil {
 					return err
 				}
 				delivery.ConversationID = sent.ConversationID
 			} else {
 				var request Request
-				if err = s.askTx(ctx, tx, a, AskInput{Target: target, Kind: out.Operation, Title: "Coordinator: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: out.Body}, out.ID+"/"+target.ID, &request); err != nil {
+				if err = s.askTx(ctx, tx, a, AskInput{Target: target, Kind: operation, Title: "Coordinator: " + strings.ToValidUTF8(out.Prompt[:min(len(out.Prompt), 150)], ""), Body: body}, out.ID+"/"+target.ID, &request); err != nil {
 					return err
 				}
 				delivery.RequestID = request.ID
@@ -650,4 +685,31 @@ func (s *Store) ConfirmOverseer(ctx context.Context, a Actor, id string) (Overse
 		return OverseerPlan{}, err
 	}
 	return out, nil
+}
+
+func (p OverseerPlan) instructionFor(agent string) (string, string) {
+	for _, instruction := range p.Instructions {
+		if instruction.AgentID == agent {
+			return instruction.Operation, instruction.Body
+		}
+	}
+	return p.Operation, p.Body
+}
+
+// Coordinate is the ordinary communication workflow. The explicit planning and
+// confirmation APIs remain available for callers that want a review first.
+func (s *Store) Coordinate(ctx context.Context, a Actor, in OverseerInput, key string) (OverseerPlan, error) {
+	in.Automatic = true
+	plan, err := s.PlanOverseer(ctx, a, in, key)
+	if err != nil {
+		return plan, err
+	}
+	if plan.Operation == "status" || len(plan.Dispatches) > 0 {
+		return plan, nil
+	}
+	plan, err = s.ConfirmOverseer(ctx, a, plan.ID)
+	if err != nil {
+		return plan, err
+	}
+	return s.OverseerPlan(ctx, a, plan.ID)
 }

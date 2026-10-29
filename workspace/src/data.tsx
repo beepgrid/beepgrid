@@ -5,6 +5,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import {
   QueryClient,
@@ -27,6 +28,11 @@ export const client = new QueryClient({
     mutations: { retry: false },
   },
 });
+// A failed refresh must not erase a usable conversation. Authorization failures
+// are different: conceal cached content immediately when access is withdrawn.
+export function accessUnavailable(error: unknown) {
+  return error instanceof APIError && [401, 403, 404].includes(error.status);
+}
 export const Session = createContext<Me | null>(null);
 export function useSession() {
   const me = useContext(Session);
@@ -45,7 +51,7 @@ export function useResource<T>(path: string, enabled = true) {
     enabled,
     refetchInterval: 15_000,
   });
-  return { ...q, data: q.error ? undefined : q.data };
+  return { ...q, data: accessUnavailable(q.error) ? undefined : q.data };
 }
 export function usePostResource<T>(
   path: string,
@@ -59,7 +65,7 @@ export function usePostResource<T>(
     enabled,
     refetchInterval: 15_000,
   });
-  return { ...q, data: q.error ? undefined : q.data };
+  return { ...q, data: accessUnavailable(q.error) ? undefined : q.data };
 }
 export function useCapabilities(
   target?: Target | { kind: string; id: string },
@@ -91,9 +97,27 @@ export function useCollection<T>(
     getNextPageParam: (page) => page.next_cursor || undefined,
     enabled,
   });
+  // A conversation's recency can change between keyset pages. Keep the first
+  // (freshest page) occurrence instead of painting a duplicate canonical row.
+  const items = useMemo(() => {
+    if (accessUnavailable(q.error)) return [];
+    const seen = new Set<string>();
+    return (q.data?.pages.flatMap((p) => p.items || []) || []).filter(
+      (item) => {
+        const id =
+          item && typeof item === "object" && "id" in item
+            ? String(item.id)
+            : "";
+        if (!id) return true;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      },
+    );
+  }, [q.data, q.error]);
   return {
     ...q,
-    items: q.error ? [] : q.data?.pages.flatMap((p) => p.items || []) || [],
+    items,
   };
 }
 export function useOperation(recoveryName?: string) {
@@ -132,6 +156,7 @@ export function useOperation(recoveryName?: string) {
         "/connections",
         "/destinations",
         "/credentials",
+        "/sessions",
         "/answers",
       ].includes(path);
       if (unkeyedCreate && (!(e instanceof APIError) || e.status >= 500)) {
@@ -166,6 +191,18 @@ export function clearDrafts() {
   try {
     for (const k of Object.keys(sessionStorage))
       if (k.startsWith(draftPrefix)) sessionStorage.removeItem(k);
+  } catch {}
+}
+export function clearConversationDrafts(id: string) {
+  try {
+    for (const key of Object.keys(sessionStorage))
+      if (
+        key.startsWith(draftPrefix) &&
+        (key.endsWith(":message:" + id) ||
+          key.endsWith(":mentions:" + id) ||
+          key.endsWith(":operation:message:" + id))
+      )
+        sessionStorage.removeItem(key);
   } catch {}
 }
 export function useDraft(name: string) {

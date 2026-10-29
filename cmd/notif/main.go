@@ -242,6 +242,7 @@ func serve(ctx context.Context, args []string) error {
 	server := &http.Server{Addr: addr, Handler: handler, BaseContext: func(net.Listener) context.Context { return ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	defer stopWorker()
+	go store.RunCoordinatorSummaries(workerCtx)
 	go func() {
 		ticker := time.NewTicker(300 * time.Millisecond)
 		defer ticker.Stop()

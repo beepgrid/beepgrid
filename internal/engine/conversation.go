@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/jackc/pgx/v5"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type recipient struct {
@@ -93,6 +95,17 @@ func canReadConversation(ctx context.Context, db DB, a Actor, id string) bool {
 	_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM participants WHERE scope=$1 AND conversation_id=$2 AND principal_id=$3)`, a.Scope, id, a.ID).Scan(&ok)
 	return ok && a.CredentialKind != "enrollment"
 }
+
+// messageTitle is presentation only, never a required part of communication.
+func messageTitle(body string) string {
+	text := strings.TrimSpace(strings.SplitN(body, "\n", 2)[0])
+	for len(text) > 180 {
+		_, size := utf8.DecodeLastRuneInString(text)
+		text = text[:len(text)-size]
+	}
+	return text
+}
+
 func newConversation(ctx context.Context, db DB, a Actor, title string, ids ...string) (string, error) {
 	id := ID("con")
 	if title == "" {
@@ -123,7 +136,7 @@ func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, err
 	for rows.Next() {
 		var c Conversation
 		var raw []byte
-		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &raw); e != nil {
+		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &raw); e != nil {
 			rows.Close()
 			return nil, e
 		}
@@ -158,21 +171,21 @@ func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, err
 }
 
 func conversationListSQL(admin bool) string {
-	candidates := `SELECT c.id,c.title,c.created_by,c.created_at FROM conversations c WHERE c.scope=$1 ORDER BY c.created_at DESC,c.id DESC LIMIT 200`
+	candidates := `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview FROM conversations c WHERE c.scope=$1 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 200`
 	if !admin {
 		// Start with this person's memberships. The lateral lookup keeps a large
 		// workspace history from becoming a repeated full-table hash-join scan.
-		candidates = `SELECT c.id,c.title,c.created_by,c.created_at FROM participants visible
- CROSS JOIN LATERAL (SELECT c.id,c.title,c.created_by,c.created_at FROM conversations c WHERE c.scope=visible.scope AND c.id=visible.conversation_id OFFSET 0) c
- WHERE visible.scope=$1 AND visible.principal_id=$2 ORDER BY c.created_at DESC,c.id DESC LIMIT 200`
+		candidates = `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview FROM participants visible
+ CROSS JOIN LATERAL (SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview FROM conversations c WHERE c.scope=visible.scope AND c.id=visible.conversation_id OFFSET 0) c
+ WHERE visible.scope=$1 AND visible.principal_id=$2 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 200`
 	}
 	// Aggregate only each selected conversation's participants. A global join
 	// otherwise scans the directory again for each authenticated reader.
 	return `WITH candidates AS (` + candidates + `)
- SELECT c.id,c.title,c.created_by,c.created_at,COALESCE(others.members,'[]') FROM candidates c
+ SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,COALESCE(others.members,'[]') FROM candidates c
  LEFT JOIN LATERAL (SELECT jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind)) FILTER(WHERE p.id<>$2) AS members
  FROM participants cp JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id
- WHERE cp.scope=$1 AND cp.conversation_id=c.id) others ON true ORDER BY c.created_at DESC,c.id DESC`
+ WHERE cp.scope=$1 AND cp.conversation_id=c.id) others ON true ORDER BY c.last_activity_at DESC,c.id DESC`
 }
 
 func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversation, error) {
@@ -181,7 +194,7 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	if e != nil {
 		return Conversation{}, e
 	}
-	rows, e := s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id)
+	rows, e := s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id)
 	if e != nil {
 		return c, e
 	}
@@ -189,7 +202,7 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	c.Messages = []Message{}
 	for rows.Next() {
 		var m Message
-		if e = rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt); e != nil {
+		if e = rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions); e != nil {
 			return c, e
 		}
 		c.Messages = append(c.Messages, m)
@@ -208,7 +221,7 @@ func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor
 		// conversations. Acquire this before creating the message timestamp.
 		lock = " FOR UPDATE OF c"
 	}
-	rows, e := db.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,
+	rows, e := db.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,
  COALESCE(p.id,''),COALESCE(p.kind,''),COALESCE(p.external_id,''),COALESCE(p.name,''),COALESCE(p.metadata,'{}'::jsonb),COALESCE(p.disabled,false),COALESCE(p.created_at,c.created_at)
  FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id
  LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id
@@ -221,7 +234,7 @@ func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor
 	for rows.Next() {
 		var p Principal
 		var meta []byte
-		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &p.ID, &p.Kind, &p.ExternalID, &p.Name, &meta, &p.Disabled, &p.CreatedAt); e != nil {
+		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &p.ID, &p.Kind, &p.ExternalID, &p.Name, &meta, &p.Disabled, &p.CreatedAt); e != nil {
 			rows.Close()
 			return Conversation{}, e
 		}
@@ -409,12 +422,24 @@ func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, ke
 		if e != nil {
 			return e
 		}
+		if in.Title == "" {
+			in.Title = messageTitle(in.Body)
+		}
 		out.Messages = []Message{}
+		if in.ReuseDirect && in.ConversationID == "" && len(rs) == 1 && rs[0].ExactInstance == "" {
+			in.ConversationID, e = s.existingDirect(ctx, tx, a, rs[0].Principal)
+			if e != nil {
+				return e
+			}
+		}
 		if in.ConversationID == "" {
+			if len(in.Mentions) > 0 {
+				return Bad("Mentions require an existing shared conversation.")
+			}
 			_, e := s.nativeFanout(ctx, tx, a, in, rs, out)
 			return e
 		}
-		m, e := s.appendConversationMessage(ctx, tx, a, in.ConversationID, in.Body, rs)
+		m, e := s.appendConversationMessage(ctx, tx, a, in.ConversationID, in.Body, rs, in.Mentions)
 		if e != nil {
 			return e
 		}
@@ -507,4 +532,28 @@ func (s *Store) Preview(ctx context.Context, a Actor, target Target, action stri
 		}
 	}
 	return map[string]any{"recipients": list, "count": len(rs), "hidden_recipients": len(rs) - len(list), "mode": "private_per_recipient", "sends": false}, nil
+}
+
+// Existing history is reused only for this exact pair and only while the sender
+// can still read it. A shared room can never be selected by this path.
+func (s *Store) existingDirect(ctx context.Context, db DB, a Actor, peer Principal) (string, error) {
+	pair := []string{a.ID, peer.ID}
+	if pair[0] > pair[1] {
+		pair[0], pair[1] = pair[1], pair[0]
+	}
+	if _, err := db.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,9127))`, a.Scope+"/direct/"+pair[0]+"/"+pair[1]); err != nil {
+		return "", err
+	}
+	var id string
+	err := db.QueryRow(ctx, `SELECT c.id FROM conversations c JOIN participants mine ON mine.scope=c.scope AND mine.conversation_id=c.id AND mine.principal_id=$2 JOIN participants theirs ON theirs.scope=c.scope AND theirs.conversation_id=c.id AND theirs.principal_id=$3 WHERE c.scope=$1 AND (SELECT count(*) FROM participants p WHERE p.scope=c.scope AND p.conversation_id=c.id)=2 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 1`, a.Scope, a.ID, peer.ID).Scan(&id)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !s.canRead(ctx, db, a, id) {
+		return "", nil
+	}
+	return id, nil
 }

@@ -85,6 +85,7 @@ export function applyLiveEvent(
   if (/message|conversation/.test(kind)) families.add("conversations");
   if (/request|response|answer/.test(kind)) {
     families.add("requests");
+    families.add("conversations");
     families.add("answers");
   }
   if (/instance|agent|worker|progress/.test(kind)) {
@@ -116,9 +117,11 @@ export function applyLiveEvent(
       }
       return (
         q.queryKey[1] === "read" &&
-        families.has("requests") &&
-        q.queryKey[2] === "/capabilities" &&
-        !!(q.queryKey[3] as { request_id?: string })?.request_id
+        ((q.queryKey[2] === "/fleet/status" &&
+          (families.has("agents") || families.has("requests"))) ||
+          (families.has("requests") &&
+            q.queryKey[2] === "/capabilities" &&
+            !!(q.queryKey[3] as { request_id?: string })?.request_id))
       );
     },
   });

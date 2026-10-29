@@ -5,7 +5,7 @@ import {
   useOperation,
   useResource,
 } from "../data";
-import type { Connection, Destination, Target } from "../contracts";
+import type { Connection, Destination, Target, Identity } from "../contracts";
 import { TargetPicker } from "../TargetPicker";
 import {
   Badge,
@@ -42,7 +42,7 @@ const descriptions: Record<string, string> = {
   native: "Browser and authenticated worker communication.",
   webhook: "Signed inbound and outbound HTTP messages.",
   slack: "Messages, threads and verified interactive responses.",
-  email: "SMTP delivery with authenticated web continuation.",
+  email: "Send messages by email. Continue the conversation in your workspace.",
 };
 const labels: Record<string, string> = {
   url: "Endpoint URL",
@@ -65,17 +65,14 @@ export default function Integrations() {
     cap = useCapabilities();
   return (
     <>
-      <PageHeader
-        title="Integrations"
-        description="Channels, connection readiness and delivery destinations."
-      />
+      <PageHeader title="Integrations" />
       <Tabs
         value={tab}
         onChange={setTab}
         options={[
-          { id: "catalog", label: "Integration catalogue" },
-          { id: "connections", label: "Connections" },
-          { id: "destinations", label: "Destinations" },
+          { id: "catalog", label: "Browse" },
+          { id: "connections", label: "Connected" },
+          { id: "destinations", label: "Delivery preferences" },
         ]}
       />
       {tab === "catalog" ? (
@@ -83,46 +80,40 @@ export default function Integrations() {
           <ErrorView error={catalog.error} />
           {catalog.isPending ? <Loading /> : null}
           <div className="provider-grid">
-            {catalog.data?.map((p) => (
-              <article className="provider" key={p.kind}>
-                <header>
-                  <IdentityIcon
-                    kind={p.kind === "native" ? "agent" : "service"}
-                    label={names[p.kind] || p.kind}
-                  />
-                  <h3>{names[p.kind] || p.kind}</h3>
-                  {p.builtin ? <Badge>Built in</Badge> : null}
-                </header>
-                <p>{descriptions[p.kind]}</p>
-                <div className="actions">
-                  <Badge>{p.inbound_messages ? "Two-way" : "Outbound"}</Badge>
-                  {p.native_approvals ? (
-                    <Badge>Native approvals</Badge>
-                  ) : p.web_continuation ? (
-                    <Badge>Web continuation</Badge>
+            {catalog.data
+              ?.filter((p) => !p.builtin)
+              .map((p) => (
+                <article className="provider" key={p.kind}>
+                  <header>
+                    <span className="provider-mark" data-kind={p.kind}><Icon name={p.kind === "email" ? "mail" : p.kind === "slack" ? "slack" : "webhook"} size={21}/></span>
+                    <h3>{names[p.kind] || p.kind}</h3>
+                    {p.builtin ? <Badge>Built in</Badge> : null}
+                  </header>
+                  <p>{descriptions[p.kind]}</p>
+                  <div className="actions">
+                    <Badge>{p.inbound_messages ? "Two-way" : "Outbound"}</Badge>
+                    {p.native_approvals ? (
+                      <Badge>In-channel approvals</Badge>
+                    ) : p.web_continuation ? (
+                      <Badge>Reply in workspace</Badge>
+                    ) : null}
+                  </div>
+                  {!p.builtin && cap.data?.operations.create_connection ? (
+                    <Button icon="plus" onClick={() => setProvider(p)}>
+                      Add connection
+                    </Button>
                   ) : null}
-                </div>
-                <small>
-                  {p.attachments
-                    ? "Authenticated attachment support"
-                    : "No native attachment mirroring promised"}
-                </small>
-                {!p.builtin && cap.data?.operations.create_connection ? (
-                  <Button icon="plus" onClick={() => setProvider(p)}>
-                    Add connection
-                  </Button>
-                ) : null}
-              </article>
-            ))}
+                </article>
+              ))}
           </div>
-          <p className="collection-footer">
-            Additional providers and OAuth installation wizards will be added
-            here when their integrations are implemented.
-          </p>
+          <div className="provider upcoming-provider">
+            <Icon name="plus" />
+            <strong>More integrations coming soon...</strong>
+          </div>
         </>
       ) : null}
       {tab === "connections" ? (
-        <QueryState query={connections} empty="No permitted connections">
+        <QueryState query={connections} empty="No connections yet">
           <table>
             <thead>
               <tr>
@@ -145,7 +136,7 @@ export default function Integrations() {
                     {c.secret_configured ? "Configured" : "Not configured"}
                   </td>
                   <td>
-                    <Button onClick={() => setSelected(c)}>Inspect</Button>
+                    <Button onClick={() => setSelected(c)}>Manage</Button>
                   </td>
                 </tr>
               ))}
@@ -178,7 +169,7 @@ export function ConnectionForm({
   onClose: () => void;
   onSaved?: () => void;
 }) {
-  const [name, setName] = useState(c?.name || ""),
+  const [name, setName] = useState(c?.name || names[p.kind] || p.kind),
     [config, setConfig] = useState<Record<string, string>>(c?.config || {}),
     [secrets, setSecrets] = useState<Record<string, string>>({}),
     [enabled, setEnabled] = useState(c?.enabled ?? true),
@@ -225,8 +216,29 @@ export function ConnectionForm({
             onChange={(e) => setName(e.target.value)}
           />
         </Field>
+        {p.kind === "slack" ? (
+          <p className="help">
+            Create a Slack app, then copy its bot token and signing secret.{" "}
+            <a
+              href="https://api.slack.com/apps"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open Slack app settings ↗
+            </a>
+          </p>
+        ) : p.kind === "email" ? (
+          <p className="help">
+            Use your email provider’s SMTP settings. Your provider supplies the
+            server and credentials.
+          </p>
+        ) : null}
         {p.fields
-          .filter((f) => !f.secret)
+          .filter(
+            (f) =>
+              !f.secret &&
+              !["inbound_sender_id", "default_agent_id"].includes(f.name),
+          )
           .map((f) => (
             <Field label={labels[f.name] || f.name} key={f.name}>
               <input
@@ -237,6 +249,43 @@ export function ConnectionForm({
                 }
               />
             </Field>
+          ))}
+        {p.fields
+          .filter((f) =>
+            ["inbound_sender_id", "default_agent_id"].includes(f.name),
+          )
+          .map((f) => (
+            <div className="field" key={f.name}>
+              <span>
+                {f.name === "default_agent_id"
+                  ? "Receive messages as"
+                  : "Send incoming messages as"}
+              </span>
+              <TargetPicker
+                value={
+                  config[f.name]
+                    ? [
+                        {
+                          kind:
+                            f.name === "default_agent_id" ||
+                            config[f.name].startsWith("agt_")
+                              ? "agent"
+                              : config[f.name].startsWith("per_")
+                                ? "person"
+                                : "service",
+                          id: config[f.name],
+                        },
+                      ]
+                    : []
+                }
+                onChange={(v) =>
+                  setConfig((old) => ({ ...old, [f.name]: v[0]?.id || "" }))
+                }
+                allowGroups={false}
+                allowInstances={false}
+                agentsOnly={f.name === "default_agent_id"}
+              />
+            </div>
           ))}
         {c ? (
           <label className="inline-check">
@@ -461,12 +510,14 @@ function Destinations() {
   const q = useCollection<Destination>("destinations"),
     [create, setCreate] = useState(false),
     [edit, setEdit] = useState<Destination | null>(null);
+  const people = useCollection<Identity>("people"),
+    agents = useCollection<Identity>("agents"),
+    services = useCollection<Identity>("services"),
+    connections = useCollection<Connection>("connections");
+  const contacts = [...people.items, ...agents.items, ...services.items];
   return (
     <>
       <div className="toolbar">
-        <p className="muted">
-          Routing changes do not grant communication permissions.
-        </p>
         <Button onClick={() => setCreate(true)}>Add destination</Button>
       </div>
       <QueryState query={q} empty="No permitted destinations">
@@ -484,6 +535,14 @@ function Destinations() {
               <DestinationRow
                 key={d.id}
                 destination={d}
+                recipientName={
+                  contacts.find((p) => p.id === d.principal_id)?.name ||
+                  "Contact"
+                }
+                connectionName={
+                  connections.items.find((c) => c.id === d.connection_id)
+                    ?.name || "Connection"
+                }
                 onEdit={() => setEdit(d)}
               />
             ))}
@@ -493,6 +552,9 @@ function Destinations() {
       {create || edit ? (
         <DestinationForm
           destination={edit || undefined}
+          recipientName={
+            contacts.find((p) => p.id === edit?.principal_id)?.name
+          }
           onClose={() => {
             setCreate(false);
             setEdit(null);
@@ -504,9 +566,13 @@ function Destinations() {
 }
 function DestinationRow({
   destination: d,
+  recipientName,
+  connectionName,
   onEdit,
 }: {
   destination: Destination;
+  recipientName: string;
+  connectionName: string;
   onEdit: () => void;
 }) {
   const connection = useCapabilities({
@@ -520,12 +586,10 @@ function DestinationRow({
       <td>
         {d.address}
         <p>
-          <small>{d.connection_id}</small>
+          <small>{connectionName}</small>
         </p>
       </td>
-      <td>
-        <code>{d.principal_id}</code>
-      </td>
+      <td>{recipientName}</td>
       <td>
         {d.mode} · {d.priority}
       </td>
@@ -566,9 +630,11 @@ function DestinationRow({
 }
 function DestinationForm({
   destination: d,
+  recipientName,
   onClose,
 }: {
   destination?: Destination;
+  recipientName?: string;
   onClose: () => void;
 }) {
   const connections = useCollection<Connection>("connections"),
@@ -627,7 +693,7 @@ function DestinationForm({
         ) : null}
         {d ? (
           <p>
-            Recipient: <code>{d.principal_id}</code>
+            Recipient: <strong>{recipientName || "Selected contact"}</strong>
           </p>
         ) : (
           <TargetPicker

@@ -1,7 +1,7 @@
 import { useResource } from "./data";
 import type { AssistanceSettings } from "./contracts";
 import { navigate } from "./navigation";
-import { Badge, Icon } from "./ui";
+import { Icon } from "./ui";
 
 export const assistantName = "Coordinator";
 
@@ -9,54 +9,56 @@ export function OverseerMark() {
   return (
     <span className="identity-icon overseer-mark" aria-hidden="true">
       <svg
-        width="27"
-        height="25"
-        style={{ width: 27, height: 25 }}
-        viewBox="0 0 28 26"
+        width="30"
+        height="30"
+        viewBox="0 0 36 36"
         fill="none"
         aria-hidden="true"
       >
         <path
-          d="M6 13h5m5-1 6-7m-6 8h6m-6 1 6 7"
+          d="M8.5 18H13m7-2 7-8m-7 10h7m-7 2 7 8"
           stroke="currentColor"
-          strokeWidth="1.35"
+          strokeWidth="1.6"
           strokeLinecap="round"
         />
         <circle
-          cx="3.5"
-          cy="13"
-          r="2.5"
+          cx="5.5"
+          cy="18"
+          r="3"
           stroke="currentColor"
-          strokeWidth="1.35"
+          strokeWidth="1.6"
         />
         <circle
-          cx="24"
-          cy="4"
-          r="2.2"
+          cx="30"
+          cy="6.5"
+          r="3"
           stroke="currentColor"
-          strokeWidth="1.35"
+          strokeWidth="1.6"
         />
+        <circle cx="30" cy="18" r="3" stroke="currentColor" strokeWidth="1.6" />
         <circle
-          cx="24"
-          cy="13"
-          r="2.2"
+          cx="30"
+          cy="29.5"
+          r="3"
           stroke="currentColor"
-          strokeWidth="1.35"
+          strokeWidth="1.6"
         />
-        <circle
-          cx="24"
-          cy="22"
-          r="2.2"
-          stroke="currentColor"
-          strokeWidth="1.35"
-        />
-        <circle cx="13.5" cy="13" r="3.5" fill="var(--accent)" />
+        <circle cx="17" cy="18" r="4.5" fill="var(--accent)" />
       </svg>
     </span>
   );
 }
 export function OverseerEntry({ selected = false }: { selected?: boolean }) {
   const settings = useResource<AssistanceSettings>("/assistance/settings");
+  const state = settings.error
+    ? "Unavailable"
+    : settings.data?.overseer
+      ? "On"
+      : settings.data
+        ? settings.data.overseer_configured
+          ? "Off"
+          : "Not set up"
+        : "Checking";
   return (
     <button
       className="conversation-row conversation-preview overseer-entry"
@@ -65,18 +67,13 @@ export function OverseerEntry({ selected = false }: { selected?: boolean }) {
     >
       <OverseerMark />
       <div className="conversation-copy">
-        <strong>{assistantName}</strong>
-        <p>Your private agent coordinator</p>
-        <div className="conversation-meta">
-          <span>Built-in assistant</span>
-          <Badge>
-            {settings.data?.overseer
-              ? "On"
-              : settings.data
-                ? "Off"
-                : "Checking"}
-          </Badge>
+        <div className="coordinator-entry-title">
+          <strong>{assistantName}</strong>
+          <span className="badge coordinator-state" data-state={state}>
+            {state}
+          </span>
         </div>
+        <p>Built-in agent</p>
       </div>
       <Icon name="chevron" size={16} />
     </button>

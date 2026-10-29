@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   useCapabilities,
   useCollection,
@@ -20,6 +20,7 @@ import { TargetPicker } from "../TargetPicker";
 import { Compose } from "../Compose";
 import { IdentityDetail } from "./Directory";
 import { AccountView, type Account } from "../AccountView";
+import { OverseerMark } from "../OverseerEntry";
 import {
   Badge,
   Button,
@@ -36,12 +37,15 @@ import {
   QueryState,
 } from "../ui";
 
+const Activity = lazy(() => import("./Activity"));
+const Permissions = lazy(() => import("./Permissions"));
+const Groups = lazy(() => import("./Groups"));
 const sections = [
   ["account", "My account"],
   ["workspace", "Workspace"],
   ["services", "Software services"],
   ["credentials", "Access tokens"],
-  ["assistance", "Assistance"],
+  ["assistance", "Coordinator"],
   ["answers", "Published answers"],
 ];
 export default function Settings() {
@@ -51,21 +55,47 @@ export default function Settings() {
     meta = useResource<Workspace>("/workspace");
   return (
     <>
-      <PageHeader
-        title="Settings"
-        description="Your account and authorized workspace configuration."
-      />
+      <PageHeader title="Settings" />
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
-          {sections.map(([key, label]) => (
+          {sections
+            .filter(
+              ([key]) =>
+                me.admin ||
+                ["account", "workspace"].includes(key) ||
+                (key === "answers" && !!me.can_publish_answers),
+            )
+            .map(([key, label]) => (
+              <button
+                key={key}
+                aria-current={tab === key}
+                onClick={() => navigate("/settings/" + key)}
+              >
+                {label}
+              </button>
+            ))}
+          <button
+            aria-current={tab === "contacts"}
+            onClick={() => navigate("/settings/contacts")}
+          >
+            Contact permissions
+          </button>
+          {me.admin ? (
             <button
-              key={key}
-              aria-current={tab === key}
-              onClick={() => navigate("/settings/" + key)}
+              aria-current={tab === "groups"}
+              onClick={() => navigate("/settings/groups")}
             >
-              {label}
+              Contact groups
             </button>
-          ))}
+          ) : null}
+          {me.admin ? (
+            <button
+              aria-current={tab === "activity"}
+              onClick={() => navigate("/settings/activity")}
+            >
+              Activity log
+            </button>
+          ) : null}
           {meta.data?.workspace.can_read_account ? (
             <button
               aria-current={tab === "managed"}
@@ -88,33 +118,22 @@ export default function Settings() {
                   />
                   <div>
                     <h3>{me.person.name}</h3>
-                    <p>{me.person.external_id}</p>
+                    <p>{String(me.person.metadata?.email || "Signed in")}</p>
                   </div>
                 </div>
                 <dl className="detail-list">
-                  <dt>Person ID</dt>
-                  <dd>
-                    <code>{me.person.id}</code>
-                  </dd>
                   <dt>Company</dt>
                   <dd>{me.company}</dd>
                   <dt>Environment</dt>
                   <dd>{me.environment}</dd>
                   <dt>Session</dt>
                   <dd>Authenticated browser session</dd>
-                  <dt>Authority</dt>
-                  <dd>
-                    {me.admin
-                      ? "Administrator credential"
-                      : "Current role grants"}
-                  </dd>
+                  <dt>Role</dt>
+                  <dd>{me.admin ? "Administrator" : "Member"}</dd>
                 </dl>
-                <Details
-                  value={me.person.metadata}
-                  label="Permitted profile and linked account information"
-                />
+                <Details value={me.person.metadata} label="Profile details" />
                 <Button onClick={() => navigate("/permissions")}>
-                  View my effective access
+                  My permissions
                 </Button>
               </section>
             </>
@@ -135,12 +154,6 @@ export default function Settings() {
                     <dt>Schema version</dt>
                     <dd>{meta.data.schema_version}</dd>
                   </dl>
-                  <p className="help">
-                    Deployment and model credentials are configured by your
-                    deployment administrator. Workspace creation, company SSO
-                    onboarding, directory synchronization and payment management
-                    are deferred.
-                  </p>
                 </>
               ) : (
                 <Loading />
@@ -151,6 +164,21 @@ export default function Settings() {
           {tab === "credentials" ? <Credentials /> : null}
           {tab === "assistance" ? <Assistance /> : null}
           {tab === "answers" ? <Answers /> : null}
+          {tab === "contacts" ? (
+            <Suspense fallback={<Loading />}>
+              <Permissions />
+            </Suspense>
+          ) : null}
+          {tab === "activity" && me.admin ? (
+            <Suspense fallback={<Loading />}>
+              <Activity />
+            </Suspense>
+          ) : null}
+          {tab === "groups" && me.admin ? (
+            <Suspense fallback={<Loading />}>
+              <Groups purpose="contacts" />
+            </Suspense>
+          ) : null}
           {tab === "managed" ? <AccountStatus /> : null}
         </div>
       </div>
@@ -481,45 +509,48 @@ function Assistance() {
   const s = q.data!;
   return (
     <>
-      <h2>Optional assistance</h2>
-      <p className="help">
-        Coordinator is opt-in. The configured model receives only authorized
-        fleet reports and conversation context. Model credentials stay in
-        deployment configuration.
-      </p>
-      <ErrorView error={op.error} />
-      <section className="section">
-        <div className="page-header">
+      <div className="coordinator-settings">
+        <div className="coordinator-settings-head">
+          <OverseerMark />
           <div>
-            <h3>Coordinator</h3>
+            <h2>Coordinator</h2>
+            <p>One private conversation for coordinating your agents.</p>
+          </div>
+        </div>
+        <ErrorView error={op.error} />
+        <div className="coordinator-setting-row">
+          <div>
+            <strong>Availability</strong>
             <p>
-              Permission-filtered fleet interpretation with explicit
-              confirmation before sending.
+              {s.overseer
+                ? "Available to people in this workspace."
+                : "Turn on Coordinator for this workspace."}
             </p>
           </div>
           <Badge>{s.overseer ? "On" : "Off"}</Badge>
-        </div>
-        <small>
-          {s.overseer_configured
-            ? "Provider configured"
-            : "Provider not configured"}
-        </small>
-        {cap.data?.operations.configure_assistance ? (
-          <div className="actions">
+          {cap.data?.operations.configure_assistance ? (
             <Button
               disabled={op.pending || (!s.overseer && !s.overseer_configured)}
               onClick={() => setConfirm(true)}
             >
               {s.overseer ? "Disable" : "Enable"}
             </Button>
+          ) : null}
+        </div>
+        <div className="coordinator-setting-row">
+          <div>
+            <strong>Model provider</strong>
+            <p>
+              {s.overseer_configured
+                ? "Configured for this workspace."
+                : "A workspace operator needs to connect a model provider first."}
+            </p>
           </div>
-        ) : null}
-      </section>
-      <small>
-        Settings revision {s.version}. Disabling invalidates unconfirmed plans;
-        re-enabling does not resend them. Published answers have independent
-        validity controls.
-      </small>
+          <Badge>
+            {s.overseer_configured ? "Configured" : "Not configured"}
+          </Badge>
+        </div>
+      </div>
       {confirm ? (
         <Modal
           title={`${s.overseer ? "Disable" : "Enable"} Coordinator?`}
@@ -529,7 +560,7 @@ function Assistance() {
             <p>
               {s.overseer
                 ? "Future model work stops. Durable history remains."
-                : "Authorized context is shared with the configured provider. Current permissions and explicit send confirmation still apply."}
+                : "Authorized context is shared with the configured provider. Coordinator can send permitted instructions automatically. People can choose to review instructions before sending."}
             </p>
             <ErrorView error={op.error} />
             <div className="form-actions">

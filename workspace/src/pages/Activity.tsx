@@ -61,8 +61,7 @@ export default function Activity() {
   return (
     <>
       <PageHeader
-        title="Activity"
-        description="Authorized communication, transport and execution evidence."
+        title="Activity log"
       />
       <Tabs
         value={tab}

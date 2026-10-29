@@ -50,7 +50,7 @@ func querySearchText(table string) string {
 	case "requests":
 		fields += ",t.title,t.body"
 	case "conversations":
-		fields += ",t.title"
+		fields += ",t.title,t.last_preview"
 	case "messages":
 		fields += ",t.body"
 	case "shared_answers":
@@ -98,15 +98,24 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 	// Messages use a chronological, stable key while retaining a single opaque cursor.
 	key := "t.id"
 	order := key
-	if in.Collection == "messages" || in.Collection == "delivery_attempts" || in.Collection == "overseer_plans" {
+	if in.Collection == "messages" || in.Collection == "delivery_attempts" || in.Collection == "overseer_plans" || in.Collection == "conversations" {
+		stampColumn := "t.created_at"
+		if in.Collection == "conversations" {
+			stampColumn = "t.last_activity_at"
+		}
 		out.Order = "created_at_id_ascending"
 		key = "(to_char(t.created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US')||'/'||t.id)"
 		order = "t.created_at,t.id"
 		comparison := ">"
-		if in.Collection == "overseer_plans" {
+		if in.Collection == "overseer_plans" || in.Collection == "conversations" {
 			out.Order = "created_at_id_descending"
 			order = "t.created_at DESC,t.id DESC"
 			comparison = "<"
+		}
+		key = strings.ReplaceAll(key, "t.created_at", stampColumn)
+		order = strings.ReplaceAll(order, "t.created_at", stampColumn)
+		if in.Collection == "conversations" {
+			out.Order = "last_activity_at_id_descending"
 		}
 		// Keep the existing sealed cursor's wire format. Only the SQL seek and
 		// ordering change: format the bounded result, not every retained row.
@@ -119,7 +128,7 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 			}
 			args[1] = created.UTC()
 			args = append(args, id)
-			where = "t.scope=$1 AND (t.created_at,t.id)" + comparison + "($2::timestamptz,$4::text)"
+			where = "t.scope=$1 AND (" + stampColumn + ",t.id)" + comparison + "($2::timestamptz,$4::text)"
 		}
 	}
 	if in.Collection == "overseer_plans" {
@@ -146,6 +155,20 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 			} else if in.Collection == "deliveries" || in.Collection == "executions" {
 				expression = "t.state"
 			}
+		case "purpose":
+			if in.Collection == "groups" {
+				expression = "t.purpose"
+			}
+		case "member_id":
+			if in.Collection == "groups" {
+				p, e := principal(ctx, s.Pool, a.Scope, value)
+				if e != nil || !s.inspectIdentity(ctx, s.Pool, a, p) {
+					return out, Missing()
+				}
+				args = append(args, value)
+				where += " AND EXISTS(SELECT 1 FROM memberships m WHERE m.scope=t.scope AND m.group_id=t.id AND m.principal_id=$" + strconv.Itoa(len(args)) + ")"
+				continue
+			}
 		case "kind":
 			if in.Collection == "requests" || in.Collection == "connections" || in.Collection == "credentials" {
 				expression = "t.kind"
@@ -169,6 +192,18 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 		case "project", "type", "parent_id", "enrolled_by", "department", "manager_id":
 			if source.table == "principals" {
 				expression = "t.metadata->>'" + name + "'"
+			}
+		case "recipient_id":
+			if in.Collection == "requests" {
+				args = append(args, value)
+				where += " AND EXISTS(SELECT 1 FROM request_audience audience WHERE audience.scope=t.scope AND audience.request_id=t.id AND audience.principal_id=$" + strconv.Itoa(len(args)) + ")"
+				continue
+			}
+		case "participant_id":
+			if in.Collection == "conversations" {
+				args = append(args, value)
+				where += " AND EXISTS(SELECT 1 FROM participants member WHERE member.scope=t.scope AND member.conversation_id=t.id AND member.principal_id=$" + strconv.Itoa(len(args)) + ")"
+				continue
 			}
 		case "requester_id":
 			if in.Collection == "requests" {
@@ -376,7 +411,7 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 			return nil, Missing()
 		}
 		var c Conversation
-		e := db.QueryRow(ctx, `SELECT id,title,created_by,created_at FROM conversations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt)
+		e := db.QueryRow(ctx, `SELECT id,title,created_by,created_at,last_activity_at,last_preview FROM conversations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview)
 		if e != nil {
 			return c, normalize(e)
 		}
@@ -398,7 +433,7 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 		return c, rows.Err()
 	case "messages":
 		var m Message
-		e := db.QueryRow(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at FROM messages WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt)
+		e := db.QueryRow(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions)
 		if e != nil {
 			return nil, normalize(e)
 		}
@@ -430,7 +465,7 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 	case "groups":
 		var x Group
 		var raw []byte
-		e := db.QueryRow(ctx, `SELECT g.id,g.name,g.version,COALESCE((SELECT jsonb_agg(m.principal_id ORDER BY m.principal_id) FROM memberships m WHERE m.scope=g.scope AND m.group_id=g.id),'[]'),g.created_by FROM groups g WHERE g.scope=$1 AND g.id=$2`, a.Scope, id).Scan(&x.ID, &x.Name, &x.Version, &raw, &x.CreatedBy)
+		e := db.QueryRow(ctx, `SELECT g.id,g.name,g.version,COALESCE((SELECT jsonb_agg(m.principal_id ORDER BY m.principal_id) FROM memberships m WHERE m.scope=g.scope AND m.group_id=g.id),'[]'),g.created_by,g.purpose FROM groups g WHERE g.scope=$1 AND g.id=$2`, a.Scope, id).Scan(&x.ID, &x.Name, &x.Version, &raw, &x.CreatedBy, &x.Purpose)
 		if e != nil {
 			return nil, normalize(e)
 		}
@@ -441,19 +476,15 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 		if !x.Member && !s.manages(ctx, db, a, "group", id) && !s.allowed(ctx, db, a, "view", Target{"group", id}, "", "") {
 			return nil, Missing()
 		}
-		members := []string{}
-		for _, pid := range x.Members {
-			p, e := principal(ctx, db, a.Scope, pid)
-			if e != nil {
-				return nil, e
-			}
-			if s.inspectIdentity(ctx, db, a, p) {
-				members = append(members, pid)
-			}
+		visible, err := s.visibleGroupMembers(ctx, a, []Group{x})
+		if err != nil {
+			return nil, err
 		}
-		x.MembersComplete = len(members) == len(x.Members)
-		x.Members = members
-		return x, nil
+		if len(visible) == 0 {
+			return nil, Missing()
+		}
+		return visible[0], nil
+
 	case "connections":
 		var x Connection
 		var raw []byte

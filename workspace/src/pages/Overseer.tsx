@@ -15,11 +15,11 @@ import {
   Button,
   DateValue,
   Details,
-  Empty,
   ErrorView,
   Field,
   Form,
   IdentityIcon,
+  Icon,
   Loading,
   unavailable,
 } from "../ui";
@@ -42,15 +42,8 @@ function CoordinatorResults({ turn }: { turn: Plan }) {
           <Button
             onClick={() => navigate("/conversations/" + d.conversation_id)}
           >
-            Conversation
+            Open conversation
           </Button>
-          {d.request_id ? (
-            <Button onClick={() => navigate("/requests/" + d.request_id)}>
-              Request
-            </Button>
-          ) : (
-            <Badge>Message accepted</Badge>
-          )}
         </div>
       ))}
       {turn.replies?.map((r) => (
@@ -77,18 +70,17 @@ function CoordinatorResults({ turn }: { turn: Plan }) {
       ))}
     </>
   );
-  if (count <= 5) return results();
   return (
     <details
       className="details"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
       <summary>
-        {count} agents ·{" "}
+        {count} agent{count === 1 ? "" : "s"} ·{" "}
         {turn.replies?.length
-          ? `${settled} of ${turn.replies.length} results settled`
+          ? `${settled} of ${turn.replies.length} replies received`
           : "messages accepted"}{" "}
-        · Individual results
+        · Details
       </summary>
       {open ? results() : null}
     </details>
@@ -107,12 +99,14 @@ export default function Overseer() {
   const freshTopic = topic === "new";
   const setFreshTopic = (fresh: boolean) => setTopic(fresh ? "new" : "");
   const [notice, setNotice] = useState("");
+  const [review, setReview] = useState(false);
   const [clock, setClock] = useState(Date.now());
   const planning = useOperation("overseer");
   const op = useOperation();
   const busy = planning.pending || op.pending;
   const scroll = useRef<HTMLDivElement>(null);
   const scopeControl = useRef<HTMLDetailsElement>(null);
+  const promptControl = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
   const pinned = useRef(true);
   // The API returns newest first. Paint chronological turns, keeping older pages explicit.
@@ -158,7 +152,13 @@ export default function Overseer() {
         scroll.current.scrollTop = scroll.current.scrollHeight;
       initialized.current = true;
     }
-  }, [enabled, history.isPending, history.error, turns.length]);
+  }, [
+    enabled,
+    history.isPending,
+    history.error,
+    turns.length,
+    latest?.reply_summary,
+  ]);
   async function ask() {
     if (!prompt.trim()) return;
     if (bytes(prompt) > 4000) {
@@ -174,7 +174,7 @@ export default function Overseer() {
       prompt: string;
       target?: { kind: string; id: string };
       previous_plan_id?: string;
-    }>("/fleet/plan");
+    }>(review ? "/fleet/plan" : "/fleet/coordinate");
     const body =
       retry?.prompt === prompt && (retry.target?.id || "") === group
         ? retry
@@ -183,7 +183,10 @@ export default function Overseer() {
             ...(group ? { target: { kind: "group", id: group } } : {}),
             ...(previous ? { previous_plan_id: previous } : {}),
           };
-    const accepted = await planning.run<Plan>("/fleet/plan", body);
+    const accepted = await planning.run<Plan>(
+      review ? "/fleet/plan" : "/fleet/coordinate",
+      body,
+    );
     if (accepted) {
       setPrompt("");
       setFreshTopic(false);
@@ -196,28 +199,39 @@ export default function Overseer() {
       className="chat overseer-chat"
       aria-label={"Private " + assistantName + " conversation"}
     >
-      <header className="chat-head">
+      <header className="chat-head coordinator-head">
         <OverseerMark />
         <div className="chat-heading">
           <strong>{assistantName}</strong>
-          <p>Private to {me.person.name} · Uses your current permissions</p>
+          <p>
+            <Icon name="lock" size={12} /> Private to you
+          </p>
         </div>
-        <Badge>Built-in assistant</Badge>
-        <Button
-          disabled={busy}
-          onClick={() => {
-            planning.forget();
-            setFreshTopic(true);
-            setNotice(
-              "Your next message starts a new topic. Saved history stays here.",
-            );
-          }}
-        >
-          New topic
-        </Button>
+        <details className="coordinator-info">
+          <summary aria-label="About Coordinator">
+            <Icon name="info" size={17} />
+          </summary>
+          <p>
+            Coordinator sends permitted communications as you and brings replies
+            together. Business actions still need their own approvals.
+          </p>
+        </details>
+        {enabled ? (
+          <Button
+            disabled={busy}
+            onClick={() => {
+              planning.forget();
+              setFreshTopic(true);
+              setNotice(
+                "Your next message starts a new topic. Saved history stays here.",
+              );
+            }}
+          >
+            New topic
+          </Button>
+        ) : null}
       </header>
       <div
-        className="messages"
         ref={scroll}
         onScroll={() => {
           const el = scroll.current;
@@ -225,12 +239,8 @@ export default function Overseer() {
             pinned.current =
               el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
+        className={`messages coordinator-messages ${!enabled || !turns.length ? "coordinator-intro" : ""}`}
       >
-        <p className="help">
-          {assistantName} helps you understand and coordinate permitted agents.
-          Every outgoing message or request needs your confirmation. Group
-          conversations communicate directly with their participants.
-        </p>
         {settings.isPending ? (
           <Loading label={"Checking " + assistantName + " availability"} />
         ) : settings.error ? (
@@ -239,17 +249,33 @@ export default function Overseer() {
             retry={() => void settings.refetch()}
           />
         ) : !enabled ? (
-          <Empty
-            title={
-              settings.data?.overseer_configured
-                ? assistantName + " is turned off"
-                : assistantName + " is not configured"
-            }
-            icon="spark"
-          >
-            Your administrator can configure and enable this optional assistant
-            in Settings. Direct agent and group communication remains available.
-          </Empty>
+          <div className="coordinator-welcome">
+            <OverseerMark />
+            <span className="coordinator-eyebrow">Your built-in agent</span>
+            <h2>
+              One place to coordinate
+              <br />
+              your agents.
+            </h2>
+            <p>
+              Bring together updates, find the right agents and prepare work for
+              your fleet.
+            </p>
+            <div className="coordinator-setup">
+              {me.admin ? (
+                <Button
+                  icon="arrow"
+                  onClick={() => navigate("/settings/assistance")}
+                >
+                  Set up Coordinator
+                </Button>
+              ) : (
+                <small>
+                  Ask a workspace administrator to enable Coordinator.
+                </small>
+              )}
+            </div>
+          </div>
         ) : history.error ? (
           <ErrorView
             error={history.error}
@@ -273,10 +299,42 @@ export default function Overseer() {
               </Button>
             ) : null}
             {!turns.length ? (
-              <Empty title="What would you like to know?" icon="spark">
-                Ask about current reports, request an update, or prepare an
-                instruction for review.
-              </Empty>
+              <div className="coordinator-welcome">
+                <OverseerMark />
+                <span className="coordinator-eyebrow">Your built-in agent</span>
+                <h2>What would you like to do?</h2>
+                <p>
+                  Bring together updates, find the right agents and prepare work
+                  for your fleet.
+                </p>
+                <div className="coordinator-starters">
+                  {[
+                    [
+                      "conversations",
+                      "Check release blockers",
+                      "Find out which agents are waiting on release blockers and summarize what needs my attention.",
+                    ],
+                    [
+                      "task",
+                      "Prepare tasks for my agents",
+                      "Help me split the next release into tasks and find the right agents for each one.",
+                    ],
+                  ].map(([icon, label, text]) => (
+                    <button
+                      key={label}
+                      disabled={busy}
+                      onClick={() => {
+                        setPrompt(text);
+                        promptControl.current?.focus();
+                      }}
+                    >
+                      <Icon name={icon} size={17} />
+                      <span>{label}</span>
+                      <Icon name="arrow" size={15} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : null}
             {turns.map((turn) => (
               <div className="overseer-turn" key={turn.id}>
@@ -303,17 +361,38 @@ export default function Overseer() {
                         {turn.operation === "status"
                           ? "Interpretation"
                           : turn.dispatches?.length
-                            ? "Confirmed"
+                            ? "Sent"
                             : "Proposal"}
                       </Badge>
                     </div>
                     <p>{turn.summary}</p>
+                    {turn.instructions?.length ? (
+                      <div className="coordinator-instructions">
+                        {turn.instructions.map((i) => (
+                          <div key={i.agent_id}>
+                            <IdentityIcon kind="agent" id={i.agent_id} />
+                            <div>
+                              <strong>
+                                {turn.sources.find(
+                                  (s) => s.agent.id === i.agent_id,
+                                )?.agent.name || "Specialist"}
+                              </strong>
+                              <p>{i.body}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {turn.summary_error ? (
+                      <small>{turn.summary_error}</small>
+                    ) : null}
                     <Details
                       defer
                       label={`Sources and freshness (${turn.sources.length})`}
                       value={turn.sources}
                     />
-                    {turn.operation !== "status" ? (
+                    {turn.operation !== "status" &&
+                    (!turn.dispatches?.length || !turn.instructions?.length) ? (
                       <section className="approval">
                         <h3>
                           {turn.dispatches?.length
@@ -324,7 +403,7 @@ export default function Overseer() {
                           <strong>{turn.operation}</strong> to{" "}
                           {turn.sources.map((s) => s.agent.name).join(", ")}
                         </p>
-                        <pre>{turn.body}</pre>
+                        {turn.body ? <pre>{turn.body}</pre> : null}
                         {!turn.dispatches?.length ? (
                           <>
                             <small>
@@ -365,7 +444,8 @@ export default function Overseer() {
                       </section>
                     ) : null}
                     <CoordinatorResults turn={turn} />
-                    {turn.replies?.length ? (
+                    {turn.replies?.length &&
+                    (!turn.automatic || turn.summary_error) ? (
                       <Button
                         disabled={
                           busy ||
@@ -385,12 +465,27 @@ export default function Overseer() {
                             })
                         }
                       >
-                        Summarize replies
+                        {turn.summary_error
+                          ? "Retry summary"
+                          : "Summarize replies"}
                       </Button>
+                    ) : null}
+                    {turn.automatic &&
+                    turn.replies?.length &&
+                    !turn.reply_summary &&
+                    !turn.summary_error ? (
+                      <small className="muted">
+                        {turn.replies.some(
+                          (r) =>
+                            r.state === "open" || r.state === "clarification",
+                        )
+                          ? "Waiting for replies"
+                          : "Bringing the replies together..."}
+                      </small>
                     ) : null}
                     {turn.reply_summary ? (
                       <section className="section">
-                        <h3>Assistant summary</h3>
+                        <h3>Combined reply</h3>
                         <p>{turn.reply_summary}</p>
                       </section>
                     ) : null}
@@ -401,102 +496,109 @@ export default function Overseer() {
           </>
         )}
       </div>
-      <div className="composer">
-        <ErrorView error={planning.error} />
-        <ErrorView error={op.error} />
-        {notice ? (
-          <p className="notice" role="status">
-            {notice}
-          </p>
-        ) : null}
-        {!enabled ? (
-          <Button onClick={() => navigate("/settings/assistance")}>
-            Assistance settings
-          </Button>
-        ) : history.error || history.isPending ? (
-          <p className="help">
-            Restore current history before continuing this conversation.
-          </p>
-        ) : (
-          <Form onSubmit={() => void ask()}>
-            <details className="details" ref={scopeControl}>
-              <summary>
-                Agents:{" "}
-                {group
-                  ? groups.items.find((g) => g.id === group)?.name ||
-                    "Selected group"
-                  : "All permitted (up to 100)"}
-              </summary>
-              <Field label="Agent scope">
-                <select
-                  value={group}
-                  disabled={busy}
-                  onChange={(e) => {
-                    planning.forget();
-                    setGroup(e.target.value);
-                    if (scopeControl.current) scopeControl.current.open = false;
-                    setFreshTopic(true);
-                  }}
-                >
-                  <option value="">All permitted agents (up to 100)</option>
-                  {group && !groups.items.some((g) => g.id === group) ? (
-                    <option disabled value={group}>
-                      Saved group (not loaded)
-                    </option>
-                  ) : null}
-                  {groups.items.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              {groups.hasNextPage ? (
-                <Button
-                  disabled={groups.isFetchingNextPage}
-                  onClick={() => void groups.fetchNextPage()}
-                >
-                  Load more groups
-                </Button>
-              ) : null}
-              <ErrorView error={groups.error} />
-            </details>
-            <Field
-              label={
-                freshTopic
-                  ? "New topic for " + assistantName
-                  : "Message " + assistantName
-              }
-            >
-              <textarea
-                rows={2}
-                required
-                maxLength={4000}
-                disabled={busy}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ask about your agents or prepare an instruction…"
-              />
-            </Field>
-            <div className="actions">
-              <small>Recent context · Your current permissions</small>
-              <Button
-                primary
-                icon="arrow"
-                type="submit"
-                disabled={busy || !prompt.trim()}
+      {enabled ? (
+        <div className="composer coordinator-composer">
+          <ErrorView error={planning.error} />
+          <ErrorView error={op.error} />
+          {notice ? (
+            <p className="notice" role="status">
+              {notice}
+            </p>
+          ) : null}
+          {history.error || history.isPending ? (
+            <p className="help">
+              Restore current history before continuing this conversation.
+            </p>
+          ) : (
+            <Form onSubmit={() => void ask()}>
+              <details className="details" ref={scopeControl}>
+                <summary>
+                  Agents:{" "}
+                  {group
+                    ? groups.items.find((g) => g.id === group)?.name ||
+                      "Selected group"
+                    : "All permitted (up to 100)"}
+                </summary>
+                <Field label="Agent scope">
+                  <select
+                    value={group}
+                    disabled={busy}
+                    onChange={(e) => {
+                      planning.forget();
+                      setGroup(e.target.value);
+                      if (scopeControl.current)
+                        scopeControl.current.open = false;
+                      setFreshTopic(true);
+                    }}
+                  >
+                    <option value="">All permitted agents (up to 100)</option>
+                    {group && !groups.items.some((g) => g.id === group) ? (
+                      <option disabled value={group}>
+                        Saved group (not loaded)
+                      </option>
+                    ) : null}
+                    {groups.items.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {groups.hasNextPage ? (
+                  <Button
+                    disabled={groups.isFetchingNextPage}
+                    onClick={() => void groups.fetchNextPage()}
+                  >
+                    Load more groups
+                  </Button>
+                ) : null}
+                <ErrorView error={groups.error} />
+              </details>
+              <Field
+                label={
+                  freshTopic
+                    ? "New topic for " + assistantName
+                    : "Message " + assistantName
+                }
               >
-                {planning.pending
-                  ? "Preparing response"
-                  : "Send to " + assistantName}
-              </Button>
-            </div>
-            {planning.pending ? (
-              <Loading label="Reviewing permitted reports and recent context" />
-            ) : null}
-          </Form>
-        )}
-      </div>
+                <textarea
+                  ref={promptControl}
+                  rows={2}
+                  required
+                  maxLength={4000}
+                  disabled={busy}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Message Coordinator…"
+                />
+              </Field>
+              <div className="actions">
+                <label className="coordinator-review">
+                  <input
+                    type="checkbox"
+                    checked={review}
+                    onChange={(e) => setReview(e.target.checked)}
+                  />
+                  Review before sending
+                </label>
+                <Button
+                  primary
+                  icon="arrow"
+                  type="submit"
+                  disabled={busy || !prompt.trim()}
+                >
+                  {planning.pending
+                    ? "Preparing response"
+                    : "Send to " + assistantName}
+                </Button>
+              </div>
+              {planning.pending ? (
+                <Loading label="Reviewing permitted reports and recent context" />
+              ) : null}
+            </Form>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -11,6 +11,9 @@ import type { Identity } from "./contracts";
 import { AgentMark, identitySeed } from "./AgentMark";
 
 const paths: Record<string, string> = {
+  mail: "M3 5h18v14H3z m0 0 9 7 9-7",
+  slack: "M9 3v12 M3 9h12 M15 21V9 M21 15H9 M5 4h1 M18 4v2 M20 18h-2 M4 18v2",
+  webhook: "M7 5a4 4 0 1 0 5 6 M8 17a4 4 0 1 0-1 4 M17 12a4 4 0 1 0 4 4 M8 8l5 8 M8 18h9 M17 8l-4 8",
   inbox: "M4 4h16v16H4z M4 13h5l2 3h2l2-3h5",
   conversations: "M4 4h16v13H9l-5 4z",
   agents: "m12 3 8 5v8l-8 5-8-5V8z M4 8l8 5 8-5 M12 13v8",
@@ -19,6 +22,7 @@ const paths: Record<string, string> = {
   groups: "M3 4h7l2 3h9v13H3z",
   permissions: "m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6z M8 12l3 3 5-6",
   integrations: "M9 3v5m6-5v5 M6 8h12v3a6 6 0 0 1-6 6v5 M8 5h8",
+  fleet: "M3 4h6v6H3z M15 4h6v6h-6z M9 16h6v6H9z M6 10v3h12v-3 M12 13v3",
   activity: "M3 12h4l3-8 4 16 3-8h4",
   settings:
     "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z",
@@ -50,6 +54,8 @@ const paths: Record<string, string> = {
   spark: "m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3z",
   monitor: "M3 3h18v14H3z M8 22h8m-4-5v5",
   filter: "M3 4h18l-7 8v8l-4-2v-6z",
+  lock: "M6 10h12v11H6z M8 10V6a4 4 0 0 1 8 0v4 M12 14v3",
+  info: "M12 11v6 M12 7h.01 M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20",
 };
 export function Icon({ name, size = 18 }: { name: string; size?: number }) {
   return (
@@ -424,11 +430,13 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  className = "",
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -444,7 +452,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={wide ? "wide" : ""}
+      className={`${wide ? "wide" : ""} ${className}`}
       onCancel={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -571,7 +579,7 @@ export function QueryState({
   empty?: string;
 }) {
   if (query.isPending) return <Loading />;
-  if (query.error)
+  if (query.error && (!query.items?.length || unavailable(query.error)))
     return <ErrorView error={query.error} retry={() => void query.refetch()} />;
   return (
     <>
@@ -584,7 +592,6 @@ export function QueryState({
           >
             {query.isFetchingNextPage ? "Loading" : "Load more"}
           </Button>
-          <small>More permitted records may be available.</small>
         </div>
       ) : null}
     </>

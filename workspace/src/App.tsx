@@ -7,7 +7,14 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, APIError, advanceSession, onSessionExpired } from "./client";
-import { client, clearDrafts, Session, useResource, useSession } from "./data";
+import {
+  client,
+  clearDrafts,
+  Session,
+  useResource,
+  useSession,
+  accessUnavailable,
+} from "./data";
 import type { Me, Workspace } from "./contracts";
 import {
   Button,
@@ -26,6 +33,7 @@ import { useLive } from "./live";
 import { AccountView, type Account } from "./AccountView";
 
 const modules = {
+  fleet: () => import("./pages/Fleet"),
   agents: () => import("./pages/Directory"),
   people: () => import("./pages/Directory"),
   groups: () => import("./pages/Groups"),
@@ -52,14 +60,11 @@ export type WorkspaceExtension = {
   logout?: () => Promise<unknown>;
 };
 const defaultLinks = [
-  ["inbox", "Inbox"],
-  ["conversations", "Conversations"],
+  ["conversations", "Messages"],
   ["agents", "Agents"],
+  ["fleet", "Fleet"],
   ["people", "People"],
-  ["groups", "Groups"],
-  ["permissions", "Permissions"],
   ["integrations", "Integrations"],
-  ["activity", "Activity"],
 ];
 
 export default function App({
@@ -111,7 +116,7 @@ export default function App({
         <Loading label="Opening workspace" />
       </div>
     );
-  if (me.error) {
+  if (me.error && (!me.data || accessUnavailable(me.error))) {
     if (
       extension.authRequired &&
       me.error instanceof APIError &&
@@ -216,7 +221,7 @@ function Login({ onDone }: { onDone: () => void }) {
       <div className="login-panel">
         <Logo />
         <h1>Your workspace, connected.</h1>
-        <p>Sign in to your Beep Grid workspace.</p>
+        <p>Sign in to your workspace.</p>
         <ErrorView error={methods.error || error} />
         {methods.isPending ? <Loading /> : null}
         {methods.data?.oidc ? (
@@ -275,7 +280,9 @@ function WorkspaceApp({
   const me = useSession(),
     route = useRoute(),
     meta = useResource<Workspace>("/workspace");
-  const live = useLive(route.page === "conversations" ? route.id : "");
+  const live = useLive(
+    ["conversations", "inbox"].includes(route.page) ? route.id : "",
+  );
   const [menu, setMenu] = useState(false),
     [error, setError] = useState<Error | null>(null),
     [signingOut, setSigningOut] = useState(false);
@@ -320,12 +327,18 @@ function WorkspaceApp({
   }, [theme]);
   useEffect(() => {
     setMenu(false);
+    const section = ["inbox", "requests"].includes(route.page)
+      ? "conversations"
+      : ["permissions", "activity"].includes(route.page)
+        ? "settings"
+        : route.page === "groups"
+          ? "people"
+          : route.page === "connections"
+            ? "integrations"
+            : route.page;
     document.title =
       (links.find(
-        (x) =>
-          x[0] ===
-          (extension.navigationSection?.(route.page) ||
-            (route.page === "requests" ? "inbox" : route.page)),
+        (x) => x[0] === (extension.navigationSection?.(section) || section),
       )?.[1] || "Settings") + " · beepgrid";
   }, [route.page]);
   const page =
@@ -334,7 +347,16 @@ function WorkspaceApp({
       : route.page === "connections"
         ? "integrations"
         : route.page;
-  const activeSection = extension.navigationSection?.(page) || page;
+  const sectionPage =
+    page === "inbox"
+      ? "conversations"
+      : page === "groups"
+        ? "people"
+        : ["permissions", "activity"].includes(page)
+          ? "settings"
+          : page;
+  const activeSection =
+    extension.navigationSection?.(sectionPage) || sectionPage;
   const section = usePage(pages, page);
   const Component = section.component;
   function link(path: string) {
@@ -355,10 +377,10 @@ function WorkspaceApp({
       >
         <a
           className="brand-link"
-          href={workspaceURL("/agents")}
+          href={workspaceURL("/conversations")}
           onClick={(e) => {
             e.preventDefault();
-            link("agents");
+            link("conversations");
           }}
         >
           <Logo />
@@ -395,7 +417,7 @@ function WorkspaceApp({
           {extension.sidebar}
           <a
             href={workspaceURL("/settings")}
-            aria-current={page === "settings" ? "page" : undefined}
+            aria-current={activeSection === "settings" ? "page" : undefined}
             onClick={(e) => {
               e.preventDefault();
               link("settings");
@@ -474,10 +496,20 @@ function WorkspaceApp({
           </span>
           <span className="environment">{me.environment}</span>
         </header>
-        <main id="main" data-page={page} tabIndex={-1}>
+        <main
+          id="main"
+          data-page={
+            page === "inbox" && route.page !== "requests"
+              ? "conversations"
+              : page
+          }
+          tabIndex={-1}
+        >
           <ErrorView error={error} />
           <SectionBoundary key={page}>
-            {section.error ? (
+            {page === "activity" && !me.admin ? (
+              <p>Activity logs are available to workspace administrators.</p>
+            ) : section.error ? (
               <ErrorView error={section.error} retry={section.retry} />
             ) : Component ? (
               <>

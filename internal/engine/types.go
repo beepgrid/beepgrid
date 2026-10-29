@@ -158,6 +158,7 @@ type Binding struct {
 	SubjectID   string `json:"subject_id"`
 }
 type Group struct {
+	Purpose         string   `json:"purpose"`
 	CreatedBy       string   `json:"created_by"`
 	Version         int64    `json:"version"`
 	Member          bool     `json:"member"`
@@ -171,14 +172,24 @@ type Target struct {
 	ID   string `json:"id"`
 }
 type Conversation struct {
-	ID           string      `json:"id"`
-	Title        string      `json:"title"`
-	CreatedBy    string      `json:"created_by"`
-	CreatedAt    time.Time   `json:"created_at"`
-	Participants []Principal `json:"participants"`
-	Messages     []Message   `json:"messages,omitempty"`
+	LastActivityAt time.Time   `json:"last_activity_at"`
+	LastPreview    string      `json:"last_preview"`
+	ID             string      `json:"id"`
+	Title          string      `json:"title"`
+	CreatedBy      string      `json:"created_by"`
+	CreatedAt      time.Time   `json:"created_at"`
+	Participants   []Principal `json:"participants"`
+	Messages       []Message   `json:"messages,omitempty"`
+}
+
+// Mention offsets count Unicode code points in the original body, including @.
+type Mention struct {
+	PrincipalID string `json:"principal_id"`
+	Start       int    `json:"start"`
+	End         int    `json:"end"`
 }
 type Message struct {
+	Mentions       []Mention `json:"mentions,omitempty"`
 	ID             string    `json:"id"`
 	ConversationID string    `json:"conversation_id"`
 	SenderID       string    `json:"sender_id"`
@@ -187,11 +198,13 @@ type Message struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 type SendInput struct {
-	PreviewToken   string `json:"preview_token,omitempty"`
-	Target         Target `json:"target"`
-	ConversationID string `json:"conversation_id"`
-	Body           string `json:"body"`
-	Title          string `json:"title"`
+	Mentions       []Mention `json:"mentions,omitempty"`
+	ReuseDirect    bool      `json:"reuse_direct,omitempty"`
+	PreviewToken   string    `json:"preview_token,omitempty"`
+	Target         Target    `json:"target"`
+	ConversationID string    `json:"conversation_id"`
+	Body           string    `json:"body"`
+	Title          string    `json:"title"`
 }
 type SendResult struct {
 	Messages       []Message `json:"messages"`
@@ -206,6 +219,9 @@ type Action struct {
 	OperationKey    string         `json:"operation_key"`
 }
 type AskInput struct {
+	Mentions       []Mention `json:"mentions,omitempty"`
+	Blocking       bool      `json:"blocking,omitempty"`
+	ReuseDirect    bool      `json:"reuse_direct,omitempty"`
 	PreviewToken   string    `json:"preview_token,omitempty"`
 	Target         Target    `json:"target"`
 	ConversationID string    `json:"conversation_id"`
@@ -218,6 +234,8 @@ type AskInput struct {
 	SharedKey      string    `json:"shared_key"`
 }
 type Request struct {
+	Mentions            []Mention  `json:"mentions,omitempty"`
+	Blocking            bool       `json:"blocking,omitempty"`
 	RequesterInstanceID string     `json:"requester_instance_id,omitempty"`
 	ID                  string     `json:"id"`
 	RequesterID         string     `json:"requester_id"`

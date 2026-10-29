@@ -73,11 +73,14 @@ type Action struct {
 	OperationKey    string         `json:"operation_key"`
 }
 type AskInput struct {
+	Mentions       []Mention  `json:"mentions,omitempty"`
+	Blocking       bool       `json:"blocking,omitempty"`
+	ReuseDirect    bool       `json:"reuse_direct,omitempty"`
 	PreviewToken   string     `json:"preview_token,omitempty"`
 	Target         Target     `json:"target"`
 	ConversationID string     `json:"conversation_id,omitempty"`
 	Kind           string     `json:"kind,omitempty"`
-	Title          string     `json:"title"`
+	Title          string     `json:"title,omitempty"`
 	Body           string     `json:"body,omitempty"`
 	Choices        []string   `json:"choices,omitempty"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
@@ -95,6 +98,8 @@ type Response struct {
 	Version             int    `json:"version"`
 }
 type Request struct {
+	Mentions            []Mention `json:"mentions,omitempty"`
+	Blocking            bool      `json:"blocking,omitempty"`
 	RequesterInstanceID string    `json:"requester_instance_id,omitempty"`
 	ID                  string    `json:"id"`
 	ConversationID      string    `json:"conversation_id"`
@@ -109,19 +114,27 @@ type Request struct {
 	Action              *Action   `json:"action,omitempty"`
 	ExpiresAt           time.Time `json:"expires_at"`
 }
+type Mention struct {
+	PrincipalID string `json:"principal_id"`
+	Start       int    `json:"start"`
+	End         int    `json:"end"`
+}
 type SendInput struct {
-	PreviewToken   string `json:"preview_token,omitempty"`
-	Target         Target `json:"target"`
-	ConversationID string `json:"conversation_id,omitempty"`
-	Body           string `json:"body"`
-	Title          string `json:"title,omitempty"`
+	Mentions       []Mention `json:"mentions,omitempty"`
+	ReuseDirect    bool      `json:"reuse_direct,omitempty"`
+	PreviewToken   string    `json:"preview_token,omitempty"`
+	Target         Target    `json:"target"`
+	ConversationID string    `json:"conversation_id,omitempty"`
+	Body           string    `json:"body"`
+	Title          string    `json:"title,omitempty"`
 }
 type Message struct {
-	ID             string `json:"id"`
-	ConversationID string `json:"conversation_id"`
-	Body           string `json:"body"`
-	SenderID       string `json:"sender_id"`
-	InstanceID     string `json:"instance_id,omitempty"`
+	Mentions       []Mention `json:"mentions,omitempty"`
+	ID             string    `json:"id"`
+	ConversationID string    `json:"conversation_id"`
+	Body           string    `json:"body"`
+	SenderID       string    `json:"sender_id"`
+	InstanceID     string    `json:"instance_id,omitempty"`
 }
 type SendResult struct {
 	ConversationID string    `json:"conversation_id"`
@@ -298,6 +311,14 @@ func (c *Client) Ask(ctx context.Context, in AskInput, key string) (Request, err
 	e := c.Do(ctx, "POST", "/api/v1/requests", in, &r, key)
 	return r, e
 }
+
+// SetRequestBlocking declares whether this agent needs the answer to continue.
+// It does not cancel work or infer a dependency from an ordinary open request.
+func (c *Client) SetRequestBlocking(ctx context.Context, id string, blocking bool) (Request, error) {
+	var out Request
+	err := c.Do(ctx, "POST", "/api/v1/requests/"+url.PathEscape(id)+"/blocking", map[string]bool{"blocking": blocking}, &out, "")
+	return out, err
+}
 func (c *Client) GetRequest(ctx context.Context, id string) (Request, error) {
 	var r Request
 	e := c.Do(ctx, "GET", "/api/v1/requests/"+url.PathEscape(id), nil, &r, "")
@@ -377,4 +398,17 @@ func (c *Client) ReportExecution(ctx context.Context, id, state string, result a
 	var out Execution
 	err := c.Do(ctx, "POST", "/api/v1/executions/"+url.PathEscape(id), map[string]any{"state": state, "result": result}, &out, Key())
 	return out, err
+}
+
+// AttentionFor is an addressing hint, never an exclusive responder rule.
+func (m Message) AttentionFor(recipient string) string {
+	if len(m.Mentions) == 0 {
+		return ""
+	}
+	for _, mention := range m.Mentions {
+		if mention.PrincipalID == recipient {
+			return "You are explicitly addressed. Other participants may contribute relevant context."
+		}
+	}
+	return "Other participants are explicitly addressed. You may contribute relevant context."
 }

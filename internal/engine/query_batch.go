@@ -67,14 +67,14 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 			put(id, p, s.inspectIdentity(ctx, s.Pool, a, p))
 		}
 	case "groups":
-		rows, err := s.Pool.Query(ctx, `SELECT g.id,g.name,g.version,COALESCE(jsonb_agg(m.principal_id ORDER BY m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]'),g.created_by FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 AND g.id=ANY($2::text[]) GROUP BY g.id`, a.Scope, ids)
+		rows, err := s.Pool.Query(ctx, `SELECT g.id,g.name,g.version,COALESCE(jsonb_agg(m.principal_id ORDER BY m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]'),g.created_by,g.purpose FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 AND g.id=ANY($2::text[]) GROUP BY g.id`, a.Scope, ids)
 		if err != nil {
 			return nil, err
 		}
 		groups := []Group{}
 		for rows.Next() {
 			var g Group
-			if err = rows.Scan(&g.ID, &g.Name, &g.Version, &g.Members, &g.CreatedBy); err != nil {
+			if err = rows.Scan(&g.ID, &g.Name, &g.Version, &g.Members, &g.CreatedBy, &g.Purpose); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -161,21 +161,21 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		if err != nil {
 			return nil, err
 		}
-		rows, err := s.Pool.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind,'name',p.name) ORDER BY p.id) FILTER(WHERE p.id IS NOT NULL),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids)
+		rows, err := s.Pool.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind,'name',p.name) ORDER BY p.id) FILTER(WHERE p.id IS NOT NULL),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids)
 		if err != nil {
 			return nil, err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var c Conversation
-			if err = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.Participants); err != nil {
+			if err = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &c.Participants); err != nil {
 				return nil, err
 			}
 			put(c.ID, c, visible[c.ID])
 		}
 		return out, rows.Err()
 	case "messages", "attachments":
-		statement := `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at FROM messages WHERE scope=$1 AND id=ANY($2::text[])`
+		statement := `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=ANY($2::text[])`
 		if collection == "attachments" {
 			statement = `SELECT id,conversation_id,file_name,media_type,size,sha256,created_at FROM attachments WHERE scope=$1 AND id=ANY($2::text[])`
 		}
@@ -188,7 +188,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		for rows.Next() {
 			if collection == "messages" {
 				var x Message
-				if err = rows.Scan(&x.ID, &x.ConversationID, &x.SenderID, &x.InstanceID, &x.Body, &x.CreatedAt); err != nil {
+				if err = rows.Scan(&x.ID, &x.ConversationID, &x.SenderID, &x.InstanceID, &x.Body, &x.CreatedAt, &x.Mentions); err != nil {
 					rows.Close()
 					return nil, err
 				}
