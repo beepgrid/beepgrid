@@ -9,9 +9,7 @@ import (
 
 func deliveryScan(row pgx.Row) (Delivery, error) {
 	var d Delivery
-	var raw []byte
-	e := row.Scan(&d.ID, &d.RecipientID, &d.OperationID, &raw, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.Address, &d.ExpiresAt)
-	_ = json.Unmarshal(raw, &d.Payload)
+	e := row.Scan(&d.ID, &d.RecipientID, &d.OperationID, jsonColumn{&d.Payload}, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.Address, &d.ExpiresAt)
 	return d, normalize(e)
 }
 
@@ -19,15 +17,6 @@ const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,at
 
 // currentDeliveryPolicy rechecks the originating credential, group membership and route grants before exposing content.
 func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, d Delivery) bool {
-	var internal struct {
-		RequestID string `json:"engine_result"`
-	}
-	_ = json.Unmarshal(JSON(d.Payload["_policy"]), &internal)
-	if internal.RequestID != "" {
-		var valid bool
-		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope WHERE r.scope=$1 AND r.id=$2 AND r.requester_id=$3 AND NOT p.disabled)`, scope, internal.RequestID, d.RecipientID).Scan(&valid)
-		return valid
-	}
 	var policy struct {
 		CredentialID       string `json:"credential_id"`
 		ProviderConnection string `json:"provider_connection"`
@@ -35,47 +24,42 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 		Target             Target `json:"target"`
 		Action             string `json:"action"`
 		ActionName         string `json:"action_name"`
+		RequestID          string `json:"engine_result"`
 	}
-	if json.Unmarshal(JSON(d.Payload["_policy"]), &policy) != nil || policy.SenderID == "" {
+	if json.Unmarshal(JSON(d.Payload["_policy"]), &policy) != nil {
 		return false
 	}
-	p, e := principal(ctx, db, scope, policy.SenderID)
-	if e != nil || p.Disabled {
+	if policy.RequestID != "" {
+		var valid bool
+		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope WHERE r.scope=$1 AND r.id=$2 AND r.requester_id=$3 AND NOT p.disabled)`, scope, policy.RequestID, d.RecipientID).Scan(&valid)
+		return valid
+	}
+	if policy.SenderID == "" {
 		return false
 	}
-	sender := Actor{Principal: p, Scope: scope}
-	var valid bool
-	if policy.ProviderConnection != "" {
-		if e = db.QueryRow(ctx, `SELECT enabled FROM connections WHERE scope=$1 AND id=$2`, scope, policy.ProviderConnection).Scan(&valid); e != nil || !valid {
-			return false
-		}
-		sender.CredentialKind = "provider"
-	} else {
-		if e = db.QueryRow(ctx, `SELECT NOT revoked AND (expires_at IS NULL OR expires_at>now()),kind FROM credentials WHERE scope=$1 AND id=$2 AND principal_id=$3`, scope, policy.CredentialID, p.ID).Scan(&valid, &sender.CredentialKind); e != nil || !valid {
-			return false
-		}
-	}
-	sender.Admin = sender.CredentialKind == "admin"
-	if sender.CredentialKind == "browser" {
-		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, scope, p.ID).Scan(&sender.Admin)
-	}
-	recipient, e := principal(ctx, db, scope, d.RecipientID)
-	if e != nil || recipient.Disabled {
-		return false
-	}
-	if policy.Target.Kind == "group" {
-		var member bool
-		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships WHERE scope=$1 AND group_id=$2 AND principal_id=$3)`, scope, policy.Target.ID, d.RecipientID).Scan(&member)
-		if !member {
-			return false
-		}
-	}
+	requestID, checkRequest := "", false
 	if request, ok := d.Payload["request"].(map[string]any); ok && d.Payload["type"] == "request" {
-		var open bool
-		_ = db.QueryRow(ctx, `SELECT state='open' AND expires_at>now() FROM requests WHERE scope=$1 AND id=$2`, scope, request["id"]).Scan(&open)
-		if !open {
-			return false
-		}
+		checkRequest = true
+		requestID, _ = request["id"].(string)
+	}
+	// A claim already holds the scope fence. One current proof can join these
+	// identities and grants without repeating principal/credential round trips.
+	// Role and action-condition evaluation below still uses current policy.
+	sender := Actor{Principal: Principal{ID: policy.SenderID}, Scope: scope}
+	var valid bool
+	err := db.QueryRow(ctx, `SELECT p.kind,CASE WHEN $4<>'' THEN 'provider' ELSE COALESCE(c.kind,'') END,
+ CASE WHEN $4<>'' THEN false ELSE COALESCE(c.kind='admin' OR (c.kind='browser' AND EXISTS(
+ SELECT 1 FROM credentials ac WHERE ac.scope=$1 AND ac.principal_id=p.id AND ac.kind='admin' AND NOT ac.revoked AND (ac.expires_at IS NULL OR ac.expires_at>now()))),false) END,
+ COALESCE(NOT p.disabled AND NOT rp.disabled AND
+ (CASE WHEN $4<>'' THEN pc.enabled ELSE NOT c.revoked AND (c.expires_at IS NULL OR c.expires_at>now()) END) AND
+ ($6<>'group' OR EXISTS(SELECT 1 FROM memberships m WHERE m.scope=$1 AND m.group_id=$7 AND m.principal_id=rp.id)) AND
+ (NOT $8 OR EXISTS(SELECT 1 FROM requests r WHERE r.scope=$1 AND r.id=$9 AND r.state='open' AND r.expires_at>now())),false)
+ FROM principals p JOIN principals rp ON rp.scope=p.scope AND rp.id=$5
+ LEFT JOIN credentials c ON c.scope=p.scope AND c.id=$3 AND c.principal_id=p.id
+ LEFT JOIN connections pc ON pc.scope=p.scope AND pc.id=$4
+ WHERE p.scope=$1 AND p.id=$2`, scope, policy.SenderID, policy.CredentialID, policy.ProviderConnection, d.RecipientID, policy.Target.Kind, policy.Target.ID, checkRequest, requestID).Scan(&sender.Kind, &sender.CredentialKind, &sender.Admin, &valid)
+	if err != nil || !valid {
+		return false
 	}
 	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName, payloadAction(d.Payload))
 }

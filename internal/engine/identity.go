@@ -13,9 +13,7 @@ const principalFields = `id,kind,external_id,name,metadata,disabled,created_at`
 
 func scanPrincipal(row pgx.Row) (Principal, error) {
 	var p Principal
-	var meta []byte
-	err := row.Scan(&p.ID, &p.Kind, &p.ExternalID, &p.Name, &meta, &p.Disabled, &p.CreatedAt)
-	_ = json.Unmarshal(meta, &p.Metadata)
+	err := row.Scan(&p.ID, &p.Kind, &p.ExternalID, &p.Name, jsonColumn{&p.Metadata}, &p.Disabled, &p.CreatedAt)
 	return p, normalize(err)
 }
 func principal(ctx context.Context, db DB, scope, id string) (Principal, error) {

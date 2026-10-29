@@ -67,7 +67,7 @@ func (s *Store) mutation(ctx context.Context, a Actor, independent bool, fn func
 	if independent {
 		gate = &s.independentAdmission
 		// Leave pool headroom for readers, control operations and other tenants.
-		capacity = max(1, min(4, int(s.Pool.Config().MaxConns)/2))
+		capacity = max(1, min(4, int(s.Pool.Stat().MaxConns())/2))
 		lock = " FOR KEY SHARE"
 	}
 	release, err := gate.acquireCapacity(ctx, a.Scope, capacity)

@@ -37,6 +37,30 @@ var querySources = map[string]querySource{
 	"delivery_attempts": {"delivery_attempts", "", "created_at,id"}, "attachments": {"attachments", "", "id"}, "overseer_plans": {"overseer_plans", "", "id"},
 }
 
+// Use the existing searchable fields directly. Converting a complete row to
+// JSON once for every possible field repeatedly serializes large message,
+// delivery and plan payloads, including fields that are not searchable.
+func querySearchText(table string) string {
+	fields := "t.id"
+	switch table {
+	case "principals":
+		fields += ",t.name,t.external_id,t.metadata->>'department',t.metadata->>'email'"
+	case "groups", "roles", "connections":
+		fields += ",t.name"
+	case "requests":
+		fields += ",t.title,t.body"
+	case "conversations":
+		fields += ",t.title"
+	case "messages":
+		fields += ",t.body"
+	case "shared_answers":
+		fields += ",t.question"
+	case "overseer_plans":
+		fields += ",t.plan->>'prompt'"
+	}
+	return "concat_ws(' '," + fields + ")"
+}
+
 func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, error) {
 	out := QueryPage{Items: []any{}, Order: "id_ascending"}
 	source, exists := querySources[in.Collection]
@@ -102,7 +126,7 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 		args = append(args, a.ID)
 		where += " AND t.person_id=$" + strconv.Itoa(len(args))
 	}
-	where += " AND ($3='' OR strpos(lower(concat_ws(' ',to_jsonb(t)->>'id',to_jsonb(t)->>'name',to_jsonb(t)->>'title',to_jsonb(t)->>'body',to_jsonb(t)->>'question',to_jsonb(t)->>'external_id',to_jsonb(t)->'plan'->>'prompt',to_jsonb(t)->'metadata'->>'department',to_jsonb(t)->'metadata'->>'email')),lower($3))>0)"
+	where += " AND ($3='' OR strpos(lower(" + querySearchText(source.table) + "),lower($3))>0)"
 	for name, value := range in.Filters {
 		expression := ""
 		switch name {

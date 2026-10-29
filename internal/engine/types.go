@@ -52,6 +52,17 @@ func JSON(v any) []byte {
 	}
 	return b
 }
+
+// Decode during pgx's scan, before its row buffer can be reused. These legacy
+// readers already tolerate typed JSON decoding errors; preserve that behavior
+// without allocating an intermediate copy of the entire JSON column.
+type jsonColumn struct{ into any }
+
+func (c jsonColumn) ScanBytes(raw []byte) error {
+	_ = json.Unmarshal(raw, c.into)
+	return nil
+}
+
 func ValidText(s string, max int) bool { return strings.TrimSpace(s) != "" && len(s) <= max }
 
 // Principal is private engine machinery. Public resource collections are people, agents and services.

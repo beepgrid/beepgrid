@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
 )
 
 // Bulk evaluation has the same membership and all-other-participants View
@@ -24,12 +23,7 @@ func (s *Store) readableEventConversations(ctx context.Context, a Actor, ids []s
 	all := []candidate{}
 	for rows.Next() {
 		var c candidate
-		var raw []byte
-		if e = rows.Scan(&c.id, &c.member, &raw); e != nil {
-			rows.Close()
-			return nil, e
-		}
-		if e = json.Unmarshal(raw, &c.others); e != nil {
+		if e = rows.Scan(&c.id, &c.member, &c.others); e != nil {
 			rows.Close()
 			return nil, e
 		}

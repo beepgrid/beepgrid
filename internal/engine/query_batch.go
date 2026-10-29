@@ -74,12 +74,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		groups := []Group{}
 		for rows.Next() {
 			var g Group
-			var raw []byte
-			if err = rows.Scan(&g.ID, &g.Name, &g.Version, &raw, &g.CreatedBy); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			if err = json.Unmarshal(raw, &g.Members); err != nil {
+			if err = rows.Scan(&g.ID, &g.Name, &g.Version, &g.Members, &g.CreatedBy); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -173,11 +168,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		defer rows.Close()
 		for rows.Next() {
 			var c Conversation
-			var raw []byte
-			if err = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &raw); err != nil {
-				return nil, err
-			}
-			if err = json.Unmarshal(raw, &c.Participants); err != nil {
+			if err = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.Participants); err != nil {
 				return nil, err
 			}
 			put(c.ID, c, visible[c.ID])

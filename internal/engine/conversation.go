@@ -462,11 +462,9 @@ func (s *Store) eventPage(ctx context.Context, a Actor, after int64, recent, sum
 	out := []Event{}
 	for rows.Next() {
 		var x Event
-		var raw []byte
-		if e = rows.Scan(&x.Sequence, &x.Kind, &x.ActorID, &x.ConversationID, &x.RecipientID, &raw, &x.CreatedAt); e != nil {
+		if e = rows.Scan(&x.Sequence, &x.Kind, &x.ActorID, &x.ConversationID, &x.RecipientID, jsonColumn{&x.Data}, &x.CreatedAt); e != nil {
 			return nil, after, e
 		}
-		_ = json.Unmarshal(raw, &x.Data)
 		out = append(out, x)
 	}
 	e = rows.Err()
