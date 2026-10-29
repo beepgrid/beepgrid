@@ -11,6 +11,10 @@ import (
 
 func (s *Server) channelRoutes() {
 	m := s.mux
+	m.HandleFunc("GET /api/v1/connections/{id}/setup", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.ConnectionSetup(r.Context(), actor(r), r.PathValue("id"), s.PublicURL)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("POST /integrations/slack/{id}/events", s.slackEvents)
 	m.HandleFunc("POST /integrations/webhook/{id}", s.incomingWebhook)
 	m.HandleFunc("GET /api/v1/connections", s.protect(func(w http.ResponseWriter, r *http.Request) error {

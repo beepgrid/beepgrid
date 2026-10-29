@@ -139,15 +139,48 @@ type ProviderCapability struct {
 	WebContinuation bool            `json:"web_continuation"`
 	Attachments     bool            `json:"attachments"`
 	Builtin         bool            `json:"builtin"`
+	Directions      []string        `json:"directions"`
+	Replies         bool            `json:"replies"`
+	FileMode        string          `json:"file_mode"`
+	SetupModes      []string        `json:"setup_modes"`
+	Identity        string          `json:"identity"`
+	Constraints     []string        `json:"constraints"`
 }
 
 func ProviderCatalog() []ProviderCapability {
-	return []ProviderCapability{
+	out := []ProviderCapability{
 		{Kind: "native", Builtin: true, InboundMessages: true, NativeApprovals: true, Attachments: true, Fields: []ProviderField{}},
 		{Kind: "webhook", Fields: []ProviderField{{"url", true, false}, {"secret", true, true}, {"inbound_sender_id", false, false}}, InboundMessages: true, WebContinuation: true},
 		{Kind: "slack", Fields: []ProviderField{{"team_id", true, false}, {"bot_token", true, true}, {"signing_secret", true, true}, {"default_agent_id", false, false}}, InboundMessages: true, NativeApprovals: true, WebContinuation: true},
 		{Kind: "email", Fields: []ProviderField{{"smtp_addr", true, false}, {"from", true, false}, {"username", false, false}, {"secret", false, true}}, WebContinuation: true},
 	}
+	for i := range out {
+		p := &out[i]
+		p.Directions = []string{"outbound"}
+		p.FileMode = "workspace_link"
+		p.SetupModes = []string{"manual"}
+		p.Identity = "workspace_person"
+		p.Constraints = []string{}
+		if p.InboundMessages {
+			p.Directions = append(p.Directions, "inbound")
+			p.Replies = true
+		}
+		switch p.Kind {
+		case "native":
+			p.FileMode = "native"
+			p.SetupModes = []string{"builtin"}
+		case "slack":
+			p.SetupModes = []string{"byo_manifest"}
+			p.Identity = "admin_linked_user_and_team"
+			p.Constraints = []string{"DMs and app mentions only", "No native file upload", "Replies are messages; final decisions use approval buttons or the workspace"}
+		case "email":
+			p.Constraints = []string{"Outbound SMTP only", "Reply and decide in the authenticated workspace", "No inbound email or native file transfer"}
+		case "webhook":
+			p.Identity = "bounded_service"
+			p.Constraints = []string{"Inbound sender is a configured Service", "Signed payloads do not grant contact or decision authority", "No native file transfer"}
+		}
+	}
+	return out
 }
 
 type ConnectionDiagnostic struct {
@@ -158,10 +191,12 @@ type ConnectionDiagnostic struct {
 	Issues             []string `json:"issues"`
 	ProviderAcceptance string   `json:"provider_acceptance"`
 	Sends              bool     `json:"sends"`
+	State              string   `json:"state"`
+	Qualification      string   `json:"qualification"`
 }
 
 func (s *Store) DiagnoseConnection(ctx context.Context, a Actor, id string) (ConnectionDiagnostic, error) {
-	out := ConnectionDiagnostic{ConnectionID: id, Issues: []string{}, ProviderAcceptance: "not_tested"}
+	out := ConnectionDiagnostic{ConnectionID: id, Issues: []string{}, ProviderAcceptance: "not_tested", Qualification: "not_verified", State: "setup_incomplete"}
 	if !s.mayManageConnection(ctx, s.Pool, a, id) {
 		return out, Missing()
 	}
@@ -202,5 +237,10 @@ func (s *Store) DiagnoseConnection(ctx context.Context, a Actor, id string) (Con
 		out.Issues = append(out.Issues, "Authenticated SMTP requires a password.")
 	}
 	out.ConfigurationValid = len(out.Issues) == 0
+	if !c.Enabled {
+		out.State = "disconnected"
+	} else if out.ConfigurationValid {
+		out.State = "configured"
+	}
 	return out, nil
 }
