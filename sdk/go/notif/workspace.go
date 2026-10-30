@@ -46,10 +46,11 @@ type DispatchPreview struct {
 	Sends            bool              `json:"sends"`
 }
 type SendBatchInput struct {
-	Targets      []Target `json:"targets"`
-	Body         string   `json:"body"`
-	Title        string   `json:"title,omitempty"`
-	PreviewToken string   `json:"preview_token,omitempty"`
+	AttachmentIDs []string `json:"attachment_ids,omitempty"`
+	Targets       []Target `json:"targets"`
+	Body          string   `json:"body"`
+	Title         string   `json:"title,omitempty"`
+	PreviewToken  string   `json:"preview_token,omitempty"`
 }
 type SendBatchItem struct {
 	Target Target     `json:"target"`
@@ -68,12 +69,13 @@ type AskBatchItem struct {
 // Mentions address existing participants. Offsets count Unicode code points,
 // and never narrow the shared audience or grant contact/decision authority.
 type StartChatInput struct {
-	Targets  []Target  `json:"targets"`
-	Body     string    `json:"body"`
-	Title    string    `json:"title,omitempty"`
-	Approval bool      `json:"approval,omitempty"`
-	Choices  []string  `json:"choices,omitempty"`
-	Mentions []Mention `json:"mentions,omitempty"`
+	AttachmentIDs []string  `json:"attachment_ids,omitempty"`
+	Targets       []Target  `json:"targets"`
+	Body          string    `json:"body"`
+	Title         string    `json:"title,omitempty"`
+	Approval      bool      `json:"approval,omitempty"`
+	Choices       []string  `json:"choices,omitempty"`
+	Mentions      []Mention `json:"mentions,omitempty"`
 }
 
 func (c *Client) StartChat(ctx context.Context, in StartChatInput, key string) (SendResult, error) {
@@ -82,6 +84,31 @@ func (c *Client) StartChat(ctx context.Context, in StartChatInput, key string) (
 	}
 	var out SendResult
 	err := c.Do(ctx, "POST", "/api/v1/conversations", in, &out, key)
+	return out, err
+}
+
+// Membership controls disclosure, never IAM or the original request audience.
+// ShareHistory is false unless the caller explicitly opts in for additions.
+type ChatMembershipInput struct {
+	Operation    string   `json:"operation"`
+	Version      int      `json:"version"`
+	Title        string   `json:"title,omitempty"`
+	Members      []string `json:"members,omitempty"`
+	ShareHistory bool     `json:"share_history,omitempty"`
+	NextManager  string   `json:"next_manager,omitempty"`
+}
+type ChatMembershipResult struct {
+	ConversationID string `json:"conversation_id"`
+	Version        int    `json:"version"`
+	Left           bool   `json:"left,omitempty"`
+}
+
+func (c *Client) ChangeChatMembership(ctx context.Context, conversationID string, in ChatMembershipInput, key string) (ChatMembershipResult, error) {
+	if key == "" {
+		key = Key()
+	}
+	var out ChatMembershipResult
+	err := c.Do(ctx, "POST", "/api/v1/conversations/"+url.PathEscape(conversationID)+"/membership", in, &out, key)
 	return out, err
 }
 

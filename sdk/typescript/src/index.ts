@@ -36,6 +36,7 @@ export type Response = {
   version: number;
 };
 export type RequestItem = {
+ attachments?:Attachment[];
  mentions?:Mention[];
  blocking?:boolean;
   requester_instance_id?: string;
@@ -69,6 +70,7 @@ export type Execution = {
   result: unknown;
 };
 export type AskInput = {
+ attachment_ids?:string[];
  mentions?:Mention[];
  blocking?:boolean;
  reuse_direct?:boolean;
@@ -85,6 +87,7 @@ export type AskInput = {
 };
 export type Mention = {principal_id:string;start:number;end:number};
 export type Message = {
+ attachments?:Attachment[];
  mentions?:Mention[];
   id: string;
   conversation_id: string;
@@ -92,9 +95,13 @@ export type Message = {
   instance_id?: string;
   body: string;
 };
-export type StartChatInput = { targets:Target[]; body:string; title?:string; approval?:boolean; choices?:string[]; mentions?:Mention[] };
-export type Attachment = { id:string; conversation_id:string; message_id?:string; file_name:string; media_type:string; size:number; sha256:string; created_at:string };
+export type StartChatInput = { targets:Target[]; body:string; title?:string; approval?:boolean; choices?:string[]; mentions?:Mention[]; attachment_ids?:string[] };
+export type Attachment = { id:string; conversation_id:string; message_id?:string; request_id?:string; file_name:string; media_type:string; size:number; sha256:string; created_at:string };
+export type ChatMembershipInput = {operation:"rename"|"add"|"remove"|"leave";version:number;title?:string;members?:string[];share_history?:boolean;next_manager?:string};
+export type ChatMembershipResult = {conversation_id:string;version:number;left?:boolean};
+export type Conversation = {id:string;title:string;messages?:Message[];participants:unknown[];shared?:boolean;version?:number;manager_id?:string;history_start?:number;past_participants?:unknown[]};
 export type SendInput = {
+ attachment_ids?:string[];
  mentions?:Mention[];
  reuse_direct?:boolean;
   preview_token?: string;
@@ -250,17 +257,25 @@ export class Client {
   capabilities(input:{target?:{kind:string;id:string};request_id?:string;connection_id?:string;descriptor?:Action}={}) {return this.call<CapabilityResult>("POST","/api/v1/capabilities",input);}
   access(subject="") {return this.call<unknown>("GET","/api/v1/access?subject_id="+encodeURIComponent(subject));}
   dispatchPreview(input:DispatchPreviewInput) {return this.call<DispatchPreview>("POST","/api/v1/dispatch-preview",input);}
-  sendBatch(input:{targets:Target[];body:string;title?:string;preview_token?:string},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;result:{conversation_id:string;messages:Message[]}}>>("POST","/api/v1/message-batches",input,{key});}
+  sendBatch(input:{targets:Target[];body:string;title?:string;preview_token?:string;attachment_ids?:string[]},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;result:{conversation_id:string;messages:Message[]}}>>("POST","/api/v1/message-batches",input,{key});}
   askBatch(input:{targets:Target[];request:Omit<AskInput,"target"|"conversation_id"|"preview_token">;preview_token?:string},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;request:RequestItem}>>("POST","/api/v1/request-batches",input,{key});}
   requestTrace(id:string,cursor=""){return this.call<unknown>("GET","/api/v1/requests/"+encodeURIComponent(id)+"/trace?delivery_cursor="+encodeURIComponent(cursor));}
   workspace(){return this.call<unknown>("GET","/api/v1/workspace");}
   account(){return this.call<unknown>("GET","/api/v1/workspace/account");}
   startChat(input:StartChatInput,key:string=crypto.randomUUID()) { return this.call<{conversation_id:string;messages:Message[]}>("POST","/api/v1/conversations",input,{key}); }
+  changeChatMembership(conversationId:string,input:ChatMembershipInput,key:string=crypto.randomUUID()){return this.call<ChatMembershipResult>("POST",`/api/v1/conversations/${encodeURIComponent(conversationId)}/membership`,input,{key});}
   attachments(conversationId:string) { return this.call<Attachment[]>("GET",`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`); }
   async uploadAttachment(conversationId:string, file:Blob, name:string, signal?:AbortSignal):Promise<Attachment> {
+    return this.uploadFile(`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`,file,name,signal);
+  }
+  /** Private draft for attachment_ids. No automatic retry; unused drafts expire after 24 hours. */
+  async stageAttachment(file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {
+    return this.uploadFile("/api/v1/attachments",file,name,signal);
+  }
+  private async uploadFile(path:string,file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {
     if (!file.size || file.size>5*1024*1024) throw new Error("Attachments must be between 1 byte and 5 MiB");
     const form=new FormData(); form.append("file",file,name);
-    const response=await this.transport(`${this.baseURL}/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`,{method:"POST",headers:{Authorization:`Bearer ${this.token}`},body:form,signal:signal??AbortSignal.timeout(20000),redirect:"error"});
+    const response=await this.transport(`${this.baseURL}${path}`,{method:"POST",headers:{Authorization:`Bearer ${this.token}`},body:form,signal:signal??AbortSignal.timeout(20000),redirect:"error"});
     const value=await response.json(); if(!response.ok) throw new NotifError(value.error?.code??"HTTP_ERROR",value.error?.message??"Attachment upload rejected",response.status);
     return value as Attachment;
   }
@@ -273,7 +288,7 @@ export class Client {
     return new Blob(chunks,{type:response.headers.get("Content-Type")??"application/octet-stream"});
   }
   directory(kind:"agent"|"person"|"service",search="") { return this.query<Agent|Person>({collection:kind==="person"?"people":kind+"s",search}); }
-  conversation(id:string) { return this.call<{id:string;title:string;messages:Message[];participants:unknown[]}>("GET",`/api/v1/conversations/${encodeURIComponent(id)}`); }
+  conversation(id:string) { return this.call<Conversation>("GET",`/api/v1/conversations/${encodeURIComponent(id)}`); }
   providerCatalog() { return this.call<unknown[]>("GET","/api/v1/integrations/catalog"); }
   connectionSetup(id:string) { return this.call<unknown>("GET",`/api/v1/connections/${encodeURIComponent(id)}/setup`); }
   async connect(

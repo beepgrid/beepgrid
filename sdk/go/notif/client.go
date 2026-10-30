@@ -73,6 +73,7 @@ type Action struct {
 	OperationKey    string         `json:"operation_key"`
 }
 type AskInput struct {
+	AttachmentIDs  []string   `json:"attachment_ids,omitempty"`
 	Mentions       []Mention  `json:"mentions,omitempty"`
 	Blocking       bool       `json:"blocking,omitempty"`
 	ReuseDirect    bool       `json:"reuse_direct,omitempty"`
@@ -98,21 +99,22 @@ type Response struct {
 	Version             int    `json:"version"`
 }
 type Request struct {
-	Mentions            []Mention `json:"mentions,omitempty"`
-	Blocking            bool      `json:"blocking,omitempty"`
-	RequesterInstanceID string    `json:"requester_instance_id,omitempty"`
-	ID                  string    `json:"id"`
-	ConversationID      string    `json:"conversation_id"`
-	RequesterID         string    `json:"requester_id"`
-	Kind                string    `json:"kind"`
-	Title               string    `json:"title"`
-	Body                string    `json:"body"`
-	Choices             []string  `json:"choices"`
-	State               string    `json:"state"`
-	Version             int       `json:"version"`
-	Response            *Response `json:"response,omitempty"`
-	Action              *Action   `json:"action,omitempty"`
-	ExpiresAt           time.Time `json:"expires_at"`
+	Attachments         []Attachment `json:"attachments,omitempty"`
+	Mentions            []Mention    `json:"mentions,omitempty"`
+	Blocking            bool         `json:"blocking,omitempty"`
+	RequesterInstanceID string       `json:"requester_instance_id,omitempty"`
+	ID                  string       `json:"id"`
+	ConversationID      string       `json:"conversation_id"`
+	RequesterID         string       `json:"requester_id"`
+	Kind                string       `json:"kind"`
+	Title               string       `json:"title"`
+	Body                string       `json:"body"`
+	Choices             []string     `json:"choices"`
+	State               string       `json:"state"`
+	Version             int          `json:"version"`
+	Response            *Response    `json:"response,omitempty"`
+	Action              *Action      `json:"action,omitempty"`
+	ExpiresAt           time.Time    `json:"expires_at"`
 }
 type Mention struct {
 	PrincipalID string `json:"principal_id"`
@@ -120,6 +122,7 @@ type Mention struct {
 	End         int    `json:"end"`
 }
 type SendInput struct {
+	AttachmentIDs  []string  `json:"attachment_ids,omitempty"`
 	Mentions       []Mention `json:"mentions,omitempty"`
 	ReuseDirect    bool      `json:"reuse_direct,omitempty"`
 	PreviewToken   string    `json:"preview_token,omitempty"`
@@ -129,12 +132,13 @@ type SendInput struct {
 	Title          string    `json:"title,omitempty"`
 }
 type Message struct {
-	Mentions       []Mention `json:"mentions,omitempty"`
-	ID             string    `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	Body           string    `json:"body"`
-	SenderID       string    `json:"sender_id"`
-	InstanceID     string    `json:"instance_id,omitempty"`
+	Attachments    []Attachment `json:"attachments,omitempty"`
+	Mentions       []Mention    `json:"mentions,omitempty"`
+	ID             string       `json:"id"`
+	ConversationID string       `json:"conversation_id"`
+	Body           string       `json:"body"`
+	SenderID       string       `json:"sender_id"`
+	InstanceID     string       `json:"instance_id,omitempty"`
 }
 type SendResult struct {
 	ConversationID string    `json:"conversation_id"`

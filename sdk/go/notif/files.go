@@ -21,6 +21,7 @@ type Attachment struct {
 	ID             string    `json:"id"`
 	ConversationID string    `json:"conversation_id"`
 	MessageID      string    `json:"message_id,omitempty"`
+	RequestID      string    `json:"request_id,omitempty"`
 	FileName       string    `json:"file_name"`
 	MediaType      string    `json:"media_type"`
 	Size           int64     `json:"size"`
@@ -37,6 +38,15 @@ func (c *Client) Attachments(ctx context.Context, conversationID string) ([]Atta
 // UploadAttachment never automatically retries a non-idempotent upload. Inspect
 // Attachments after an unknown response before creating another object.
 func (c *Client) UploadAttachment(ctx context.Context, conversationID, name, media string, data []byte) (Attachment, error) {
+	return c.uploadAttachment(ctx, "/api/v1/conversations/"+url.PathEscape(conversationID)+"/attachments", name, media, data)
+}
+
+// StageAttachment creates a private draft for the next send/ask/start operation.
+// It is never automatically retried. Unused drafts expire after 24 hours.
+func (c *Client) StageAttachment(ctx context.Context, name, media string, data []byte) (Attachment, error) {
+	return c.uploadAttachment(ctx, "/api/v1/attachments", name, media, data)
+}
+func (c *Client) uploadAttachment(ctx context.Context, path, name, media string, data []byte) (Attachment, error) {
 	var out Attachment
 	if len(data) == 0 || len(data) > MaxAttachmentBytes || strings.ContainsAny(name+media, "\r\n") {
 		return out, fmt.Errorf("invalid attachment or size exceeds 5 MiB")
@@ -56,7 +66,7 @@ func (c *Client) UploadAttachment(ctx context.Context, conversationID, name, med
 	if err = writer.Close(); err != nil {
 		return out, err
 	}
-	raw, err := c.fileRequest(ctx, "POST", "/api/v1/conversations/"+url.PathEscape(conversationID)+"/attachments", writer.FormDataContentType(), body.Bytes())
+	raw, err := c.fileRequest(ctx, "POST", path, writer.FormDataContentType(), body.Bytes())
 	if err == nil {
 		err = json.Unmarshal(raw, &out)
 	}

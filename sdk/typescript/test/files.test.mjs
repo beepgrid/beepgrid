@@ -18,6 +18,8 @@ test('file requests preserve binary bytes, type, path and prevent redirects with
  assert.ok(requests.every(r=>r.options.redirect==='error'&&r.options.headers.Authorization==='Bearer fixture'));
  let calls=0;const lost=new Client('http://localhost','fixture',async()=>{calls++;throw new Error('lost response')});
  await assert.rejects(()=>lost.uploadAttachment('c',new Blob(['x']),'x'),/lost response/);assert.equal(calls,1);
+ assert.equal((await client.stageAttachment(new Blob(['file bytes']),'notes.pdf')).id,'att_1');assert.equal(requests[2].url,'http://localhost/api/v1/attachments');
+ await assert.rejects(()=>lost.stageAttachment(new Blob(['x']),'x'),/lost response/);assert.equal(calls,2);
 });
 
 test('real file journey, directory and current isolation',{skip:!process.env.NOTIF_SDK_TEST_URL},async()=>{

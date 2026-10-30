@@ -68,6 +68,7 @@ class Client:
 
     def start_chat(self, *, targets: list[dict[str, str]], body: str, title: str = "", approval: bool = False,
                    choices: list[str] | None = None, mentions: list[dict[str, Any]] | None = None,
+                   attachment_ids: list[str] | None = None,
                    key: str | None = None) -> dict[str, Any]:
         """Start shared history. Mention offsets are code points; all members receive it."""
         data: dict[str, Any] = {"targets": targets, "body": body}
@@ -75,20 +76,38 @@ class Client:
         if approval: data["approval"] = True
         if choices is not None: data["choices"] = choices
         if mentions is not None: data["mentions"] = mentions
+        if attachment_ids is not None: data["attachment_ids"] = attachment_ids
         return self.call("POST", "/api/v1/conversations", data, key=key or str(uuid.uuid4()))
+
+    def change_chat_membership(self, conversation_id: str, *, operation: str, version: int, title: str = "",
+                               members: list[str] | None = None, share_history: bool = False,
+                               next_manager: str = "", key: str | None = None) -> dict[str, Any]:
+        """Change shared disclosure, never IAM. Earlier history is shared only by explicit opt-in."""
+        data: dict[str, Any] = {"operation": operation, "version": version}
+        if title: data["title"] = title
+        if members is not None: data["members"] = members
+        if share_history: data["share_history"] = True
+        if next_manager: data["next_manager"] = next_manager
+        return self.call("POST", "/api/v1/conversations/" + urllib.parse.quote(conversation_id, safe="") + "/membership", data, key=key or str(uuid.uuid4()))
 
     def attachments(self, conversation_id: str) -> list[dict[str, Any]]:
         return self.call("GET", "/api/v1/conversations/" + urllib.parse.quote(conversation_id, safe="") + "/attachments")
 
     def upload_attachment(self, conversation_id: str, name: str, media: str, data: bytes) -> dict[str, Any]:
         """No automatic retry: list attachments after an unknown upload outcome."""
+        return self._upload_attachment("/api/v1/conversations/" + urllib.parse.quote(conversation_id, safe="") + "/attachments", name, media, data)
+
+    def stage_attachment(self, name: str, media: str, data: bytes) -> dict[str, Any]:
+        """Private draft for attachment_ids. No automatic retry; unused drafts expire after 24 hours."""
+        return self._upload_attachment("/api/v1/attachments", name, media, data)
+
+    def _upload_attachment(self, path: str, name: str, media: str, data: bytes) -> dict[str, Any]:
         if not data or len(data) > 5 * 1024 * 1024 or any(ch in name + media for ch in "\r\n"):
             raise ValueError("Invalid attachment or size exceeds 5 MiB")
         boundary = "beepgrid-" + uuid.uuid4().hex
         escaped = name.replace("\\", "\\\\").replace('"', '\\"')
         header = ('--' + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="' + escaped + '"\r\nContent-Type: ' + media + '\r\n\r\n').encode()
         raw = header + data + ("\r\n--" + boundary + "--\r\n").encode()
-        path = "/api/v1/conversations/" + urllib.parse.quote(conversation_id, safe="") + "/attachments"
         return json.loads(self._file_request("POST", path, raw, "multipart/form-data; boundary=" + boundary))
 
     def download_attachment(self, attachment_id: str) -> bytes:
@@ -159,12 +178,14 @@ class Client:
         return Client(self.base_url, session["token"], self.timeout), session
 
     def send(self, *, body: str, target: dict[str, str] | None = None, conversation_id: str = "",
-             title: str = "", key: str | None = None, minimal: bool = False, preview_token: str = "", mentions: list[dict[str, Any]] | None = None, reuse_direct: bool = False) -> dict[str, Any]:
+             title: str = "", key: str | None = None, minimal: bool = False, preview_token: str = "", mentions: list[dict[str, Any]] | None = None, reuse_direct: bool = False, attachment_ids: list[str] | None = None) -> dict[str, Any]:
         data: dict[str, Any] = {"body": body, "conversation_id": conversation_id, "title": title}
         if mentions:
             data["mentions"] = mentions
         if reuse_direct:
             data["reuse_direct"] = True
+        if attachment_ids is not None:
+            data["attachment_ids"] = attachment_ids
         if target:
             data["target"] = target
         if preview_token:

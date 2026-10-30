@@ -173,14 +173,34 @@ class FileJourneyTests(unittest.TestCase):
             stream.close()
 
 class StartChatTests(unittest.TestCase):
+    def test_membership_preserves_key_and_defaults_to_history_from_join(self):
+        client = Client("http://localhost", "fixture")
+        with patch.object(client, "call", return_value={"version": 4}) as call:
+            client.change_chat_membership("a/b", operation="add", version=3, members=["agent_2"], key="membership-1")
+            call.assert_called_once_with("POST", "/api/v1/conversations/a%2Fb/membership",
+                {"operation":"add","version":3,"members":["agent_2"]}, key="membership-1")
+        with patch.object(client, "call", return_value={"version": 5}) as call:
+            client.change_chat_membership("a/b", operation="add", version=4, members=["agent_2"], share_history=True, key="membership-2")
+            self.assertTrue(call.call_args.args[2]["share_history"])
+
+    def test_stage_attachment_is_private_and_never_automatically_retried(self):
+        client = Client("http://localhost", "fixture")
+        with patch.object(client, "_file_request", return_value=b'{"id":"draft"}') as call:
+            self.assertEqual(client.stage_attachment("brief.txt", "text/plain", b"private draft")["id"], "draft")
+            self.assertEqual(call.call_args.args[:2], ("POST", "/api/v1/attachments"))
+            self.assertIn(b"private draft", call.call_args.args[2])
+        with patch.object(client, "_file_request", side_effect=ConnectionError("lost response")) as call:
+            with self.assertRaises(ConnectionError): client.stage_attachment("brief.txt", "text/plain", b"private draft")
+            self.assertEqual(call.call_count, 1)
+
     def test_start_chat_preserves_codepoint_offsets_choices_and_approval(self):
         client = Client("http://localhost", "fixture")
         mentions = [{"principal_id": "a", "start": 2, "end": 13}]
         with patch.object(client, "call", return_value={"conversation_id": "shared_1"}) as call:
             client.start_chat(targets=[{"kind":"agent","id":"a"}], body="👋 @Reviewer 2 please review", approval=True,
-                              choices=["Yes","No"], mentions=mentions, key="shared-1")
+                              choices=["Yes","No"], mentions=mentions, attachment_ids=["draft"], key="shared-1")
             call.assert_called_once_with("POST", "/api/v1/conversations", {"targets":[{"kind":"agent","id":"a"}],
-                "body":"👋 @Reviewer 2 please review","approval":True,"choices":["Yes","No"],"mentions":mentions}, key="shared-1")
+                "body":"👋 @Reviewer 2 please review","approval":True,"choices":["Yes","No"],"mentions":mentions,"attachment_ids":["draft"]}, key="shared-1")
 
     @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL") and os.getenv("NOTIF_SDK_EXPECT_START_CHAT_MENTIONS"), "Requires integrated StartChat mention engine")
     def test_real_start_chat_mentions(self):

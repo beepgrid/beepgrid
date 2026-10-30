@@ -146,6 +146,12 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
             cli(['file-download', '--out', str(downloaded_file), uploaded_cli['id']], credential=worker)
             assert downloaded_file.read_bytes() == source_file.read_bytes()
             assert downloaded_file.stat().st_mode & 0o777 == 0o600
+            # The private staging command associates bytes with the initial message.
+            staged_cli = cli(['file-stage', '--media', 'application/pdf', str(source_file)], credential=worker)
+            assert not staged_cli.get('conversation_id')
+            staged_message = cli(['send', '--input', '-', '--key', 'staged-cli/v1'],
+                {'target':{'kind':'person','id':person}, 'body':'Initial CLI file', 'attachment_ids':[staged_cli['id']]}, worker)
+            assert staged_message['messages'][0]['attachments'][0]['id'] == staged_cli['id']
             # File tools use canonical current access and never read arbitrary host paths.
             def mcp_call(name, arguments):
                 request = {'jsonrpc':'2.0','id':100,'method':'tools/call','params':{'name':name,'arguments':arguments}}
@@ -159,6 +165,16 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
                 'media_type':'application/pdf', 'base64':'JVBERi0xLjQKZml4dHVyZQ=='})
             assert uploaded['id'] in [item['id'] for item in mcp_call('list_attachments', {'conversation_id':sent['conversation_id']})]
             assert mcp_call('download_attachment', {'id':uploaded['id']})['base64'] == 'JVBERi0xLjQKZml4dHVyZQ=='
+            staged = mcp_call('stage_attachment', {'file_name':'initial.txt','media_type':'text/plain','base64':'eA=='})
+            shared = mcp_call('start_chat', {'targets':[{'kind':'person','id':person}], 'body':'MCP initial file',
+                'attachment_ids':[staged['id']], 'idempotency_key':'mcp-shared/v1'})
+            assert shared['messages'][0]['attachments'][0]['id'] == staged['id']
+            change = {'conversation_id':shared['conversation_id'], 'operation':'rename','version':1,
+                'title':'MCP renamed chat','idempotency_key':'mcp-rename/v1'}
+            renamed = mcp_call('change_chat_membership', change)
+            assert renamed['version'] == 2
+            assert mcp_call('change_chat_membership', change) == renamed
+            assert cli(['api','GET','/api/v1/conversations/'+shared['conversation_id']], credential=worker)['title'] == 'MCP renamed chat'
             # The stdio MCP adapter is also part of the headless binary.
             messages = [{'jsonrpc':'2.0','id':1,'method':'initialize'},
                         {'jsonrpc':'2.0','method':'notifications/initialized'},

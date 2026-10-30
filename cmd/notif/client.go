@@ -31,6 +31,7 @@ Clients (flags before positional arguments):
   enroll --input file|- --out TOKEN_FILE
 	files CONVERSATION_ID
 	file-upload --conversation CONVERSATION_ID [--media MIME] FILE
+	file-stage [--media MIME] FILE
 	file-download --out FILE ATTACHMENT_ID
   mcp, trace REQUEST_ID, version
 
@@ -139,7 +140,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		return true, err
 	}
 	switch command {
-	case "send", "ask", "approve", "task", "respond", "wait", "list", "api", "enroll", "files", "file-upload", "file-download":
+	case "send", "ask", "approve", "task", "respond", "wait", "list", "api", "enroll", "files", "file-upload", "file-stage", "file-download":
 	default:
 		return false, nil
 	}
@@ -200,11 +201,11 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		if err = need(1); err == nil {
 			result, err = c.Attachments(ctx, pos[0])
 		}
-	case "file-upload":
+	case "file-upload", "file-stage":
 		if err = need(1); err != nil {
 			break
 		}
-		if *conversation == "" {
+		if command == "file-upload" && *conversation == "" {
 			err = usageError{fmt.Errorf("file-upload requires --conversation")}
 			break
 		}
@@ -217,7 +218,11 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		data, err = io.ReadAll(io.LimitReader(file, notif.MaxAttachmentBytes+1))
 		file.Close()
 		if err == nil {
-			result, err = c.UploadAttachment(ctx, *conversation, filepath.Base(pos[0]), *media, data)
+			if command == "file-stage" {
+				result, err = c.StageAttachment(ctx, filepath.Base(pos[0]), *media, data)
+			} else {
+				result, err = c.UploadAttachment(ctx, *conversation, filepath.Base(pos[0]), *media, data)
+			}
 		}
 	case "file-download":
 		if err = need(1); err != nil {

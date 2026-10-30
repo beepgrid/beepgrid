@@ -3,12 +3,20 @@ import assert from 'node:assert/strict';
 import {Client} from '../dist/index.js';
 const body='👋 @Reviewer 2 please review';
 test('StartChat preserves code-point mention offsets, choices, approval and the stable operation key',async()=>{
- const input={targets:[{kind:'agent',id:'a'}],body,approval:true,choices:['Yes','No'],mentions:[{principal_id:'a',start:2,end:13}]};
+ const input={targets:[{kind:'agent',id:'a'}],body,approval:true,choices:['Yes','No'],mentions:[{principal_id:'a',start:2,end:13}],attachment_ids:['att_draft']};
  const client=new Client('http://localhost','fixture',async(url,options)=>{
   assert.equal(url,'http://localhost/api/v1/conversations');assert.equal(options.headers['Idempotency-Key'],'shared-1');assert.deepEqual(JSON.parse(options.body),input);
   return Response.json({conversation_id:'shared_1',messages:[]});
  });
  assert.equal((await client.startChat(input,'shared-1')).conversation_id,'shared_1');
+});
+test('membership keeps a stable key and leaves earlier history opt-in explicit',async()=>{
+ let calls=0;const input={operation:'add',version:3,members:['agent_2']};
+ const client=new Client('http://localhost','fixture',async(url,options)=>{
+  calls++;assert.equal(url,'http://localhost/api/v1/conversations/a%2Fb/membership');assert.equal(options.headers['Idempotency-Key'],'membership-1');assert.deepEqual(JSON.parse(options.body),input);assert.equal(JSON.parse(options.body).share_history,undefined);
+  if(calls===1)throw new Error('lost response');return Response.json({conversation_id:'a/b',version:4});
+ });
+ assert.equal((await client.changeChatMembership('a/b',input,'membership-1')).version,4);assert.equal(calls,2);
 });
 test('StartChat mentions address a member while all observers receive the original',{skip:!process.env.NOTIF_SDK_TEST_URL||!process.env.NOTIF_SDK_EXPECT_START_CHAT_MENTIONS},async()=>{
  const owner=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);

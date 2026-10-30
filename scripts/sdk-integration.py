@@ -22,6 +22,7 @@ environment["NOTIF_DATABASE_URL"] = database
 environment["NOTIF_SDK_TEST_URL"] = origin
 environment["NOTIF_SDK_TEST_TOKEN"] = environment["NOTIF_BOOTSTRAP_TOKEN"]
 environment.setdefault("NOTIF_SDK_EXPECT_START_CHAT_MENTIONS", "1")
+environment.setdefault("NOTIF_SDK_EXPECT_CHAT_LIFECYCLE", "1")
 environment["PYTHONPATH"] = str(root / "sdk/python")
 binary = pathlib.Path(environment.get("NOTIF_SDK_ENGINE_BINARY", str(root / ".local/notif-sdk-test")))
 binary.parent.mkdir(mode=0o700, exist_ok=True)

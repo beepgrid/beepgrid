@@ -48,19 +48,24 @@ import { browserClient, NotifRequest, NotifConversation } from '@notif/react';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 assert.equal(typeof new Client('http://localhost','fixture').uploadAttachment,'function');
+assert.equal(typeof new Client('http://localhost','fixture').stageAttachment,'function');
+assert.equal(typeof new Client('http://localhost','fixture').changeChatMembership,'function');
 assert.equal(typeof browserClient('http://localhost').events,'function');
 assert.match(import.meta.resolve('@notif/react/styles.css'),/styles.css$/);
 assert.equal(typeof NotifConversation,'function');
 assert.ok(renderToString(createElement(NotifRequest,{client:new Client('http://localhost',''),id:'request-fixture'})).length>0);
 ''')
     run(["node", "consumer.mjs"], cwd=node)
-    (node / "consumer.ts").write_text('''import { Client, type Attachment, type EventOptions, type StartChatInput } from '@notif/client';
+    (node / "consumer.ts").write_text('''import { Client, type Attachment, type EventOptions, type StartChatInput, type ChatMembershipInput, type ChatMembershipResult } from '@notif/client';
 import { NotifRequest } from '@notif/react';
 const client = new Client('http://localhost','fixture');
 const upload: Promise<Attachment> = client.uploadAttachment('c',new Blob(['x']),'brief.txt');
 const events: EventOptions = { after: 1 };
 const shared: StartChatInput = {targets:[{kind:"agent",id:"a"}],body:"👋 @Reviewer 2",mentions:[{principal_id:"a",start:2,end:13}]};
-void [upload, events, shared, NotifRequest];
+const draft: Promise<Attachment> = client.stageAttachment(new Blob(['x']),'brief.txt');
+const membership: ChatMembershipInput = {operation:'add',version:1,members:['peer'],share_history:false};
+const changed: Promise<ChatMembershipResult> = client.changeChatMembership('c',membership,'members-1');
+void [upload, draft, changed, events, shared, NotifRequest];
 ''')
     run([root/"sdk/typescript/node_modules/.bin/tsc", "--noEmit", "--strict", "--module", "nodenext", "--target", "es2022", "consumer.ts"], cwd=node)
     wheel_stage = scratch / "python-source"
@@ -80,13 +85,13 @@ void [upload, events, shared, NotifRequest];
     run([python, "-m", "venv", venv])
     vpython = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     run([vpython, "-m", "pip", "install", "--no-deps", "--no-index", wheel])
-    run([vpython, "-c", "from notif import Client; from notif.events import read_frames; assert callable(Client.start_chat); assert callable(Client.events); assert callable(Client.upload_attachment); assert callable(Client.download_attachment)"], cwd=scratch)
+    run([vpython, "-c", "from notif import Client; from notif.events import read_frames; assert callable(Client.start_chat); assert callable(Client.events); assert callable(Client.upload_attachment); assert callable(Client.download_attachment); assert callable(Client.stage_attachment); assert callable(Client.change_chat_membership)"], cwd=scratch)
     go = scratch / "go"
     go.mkdir()
     (go / "go.mod").write_text('module example.com/beepgrid-consumer\n\ngo 1.26.0\n\nrequire github.com/notif-dev/notif v0.0.0\nreplace github.com/notif-dev/notif => ' + json.dumps(str(root)) + '\n')
     (go / "main.go").write_text('''package main
 import "github.com/notif-dev/notif/sdk/go/notif"
-func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ = c.StreamEvents;_ = c.Directory;_ = c.Cancel;_ = c.StartChat;_ = notif.StartChatInput{Mentions:[]notif.Mention{{PrincipalID:"a",Start:2,End:13}}}}
+func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ = c.StageAttachment;_ = c.ChangeChatMembership;_ = notif.ChatMembershipInput{Operation:"add",Version:1,Members:[]string{"peer"}};_ = c.StreamEvents;_ = c.Directory;_ = c.Cancel;_ = c.StartChat;_ = notif.StartChatInput{AttachmentIDs:[]string{"draft"},Mentions:[]notif.Mention{{PrincipalID:"a",Start:2,End:13}}}}
 ''')
     run(["go", "run", "-buildvcs=false", "."], cwd=go)
 
