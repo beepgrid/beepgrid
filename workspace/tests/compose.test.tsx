@@ -239,3 +239,72 @@ it("defaults multi-recipient messages to private conversations", async () => {
   );
   expect(fn.mock.calls.some(([p]) => p.endsWith("/conversations"))).toBe(false);
 });
+it("stages a private file and sends its reference with the first message", async () => {
+  let acceptUpload: (v: Response) => void = () => {};
+  const fn = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.endsWith("/attachments"))
+      return new Promise<Response>((resolve) => {
+        acceptUpload = resolve;
+      });
+    if (path.endsWith("/query"))
+      return json({
+        items: requestBody(init).collection === "agents" ? [agent] : [],
+      });
+    return json({ conversation_id: "con_file" });
+  });
+  vi.stubGlobal("fetch", fn);
+  const { Wrapper } = harness();
+  render(
+    <Compose initial={[{ kind: "agent", id: agent.id }]} onClose={vi.fn()} />,
+    { wrapper: Wrapper },
+  );
+  fireEvent.change(screen.getByLabelText("Choose files"), {
+    target: {
+      files: [
+        new File(["%PDF-1.4\nfixture"], "orders.pdf", {
+          type: "application/pdf",
+        }),
+      ],
+    },
+  });
+  await screen.findByText("Uploading...");
+  expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  expect(fn.mock.calls.some(([p]) => p.endsWith("/messages"))).toBe(false);
+  acceptUpload(json({ id: "file_draft", file_name: "orders.pdf", size: 17 }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() =>
+    expect(fn.mock.calls.some(([p]) => p.endsWith("/messages"))).toBe(true),
+  );
+  expect(
+    requestBody(fn.mock.calls.find(([p]) => p.endsWith("/messages"))![1]),
+  ).toMatchObject({ attachment_ids: ["file_draft"], body: "" });
+  expect(
+    fn.mock.calls.find(([p]) => p.endsWith("/attachments"))![1]?.body,
+  ).toBeInstanceOf(FormData);
+});
+it("keeps a failed upload removable without sending or persisting a file reference", async () => {
+  const fn = vi.fn(async (path: string, init?: RequestInit) =>
+    path.endsWith("/attachments")
+      ? json({ error: { message: "Upload unavailable" } }, 503)
+      : json({
+          items: requestBody(init).collection === "agents" ? [agent] : [],
+        }),
+  );
+  vi.stubGlobal("fetch", fn);
+  const { Wrapper } = harness();
+  render(
+    <Compose initial={[{ kind: "agent", id: agent.id }]} onClose={vi.fn()} />,
+    { wrapper: Wrapper },
+  );
+  fireEvent.change(screen.getByLabelText("Choose files"), {
+    target: { files: [new File(["x"], "brief.txt", { type: "text/plain" })] },
+  });
+  await screen.findByRole("alert");
+  expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Remove brief.txt" }));
+  expect(screen.queryByText("brief.txt")).not.toBeInTheDocument();
+  expect(fn.mock.calls.some(([p]) => p.endsWith("/messages"))).toBe(false);
+});

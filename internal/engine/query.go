@@ -53,6 +53,8 @@ func querySearchText(table string) string {
 		fields += ",t.title,t.last_preview"
 	case "messages":
 		fields += ",t.body"
+	case "attachments":
+		fields += ",t.file_name"
 	case "shared_answers":
 		fields += ",t.question"
 	case "overseer_plans":
@@ -93,8 +95,8 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 		}
 		last = c.Last
 	}
-	args := []any{a.Scope, last, in.Search}
-	where := "t.scope=$1" + source.extra + " AND t.id>$2"
+	args := []any{a.Scope, last, in.Search, a.ID, a.Admin}
+	where := "t.scope=$1" + source.extra + " AND t.id>$2 AND ($4::text IS NOT NULL AND $5::boolean IS NOT NULL)"
 	// Messages use a chronological, stable key while retaining a single opaque cursor.
 	key := "t.id"
 	order := key
@@ -128,14 +130,26 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 			}
 			args[1] = created.UTC()
 			args = append(args, id)
-			where = "t.scope=$1 AND (" + stampColumn + ",t.id)" + comparison + "($2::timestamptz,$4::text)"
+			where = "t.scope=$1 AND (" + stampColumn + ",t.id)" + comparison + "($2::timestamptz,$6::text)"
 		}
+	}
+	where += " AND ($4::text IS NOT NULL AND $5::boolean IS NOT NULL)"
+	switch in.Collection {
+	case "messages":
+		// The scoped conversation filter below supplies a single membership window.
+	case "requests":
+		where += " AND (NOT EXISTS(SELECT 1 FROM conversations c WHERE c.scope=t.scope AND c.id=t.conversation_id AND c.shared) OR chat_history_allows(t.scope,t.conversation_id,$4,$5,t.created_sequence))"
+	case "attachments":
+		history := strings.NewReplacer("$3", "$4", "$4", "$5").Replace(attachmentHistorySQL)
+		where += " AND EXISTS(SELECT 1 FROM attachments a LEFT JOIN attachment_links l ON l.scope=a.scope AND l.attachment_id=a.id WHERE a.scope=t.scope AND a.id=t.id AND " + history + ")"
+	case "conversations":
+		where += " AND ($5 OR EXISTS(SELECT 1 FROM participants cp WHERE cp.scope=t.scope AND cp.conversation_id=t.id AND cp.principal_id=$4 AND cp.left_at IS NULL))"
 	}
 	if in.Collection == "overseer_plans" {
 		args = append(args, a.ID)
 		where += " AND t.person_id=$" + strconv.Itoa(len(args))
 	}
-	where += " AND ($3='' OR strpos(lower(" + querySearchText(source.table) + "),lower($3))>0)"
+	where += " AND ($3='' OR strpos(lower(" + strings.Replace(querySearchText(source.table), "t.last_preview", "CASE WHEN chat_history_allows(t.scope,t.id,$4,$5,t.preview_sequence) THEN t.last_preview ELSE '' END", 1) + "),lower($3))>0)"
 	for name, value := range in.Filters {
 		expression := ""
 		switch name {
@@ -146,6 +160,12 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 				expression = "t.delivery_id"
 			}
 		case "conversation_id":
+			if in.Collection == "attachments" {
+				args = append(args, value)
+				n := strconv.Itoa(len(args))
+				where += " AND (t.conversation_id=$" + n + " OR EXISTS(SELECT 1 FROM attachment_links l WHERE l.scope=t.scope AND l.attachment_id=t.id AND l.conversation_id=$" + n + "))"
+				continue
+			}
 			if in.Collection == "messages" || in.Collection == "attachments" || in.Collection == "requests" {
 				expression = "t.conversation_id"
 			}
@@ -262,8 +282,19 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 		if id == "" {
 			return out, Bad("Message history requires a conversation_id.")
 		}
-		if !s.canRead(ctx, s.Pool, a, id) {
-			return out, Missing()
+		c, err := s.readConversationParticipants(ctx, s.Pool, a, id)
+		if err != nil {
+			return out, err
+		}
+		if in.Collection == "messages" {
+			floor := c.HistoryStart
+			if a.Admin {
+				floor = 0
+			}
+			args = append(args, id, floor)
+			convParam := "$" + strconv.Itoa(len(args)-1)
+			floorParam := "$" + strconv.Itoa(len(args))
+			where += " AND t.created_sequence >= " + floorParam + " AND ($5 OR EXISTS(SELECT 1 FROM participants WHERE scope=$1 AND conversation_id=" + convParam + " AND principal_id=$4 AND left_at IS NULL AND history_start=" + floorParam + "))"
 		}
 	}
 	if in.Collection == "delivery_attempts" {
@@ -285,6 +316,7 @@ func (s *Store) Query(ctx context.Context, a Actor, in QueryInput) (QueryPage, e
 		}
 	}
 	ctx = withPolicySnapshot(ctx)
+	ctx = context.WithValue(ctx, attachmentQueryConversationKey{}, in.Filters["conversation_id"])
 	// Read candidate IDs only. No private payload or secret enters the response
 	// until the per-resource reader has enforced current visibility.
 	rows, e := s.Pool.Query(ctx, "SELECT t.id,"+key+" FROM "+source.table+" t WHERE "+where+" ORDER BY "+order+" LIMIT 501", args...)
@@ -369,15 +401,31 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 	db := s.Pool
 	switch collection {
 	case "attachments":
-		var x Attachment
-		e := db.QueryRow(ctx, `SELECT id,conversation_id,file_name,media_type,size,sha256,created_at FROM attachments WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&x.ID, &x.ConversationID, &x.FileName, &x.MediaType, &x.Size, &x.SHA256, &x.CreatedAt)
-		if e != nil {
-			return nil, normalize(e)
+		conv, _ := ctx.Value(attachmentQueryConversationKey{}).(string)
+		rows, err := db.Query(ctx, attachmentListSQL+` WHERE a.scope=$1 AND a.id=$2 AND `+attachmentHistorySQL+` ORDER BY COALESCE(l.conversation_id,a.conversation_id)`, a.Scope, id, a.ID, a.Admin)
+		if err != nil {
+			return nil, err
 		}
-		if !s.canRead(ctx, db, a, x.ConversationID) {
-			return nil, Missing()
+		candidates := []Attachment{}
+		for rows.Next() {
+			var x Attachment
+			if err = scanAttachmentRow(rows, &x); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			candidates = append(candidates, x)
 		}
-		return x, nil
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range candidates {
+			if (conv == "" || conv == x.ConversationID) && s.canRead(ctx, db, a, x.ConversationID) {
+				return x, nil
+			}
+		}
+		return nil, Missing()
 	case "overseer_plans":
 		return s.OverseerPlan(ctx, a, id)
 	case "delivery_attempts":
@@ -407,40 +455,28 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 	case "requests":
 		return s.request(ctx, db, a, id)
 	case "conversations":
-		if !s.canRead(ctx, db, a, id) {
-			return nil, Missing()
+		items, err := s.queryRecords(ctx, a, "conversations", []string{id})
+		if err != nil {
+			return nil, err
 		}
-		var c Conversation
-		e := db.QueryRow(ctx, `SELECT id,title,created_by,created_at,last_activity_at,last_preview FROM conversations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview)
-		if e != nil {
-			return c, normalize(e)
+		if x, ok := items[id]; ok {
+			return x.value, x.err
 		}
-		// A directory row needs participant presentation, not 500 message bodies
-		// or private profile metadata. Visibility is the same canRead check above.
-		rows, e := db.Query(ctx, `SELECT p.id,p.kind,p.name FROM participants cp JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE cp.scope=$1 AND cp.conversation_id=$2 ORDER BY p.id`, a.Scope, id)
-		if e != nil {
-			return c, e
-		}
-		defer rows.Close()
-		c.Participants = []Principal{}
-		for rows.Next() {
-			var p Principal
-			if e = rows.Scan(&p.ID, &p.Kind, &p.Name); e != nil {
-				return c, e
-			}
-			c.Participants = append(c.Participants, p)
-		}
-		return c, rows.Err()
+		return nil, Missing()
 	case "messages":
 		var m Message
-		e := db.QueryRow(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions)
+		e := db.QueryRow(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=$2 AND chat_history_allows(scope,conversation_id,$3,$4,created_sequence)`, a.Scope, id, a.ID, a.Admin).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions)
 		if e != nil {
 			return nil, normalize(e)
 		}
 		if !s.canRead(ctx, db, a, m.ConversationID) {
 			return nil, Missing()
 		}
-		return m, nil
+		ms := []Message{m}
+		if e = s.loadMessageFiles(ctx, db, a.Scope, ms); e != nil {
+			return nil, e
+		}
+		return ms[0], nil
 	case "answers":
 		x, e := scanAnswer(db.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2`, a.Scope, id))
 		if e != nil {

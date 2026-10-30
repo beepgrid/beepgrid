@@ -16,7 +16,9 @@ import type {
   Identity,
   Request,
 } from "../contracts";
-import { relative, timestamp, upload } from "../client";
+import { ChatMembers } from "../ChatMembers";
+import { FileLinks } from "../Attachments";
+import { relative, timestamp } from "../client";
 import { navigate, useRoute, workspaceURL } from "../navigation";
 import { MentionText } from "../Mentions";
 import { RequestCard } from "../RequestCard";
@@ -148,9 +150,11 @@ export default function Conversations() {
                     </strong>
                     <p>
                       {c.last_preview ||
-                        (c.title === "Conversation"
-                          ? "Start a conversation"
-                          : c.title)}
+                        (c.shared
+                          ? "No messages yet"
+                          : c.title === "Conversation"
+                            ? "Start a conversation"
+                            : c.title)}
                     </p>
                     <div className="conversation-meta">
                       <span>
@@ -190,12 +194,11 @@ function Chat({ id }: { id: string }) {
     q = useResource<Conversation>("/conversations/" + id),
     cache = useQueryClient();
   const [error, setError] = useState<Error | null>(null),
-    [uploading, setUploading] = useState(false),
-    [history, setHistory] = useState(false);
+    [history, setHistory] = useState(false),
+    [membersOpen, setMembersOpen] = useState(false);
   const end = useRef<HTMLDivElement>(null),
     scroll = useRef<HTMLDivElement>(null),
-    pinned = useRef(true),
-    fileInput = useRef<HTMLInputElement>(null);
+    pinned = useRef(true);
   const participants =
     q.data?.participants?.filter((p) => p.id !== me.person.id) || [];
   const destination = participants[0] && {
@@ -237,41 +240,11 @@ function Chat({ id }: { id: string }) {
     )
       clearConversationDrafts(id);
   }, [q.error, caps.error, caps.data, id]);
-  async function attach(file?: File) {
-    if (!file) return;
-    setError(null);
-    if (!file.size || file.size > 5 * 1024 * 1024) {
-      setError(Error("Choose a nonempty file up to 5 MiB."));
-      return;
-    }
-    if (
-      ![
-        "text/plain",
-        "application/json",
-        "application/pdf",
-        "image/png",
-        "image/jpeg",
-        "image/webp",
-      ].includes(file.type)
-    ) {
-      setError(Error("Supported types: text, JSON, PDF, PNG, JPEG and WebP."));
-      return;
-    }
-    setUploading(true);
-    try {
-      await upload("/conversations/" + id + "/attachments", file);
-      void cache.invalidateQueries();
-    } catch (e) {
-      setError(e as Error);
-    } finally {
-      setUploading(false);
-      if (fileInput.current) fileInput.current.value = "";
-    }
-  }
   if (q.isPending) return <Loading label="Opening conversation" />;
   if (!q.data)
     return <ErrorView error={q.error} retry={() => void q.refetch()} />;
   const c = q.data!;
+  const knownParticipants = [...c.participants, ...(c.past_participants || [])];
   return (
     <section className="chat">
       <header className="chat-head">
@@ -281,13 +254,32 @@ function Chat({ id }: { id: string }) {
         />
         <div className="chat-heading">
           <strong>
-            {participants.length === 1
+            {participants.length === 1 && !c.shared
               ? participants[0].name
               : c.title || "Group chat"}
           </strong>
           <p>{c.participants.map((p) => p.name).join(", ")}</p>
         </div>
+        {c.shared ? (
+          <Button icon="people" onClick={() => setMembersOpen(true)}>
+            {c.participants.length} members
+          </Button>
+        ) : null}
       </header>
+      {membersOpen ? (
+        <ChatMembers
+          chat={c}
+          onClose={() => setMembersOpen(false)}
+          onChanged={() => void q.refetch()}
+          onLeft={() => {
+            setMembersOpen(false);
+            cache.removeQueries({
+              predicate: (q) => JSON.stringify(q.queryKey).includes(id),
+            });
+            navigate("/conversations");
+          }}
+        />
+      ) : null}
       <div
         className="messages"
         ref={scroll}
@@ -342,13 +334,13 @@ function Chat({ id }: { id: string }) {
               <ChatMessage
                 key={item.id}
                 message={item.value}
-                participants={c.participants}
+                participants={knownParticipants}
                 name={
-                  c.participants.find((p) => p.id === item.value.sender_id)
+                  knownParticipants.find((p) => p.id === item.value.sender_id)
                     ?.name || "Participant"
                 }
                 kind={
-                  c.participants.find((p) => p.id === item.value.sender_id)
+                  knownParticipants.find((p) => p.id === item.value.sender_id)
                     ?.kind || "agent"
                 }
               />
@@ -356,19 +348,21 @@ function Chat({ id }: { id: string }) {
               <article key={item.id} className="message">
                 <IdentityIcon
                   kind={
-                    c.participants.find((p) => p.id === item.value.resolved_by)
-                      ?.kind || "person"
+                    knownParticipants.find(
+                      (p) => p.id === item.value.resolved_by,
+                    )?.kind || "person"
                   }
                   id={item.value.resolved_by}
                   label={
-                    c.participants.find((p) => p.id === item.value.resolved_by)
-                      ?.name
+                    knownParticipants.find(
+                      (p) => p.id === item.value.resolved_by,
+                    )?.name
                   }
                 />
                 <div className="message-body">
                   <div className="message-meta">
                     <strong>
-                      {c.participants.find(
+                      {knownParticipants.find(
                         (p) => p.id === item.value.resolved_by,
                       )?.name || "Participant"}
                     </strong>
@@ -400,8 +394,8 @@ function Chat({ id }: { id: string }) {
               <RequestCard
                 key={item.id}
                 request={item.value}
-                participants={c.participants}
-                sender={c.participants.find(
+                participants={knownParticipants}
+                sender={knownParticipants.find(
                   (p) => p.id === item.value.requester_id,
                 )}
                 onFollowUp={() =>
@@ -413,7 +407,16 @@ function Chat({ id }: { id: string }) {
             ),
           )}
         {!messages.length && !related.items.length ? (
-          <Empty title="Start the conversation" icon="conversations" />
+          <Empty
+            title={
+              c.history_start ? "You’re in the chat" : "Start the conversation"
+            }
+            icon="conversations"
+          >
+            {c.history_start
+              ? "Messages sent after you joined will appear here."
+              : null}
+          </Empty>
         ) : null}
         {related.hasNextPage ? (
           <Button onClick={() => void related.fetchNextPage()}>
@@ -423,20 +426,22 @@ function Chat({ id }: { id: string }) {
         <div ref={end} />
       </div>
       {attachments.error ? <ErrorView error={attachments.error} /> : null}
-      {attachments.items.length ? (
+      {attachments.items.some((a) => !a.message_id && !a.request_id) ? (
         <div className="attachments">
-          {attachments.items.map((a) => (
-            <a
-              className="file-chip"
-              key={a.id}
-              href={workspaceURL("/api/v1/attachments/" + a.id)}
-              download
-            >
-              <Icon name="file" size={14} />
-              {a.file_name}
-              <small>{(a.size / 1024).toFixed(1)} KiB</small>
-            </a>
-          ))}
+          {attachments.items
+            .filter((a) => !a.message_id && !a.request_id)
+            .map((a) => (
+              <a
+                className="file-chip"
+                key={a.id}
+                href={workspaceURL("/api/v1/attachments/" + a.id)}
+                download
+              >
+                <Icon name="file" size={14} />
+                {a.file_name}
+                <small>{(a.size / 1024).toFixed(1)} KiB</small>
+              </a>
+            ))}
           {attachments.hasNextPage ? (
             <Button onClick={() => void attachments.fetchNextPage()}>
               More files
@@ -455,27 +460,6 @@ function Chat({ id }: { id: string }) {
             onSent={() => {
               pinned.current = true;
             }}
-            tools={
-              <>
-                <button
-                  className="icon-button"
-                  type="button"
-                  disabled={uploading}
-                  aria-label="Attach a file"
-                  onClick={() => fileInput.current?.click()}
-                >
-                  <Icon name="attachment" size={18} />
-                </button>
-                <input
-                  hidden
-                  type="file"
-                  ref={fileInput}
-                  accept=".txt,.json,.pdf,.png,.jpg,.jpeg,.webp"
-                  onChange={(e) => void attach(e.target.files?.[0])}
-                />
-                {uploading ? <small>Uploading...</small> : null}
-              </>
-            }
           />
         ) : (
           <p>Messaging is unavailable for this conversation.</p>
@@ -515,6 +499,7 @@ const ChatMessage = memo(function ChatMessage({
             participants={participants}
           />
         </p>
+        <FileLinks files={m.attachments} />
       </div>
     </article>
   );

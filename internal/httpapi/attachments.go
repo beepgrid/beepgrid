@@ -14,7 +14,7 @@ func (s *Server) attachmentRoutes() {
 		x, e := s.Store.Attachments(r.Context(), actor(r), r.PathValue("id"))
 		return ok(w, x, e)
 	}))
-	m.HandleFunc("POST /api/v1/conversations/{id}/attachments", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+	upload := s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		r.Body = http.MaxBytesReader(w, r.Body, (5<<20)+65536)
 		if e := r.ParseMultipartForm(65536); e != nil {
 			return engine.Bad("Invalid upload or attachment exceeds 5 MiB.")
@@ -32,7 +32,9 @@ func (s *Server) attachmentRoutes() {
 		media := strings.Split(header.Header.Get("Content-Type"), ";")[0]
 		x, e := s.Store.UploadAttachment(r.Context(), actor(r), r.PathValue("id"), header.Filename, media, data)
 		return ok(w, x, e)
-	}))
+	})
+	m.HandleFunc("POST /api/v1/conversations/{id}/attachments", upload)
+	m.HandleFunc("POST /api/v1/attachments", upload)
 	m.HandleFunc("GET /api/v1/attachments/{id}", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, file, e := s.Store.DownloadAttachment(r.Context(), actor(r), r.PathValue("id"))
 		if e != nil {

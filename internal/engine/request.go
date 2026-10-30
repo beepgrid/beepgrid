@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-const requestFields = `r.id,r.requester_id,COALESCE(r.requester_instance,''),r.conversation_id,r.kind,r.title,r.body,r.choices,r.action,CASE WHEN r.state='open' AND r.expires_at<=now() THEN 'expired' ELSE r.state END,r.version,r.response,r.resolved_by,r.resolved_at,r.expires_at,r.created_at,r.shared_key,r.blocking,r.mentions`
+const requestFields = `r.id,r.requester_id,COALESCE(r.requester_instance,''),r.conversation_id,r.kind,r.title,r.body,r.choices,r.action,CASE WHEN r.state='open' AND r.expires_at<=now() THEN 'expired' ELSE r.state END,r.version,r.response,r.resolved_by,r.resolved_at,r.expires_at,r.created_at,r.shared_key,r.blocking,r.mentions,EXISTS(SELECT 1 FROM conversations cr WHERE cr.scope=r.scope AND cr.id=r.conversation_id AND cr.shared),EXISTS(SELECT 1 FROM attachment_links al WHERE al.scope=r.scope AND al.request_id=r.id),r.created_sequence`
 
 func scanRequest(row pgx.Row, extra ...any) (Request, error) {
 	var r Request
 	var choices, action, response []byte
-	targets := []any{&r.ID, &r.RequesterID, &r.RequesterInstanceID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey, &r.Blocking, &r.Mentions}
+	targets := []any{&r.ID, &r.RequesterID, &r.RequesterInstanceID, &r.ConversationID, &r.Kind, &r.Title, &r.Body, &choices, &action, &r.State, &r.Version, &response, &r.ResolvedBy, &r.ResolvedAt, &r.ExpiresAt, &r.CreatedAt, &r.SharedKey, &r.Blocking, &r.Mentions, &r.shared, &r.hasFiles, &r.createdSequence}
 	e := row.Scan(append(targets, extra...)...)
 	_ = json.Unmarshal(choices, &r.Choices)
 	if len(action) > 0 && string(action) != "null" {
@@ -25,7 +25,7 @@ func scanRequest(row pgx.Row, extra ...any) (Request, error) {
 	return r, normalize(e)
 }
 func (s *Store) request(ctx context.Context, db DB, a Actor, id string) (Request, error) {
-	r, e := scanRequest(db.QueryRow(ctx, `SELECT `+requestFields+` FROM requests r WHERE r.scope=$1 AND r.id=$2 AND ($3 OR r.requester_id=$4 OR EXISTS(SELECT 1 FROM request_audience ra WHERE ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$4))`, a.Scope, id, a.Admin, a.ID))
+	r, e := scanRequest(db.QueryRow(ctx, `SELECT `+requestFields+` FROM requests r WHERE r.scope=$1 AND r.id=$2 AND ($3 OR r.requester_id=$4 OR EXISTS(SELECT 1 FROM request_audience ra WHERE ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$4) OR EXISTS(SELECT 1 FROM conversations cr JOIN participants cp ON cp.scope=cr.scope AND cp.conversation_id=cr.id WHERE cr.scope=r.scope AND cr.id=r.conversation_id AND cr.shared AND cp.principal_id=$4 AND cp.left_at IS NULL))`, a.Scope, id, a.Admin, a.ID))
 	if e != nil {
 		return r, e
 	}
@@ -39,10 +39,18 @@ func (s *Store) request(ctx context.Context, db DB, a Actor, id string) (Request
 		}
 		_ = db.QueryRow(ctx, `SELECT conversation_id FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3`, a.Scope, id, a.ID).Scan(&r.ConversationID)
 	}
+	if !s.requestHistoryAllowed(ctx, db, a, r) {
+		return Request{}, Missing()
+	}
 	if r.Response != nil && r.Response.SourceAnswerID != "" {
 		answer, e := scanAnswer(db.QueryRow(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=$2`, a.Scope, r.Response.SourceAnswerID))
 		r.Response.SourceInvalidated = e != nil || answer.Invalidated || answer.ValidUntil.Before(time.Now()) || !s.publisherCurrent(ctx, db, a.Scope, answer)
 	}
+	loaded := []Request{r}
+	if e = s.loadRequestFiles(ctx, db, a.Scope, loaded); e != nil {
+		return r, e
+	}
+	r.Attachments = loaded[0].Attachments
 	return r, nil
 }
 func (s *Store) Request(ctx context.Context, a Actor, id string) (Request, error) {
@@ -50,8 +58,8 @@ func (s *Store) Request(ctx context.Context, a Actor, id string) (Request, error
 }
 func (s *Store) Requests(ctx context.Context, a Actor) ([]Request, error) {
 	ctx = withPolicySnapshot(ctx)
-	fields := strings.Replace(requestFields, "r.conversation_id", "CASE WHEN $2 OR r.requester_id=$3 THEN r.conversation_id ELSE ra.conversation_id END", 1)
-	rows, e := s.Pool.Query(ctx, `SELECT `+fields+`,p.kind FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope LEFT JOIN request_audience ra ON ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$3 WHERE r.scope=$1 AND ($2 OR r.requester_id=$3 OR ra.principal_id IS NOT NULL) ORDER BY r.created_at DESC,r.id DESC LIMIT 200`, a.Scope, a.Admin, a.ID)
+	fields := strings.Replace(requestFields, "r.conversation_id", "CASE WHEN $2 OR r.requester_id=$3 THEN r.conversation_id ELSE COALESCE(ra.conversation_id,r.conversation_id) END", 1)
+	rows, e := s.Pool.Query(ctx, `SELECT `+fields+`,p.kind FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope LEFT JOIN request_audience ra ON ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$3 WHERE r.scope=$1 AND ($2 OR r.requester_id=$3 OR ra.principal_id IS NOT NULL OR EXISTS(SELECT 1 FROM conversations cr JOIN participants cp ON cp.scope=cr.scope AND cp.conversation_id=cr.id WHERE cr.scope=r.scope AND cr.id=r.conversation_id AND cr.shared AND cp.principal_id=$3 AND cp.left_at IS NULL)) ORDER BY r.created_at DESC,r.id DESC LIMIT 200`, a.Scope, a.Admin, a.ID)
 	if e != nil {
 		return nil, e
 	}
@@ -74,9 +82,20 @@ func (s *Store) Requests(ctx context.Context, a Actor) ([]Request, error) {
 	if e != nil {
 		return nil, e
 	}
+	window := []Request{}
+	for _, x := range all {
+		window = append(window, x.request)
+	}
+	readable, err := s.readableRequestChats(ctx, a, window)
+	if err != nil {
+		return nil, err
+	}
 	out := []Request{}
 	for _, x := range all {
 		r := x.request
+		if r.shared && !readable[r.ID] {
+			continue
+		}
 		if !a.Admin && a.ID != r.RequesterID && !s.allowed(ctx, s.Pool, a, "view", Target{x.kind, r.RequesterID}, "", "") {
 			continue
 		}
@@ -85,10 +104,14 @@ func (s *Store) Requests(ctx context.Context, a Actor) ([]Request, error) {
 	if e = s.markAnswerSources(ctx, s.Pool, a.Scope, out); e != nil {
 		return nil, e
 	}
+	if e = s.loadRequestFiles(ctx, s.Pool, a.Scope, out); e != nil {
+		return nil, e
+	}
 	return out, nil
 }
 
 func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Request, error) {
+	ctx = withAttachmentBinding(ctx, "ask", key)
 	var out Request
 	err := s.tx(ctx, a, func(tx pgx.Tx) error { return s.askTx(ctx, tx, a, in, key, &out) })
 	if err == nil {
@@ -106,6 +129,9 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 	}
 	if in.Title == "" {
 		in.Title = messageTitle(in.Body)
+		if in.Title == "" && len(in.AttachmentIDs) > 0 {
+			in.Title = "Files"
+		}
 	}
 	if !ValidText(in.Title, 200) || len(in.Body) > 32768 || len(in.Choices) > 20 {
 		return Bad("A message or title is required, with at most 20 choices.")
@@ -201,6 +227,18 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 		if _, e = tx.Exec(ctx, `INSERT INTO requests(id,scope,requester_id,requester_instance,conversation_id,kind,title,body,choices,action,expires_at,shared_key,blocking,mentions) VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, out.ID, a.Scope, a.ID, a.InstanceID, conv, in.Kind, in.Title, in.Body, JSON(in.Choices), JSON(in.Action), in.ExpiresAt, in.SharedKey, in.Blocking, JSON(in.Mentions)); e != nil {
 			return e
 		}
+		files, err := s.claimAttachments(ctx, tx, a, in.AttachmentIDs)
+		if err != nil {
+			return err
+		}
+		for i := range files {
+			files[i].ConversationID = conv
+			files[i].RequestID = out.ID
+		}
+		out.Attachments = files
+		if err = linkAttachments(ctx, tx, a.Scope, conv, "", out.ID, files); err != nil {
+			return err
+		}
 		if in.ConversationID == "" && in.SharedKey == "" {
 			if e = s.newRequestAudience(ctx, tx, a, *out, rs); e != nil {
 				return e
@@ -218,7 +256,16 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 					return e
 				}
 				view := *out
+				view.Attachments = append([]Attachment(nil), out.Attachments...)
+				for i := range view.Attachments {
+					view.Attachments[i].ConversationID = projection
+				}
 				view.ConversationID = projection
+				if projection != conv {
+					if e = linkAttachments(ctx, tx, a.Scope, projection, "", out.ID, files); e != nil {
+						return e
+					}
+				}
 				if e = event(ctx, tx, a, "request.created", projection, r.ID, view); e != nil {
 					return e
 				}
@@ -505,6 +552,9 @@ func (s *Store) Executions(ctx context.Context, a Actor) ([]Execution, error) {
 func (s *Store) responseAuthorization(ctx context.Context, db DB, a Actor, r Request) error {
 	var e error
 	var eligible bool
+	if !s.requestHistoryAllowed(ctx, db, a, r) {
+		return Denied()
+	}
 	if e = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM request_audience WHERE scope=$1 AND request_id=$2 AND principal_id=$3)`, a.Scope, r.ID, a.ID).Scan(&eligible); e != nil {
 		return e
 	}

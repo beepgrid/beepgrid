@@ -15,8 +15,10 @@ export function TargetPicker({
   agentsOnly = false,
   messaging = false,
   onIdentitiesChange,
+  excludeIds = [],
 }: {
   value: Target[];
+  excludeIds?: string[];
   onChange: (v: Target[]) => void;
   onIdentitiesChange?: (identities: Identity[]) => void;
   multiple?: boolean;
@@ -196,6 +198,7 @@ export function TargetPicker({
             ? [["instance", "Agent connections"] as [Kind, string]]
             : []),
         ];
+  const available = q.items.filter((item) => !excludeIds.includes(item.id));
   return (
     <div className="recipient-picker">
       <div className="recipient-tabs" aria-label="Recipient categories">
@@ -225,7 +228,9 @@ export function TargetPicker({
           >
             <option value="">More</option>
             <option value="service">Software services</option>
-            <option value="instance">Agent connections</option>
+            {allowInstances ? (
+              <option value="instance">Agent connections</option>
+            ) : null}
           </select>
         ) : null}
       </div>
@@ -260,8 +265,8 @@ export function TargetPicker({
         </div>
       ) : null}
       <div className="recipient-results">
-        <QueryState query={q} empty="No matches">
-          {q.items
+        <QueryState query={{ ...q, items: available }} empty="No matches">
+          {available
             .filter(
               (item) =>
                 !messaging ||

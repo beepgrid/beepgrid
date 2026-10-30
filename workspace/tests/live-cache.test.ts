@@ -78,3 +78,24 @@ it("groups only exact compatible ordinary questions, preserving independent IDs"
     ["f"],
   ]);
 });
+
+it("resets the workspace cache on a targeted shared-chat access change without a message body", async () => {
+  const query = new QueryClient();
+  query.setQueryData(["test", "resource", "/conversations/con_removed"], {
+    id: "con_removed",
+    messages: [{ body: "Previously visible" }],
+  });
+  query.setQueryData(["other", "resource", "/conversations/con_kept"], {
+    id: "con_kept",
+  });
+  applyLiveEvent(query, "test", "con_removed", {
+    kind: "conversation.access_changed",
+    sequence: 50,
+  });
+  expect(
+    query.getQueryData(["test", "resource", "/conversations/con_removed"]),
+  ).toBeUndefined();
+  expect(
+    query.getQueryData(["other", "resource", "/conversations/con_kept"]),
+  ).toEqual({ id: "con_kept" });
+});

@@ -63,6 +63,9 @@ func (s *Store) deliveryEvidence(ctx context.Context, a Actor, d Delivery) (Deli
 			out.ContentVisible = s.canRead(ctx, s.Pool, a, conv)
 		}
 	}
+	if !s.deliveryChatVisible(ctx, s.Pool, a.Scope, d, a.ID, a.Admin) {
+		out.ContentVisible = false
+	}
 	if !out.ContentVisible {
 		out.Payload = nil
 	}

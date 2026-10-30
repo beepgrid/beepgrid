@@ -54,8 +54,9 @@ export type Action = {
   operation_key: string;
 };
 export type Request = {
-  mentions?:Mention[];
-  blocking?:boolean;
+  attachments?: Attachment[];
+  mentions?: Mention[];
+  blocking?: boolean;
   id: string;
   requester_id: string;
   requester_instance_id?: string;
@@ -81,9 +82,10 @@ export type Request = {
     reuse_reason?: string;
   };
 };
-export type Mention = {principal_id:string;start:number;end:number};
+export type Mention = { principal_id: string; start: number; end: number };
 export type Message = {
-  mentions?:Mention[];
+  attachments?: Attachment[];
+  mentions?: Mention[];
   id: string;
   conversation_id: string;
   sender_id: string;
@@ -92,6 +94,11 @@ export type Message = {
   created_at: string;
 };
 export type Conversation = {
+  shared?: boolean;
+  version: number;
+  manager_id?: string;
+  history_start?: number;
+  past_participants?: Identity[];
   last_activity_at?: string;
   last_preview?: string;
   id: string;
@@ -164,6 +171,8 @@ export type Credential = {
   revoked: boolean;
 };
 export type Attachment = {
+  message_id?: string;
+  request_id?: string;
   id: string;
   file_name: string;
   media_type: string;
@@ -195,9 +204,9 @@ export type FleetSource = {
   fresh: boolean;
 };
 export type Plan = {
- automatic?:boolean;
- instructions?:{agent_id:string;operation:string;body:string}[];
- summary_error?:string;
+  automatic?: boolean;
+  instructions?: { agent_id: string; operation: string; body: string }[];
+  summary_error?: string;
   previous_plan_id?: string;
   target?: Target;
   id: string;

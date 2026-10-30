@@ -17,6 +17,7 @@ const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,at
 
 // currentDeliveryPolicy rechecks the originating credential, group membership and route grants before exposing content.
 func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, d Delivery) bool {
+	conv, _ := d.Payload["conversation_id"].(string)
 	var policy struct {
 		CredentialID       string `json:"credential_id"`
 		ProviderConnection string `json:"provider_connection"`
@@ -31,7 +32,7 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 	}
 	if policy.RequestID != "" {
 		var valid bool
-		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope WHERE r.scope=$1 AND r.id=$2 AND r.requester_id=$3 AND NOT p.disabled)`, scope, policy.RequestID, d.RecipientID).Scan(&valid)
+		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requests r JOIN principals p ON p.id=r.requester_id AND p.scope=r.scope WHERE r.scope=$1 AND r.id=$2 AND r.requester_id=$3 AND NOT p.disabled AND chat_delivery_allows($1,$4,$5,$3,false))`, scope, policy.RequestID, d.RecipientID, conv, d.OperationID).Scan(&valid)
 		return valid
 	}
 	if policy.SenderID == "" {
@@ -52,12 +53,13 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
  SELECT 1 FROM credentials ac WHERE ac.scope=$1 AND ac.principal_id=p.id AND ac.kind='admin' AND NOT ac.revoked AND (ac.expires_at IS NULL OR ac.expires_at>now()))),false) END,
  COALESCE(NOT p.disabled AND NOT rp.disabled AND
  (CASE WHEN $4<>'' THEN pc.enabled ELSE NOT c.revoked AND (c.expires_at IS NULL OR c.expires_at>now()) END) AND
+ chat_delivery_allows($1,$10,$11,$5,false) AND
  ($6<>'group' OR EXISTS(SELECT 1 FROM memberships m WHERE m.scope=$1 AND m.group_id=$7 AND m.principal_id=rp.id)) AND
  (NOT $8 OR EXISTS(SELECT 1 FROM requests r WHERE r.scope=$1 AND r.id=$9 AND r.state='open' AND r.expires_at>now())),false)
  FROM principals p JOIN principals rp ON rp.scope=p.scope AND rp.id=$5
  LEFT JOIN credentials c ON c.scope=p.scope AND c.id=$3 AND c.principal_id=p.id
  LEFT JOIN connections pc ON pc.scope=p.scope AND pc.id=$4
- WHERE p.scope=$1 AND p.id=$2`, scope, policy.SenderID, policy.CredentialID, policy.ProviderConnection, d.RecipientID, policy.Target.Kind, policy.Target.ID, checkRequest, requestID).Scan(&sender.Kind, &sender.CredentialKind, &sender.Admin, &valid)
+ WHERE p.scope=$1 AND p.id=$2`, scope, policy.SenderID, policy.CredentialID, policy.ProviderConnection, d.RecipientID, policy.Target.Kind, policy.Target.ID, checkRequest, requestID, conv, d.OperationID).Scan(&sender.Kind, &sender.CredentialKind, &sender.Admin, &valid)
 	if err != nil || !valid {
 		return false
 	}

@@ -24,9 +24,9 @@ WITH input AS MATERIALIZED (
  UNION SELECT $1,i.conversation_id,$4 FROM input i JOIN created c ON c.id=i.conversation_id
  RETURNING conversation_id
 ), written AS (
- INSERT INTO messages(id,scope,conversation_id,sender_id,instance_id,body,created_at)
- SELECT i.message->>'id',$1,i.conversation_id,$4,NULLIF($5,''),$9,(i.message->>'created_at')::timestamptz
- FROM input i JOIN created c ON c.id=i.conversation_id RETURNING id
+ INSERT INTO messages(id,scope,conversation_id,sender_id,instance_id,body,created_at,created_sequence)
+ SELECT i.message->>'id',$1,i.conversation_id,$4,NULLIF($5,''),$9,(i.message->>'created_at')::timestamptz,r.sequence-(SELECT count(*) FROM input)+i.ordinality
+ FROM input i JOIN created c ON c.id=i.conversation_id CROSS JOIN reservation r RETURNING id
 ), emitted AS (
  INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data)
  SELECT $1,r.sequence-(SELECT count(*) FROM input)+i.ordinality,'message.created',$4,i.conversation_id,'',i.message

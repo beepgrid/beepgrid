@@ -33,6 +33,10 @@ func (s *Store) ProcessAttachmentCleanup(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	defer release()
+	// Row deletion serializes with draft claiming. Once absent, it cannot be sent.
+	if _, err = connection.Exec(ctx, `DELETE FROM attachments a WHERE a.scope=$1 AND a.id=$2 AND a.bound_operation='' AND a.draft_until<=now() AND EXISTS(SELECT 1 FROM attachment_uploads u WHERE u.scope=a.scope AND u.id=a.id AND u.lease_until<=now() AND u.next_at<=now())`, scope, id); err != nil {
+		return false, err
+	}
 	var eligible bool
 	err = connection.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM attachment_uploads u JOIN scopes s ON s.id=u.scope WHERE u.scope=$1 AND u.id=$2 AND u.lease_until<=now() AND u.next_at<=now() AND NOT s.recovery_hold AND (s.erasure_operation='' OR s.erase_after<=now()) AND NOT EXISTS(SELECT 1 FROM attachments a WHERE a.scope=u.scope AND a.id=u.id))`, scope, id).Scan(&eligible)
 	if err != nil || !eligible {

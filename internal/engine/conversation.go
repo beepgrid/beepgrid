@@ -92,7 +92,7 @@ func canReadConversation(ctx context.Context, db DB, a Actor, id string) bool {
 		return exists
 	}
 	var ok bool
-	_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM participants WHERE scope=$1 AND conversation_id=$2 AND principal_id=$3)`, a.Scope, id, a.ID).Scan(&ok)
+	_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM participants WHERE scope=$1 AND conversation_id=$2 AND principal_id=$3 AND left_at IS NULL)`, a.Scope, id, a.ID).Scan(&ok)
 	return ok && a.CredentialKind != "enrollment"
 }
 
@@ -136,7 +136,7 @@ func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, err
 	for rows.Next() {
 		var c Conversation
 		var raw []byte
-		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &raw); e != nil {
+		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &c.Shared, &c.Version, &c.ManagerID, &raw); e != nil {
 			rows.Close()
 			return nil, e
 		}
@@ -171,18 +171,18 @@ func (s *Store) Conversations(ctx context.Context, a Actor) ([]Conversation, err
 }
 
 func conversationListSQL(admin bool) string {
-	candidates := `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview FROM conversations c WHERE c.scope=$1 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 200`
+	candidates := `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,c.preview_sequence,c.shared,c.version,c.manager_id FROM conversations c WHERE c.scope=$1 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 200`
 	if !admin {
 		// Start with this person's memberships. The lateral lookup keeps a large
 		// workspace history from becoming a repeated full-table hash-join scan.
-		candidates = `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview FROM participants visible
- CROSS JOIN LATERAL (SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview FROM conversations c WHERE c.scope=visible.scope AND c.id=visible.conversation_id OFFSET 0) c
- WHERE visible.scope=$1 AND visible.principal_id=$2 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 200`
+		candidates = `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,c.preview_sequence,c.shared,c.version,c.manager_id FROM participants visible
+ CROSS JOIN LATERAL (SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,c.preview_sequence,c.shared,c.version,c.manager_id FROM conversations c WHERE c.scope=visible.scope AND c.id=visible.conversation_id OFFSET 0) c
+ WHERE visible.scope=$1 AND visible.principal_id=$2 AND visible.left_at IS NULL ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 200`
 	}
 	// Aggregate only each selected conversation's participants. A global join
 	// otherwise scans the directory again for each authenticated reader.
 	return `WITH candidates AS (` + candidates + `)
- SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,COALESCE(others.members,'[]') FROM candidates c
+ SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,CASE WHEN chat_history_allows($1,c.id,$2,` + boolSQL(admin) + `,c.preview_sequence) THEN c.last_preview ELSE '' END,c.shared,c.version,c.manager_id,COALESCE(others.members,'[]') FROM candidates c
  LEFT JOIN LATERAL (SELECT jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind)) FILTER(WHERE p.id<>$2) AS members
  FROM participants cp JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id
  WHERE cp.scope=$1 AND cp.conversation_id=c.id) others ON true ORDER BY c.last_activity_at DESC,c.id DESC`
@@ -194,20 +194,31 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	if e != nil {
 		return Conversation{}, e
 	}
-	rows, e := s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id)
+	rows, e := s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions,EXISTS(SELECT 1 FROM attachment_links l WHERE l.scope=m.scope AND l.message_id=m.id) FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 AND ($4 OR created_sequence >= COALESCE((SELECT history_start FROM participants WHERE scope=$1 AND conversation_id=$2 AND principal_id=$3 AND left_at IS NULL),9223372036854775807)) ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id, a.ID, a.Admin)
 	if e != nil {
 		return c, e
 	}
 	defer rows.Close()
 	c.Messages = []Message{}
+	hasFiles := false
 	for rows.Next() {
 		var m Message
-		if e = rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions); e != nil {
+		var files bool
+		if e = rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions, &files); e != nil {
 			return c, e
 		}
+		hasFiles = hasFiles || files
 		c.Messages = append(c.Messages, m)
 	}
-	return c, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return c, e
+	}
+	if !hasFiles {
+		return c, nil
+	}
+	return c, s.loadMessageFiles(ctx, s.Pool, a.Scope, c.Messages)
 }
 
 // Load membership, current identities and conversation metadata together.
@@ -222,7 +233,7 @@ func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor
 		lock = " FOR UPDATE OF c"
 	}
 	rows, e := db.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,
- COALESCE(p.id,''),COALESCE(p.kind,''),COALESCE(p.external_id,''),COALESCE(p.name,''),COALESCE(p.metadata,'{}'::jsonb),COALESCE(p.disabled,false),COALESCE(p.created_at,c.created_at)
+ c.shared,c.version,c.manager_id,COALESCE(cp.left_at IS NULL,false),COALESCE(cp.history_start,0),COALESCE(p.id,''),COALESCE(p.kind,''),COALESCE(p.external_id,''),COALESCE(p.name,''),COALESCE(p.metadata,'{}'::jsonb),COALESCE(p.disabled,false),COALESCE(p.created_at,c.created_at)
  FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id
  LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id
  WHERE c.scope=$1 AND c.id=$2 ORDER BY p.id`+lock, a.Scope, id)
@@ -233,8 +244,10 @@ func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor
 	member := false
 	for rows.Next() {
 		var p Principal
+		var active bool
+		var floor int64
 		var meta []byte
-		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &p.ID, &p.Kind, &p.ExternalID, &p.Name, &meta, &p.Disabled, &p.CreatedAt); e != nil {
+		if e = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &c.Shared, &c.Version, &c.ManagerID, &active, &floor, &p.ID, &p.Kind, &p.ExternalID, &p.Name, &meta, &p.Disabled, &p.CreatedAt); e != nil {
 			rows.Close()
 			return Conversation{}, e
 		}
@@ -243,8 +256,15 @@ func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor
 				rows.Close()
 				return Conversation{}, e
 			}
-			member = member || p.ID == a.ID
-			c.Participants = append(c.Participants, p)
+			if p.ID == a.ID && active {
+				member = true
+				c.HistoryStart = floor
+			}
+			if active {
+				c.Participants = append(c.Participants, p)
+			} else {
+				c.PastParticipants = append(c.PastParticipants, p)
+			}
 		}
 	}
 	e = rows.Err()
@@ -257,7 +277,7 @@ func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor
 	}
 	if !a.Admin {
 		others := 0
-		for _, p := range c.Participants {
+		for _, p := range append(append([]Principal{}, c.Participants...), c.PastParticipants...) {
 			if p.ID == a.ID {
 				continue
 			}
@@ -268,6 +288,15 @@ func (s *Store) readConversationParticipants(ctx context.Context, db DB, a Actor
 		}
 		if others == 0 {
 			return Conversation{}, Missing()
+		}
+	}
+	if !a.Admin && c.HistoryStart > 0 {
+		var origin int64
+		if e = db.QueryRow(ctx, `SELECT preview_sequence FROM conversations WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&origin); e != nil {
+			return Conversation{}, e
+		}
+		if origin < c.HistoryStart {
+			c.LastPreview = ""
 		}
 	}
 	return c, nil
@@ -389,7 +418,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 }
 func (s *Store) Send(ctx context.Context, a Actor, in SendInput, key string) (SendResult, error) {
 	var out SendResult
-	ctx = context.WithValue(ctx, concurrentMessageKey{}, true)
+	ctx = withAttachmentBinding(context.WithValue(ctx, concurrentMessageKey{}, true), "send", key)
 	err := s.mutation(ctx, a, true, func(tx pgx.Tx) error { return s.sendTx(ctx, tx, a, in, key, &out) })
 	return out, err
 }
@@ -398,7 +427,7 @@ func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, ke
 	// Share one bounded snapshot across resolution and queueing, inside the
 	// workspace-locked transaction, rather than reloading roles per member.
 	ctx = withPolicySnapshot(ctx)
-	if !ValidText(in.Body, 32768) || len(in.Title) > 200 {
+	if (!ValidText(in.Body, 32768) && !(in.Body == "" && len(in.AttachmentIDs) > 0)) || len(in.Title) > 200 {
 		return Bad("Message body is required and must be at most 32768 bytes.")
 	}
 
@@ -436,10 +465,25 @@ func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, ke
 			if len(in.Mentions) > 0 {
 				return Bad("Mentions require an existing shared conversation.")
 			}
+			if len(in.AttachmentIDs) > 0 {
+				for _, r := range rs {
+					conv, err := newConversation(ctx, tx, a, in.Title, r.ID)
+					if err != nil {
+						return err
+					}
+					m, err := s.appendMessageFiles(ctx, tx, a, conv, in.Body, []recipient{r}, in.Mentions, in.AttachmentIDs)
+					if err != nil {
+						return err
+					}
+					out.Messages = append(out.Messages, m)
+				}
+				out.ConversationID = out.Messages[0].ConversationID
+				return nil
+			}
 			_, e := s.nativeFanout(ctx, tx, a, in, rs, out)
 			return e
 		}
-		m, e := s.appendConversationMessage(ctx, tx, a, in.ConversationID, in.Body, rs, in.Mentions)
+		m, e := s.appendMessageFiles(ctx, tx, a, in.ConversationID, in.Body, rs, in.Mentions, in.AttachmentIDs)
 		if e != nil {
 			return e
 		}
@@ -479,7 +523,7 @@ func (s *Store) eventPage(ctx context.Context, a Actor, after int64, recent, sum
 		order = "DESC"
 	}
 
-	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,CASE WHEN $5 AND NOT (e.kind='message.created' AND e.conversation_id=$6 AND $6<>'') THEN 'null'::jsonb ELSE e.data END,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND ($3 OR (e.conversation_id<>'' AND e.conversation_id IN(SELECT p.conversation_id FROM participants p WHERE p.scope=$1 AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence `+order+` LIMIT 200`, a.Scope, after, a.Admin, a.ID, summary, conversation)
+	rows, e := s.Pool.Query(ctx, `SELECT e.sequence,e.kind,e.actor_id,e.conversation_id,e.recipient_id,CASE WHEN $5 AND NOT (e.kind='message.created' AND e.conversation_id=$6 AND $6<>'') THEN 'null'::jsonb ELSE e.data END,e.created_at FROM events e WHERE e.scope=$1 AND e.sequence>$2 AND (e.conversation_id='' OR chat_history_allows(e.scope,e.conversation_id,$4,$3,CASE WHEN e.kind LIKE 'request.%' THEN COALESCE((SELECT created_sequence FROM requests WHERE scope=e.scope AND id=e.data->>'id'),e.sequence) ELSE e.sequence END)) AND ($3 OR (e.conversation_id<>'' AND e.conversation_id IN(SELECT p.conversation_id FROM participants p WHERE p.scope=$1 AND p.principal_id=$4)) OR e.recipient_id=$4) ORDER BY e.sequence `+order+` LIMIT 200`, a.Scope, after, a.Admin, a.ID, summary, conversation)
 	if e != nil {
 		return nil, after, e
 	}
@@ -545,7 +589,7 @@ func (s *Store) existingDirect(ctx context.Context, db DB, a Actor, peer Princip
 		return "", err
 	}
 	var id string
-	err := db.QueryRow(ctx, `SELECT c.id FROM conversations c JOIN participants mine ON mine.scope=c.scope AND mine.conversation_id=c.id AND mine.principal_id=$2 JOIN participants theirs ON theirs.scope=c.scope AND theirs.conversation_id=c.id AND theirs.principal_id=$3 WHERE c.scope=$1 AND (SELECT count(*) FROM participants p WHERE p.scope=c.scope AND p.conversation_id=c.id)=2 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 1`, a.Scope, a.ID, peer.ID).Scan(&id)
+	err := db.QueryRow(ctx, `SELECT c.id FROM conversations c JOIN participants mine ON mine.scope=c.scope AND mine.conversation_id=c.id AND mine.principal_id=$2 JOIN participants theirs ON theirs.scope=c.scope AND theirs.conversation_id=c.id AND theirs.principal_id=$3 WHERE c.scope=$1 AND NOT c.shared AND mine.left_at IS NULL AND theirs.left_at IS NULL AND (SELECT count(*) FROM participants p WHERE p.scope=c.scope AND p.conversation_id=c.id)=2 ORDER BY c.last_activity_at DESC,c.id DESC LIMIT 1`, a.Scope, a.ID, peer.ID).Scan(&id)
 	if err == pgx.ErrNoRows {
 		return "", nil
 	}

@@ -396,6 +396,14 @@ func (s *Server) routes() {
 		x, e := s.Store.Conversation(r.Context(), actor(r), r.PathValue("id"))
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/conversations/{id}/membership", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.ChatMembershipInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.ChangeChatMembership(r.Context(), actor(r), r.PathValue("id"), in, r.Header.Get("Idempotency-Key"))
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("POST /api/v1/messages", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in engine.SendInput
 		if e := decode(r, &in); e != nil {

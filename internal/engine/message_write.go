@@ -13,10 +13,20 @@ import (
 // revalidates current credentials and commits the idempotency receipt before ack.
 // Requests retain their separate approval/coalescing enqueue path.
 func (s *Store) appendConversationMessage(ctx context.Context, tx pgx.Tx, a Actor, conv, body string, rs []recipient, addressed ...[]Mention) (Message, error) {
-	m := Message{ID: ID("msg"), ConversationID: conv, SenderID: a.ID, InstanceID: a.InstanceID, Body: body, CreatedAt: time.Now()}
+	var mentions []Mention
 	if len(addressed) > 0 {
-		m.Mentions = addressed[0]
+		mentions = addressed[0]
 	}
+	return s.appendMessageFiles(ctx, tx, a, conv, body, rs, mentions, nil)
+}
+func (s *Store) appendMessageFiles(ctx context.Context, tx pgx.Tx, a Actor, conv, body string, rs []recipient, mentions []Mention, fileIDs []string) (Message, error) {
+	m := Message{ID: ID("msg"), ConversationID: conv, SenderID: a.ID, InstanceID: a.InstanceID, Body: body, CreatedAt: time.Now()}
+	m.Mentions = mentions
+	files, err := s.claimAttachments(ctx, tx, a, fileIDs)
+	if err != nil {
+		return m, err
+	}
+	m.Attachments = messageFiles(files, conv, m.ID)
 	if len(m.Mentions) > 0 {
 		if err := s.validateMentions(ctx, tx, a, conv, body, m.Mentions); err != nil {
 			return m, err
@@ -79,6 +89,9 @@ func (s *Store) appendConversationMessage(ctx context.Context, tx pgx.Tx, a Acto
 		items = append(items, item)
 	}
 	_, err = tx.Exec(ctx, appendMessageSQL, a.Scope, JSON(m), JSON(items), a.CredentialID, a.ProviderConnection, time.Now().Add(7*24*time.Hour))
+	if err == nil {
+		err = linkAttachments(ctx, tx, a.Scope, conv, m.ID, "", m.Attachments)
+	}
 	return m, err
 }
 

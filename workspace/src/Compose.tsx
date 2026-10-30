@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { useCollection, useDraft, useOperation, useSession } from "./data";
 import { MentionEditor } from "./Mentions";
-import type { Identity, Mention, Target } from "./contracts";
-import { bytes } from "./client";
+import type { Identity, Mention, Target, Attachment } from "./contracts";
+import { bytes, upload } from "./client";
+import { fileSize } from "./Attachments";
 import { navigate } from "./navigation";
 import { TargetPicker } from "./TargetPicker";
 import { Button, ErrorView, Form, Icon, Modal } from "./ui";
@@ -60,6 +61,62 @@ export function MessageComposer({
   function setMentions(items: Mention[]) {
     setMentionDraft(JSON.stringify(items));
   }
+  type DraftFile = {
+    key: string;
+    name: string;
+    size: number;
+    id?: string;
+    error?: string;
+  };
+  const [files, setFiles] = useState<DraftFile[]>([]);
+  const fileInput = useRef<HTMLInputElement>(null);
+  async function attach(chosen: FileList | null) {
+    if (!chosen) return;
+    const added = Array.from(chosen);
+    if (added.length + files.length > 5) {
+      setError(Error("Attach up to five files per message."));
+      return;
+    }
+    for (const file of added) {
+      if (!file.size || file.size > 5 * 1024 * 1024) {
+        setError(Error("Choose a nonempty file up to 5 MiB."));
+        continue;
+      }
+      if (
+        ![
+          "text/plain",
+          "application/json",
+          "application/pdf",
+          "image/png",
+          "image/jpeg",
+          "image/webp",
+        ].includes(file.type)
+      ) {
+        setError(
+          Error("Supported types: text, JSON, PDF, PNG, JPEG and WebP."),
+        );
+        continue;
+      }
+      const key = crypto.randomUUID();
+      setFiles((old) => [...old, { key, name: file.name, size: file.size }]);
+      void upload<Attachment>("/attachments", file)
+        .then((result) =>
+          setFiles((old) =>
+            old.map((x) => (x.key === key ? { ...x, id: result.id } : x)),
+          ),
+        )
+        .catch((e) =>
+          setFiles((old) =>
+            old.map((x) =>
+              x.key === key ? { ...x, error: e.message || "Upload failed" } : x,
+            ),
+          ),
+        );
+    }
+    if (fileInput.current) fileInput.current.value = "";
+  }
+  const waitingFiles = files.some((x) => !x.id);
+  const attachment_ids = files.flatMap((x) => (x.id ? [x.id] : []));
   const [approval, setApproval] = useState(false),
     [choices, setChoices] = useState<string[]>([]),
     [error, setError] = useState<Error | null>(null);
@@ -72,7 +129,7 @@ export function MessageComposer({
           .join(",")),
   );
   async function send() {
-    if (!body.trim() || op.pending) return;
+    if ((!body.trim() && !files.length) || waitingFiles || op.pending) return;
     setError(null);
     if (bytes(body) > 32768) {
       setError(Error("Your message is too long. Keep it under 32 KB."));
@@ -99,6 +156,7 @@ export function MessageComposer({
           {
             targets,
             request: {
+              attachment_ids,
               kind: approval ? "approval" : "question",
               body,
               choices: clean,
@@ -111,7 +169,7 @@ export function MessageComposer({
       } else {
         const sent = await op.run<{ result: { conversation_id: string } }[]>(
           "/message-batches",
-          { targets, body, reuse_direct: true },
+          { targets, body, reuse_direct: true, attachment_ids },
         );
         if (sent) result = { conversation_id: sent[0]?.result.conversation_id };
       }
@@ -119,12 +177,14 @@ export function MessageComposer({
       result = await op.run("/conversations", {
         targets,
         body,
+        attachment_ids,
         approval,
         choices: clean,
         mentions,
       });
     } else if (request) {
       result = await op.run("/requests", {
+        attachment_ids,
         target: targets[0],
         conversation_id: conversation || undefined,
         kind: approval ? "approval" : "question",
@@ -138,6 +198,7 @@ export function MessageComposer({
         conversation_id?: string;
         messages?: { conversation_id: string }[];
       }>("/messages", {
+        attachment_ids,
         target: targets[0],
         conversation_id: conversation || undefined,
         body,
@@ -155,6 +216,7 @@ export function MessageComposer({
       setMentions([]);
       setChoices([]);
       setApproval(false);
+      setFiles([]);
       op.forget();
       onSent?.(result.conversation_id || conversation);
     }
@@ -177,6 +239,33 @@ export function MessageComposer({
             }
           }}
         />
+        {files.length ? (
+          <div className="draft-files" aria-label="Message attachments">
+            {files.map((file) => (
+              <div className="draft-file" key={file.key}>
+                <Icon name="file" size={18} />
+                <span className="file-label">
+                  <strong>{file.name}</strong>
+                  <small role={file.error ? "alert" : undefined}>
+                    {file.error ||
+                      (file.id ? fileSize(file.size) : "Uploading...")}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={"Remove " + file.name}
+                  disabled={op.pending}
+                  onClick={() =>
+                    setFiles((old) => old.filter((x) => x.key !== file.key))
+                  }
+                >
+                  <Icon name="close" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {approval ? (
           <div className="approval-preview" aria-label="Approval flow preview">
             <button
@@ -236,6 +325,23 @@ export function MessageComposer({
         ) : null}
         <div className="compose-bottom">
           <div className="actions">
+            <Button
+              icon="attachment"
+              disabled={op.pending || files.length >= 5}
+              onClick={() => fileInput.current?.click()}
+            >
+              Attach files
+            </Button>
+            <input
+              hidden
+              type="file"
+              multiple
+              ref={fileInput}
+              aria-label="Choose files"
+              accept=".txt,.json,.pdf,.png,.jpg,.jpeg,.webp"
+              onChange={(e) => void attach(e.target.files)}
+            />
+
             {canAsk && !approval && !choices.length ? (
               <>
                 <Button icon="plus" onClick={() => setApproval(true)}>
@@ -256,7 +362,10 @@ export function MessageComposer({
             icon="arrow"
             type="submit"
             disabled={
-              op.pending || !body.trim() || (!conversation && !targets.length)
+              op.pending ||
+              waitingFiles ||
+              (!body.trim() && !files.length) ||
+              (!conversation && !targets.length)
             }
           >
             {op.pending ? "Sending..." : "Send"}

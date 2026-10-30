@@ -1387,6 +1387,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
           }
         ],
         "requestBody": {
@@ -1410,6 +1420,14 @@
                   },
                   "preview_token": {
                     "type": "string"
+                  },
+                  "attachment_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "uniqueItems": true
                   }
                 },
                 "required": [
@@ -4129,7 +4147,18 @@
             }
           }
         },
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4164,6 +4193,14 @@
                       "$ref": "#/components/schemas/Mention"
                     },
                     "maxItems": 20
+                  },
+                  "attachment_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "uniqueItems": true
                   }
                 },
                 "required": [
@@ -4357,6 +4394,164 @@
                 "required": [
                   "subject",
                   "rules",
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/membership": {
+      "post": {
+        "operationId": "post_api_v1_conversations_id_membership",
+        "description": "Versioned and idempotent shared-chat membership. Manager or admin can rename/add/remove; members can leave. New members see history from joining unless share_history is explicitly true. Current mutual View is required; membership grants no contact, decision or tool authority. Removing or leaving stops future read and delivery; already downloaded data cannot be recalled. A departing manager names an existing successor.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conversation_id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "left": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "enum": [
+                      "rename",
+                      "add",
+                      "remove",
+                      "leave"
+                    ]
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "members": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 100,
+                    "uniqueItems": true
+                  },
+                  "share_history": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "next_manager": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "operation",
                   "version"
                 ],
                 "additionalProperties": false
@@ -7427,6 +7622,105 @@
         }
       }
     },
+    "/api/v1/attachments": {
+      "post": {
+        "operationId": "post_api_v1_attachments",
+        "description": "Stage a private file for up to 24 hours. Only its uploader can read it until a keyed communication atomically claims attachment_ids. Maximum five files per message, 5 MiB each. An abandoned draft expires; upload itself has no automatic retry contract.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/attachments/{id}": {
       "get": {
         "operationId": "get_api_v1_attachments_id",
@@ -9623,6 +9917,14 @@
           "reuse_direct": {
             "type": "boolean",
             "description": "Reuse authorized exact two-principal history. Defaults to false. Does not merge shared group chats."
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "uniqueItems": true
           }
         },
         "required": [
@@ -9657,6 +9959,12 @@
               "$ref": "#/components/schemas/Mention"
             },
             "maxItems": 20
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
           }
         },
         "required": [],
@@ -9725,6 +10033,24 @@
           },
           "last_preview": {
             "type": "string"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "manager_id": {
+            "type": "string"
+          },
+          "history_start": {
+            "type": "integer"
+          },
+          "past_participants": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         },
         "required": [],
@@ -9784,6 +10110,14 @@
           "blocking": {
             "type": "boolean",
             "description": "Explicit agent-to-individual-agent dependency. Ordinary open requests are not deadlocks."
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "uniqueItems": true
           }
         },
         "required": [],
@@ -9915,6 +10249,12 @@
           "blocking": {
             "type": "boolean",
             "description": "Explicit agent-to-individual-agent dependency. Ordinary open requests are not deadlocks."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
           }
         },
         "required": [],
@@ -10242,6 +10582,12 @@
             "type": "string"
           },
           "created_at": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "request_id": {
             "type": "string"
           }
         },

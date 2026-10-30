@@ -49,6 +49,11 @@ schemas={
 'Event':obj({'sequence':{'type':'integer'},'kind':S,'actor_id':S,'conversation_id':S,'recipient_id':S,'data':{},'created_at':S}),
 'Error':obj({'error':obj({'code':S,'message':S},['code','message'])},['error'])}
 schemas['Mention']={'type': 'object', 'required': ['principal_id', 'start', 'end'], 'additionalProperties': False, 'properties': {'principal_id': {'type': 'string'}, 'start': {'type': 'integer', 'minimum': 0}, 'end': {'type': 'integer', 'minimum': 1}}, 'description': 'Stable explicit addressee. start/end are Unicode code-point offsets for the exact @name token. Must be a current visible conversation participant. All members receive the original message and may contribute.'}
+schemas['SendInput']['properties']['attachment_ids']={'type':'array','items':S,'maxItems':5,'uniqueItems':True}
+schemas['AskInput']['properties']['attachment_ids']={'type':'array','items':S,'maxItems':5,'uniqueItems':True}
+for name in ['Message','Request']: schemas[name]['properties']['attachments']=array(ref('Attachment'))
+for name in ['message_id','request_id']: schemas['Attachment']['properties'][name]=S
+schemas['Conversation']['properties'].update({'shared':{'type':'boolean'},'version':{'type':'integer'},'manager_id':S,'history_start':{'type':'integer'},'past_participants':array({'type':'object'})})
 paths={}
 def add(method,path,body=None,result=None,description=''):
  op={'operationId':method.lower()+'_'+re.sub('[^A-Za-z0-9]+','_',path).strip('_'),'description':description or path,'responses':{'200':response(result or {'type':'object'}),'400':response(ref('Error')),'401':response(ref('Error')),'403':response(ref('Error')),'404':response(ref('Error')),'409':response(ref('Error')),'429':response(ref('Error'))},'parameters':[]}
@@ -93,6 +98,9 @@ add('POST','/api/v1/permissions/explain',obj({'subject_id':S,'action':S,'target'
 add('POST','/api/v1/route-preview',obj({'target':ref('Target'),'action':S},['target','action']))
 add('POST','/api/v1/conversations',obj({'targets':array(ref('Target')),'body':S,'title':S,'approval':{'type':'boolean'},'choices':array(S),'mentions':{'type':'array','items':ref('Mention'),'maxItems':20}},['targets','body']),ref('SendResult'),description='Start an explicit shared chat with a durable first message. Individual recipients only; all members must have current mutual view permission. Every later send checks current contact access. Idempotent; private broadcast contracts are unchanged.')
 add('POST','/api/v1/contact-permissions',obj({'subject':ref('Target'),'rules':array(ref('Rule')),'version':{'type':'integer'}},['subject','rules','version']),ref('Role'),description='Atomically save and assign a dedicated contact-access policy. Only view, message, ask and decide toward exact contacts. Existing delegation ceilings and observed-version checks apply. Inherited policies remain effective.')
+add('POST','/api/v1/conversations/{id}/membership',obj({'operation':{'enum':['rename','add','remove','leave']},'version':{'type':'integer','minimum':1},'title':S,'members':{'type':'array','items':S,'maxItems':100,'uniqueItems':True},'share_history':{'type':'boolean','default':False},'next_manager':S},['operation','version']),obj({'conversation_id':S,'version':{'type':'integer'},'left':{'type':'boolean'}}),description='Versioned and idempotent shared-chat membership. Manager or admin can rename/add/remove; members can leave. New members see history from joining unless share_history is explicitly true. Current mutual View is required; membership grants no contact, decision or tool authority. Removing or leaving stops future read and delivery; already downloaded data cannot be recalled. A departing manager names an existing successor.')
+paths['/api/v1/conversations']['post']['requestBody']['content']['application/json']['schema']['properties']['attachment_ids']=schemas['SendInput']['properties']['attachment_ids']
+paths['/api/v1/message-batches']['post']['requestBody']['content']['application/json']['schema']['properties']['attachment_ids']=schemas['SendInput']['properties']['attachment_ids']
 add('GET','/api/v1/conversations',result=array(ref('Conversation')))
 add('GET','/api/v1/conversations/{id}',result=ref('Conversation'))
 add('POST','/api/v1/messages',ref('SendInput'),ref('SendResult'))
@@ -135,6 +143,10 @@ add('POST','/api/v1/fleet/command',obj({'plan_id':S},['plan_id']),ref('OverseerP
 add('GET','/api/v1/conversations/{id}/attachments',result=array(ref('Attachment')))
 add('POST','/api/v1/conversations/{id}/attachments',result=ref('Attachment'))
 paths['/api/v1/conversations/{id}/attachments']['post']['requestBody']={'required':True,'content':{'multipart/form-data':{'schema':obj({'file':{'type':'string','format':'binary'}},['file'])}}}
+add('POST','/api/v1/attachments',result=ref('Attachment'),description='Stage a private file for up to 24 hours. Only its uploader can read it until a keyed communication atomically claims attachment_ids. Maximum five files per message, 5 MiB each. An abandoned draft expires; upload itself has no automatic retry contract.')
+paths['/api/v1/attachments']['post']['requestBody']=paths['/api/v1/conversations/{id}/attachments']['post']['requestBody']
+for path in ['/api/v1/conversations','/api/v1/conversations/{id}/membership','/api/v1/message-batches']:
+ paths[path]['post']['parameters'].append({'name':'Idempotency-Key','in':'header','required':True,'schema':{'type':'string','minLength':1,'maxLength':200}})
 add('GET','/api/v1/attachments/{id}')
 paths['/api/v1/attachments/{id}']['get']['responses']['200']={'description':'Authenticated attachment download, at most 5 MiB','content':{'application/octet-stream':{'schema':{'type':'string','format':'binary'}}}}
 for path,body in [('slack-account',obj({'team_id':S,'user_id':S},['team_id','user_id'])),('oidc-account',obj({'issuer':S,'subject':S},['issuer','subject']))]:add('POST','/api/v1/people/{id}/'+path,body)

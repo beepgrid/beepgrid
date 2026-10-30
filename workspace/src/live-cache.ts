@@ -20,7 +20,7 @@ export function applyLiveEvent(
 ) {
   const kind = event.kind;
   if (
-    /(role|binding|group\.saved|membership|disabled|credential|status_changed|recovery|suspend|assistance\.)/.test(
+    /(role|binding|group\.saved|membership|access_changed|disabled|credential|status_changed|recovery|suspend|assistance\.)/.test(
       kind,
     )
   ) {

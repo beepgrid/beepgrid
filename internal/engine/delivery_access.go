@@ -3,6 +3,9 @@ package engine
 import "context"
 
 func (s *Store) mayReadDelivery(ctx context.Context, db DB, a Actor, d Delivery) bool {
+	if !s.deliveryChatVisible(ctx, db, a.Scope, d, a.ID, a.Admin) {
+		return false
+	}
 	if a.Admin {
 		return true
 	}

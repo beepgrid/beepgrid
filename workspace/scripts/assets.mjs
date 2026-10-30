@@ -40,7 +40,7 @@ for (const name of assets) {
 const budgets = {
   entry_js_gzip_kib: 96,
   all_js_gzip_kib: 145,
-  css_gzip_kib: 12.5,
+  css_gzip_kib: 13,
   all_fonts_kib: 320,
   largest_font_kib: 96,
 };

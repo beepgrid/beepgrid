@@ -41,6 +41,7 @@ const paths: Record<string, string> = {
   question:
     "M9 8a3 3 0 0 1 6 0c0 3-3 2-3 5 M12 17h.01 M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20",
   task: "M9 3h6v4H9z M9 5H5v16h14V5h-4 M8 12h8m-8 4h5",
+  download: "M12 3v12m-5-5 5 5 5-5 M5 17v4h14v-4",
   attachment: "m8 12 6-6a3 3 0 0 1 4 4L9 19a5 5 0 0 1-7-7L12 2",
   menu: "M4 6h16M4 12h16M4 18h16",
   refresh: "M20 7v5h-5 M4 17v-5h5 M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6",

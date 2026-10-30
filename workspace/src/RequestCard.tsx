@@ -1,3 +1,4 @@
+import { FileLinks } from "./Attachments";
 import { MentionText } from "./Mentions";
 import { useState } from "react";
 import { useCapabilities, useOperation, useSession } from "./data";
@@ -68,6 +69,7 @@ export function RequestCard({
               participants={participants}
             />
           </p>
+          <FileLinks files={r.attachments} />
           {r.body &&
           r.title &&
           r.title !== r.body &&

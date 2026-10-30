@@ -58,8 +58,12 @@ func (s *Store) newRequestAudience(ctx context.Context, tx pgx.Tx, a Actor, requ
 	}
 	for _, r := range recipients {
 		view := request
+		view.Attachments = append([]Attachment(nil), request.Attachments...)
 		if len(recipients) > 1 {
 			view.ConversationID = ID("con")
+		}
+		for i := range view.Attachments {
+			view.Attachments[i].ConversationID = view.ConversationID
 		}
 		x := record{Recipient: r.ID, Conversation: view.ConversationID, Exact: r.ExactInstance, Delivery: ID("del"), Target: r.PolicyTarget, Native: s.allowed(ctx, tx, a, "ask", r.PolicyTarget, "", actionName, request.Action), Request: view}
 		for _, d := range routes[r.ID] {
@@ -77,6 +81,13 @@ func (s *Store) newRequestAudience(ctx context.Context, tx pgx.Tx, a Actor, requ
 	for start := 0; start < len(items); start += batchSize {
 		if _, err = tx.Exec(ctx, requestAudienceSQL, a.Scope, JSON(items[start:min(start+batchSize, len(items))]), a.ID, a.CredentialID, a.ProviderConnection, request.ExpiresAt, request.ID, request.Title, len(recipients) > 1, actionName); err != nil {
 			return err
+		}
+	}
+	for _, item := range items {
+		if item.Conversation != request.ConversationID {
+			if err = linkAttachments(ctx, tx, a.Scope, item.Conversation, "", request.ID, request.Attachments); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

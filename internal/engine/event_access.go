@@ -11,7 +11,7 @@ func (s *Store) readableEventConversations(ctx context.Context, a Actor, ids []s
 	if len(ids) == 0 || a.CredentialKind == "enrollment" {
 		return out, nil
 	}
-	rows, e := s.Pool.Query(ctx, `SELECT c.id,EXISTS(SELECT 1 FROM participants own WHERE own.scope=c.scope AND own.conversation_id=c.id AND own.principal_id=$3),COALESCE(jsonb_agg(jsonb_build_object('kind',p.kind,'id',p.id)) FILTER(WHERE p.id<>$3),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids, a.ID)
+	rows, e := s.Pool.Query(ctx, `SELECT c.id,EXISTS(SELECT 1 FROM participants own WHERE own.scope=c.scope AND own.conversation_id=c.id AND own.principal_id=$3 AND own.left_at IS NULL),COALESCE(jsonb_agg(jsonb_build_object('kind',p.kind,'id',p.id)) FILTER(WHERE p.id<>$3),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids, a.ID)
 	if e != nil {
 		return nil, e
 	}

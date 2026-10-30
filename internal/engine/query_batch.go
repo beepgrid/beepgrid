@@ -26,6 +26,24 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		}
 	}
 	switch collection {
+	case "attachments":
+		conv, _ := ctx.Value(attachmentQueryConversationKey{}).(string)
+		if conv == "" {
+			return nil, Bad("Files require a conversation.")
+		}
+		xs, err := s.Attachments(ctx, a, conv)
+		if err != nil {
+			return nil, err
+		}
+		wanted := map[string]bool{}
+		for _, id := range ids {
+			wanted[id] = true
+		}
+		for _, x := range xs {
+			if wanted[x.ID] {
+				put(x.ID, x, true)
+			}
+		}
 	case "deliveries":
 		return s.queryDeliveryRecords(ctx, a, ids)
 	case "credentials":
@@ -120,8 +138,8 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 			put(r.ID, r, s.roleVisible(ctx, s.Pool, a, r.ID))
 		}
 	case "requests":
-		fields := strings.Replace(requestFields, "r.conversation_id", "CASE WHEN $3 OR r.requester_id=$4 THEN r.conversation_id ELSE ra.conversation_id END", 1)
-		rows, err := s.Pool.Query(ctx, `SELECT `+fields+`,p.kind FROM requests r JOIN principals p ON p.scope=r.scope AND p.id=r.requester_id LEFT JOIN request_audience ra ON ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$4 WHERE r.scope=$1 AND r.id=ANY($2::text[]) AND ($3 OR r.requester_id=$4 OR ra.principal_id IS NOT NULL)`, a.Scope, ids, a.Admin, a.ID)
+		fields := strings.Replace(requestFields, "r.conversation_id", "CASE WHEN $3 OR r.requester_id=$4 THEN r.conversation_id ELSE COALESCE(ra.conversation_id,r.conversation_id) END", 1)
+		rows, err := s.Pool.Query(ctx, `SELECT `+fields+`,p.kind FROM requests r JOIN principals p ON p.scope=r.scope AND p.id=r.requester_id LEFT JOIN request_audience ra ON ra.scope=r.scope AND ra.request_id=r.id AND ra.principal_id=$4 WHERE r.scope=$1 AND r.id=ANY($2::text[]) AND ($3 OR r.requester_id=$4 OR ra.principal_id IS NOT NULL OR EXISTS(SELECT 1 FROM conversations cr JOIN participants cp ON cp.scope=cr.scope AND cp.conversation_id=cr.id WHERE cr.scope=r.scope AND cr.id=r.conversation_id AND cr.shared AND cp.principal_id=$4 AND cp.left_at IS NULL))`, a.Scope, ids, a.Admin, a.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -144,13 +162,24 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		if err != nil {
 			return nil, err
 		}
+		window := []Request{}
+		for _, x := range all {
+			window = append(window, x.r)
+		}
+		readable, err := s.readableRequestChats(ctx, a, window)
+		if err != nil {
+			return nil, err
+		}
 		visible := []Request{}
 		for _, x := range all {
-			if a.Admin || a.ID == x.r.RequesterID || s.allowed(ctx, s.Pool, a, "view", Target{x.kind, x.r.RequesterID}, "", "") {
+			if (!x.r.shared || readable[x.r.ID]) && (a.Admin || a.ID == x.r.RequesterID || s.allowed(ctx, s.Pool, a, "view", Target{x.kind, x.r.RequesterID}, "", "")) {
 				visible = append(visible, x.r)
 			}
 		}
 		if err = s.markAnswerSources(ctx, s.Pool, a.Scope, visible); err != nil {
+			return nil, err
+		}
+		if err = s.loadRequestFiles(ctx, s.Pool, a.Scope, visible); err != nil {
 			return nil, err
 		}
 		for _, r := range visible {
@@ -161,50 +190,36 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		if err != nil {
 			return nil, err
 		}
-		rows, err := s.Pool.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,c.last_preview,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind,'name',p.name) ORDER BY p.id) FILTER(WHERE p.id IS NOT NULL),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids)
+		rows, err := s.Pool.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,CASE WHEN chat_history_allows(c.scope,c.id,$3,$4,c.preview_sequence) THEN c.last_preview ELSE '' END,c.shared,c.version,c.manager_id,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind,'name',p.name) ORDER BY p.id) FILTER(WHERE p.id IS NOT NULL AND cp.left_at IS NULL),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids, a.ID, a.Admin)
 		if err != nil {
 			return nil, err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var c Conversation
-			if err = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &c.Participants); err != nil {
+			if err = rows.Scan(&c.ID, &c.Title, &c.CreatedBy, &c.CreatedAt, &c.LastActivityAt, &c.LastPreview, &c.Shared, &c.Version, &c.ManagerID, &c.Participants); err != nil {
 				return nil, err
 			}
 			put(c.ID, c, visible[c.ID])
 		}
 		return out, rows.Err()
-	case "messages", "attachments":
-		statement := `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=ANY($2::text[])`
-		if collection == "attachments" {
-			statement = `SELECT id,conversation_id,file_name,media_type,size,sha256,created_at FROM attachments WHERE scope=$1 AND id=ANY($2::text[])`
-		}
-		rows, err := s.Pool.Query(ctx, statement, a.Scope, ids)
+	case "messages":
+		statement := `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=ANY($2::text[]) AND chat_history_allows(scope,conversation_id,$3,$4,created_sequence)`
+		rows, err := s.Pool.Query(ctx, statement, a.Scope, ids, a.ID, a.Admin)
 		if err != nil {
 			return nil, err
 		}
 		conversations := []string{}
 		pending := map[string]string{}
 		for rows.Next() {
-			if collection == "messages" {
-				var x Message
-				if err = rows.Scan(&x.ID, &x.ConversationID, &x.SenderID, &x.InstanceID, &x.Body, &x.CreatedAt, &x.Mentions); err != nil {
-					rows.Close()
-					return nil, err
-				}
-				out[x.ID] = queryItem{value: x}
-				pending[x.ID] = x.ConversationID
-				conversations = append(conversations, x.ConversationID)
-			} else {
-				var x Attachment
-				if err = rows.Scan(&x.ID, &x.ConversationID, &x.FileName, &x.MediaType, &x.Size, &x.SHA256, &x.CreatedAt); err != nil {
-					rows.Close()
-					return nil, err
-				}
-				out[x.ID] = queryItem{value: x}
-				pending[x.ID] = x.ConversationID
-				conversations = append(conversations, x.ConversationID)
+			var x Message
+			if err = rows.Scan(&x.ID, &x.ConversationID, &x.SenderID, &x.InstanceID, &x.Body, &x.CreatedAt, &x.Mentions); err != nil {
+				rows.Close()
+				return nil, err
 			}
+			out[x.ID] = queryItem{value: x}
+			pending[x.ID] = x.ConversationID
+			conversations = append(conversations, x.ConversationID)
 		}
 		err = rows.Err()
 		rows.Close()
@@ -219,6 +234,18 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 			if !visible[conv] {
 				delete(out, id)
 			}
+		}
+		ms := []Message{}
+		for _, item := range out {
+			if m, ok := item.value.(Message); ok {
+				ms = append(ms, m)
+			}
+		}
+		if err = s.loadMessageFiles(ctx, s.Pool, a.Scope, ms); err != nil {
+			return nil, err
+		}
+		for _, m := range ms {
+			put(m.ID, m, true)
 		}
 	case "answers":
 		rows, err := s.Pool.Query(ctx, `SELECT `+answerFields+` FROM shared_answers WHERE scope=$1 AND id=ANY($2::text[])`, a.Scope, ids)

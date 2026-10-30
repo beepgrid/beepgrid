@@ -221,11 +221,12 @@ func (s *Store) checkDispatchPreview(ctx context.Context, db DB, a Actor, in Dis
 }
 
 type SendBatchInput struct {
-	ReuseDirect  bool     `json:"reuse_direct,omitempty"`
-	Targets      []Target `json:"targets"`
-	Body         string   `json:"body"`
-	Title        string   `json:"title"`
-	PreviewToken string   `json:"preview_token,omitempty"`
+	AttachmentIDs []string `json:"attachment_ids,omitempty"`
+	ReuseDirect   bool     `json:"reuse_direct,omitempty"`
+	Targets       []Target `json:"targets"`
+	Body          string   `json:"body"`
+	Title         string   `json:"title"`
+	PreviewToken  string   `json:"preview_token,omitempty"`
 }
 type SendBatchItem struct {
 	Target Target     `json:"target"`
@@ -242,6 +243,7 @@ type AskBatchItem struct {
 }
 
 func (s *Store) SendBatch(ctx context.Context, a Actor, in SendBatchInput, key string) ([]SendBatchItem, error) {
+	ctx = withAttachmentBinding(ctx, "send_batch", key)
 	out := []SendBatchItem{}
 	e := s.tx(ctx, a, func(db pgx.Tx) error {
 		return idempotent(ctx, db, a, "send_batch", key, in, &out, func() error {
@@ -259,7 +261,7 @@ func (s *Store) SendBatch(ctx context.Context, a Actor, in SendBatchInput, key s
 					t = Target{"instance", r.ExactInstance}
 				}
 				var result SendResult
-				if e = s.sendTx(ctx, db, a, SendInput{Target: t, Body: in.Body, Title: in.Title, ReuseDirect: in.ReuseDirect}, Digest(key+"/batch/"+r.ID), &result); e != nil {
+				if e = s.sendTx(ctx, db, a, SendInput{AttachmentIDs: in.AttachmentIDs, Target: t, Body: in.Body, Title: in.Title, ReuseDirect: in.ReuseDirect}, Digest(key+"/batch/"+r.ID), &result); e != nil {
 					return e
 				}
 				out = append(out, SendBatchItem{t, result})
@@ -273,6 +275,7 @@ func (s *Store) SendBatch(ctx context.Context, a Actor, in SendBatchInput, key s
 	return out, nil
 }
 func (s *Store) AskBatch(ctx context.Context, a Actor, in AskBatchInput, key string) ([]AskBatchItem, error) {
+	ctx = withAttachmentBinding(ctx, "ask_batch", key)
 	out := []AskBatchItem{}
 	if in.Request.PreviewToken != "" || in.Request.ConversationID != "" || in.Request.Target.ID != "" || in.Request.Target.Kind != "" {
 		return nil, Bad("Batch requests supply targets only in the targets list.")

@@ -16,7 +16,7 @@ func (s *Store) queryDeliveryRecords(ctx context.Context, a Actor, ids []string)
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, err := s.Pool.Query(ctx, `SELECT `+deliveryFields+`,created_at,next_at,lease_until,exact_instance,owner_instance FROM deliveries WHERE scope=$1 AND id=ANY($2::text[])`, a.Scope, ids)
+	rows, err := s.Pool.Query(ctx, `SELECT `+deliveryFields+`,created_at,next_at,lease_until,exact_instance,owner_instance FROM deliveries WHERE scope=$1 AND id=ANY($2::text[]) AND chat_delivery_allows(scope,COALESCE(payload->>'conversation_id',''),operation_id,$3,$4)`, a.Scope, ids, a.ID, a.Admin)
 	if err != nil {
 		return nil, err
 	}

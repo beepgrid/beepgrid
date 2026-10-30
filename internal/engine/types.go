@@ -172,14 +172,19 @@ type Target struct {
 	ID   string `json:"id"`
 }
 type Conversation struct {
-	LastActivityAt time.Time   `json:"last_activity_at"`
-	LastPreview    string      `json:"last_preview"`
-	ID             string      `json:"id"`
-	Title          string      `json:"title"`
-	CreatedBy      string      `json:"created_by"`
-	CreatedAt      time.Time   `json:"created_at"`
-	Participants   []Principal `json:"participants"`
-	Messages       []Message   `json:"messages,omitempty"`
+	Shared           bool        `json:"shared"`
+	Version          int         `json:"version"`
+	ManagerID        string      `json:"manager_id,omitempty"`
+	HistoryStart     int64       `json:"history_start,omitempty"`
+	PastParticipants []Principal `json:"past_participants,omitempty"`
+	LastActivityAt   time.Time   `json:"last_activity_at"`
+	LastPreview      string      `json:"last_preview"`
+	ID               string      `json:"id"`
+	Title            string      `json:"title"`
+	CreatedBy        string      `json:"created_by"`
+	CreatedAt        time.Time   `json:"created_at"`
+	Participants     []Principal `json:"participants"`
+	Messages         []Message   `json:"messages,omitempty"`
 }
 
 // Mention offsets count Unicode code points in the original body, including @.
@@ -189,15 +194,17 @@ type Mention struct {
 	End         int    `json:"end"`
 }
 type Message struct {
-	Mentions       []Mention `json:"mentions,omitempty"`
-	ID             string    `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	SenderID       string    `json:"sender_id"`
-	InstanceID     string    `json:"instance_id,omitempty"`
-	Body           string    `json:"body"`
-	CreatedAt      time.Time `json:"created_at"`
+	Attachments    []Attachment `json:"attachments,omitempty"`
+	Mentions       []Mention    `json:"mentions,omitempty"`
+	ID             string       `json:"id"`
+	ConversationID string       `json:"conversation_id"`
+	SenderID       string       `json:"sender_id"`
+	InstanceID     string       `json:"instance_id,omitempty"`
+	Body           string       `json:"body"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 type SendInput struct {
+	AttachmentIDs  []string  `json:"attachment_ids,omitempty"`
 	Mentions       []Mention `json:"mentions,omitempty"`
 	ReuseDirect    bool      `json:"reuse_direct,omitempty"`
 	PreviewToken   string    `json:"preview_token,omitempty"`
@@ -219,6 +226,7 @@ type Action struct {
 	OperationKey    string         `json:"operation_key"`
 }
 type AskInput struct {
+	AttachmentIDs  []string  `json:"attachment_ids,omitempty"`
 	Mentions       []Mention `json:"mentions,omitempty"`
 	Blocking       bool      `json:"blocking,omitempty"`
 	ReuseDirect    bool      `json:"reuse_direct,omitempty"`
@@ -234,25 +242,29 @@ type AskInput struct {
 	SharedKey      string    `json:"shared_key"`
 }
 type Request struct {
-	Mentions            []Mention  `json:"mentions,omitempty"`
-	Blocking            bool       `json:"blocking,omitempty"`
-	RequesterInstanceID string     `json:"requester_instance_id,omitempty"`
-	ID                  string     `json:"id"`
-	RequesterID         string     `json:"requester_id"`
-	ConversationID      string     `json:"conversation_id"`
-	Kind                string     `json:"kind"`
-	Title               string     `json:"title"`
-	Body                string     `json:"body"`
-	Choices             []string   `json:"choices"`
-	Action              *Action    `json:"action,omitempty"`
-	State               string     `json:"state"`
-	Version             int        `json:"version"`
-	Response            *Response  `json:"response,omitempty"`
-	ResolvedBy          *string    `json:"resolved_by,omitempty"`
-	ResolvedAt          *time.Time `json:"resolved_at,omitempty"`
-	ExpiresAt           time.Time  `json:"expires_at"`
-	CreatedAt           time.Time  `json:"created_at"`
-	SharedKey           string     `json:"shared_key"`
+	createdSequence     int64
+	hasFiles            bool
+	shared              bool
+	Attachments         []Attachment `json:"attachments,omitempty"`
+	Mentions            []Mention    `json:"mentions,omitempty"`
+	Blocking            bool         `json:"blocking,omitempty"`
+	RequesterInstanceID string       `json:"requester_instance_id,omitempty"`
+	ID                  string       `json:"id"`
+	RequesterID         string       `json:"requester_id"`
+	ConversationID      string       `json:"conversation_id"`
+	Kind                string       `json:"kind"`
+	Title               string       `json:"title"`
+	Body                string       `json:"body"`
+	Choices             []string     `json:"choices"`
+	Action              *Action      `json:"action,omitempty"`
+	State               string       `json:"state"`
+	Version             int          `json:"version"`
+	Response            *Response    `json:"response,omitempty"`
+	ResolvedBy          *string      `json:"resolved_by,omitempty"`
+	ResolvedAt          *time.Time   `json:"resolved_at,omitempty"`
+	ExpiresAt           time.Time    `json:"expires_at"`
+	CreatedAt           time.Time    `json:"created_at"`
+	SharedKey           string       `json:"shared_key"`
 }
 type Response struct {
 	ResponderInstanceID string `json:"responder_instance_id,omitempty"`
