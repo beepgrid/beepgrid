@@ -44,6 +44,28 @@ afterEach(() => {
   history.replaceState(null, "", "/agents");
 });
 
+it("does not claim message acceptance for an informational reply without dispatch", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) =>
+      path.endsWith("/assistance/settings")
+        ? json(settings)
+        : json({
+            items:
+              requestBody(init).collection === "overseer_plans" ? [plan()] : [],
+          }),
+    ),
+  );
+  const { Wrapper } = harness();
+  render(<Overseer />, { wrapper: Wrapper });
+  await screen.findByText("Scout reports three of ten pages complete.");
+  expect(screen.queryByText(/messages accepted/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/0 agents/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Open conversation" }),
+  ).not.toBeInTheDocument();
+});
+
 it("keeps a 25-agent result compact and reveals canonical per-agent details on demand", async () => {
   const large = plan();
   large.dispatches = Array.from({ length: 25 }, (_, i) => ({

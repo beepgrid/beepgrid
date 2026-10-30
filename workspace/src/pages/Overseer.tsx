@@ -31,6 +31,7 @@ function CoordinatorResults({ turn }: { turn: Plan }) {
     turn.replies?.filter(
       (r) => r.state !== "open" && r.state !== "clarification",
     ).length || 0;
+  if (!count && !turn.replies?.length) return null;
   const results = () => (
     <>
       {turn.dispatches?.map((d) => (

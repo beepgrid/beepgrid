@@ -199,3 +199,105 @@ func TestOverseerConcurrentPlanningReceiptAndCallerBoundary(t *testing.T) {
 		t.Fatal(count, err)
 	}
 }
+
+func TestCoordinatorHistorySurvivesAgentRetirementWithoutRetainingSendAuthority(t *testing.T) {
+	for _, scoped := range []bool{false, true} {
+		t.Run(fmt.Sprintf("group=%t", scoped), func(t *testing.T) {
+			s, owner := testStore(t)
+			ctx := context.Background()
+			worker := testWorker(t, s, owner, "Deployment 2")
+			person := testPerson(t, s, owner, "Maya")
+			rules := []Rule{{Action: "view", TargetKind: "agent", TargetID: worker.ID}, {Action: "ask", TargetKind: "agent", TargetID: worker.ID}}
+			var target *Target
+			var group Group
+			if scoped {
+				var err error
+				group, err = s.SaveGroup(ctx, owner, Group{Name: "Release", Members: []string{worker.ID}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				target = &Target{"group", group.ID}
+				rules = append(rules, Rule{Action: "view", TargetKind: "group", TargetID: group.ID})
+			}
+			grant(t, s, owner, person, rules)
+			grant(t, s, owner, worker, []Rule{{Action: "view", TargetKind: "person", TargetID: person.ID}, {Action: "decide", TargetKind: "person", TargetID: person.ID}})
+			s.OverseerPlanner = func(_ context.Context, prompt string, _ []FleetStatus) (OverseerDecision, error) {
+				if prompt == "Handoff" {
+					return OverseerDecision{Operation: "status", Summary: "The release requires human approval."}, nil
+				}
+				return OverseerDecision{Operation: "question", AgentIDs: []string{worker.ID}, Body: "Which release gate remains?", Summary: "Check the release gate."}, nil
+			}
+			s.OverseerSummarizer = func(context.Context, string, []OverseerReply) (string, error) { return "Awaiting human approval.", nil }
+			enableAssistance(t, s, owner, true)
+			in := OverseerInput{Prompt: "Release gate", Target: target, Automatic: true}
+			first, err := s.Coordinate(ctx, person, in, "retired-history")
+			if err != nil || len(first.Dispatches) != 1 {
+				t.Fatal(first, err)
+			}
+			if _, err = s.Respond(ctx, worker, first.Dispatches[0].RequestID, Response{Version: 1, Outcome: "answered", Answer: "Human approval"}); err != nil {
+				t.Fatal(err)
+			}
+			first, err = s.SummarizeOverseer(ctx, person, first.ID)
+			if err != nil || first.ReplySummary == "" {
+				t.Fatal(first, err)
+			}
+			follow, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Handoff", PreviousPlanID: first.ID})
+			if err != nil {
+				t.Fatal(err)
+			}
+			pending, err := s.PlanOverseer(ctx, person, OverseerInput{Prompt: "Check again", Target: target})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = s.Revoke(ctx, owner, worker.CredentialID); err != nil {
+				t.Fatal(err)
+			}
+			if err = s.SetDisabled(ctx, owner, worker.ID, true); err != nil {
+				t.Fatal(err)
+			}
+			retained, err := s.OverseerPlan(ctx, person, first.ID)
+			if err != nil || retained.ReplySummary != first.ReplySummary || len(retained.Replies) != 1 || retained.Replies[0].Response == nil {
+				t.Fatal("retiring an agent hid authorized canonical history", retained, err)
+			}
+			if _, err = s.OverseerPlan(ctx, person, follow.ID); err != nil {
+				t.Fatal("inherited history disappeared", err)
+			}
+			page, err := s.Query(ctx, person, QueryInput{Collection: "overseer_plans"})
+			if err != nil || len(page.Items) != 3 {
+				t.Fatal("history list omitted retired sources", page, err)
+			}
+			if replay, e := s.Coordinate(ctx, person, in, "retired-history"); e != nil || replay.ID != first.ID || len(replay.Dispatches) != 1 {
+				t.Fatal("accepted receipt was not replayable", replay, e)
+			}
+			if _, err = s.ConfirmOverseer(ctx, person, pending.ID); ErrorStatus(err) != 404 && ErrorStatus(err) != 403 {
+				t.Fatal("disabled source retained send authority", err)
+			}
+			var count int
+			if err = s.Pool.QueryRow(ctx, `SELECT count(*) FROM requests WHERE scope=$1`, owner.Scope).Scan(&count); err != nil || count != 1 {
+				t.Fatal("replay or disabled target created new work", count, err)
+			}
+			if scoped {
+				group.Members = []string{}
+				if group, err = s.SaveGroup(ctx, owner, group); err != nil {
+					t.Fatal(err)
+				}
+				if _, err = s.OverseerPlan(ctx, person, follow.ID); ErrorStatus(err) != 404 {
+					t.Fatal("retired source bypassed removed group provenance", err)
+				}
+				group.Members = []string{worker.ID}
+				if _, err = s.SaveGroup(ctx, owner, group); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err = s.Pool.Exec(ctx, `DELETE FROM role_bindings WHERE scope=$1 AND subject_id=$2`, owner.Scope, person.ID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = s.OverseerPlan(ctx, person, follow.ID); ErrorStatus(err) != 404 {
+				t.Fatal("retired source bypassed revoked View", err)
+			}
+			if _, err = s.Coordinate(ctx, person, in, "retired-history"); ErrorStatus(err) != 404 {
+				t.Fatal("receipt bypassed revoked View", err)
+			}
+		})
+	}
+}

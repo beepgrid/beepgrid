@@ -431,18 +431,8 @@ func (s *Store) validateOverseerContext(ctx context.Context, db DB, a Actor, out
 		}
 	}
 	for group, ids := range out.ContextGroups {
-		current, err := s.resolve(ctx, db, a, Target{"group", group}, "view", "")
-		if err != nil {
-			return Missing()
-		}
-		members := map[string]bool{}
-		for _, member := range current {
-			members[member.ID] = true
-		}
-		for _, id := range ids {
-			if !members[id] {
-				return Missing()
-			}
+		if err := s.validateOverseerGroupHistory(ctx, db, a, group, ids); err != nil {
+			return err
 		}
 	}
 	// Context IDs are canonical IDs generated from the current fleet, never
@@ -453,25 +443,37 @@ func (s *Store) validateOverseerContext(ctx context.Context, db DB, a Actor, out
 	}
 	for _, id := range out.ContextIDs {
 		p, ok := people[id]
-		if !ok || p.Kind != "agent" || p.Disabled || !s.allowed(ctx, db, a, "view", Target{"agent", id}, "*", "") {
+		if !ok || p.Kind != "agent" || !s.allowed(ctx, db, a, "view", Target{"agent", id}, "*", "") {
 			return Missing()
 		}
 	}
 	if out.Target != nil && out.Target.Kind == "group" {
-		current, err := s.resolve(ctx, db, a, *out.Target, "view", "")
-		if err != nil {
-			return Missing()
-		}
-		members := map[string]bool{}
-		for _, member := range current {
-			members[member.ID] = true
-		}
 		ids := out.ScopeAgentIDs
 		if len(ids) == 0 {
 			ids = out.ContextIDs
 		}
-		for _, sourceID := range ids {
-			if !members[sourceID] {
+		if err := s.validateOverseerGroupHistory(ctx, db, a, out.Target.ID, ids); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Historical disclosure depends on current View grants and group membership,
+// not whether a past recipient can still receive new work. resolve remains the
+// active-recipient boundary for planning and dispatch, including disabled agents.
+func (s *Store) validateOverseerGroupHistory(ctx context.Context, db DB, a Actor, group string, ids []string) error {
+	ids = distinctIDs(ids)
+	var members int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM memberships m JOIN principals p ON p.scope=m.scope AND p.id=m.principal_id WHERE m.scope=$1 AND m.group_id=$2 AND p.id=ANY($3::text[]) AND p.kind='agent'`, a.Scope, group, ids).Scan(&members); err != nil {
+		return err
+	}
+	if len(ids) == 0 || members != len(ids) {
+		return Missing()
+	}
+	if !s.allowed(ctx, db, a, "view", Target{"group", group}, "*", "") {
+		for _, id := range ids {
+			if !s.allowed(ctx, db, a, "view", Target{"agent", id}, "*", "") {
 				return Missing()
 			}
 		}
