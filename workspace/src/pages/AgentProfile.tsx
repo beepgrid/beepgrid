@@ -20,6 +20,7 @@ import { Compose } from "../Compose";
 import {
   Badge,
   Button,
+  ConversationAvatar,
   Details,
   ErrorView,
   Icon,
@@ -404,10 +405,9 @@ function ConversationList({
               key={c.id}
               onClick={() => navigate("/conversations/" + c.id)}
             >
-              <IdentityIcon
-                kind={peers.length > 1 ? "group" : peers[0]?.kind || "person"}
-                id={c.id}
-                label={c.title}
+              <ConversationAvatar
+                participants={c.participants}
+                currentId={agentID}
               />
               <div>
                 <strong>

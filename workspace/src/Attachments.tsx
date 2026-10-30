@@ -17,14 +17,30 @@ export function FileLinks({ files }: { files?: Attachment[] }) {
           href={workspaceURL("/api/v1/attachments/" + file.id)}
           download
         >
-          <span className="file-mark">
+          <span
+            className="file-mark"
+            data-type={
+              file.media_type === "application/pdf" ? "pdf" : undefined
+            }
+          >
             <Icon name="file" size={19} />
           </span>
           <span className="file-label">
             <strong>{file.file_name}</strong>
-            <small>{fileSize(file.size)}</small>
+            <small>
+              {fileSize(file.size)} ·{" "}
+              {file.media_type === "application/pdf"
+                ? "PDF"
+                : file.media_type?.startsWith("image/")
+                  ? "Image"
+                  : file.media_type === "application/json"
+                    ? "JSON"
+                    : "Text"}
+            </small>
           </span>
-          <Icon name="download" size={16} />
+          <span className="file-download">
+            <Icon name="download" size={16} />
+          </span>
         </a>
       ))}
     </div>

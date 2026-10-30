@@ -204,7 +204,7 @@ it("attaches a removable approval preview without claiming it was sent", () => {
   );
   fireEvent.click(screen.getByRole("button", { name: "Request approval" }));
   expect(screen.getByLabelText("Approval flow preview")).toBeInTheDocument();
-  for (const label of ["Approve", "Deny", "Ask for context"])
+  for (const label of ["Approve", "Decline", "Ask for context"])
     expect(screen.getByText(label, { exact: true })).toBeInTheDocument();
   expect(screen.queryByText("Approval requested")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Remove approval flow" }));

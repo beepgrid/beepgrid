@@ -77,6 +77,7 @@ if (process.argv.includes("--embed")) {
       "agent-icons/manifest.json",
       "agent-icons/lucide-LICENSE.txt",
       "agent-icons/phosphor-LICENSE.txt",
+      "agent-icons/simple-icons-CC0.txt",
       "fonts/manifest.json",
       ...fonts.flatMap((f) => [
         "fonts/" + f.file,

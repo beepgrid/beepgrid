@@ -7,6 +7,7 @@ import {
 } from "../data";
 import type { Connection, Destination, Target, Identity } from "../contracts";
 import { TargetPicker } from "../TargetPicker";
+import { ChannelMark } from "../ChannelMark";
 import { navigate } from "../navigation";
 import {
   Badge,
@@ -127,20 +128,7 @@ export default function Integrations() {
                 <article className="provider" key={p.kind}>
                   <header>
                     <span className="provider-mark" data-kind={p.kind}>
-                      <Icon
-                        name={
-                          p.kind === "email"
-                            ? "mail"
-                            : p.kind === "slack"
-                              ? "slack"
-                              : p.kind === "discord"
-                                ? "conversations"
-                                : p.kind === "telegram"
-                                  ? "send"
-                                  : "webhook"
-                        }
-                        size={21}
-                      />
+                      <ChannelMark kind={p.kind} />
                     </span>
                     <h3>{names[p.kind] || p.kind}</h3>
                     {p.builtin ? <Badge>Built in</Badge> : null}

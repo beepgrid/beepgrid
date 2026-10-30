@@ -90,6 +90,11 @@ export function AgentSetup({
   const guide = connectionGuide(method, base, host);
   return (
     <div className="agent-setup-guide">
+      <Tabs
+        value={method}
+        onChange={onMethodChange}
+        options={connectionMethods}
+      />
       <section className="setup-step">
         <header>
           <span>1</span>
@@ -104,7 +109,7 @@ export function AgentSetup({
             <code>worker-token</code>
             <small>Shown once. Keep this file private.</small>
           </span>
-          <Copy value={token} />
+          <Copy value={token} label="Copy token" />
         </div>
         <Code
           label="Protect the token file"
@@ -118,11 +123,6 @@ export function AgentSetup({
             {method === "mcp" ? "Connect your tool host" : "Run your worker"}
           </h3>
         </header>
-        <Tabs
-          value={method}
-          onChange={onMethodChange}
-          options={connectionMethods}
-        />
         <p>
           From your Beepgrid source checkout. Use your token file’s absolute
           path below.

@@ -545,7 +545,13 @@ export function JsonField({
     </Field>
   );
 }
-export function Copy({ value }: { value: string }) {
+export function Copy({
+  value,
+  label = "Copy",
+}: {
+  value: string;
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -560,7 +566,7 @@ export function Copy({ value }: { value: string }) {
         }
       }}
     >
-      {copied ? "Copied" : "Copy"}
+      {copied ? "Copied" : label}
     </Button>
   );
 }

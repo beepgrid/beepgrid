@@ -558,9 +558,18 @@ export function Connect({
     <Modal
       title={agent ? `Connect ${agent.name}` : "Connect an agent"}
       onClose={onClose}
+      className="agent-connect-dialog"
     >
       {session ? (
         <div className="form">
+          <div className="setup-agent">
+            <IdentityIcon
+              kind="agent"
+              id={session.agent.id}
+              label={session.agent.name}
+            />
+            <strong>{session.agent.name}</strong>
+          </div>
           <AgentSetup
             method={runtime}
             onMethodChange={setRuntime}
@@ -573,7 +582,7 @@ export function Connect({
               <h3>Verify your connection</h3>
             </header>
             {testConversation ? (
-              <div role="status">
+              <div className="setup-verify-state" role="status">
                 <Status value={replied ? "connected" : "waiting"} />
                 <p>
                   {replied
@@ -609,17 +618,19 @@ export function Connect({
             <ErrorView error={replies.error} />
             <ErrorView error={op.error} />
           </section>
-          <Button
-            onClick={() => {
-              onClose();
-              navigate("/permissions/" + session.agent.id);
-            }}
-          >
-            Manage this agent’s permissions
-          </Button>
-          <Button primary onClick={onClose}>
-            Done
-          </Button>
+          <div className="form-actions">
+            <Button
+              onClick={() => {
+                onClose();
+                navigate("/permissions/" + session.agent.id);
+              }}
+            >
+              Manage permissions
+            </Button>
+            <Button primary onClick={onClose}>
+              Done
+            </Button>
+          </div>
         </div>
       ) : (
         <Form onSubmit={() => void prepare()}>

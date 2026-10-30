@@ -2,7 +2,16 @@ import { useState } from "react";
 import type { Conversation, Target } from "./contracts";
 import { useOperation, useSession, clearConversationDrafts } from "./data";
 import { TargetPicker } from "./TargetPicker";
-import { Button, ErrorView, Field, Form, IdentityIcon, Modal } from "./ui";
+import {
+  Badge,
+  Button,
+  ConversationAvatar,
+  ErrorView,
+  Field,
+  Form,
+  IdentityIcon,
+  Modal,
+} from "./ui";
 
 export function ChatMembers({
   chat,
@@ -74,6 +83,10 @@ export function ChatMembers({
       {mode === "members" ? (
         <>
           <div className="chat-details-name">
+            <ConversationAvatar
+              participants={chat.participants}
+              currentId={me.person.id}
+            />
             <div>
               <strong>{chat.title}</strong>
               <span>{chat.participants.length} members</span>
@@ -92,15 +105,14 @@ export function ChatMembers({
                     {p.id === me.person.id ? " (you)" : ""}
                   </strong>
                   <span>
-                    {p.id === chat.manager_id
-                      ? "Chat manager"
-                      : p.kind === "agent"
-                        ? "Agent"
-                        : p.kind === "service"
-                          ? "Software service"
-                          : "Person"}
+                    {p.kind === "agent"
+                      ? "Agent"
+                      : p.kind === "service"
+                        ? "Software service"
+                        : "Person"}
                   </span>
                 </div>
+                {p.id === chat.manager_id ? <Badge>Manager</Badge> : null}
                 {manager && p.id !== me.person.id ? (
                   <Button
                     onClick={() => {

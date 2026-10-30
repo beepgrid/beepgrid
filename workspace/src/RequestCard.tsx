@@ -79,7 +79,9 @@ export function RequestCard({
           ) : null}
           <ErrorView error={op.error} />
           {r.state !== "open" ? (
-            <Badge>
+            <Badge
+              tone={r.response?.outcome === "approved" ? "good" : "neutral"}
+            >
               {r.response?.outcome === "denied"
                 ? "Declined"
                 : r.response?.outcome === "approved"
@@ -112,6 +114,7 @@ export function RequestCard({
                 <div className="decision-actions">
                   <Button
                     primary
+                    icon="check"
                     disabled={op.pending}
                     onClick={() =>
                       r.action
@@ -122,15 +125,18 @@ export function RequestCard({
                     Approve
                   </Button>
                   <Button
+                    icon="close"
                     disabled={op.pending}
                     onClick={() =>
                       r.action ? setConfirm("denied") : void respond("denied")
                     }
                   >
-                    Deny
+                    Decline
                   </Button>
                   {onFollowUp ? (
-                    <Button onClick={onFollowUp}>Ask for context</Button>
+                    <Button icon="conversations" onClick={onFollowUp}>
+                      Ask for context
+                    </Button>
                   ) : null}
                 </div>
               ) : (

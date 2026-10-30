@@ -1,4 +1,11 @@
-import { memo, useDeferredValue, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   usePostResource,
@@ -24,6 +31,7 @@ import { MentionText } from "../Mentions";
 import { RequestCard } from "../RequestCard";
 import { Compose, MessageComposer } from "../Compose";
 import {
+  Badge,
   Button,
   ConversationAvatar,
   conversationPeers,
@@ -196,7 +204,7 @@ function Chat({ id }: { id: string }) {
   const [error, setError] = useState<Error | null>(null),
     [history, setHistory] = useState(false),
     [membersOpen, setMembersOpen] = useState(false);
-  const end = useRef<HTMLDivElement>(null),
+  const timeline = useRef<HTMLDivElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     pinned = useRef(true);
   const participants =
@@ -230,9 +238,29 @@ function Chat({ id }: { id: string }) {
     !!q.data && !q.error,
   );
   const decisions = related.items.filter((r) => r.response && r.resolved_at);
+  useLayoutEffect(() => {
+    const el = scroll.current;
+    if (pinned.current && el) el.scrollTop = el.scrollHeight;
+  }, [
+    messages.length,
+    related.items.length,
+    decisions.length,
+    caps.isPending,
+    id,
+  ]);
   useEffect(() => {
-    if (pinned.current) end.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, related.items.length, decisions.length, id]);
+    const el = scroll.current,
+      content = timeline.current;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+    // Follow layout changes only while reading the newest messages. Opening
+    // approval controls or loading files must not obscure the last reply.
+    const observer = new ResizeObserver(() => {
+      if (pinned.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [!!q.data, id]);
   useEffect(() => {
     if (
       accessUnavailable(q.error) ||
@@ -262,8 +290,15 @@ function Chat({ id }: { id: string }) {
           <p>{c.participants.map((p) => p.name).join(", ")}</p>
         </div>
         {c.shared ? (
-          <Button icon="people" onClick={() => setMembersOpen(true)}>
-            {c.participants.length} members
+          <Button
+            icon="people"
+            aria-label={`${c.participants.length} members`}
+            onClick={() => setMembersOpen(true)}
+          >
+            <span>
+              {c.participants.length}
+              <span className="chat-member-label"> members</span>
+            </span>
           </Button>
         ) : null}
       </header>
@@ -290,139 +325,149 @@ function Chat({ id }: { id: string }) {
             el.scrollHeight - el.scrollTop - el.clientHeight < 100;
         }}
       >
-        {history ? (
-          <Button
-            onClick={() => void all.fetchNextPage()}
-            disabled={!all.hasNextPage || all.isFetchingNextPage}
-          >
-            Earlier messages
-          </Button>
-        ) : messages.length >= 500 ? (
-          <Button
-            onClick={() => {
-              pinned.current = false;
-              setHistory(true);
-            }}
-          >
-            Earlier messages
-          </Button>
-        ) : null}
-        {[
-          ...messages.map((m) => ({
-            kind: "message" as const,
-            at: m.created_at,
-            id: m.id,
-            value: m,
-          })),
-          ...related.items.map((r) => ({
-            kind: "request" as const,
-            at: r.created_at,
-            id: r.id,
-            value: r,
-          })),
-          ...decisions.map((r) => ({
-            kind: "decision" as const,
-            at: r.resolved_at!,
-            id: r.id + "/decision",
-            value: r,
-          })),
-        ]
-          .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
-          .map((item) =>
-            item.kind === "message" ? (
-              <ChatMessage
-                key={item.id}
-                message={item.value}
-                participants={knownParticipants}
-                name={
-                  knownParticipants.find((p) => p.id === item.value.sender_id)
-                    ?.name || "Participant"
-                }
-                kind={
-                  knownParticipants.find((p) => p.id === item.value.sender_id)
-                    ?.kind || "agent"
-                }
-              />
-            ) : item.kind === "decision" ? (
-              <article key={item.id} className="message">
-                <IdentityIcon
-                  kind={
-                    knownParticipants.find(
-                      (p) => p.id === item.value.resolved_by,
-                    )?.kind || "person"
+        <div className="message-timeline" ref={timeline}>
+          {history ? (
+            <Button
+              onClick={() => void all.fetchNextPage()}
+              disabled={!all.hasNextPage || all.isFetchingNextPage}
+            >
+              Earlier messages
+            </Button>
+          ) : messages.length >= 500 ? (
+            <Button
+              onClick={() => {
+                pinned.current = false;
+                setHistory(true);
+              }}
+            >
+              Earlier messages
+            </Button>
+          ) : null}
+          {[
+            ...messages.map((m) => ({
+              kind: "message" as const,
+              at: m.created_at,
+              id: m.id,
+              value: m,
+            })),
+            ...related.items.map((r) => ({
+              kind: "request" as const,
+              at: r.created_at,
+              id: r.id,
+              value: r,
+            })),
+            ...decisions.map((r) => ({
+              kind: "decision" as const,
+              at: r.resolved_at!,
+              id: r.id + "/decision",
+              value: r,
+            })),
+          ]
+            .sort(
+              (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id),
+            )
+            .map((item) =>
+              item.kind === "message" ? (
+                <ChatMessage
+                  key={item.id}
+                  message={item.value}
+                  participants={knownParticipants}
+                  name={
+                    knownParticipants.find((p) => p.id === item.value.sender_id)
+                      ?.name || "Participant"
                   }
-                  id={item.value.resolved_by}
-                  label={
-                    knownParticipants.find(
-                      (p) => p.id === item.value.resolved_by,
-                    )?.name
+                  kind={
+                    knownParticipants.find((p) => p.id === item.value.sender_id)
+                      ?.kind || "agent"
                   }
                 />
-                <div className="message-body">
-                  <div className="message-meta">
-                    <strong>
-                      {knownParticipants.find(
+              ) : item.kind === "decision" ? (
+                <article key={item.id} className="message">
+                  <IdentityIcon
+                    kind={
+                      knownParticipants.find(
                         (p) => p.id === item.value.resolved_by,
-                      )?.name || "Participant"}
-                    </strong>
-                    <time>
-                      {new Date(item.at).toLocaleTimeString(undefined, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </time>
-                  </div>
-                  <p
-                    className={
-                      item.value.response?.outcome === "approved"
-                        ? "approved-reply"
-                        : ""
+                      )?.kind || "person"
                     }
-                  >
-                    {item.value.response?.outcome === "approved"
-                      ? "Approved"
-                      : item.value.response?.outcome === "denied"
-                        ? "Declined"
-                        : typeof item.value.response?.answer === "string"
-                          ? item.value.response.answer
-                          : item.value.response?.outcome}
-                  </p>
-                </div>
-              </article>
-            ) : (
-              <RequestCard
-                key={item.id}
-                request={item.value}
-                participants={knownParticipants}
-                sender={knownParticipants.find(
-                  (p) => p.id === item.value.requester_id,
-                )}
-                onFollowUp={() =>
-                  document
-                    .querySelector<HTMLTextAreaElement>(".composer textarea")
-                    ?.focus()
-                }
-              />
-            ),
-          )}
-        {!messages.length && !related.items.length && !related.isPending ? (
-          <Empty
-            title={
-              c.history_start ? "You’re in the chat" : "Start the conversation"
-            }
-            icon="conversations"
-          >
-            {c.history_start
-              ? "Messages sent after you joined will appear here."
-              : null}
-          </Empty>
-        ) : null}
-        {related.hasNextPage ? (
-          <Button onClick={() => void related.fetchNextPage()}>
-            More decisions
-          </Button>
-        ) : null}
-        <div ref={end} />
+                    id={item.value.resolved_by}
+                    label={
+                      knownParticipants.find(
+                        (p) => p.id === item.value.resolved_by,
+                      )?.name
+                    }
+                  />
+                  <div className="message-body">
+                    <div className="message-meta">
+                      <strong>
+                        {knownParticipants.find(
+                          (p) => p.id === item.value.resolved_by,
+                        )?.name || "Participant"}
+                      </strong>
+                      <time>
+                        {new Date(item.at).toLocaleTimeString(undefined, {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
+                    </div>
+                    <p
+                      className={
+                        item.value.response?.outcome === "approved"
+                          ? "approved-reply"
+                          : ""
+                      }
+                    >
+                      {item.value.response?.outcome === "approved" ? (
+                        <Badge tone="good">
+                          <Icon name="check" size={14} />
+                          Approved
+                        </Badge>
+                      ) : item.value.response?.outcome === "denied" ? (
+                        "Declined"
+                      ) : typeof item.value.response?.answer === "string" ? (
+                        item.value.response.answer
+                      ) : (
+                        item.value.response?.outcome
+                      )}
+                    </p>
+                  </div>
+                </article>
+              ) : (
+                <RequestCard
+                  key={item.id}
+                  request={item.value}
+                  participants={knownParticipants}
+                  sender={knownParticipants.find(
+                    (p) => p.id === item.value.requester_id,
+                  )}
+                  onFollowUp={() =>
+                    document
+                      .querySelector<HTMLTextAreaElement>(".composer textarea")
+                      ?.focus()
+                  }
+                />
+              ),
+            )}
+          {!messages.length && !related.items.length && !related.isPending ? (
+            <Empty
+              title={
+                c.history_start
+                  ? "You’re in the chat"
+                  : "Start the conversation"
+              }
+              icon="conversations"
+            >
+              {c.history_start
+                ? "Messages sent after you joined will appear here."
+                : null}
+            </Empty>
+          ) : null}
+          {related.hasNextPage ? (
+            <Button onClick={() => void related.fetchNextPage()}>
+              More decisions
+            </Button>
+          ) : null}
+        </div>
       </div>
       {attachments.error ? <ErrorView error={attachments.error} /> : null}
       {attachments.items.some((a) => !a.message_id && !a.request_id) ? (

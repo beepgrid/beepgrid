@@ -218,6 +218,9 @@ export function TargetPicker({
         {messaging ? (
           <select
             aria-label="Other recipient types"
+            style={{
+              maxWidth: kind === "service" || kind === "instance" ? 160 : 80,
+            }}
             value={["service", "instance"].includes(kind) ? kind : ""}
             onChange={(e) => {
               if (e.target.value) {
