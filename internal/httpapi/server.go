@@ -265,6 +265,14 @@ func (s *Server) routes() {
 		x, e := s.Store.Instances(r.Context(), actor(r), r.PathValue("id"))
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/agents/{id}/contacts", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.AgentContactsInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.AgentContacts(r.Context(), actor(r), r.PathValue("id"), in)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("POST /api/v1/worker/heartbeat", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in map[string]any
 		if e := decode(r, &in); e != nil {

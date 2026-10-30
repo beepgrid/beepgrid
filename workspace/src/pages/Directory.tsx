@@ -36,6 +36,7 @@ import { OverseerEntry } from "../OverseerEntry";
 import Groups from "./Groups";
 import type { AgentDeadlock } from "./Fleet";
 import AgentProfile from "./AgentProfile";
+import { AgentSetup, connectionMethods } from "../AgentSetup";
 export default function Directory({
   section,
   onAddPerson,
@@ -530,12 +531,6 @@ export function Connect({
         m.sender_id === session.agent.id &&
         m.instance_id === session.instance_id,
     );
-  const command =
-    runtime === "python"
-      ? "PYTHONPATH=sdk/python python3 examples/python-worker/main.py"
-      : runtime === "go"
-        ? "go run -buildvcs=false ./examples/go-worker"
-        : "node examples/typescript-worker/main.mjs";
   async function prepare() {
     const result = await op.run<{
       token: string;
@@ -566,81 +561,54 @@ export function Connect({
     >
       {session ? (
         <div className="form">
-          <h3>Run your worker</h3>
-          <p>
-            Save this 24-hour token in an owner-only file. It is shown only
-            here.
-          </p>
-          <Field label="API URL">
-            <input readOnly value={base} />
-          </Field>
-          <div className="session-secret">
-            <strong>Session token</strong>
-            <Copy value={session.token} />
-          </div>
-          <Tabs
-            value={runtime}
-            onChange={setRuntime}
-            options={[
-              { id: "python", label: "Python" },
-              { id: "typescript", label: "TypeScript" },
-              { id: "go", label: "Go" },
-            ]}
+          <AgentSetup
+            method={runtime}
+            onMethodChange={setRuntime}
+            base={base}
+            token={session.token}
           />
-          <p className="help">
-            From your Beepgrid source checkout. Replace the token-file path
-            below.
-            {runtime === "typescript"
-              ? " First run npm --prefix sdk/typescript ci and npm --prefix sdk/typescript run build."
-              : ""}
-          </p>
-          <pre className="code-example">
-            {[
-              "NOTIF_URL=" + shellQuote(base) + " \\",
-              "NOTIF_TOKEN_FILE='/path/to/worker-token' \\",
-              command,
-            ].join("\n")}
-          </pre>
-          <p className="help">
-            The starter receives messages and sends an attributed reply. Add
-            your own agent logic in its handler.
-          </p>
-          {testConversation ? (
-            <div role="status">
-              <Status value={replied ? "connected" : "waiting"} />
-              <p>
-                {replied
-                  ? "Reply received from " + session.agent.name + "."
-                  : "Waiting for your worker’s reply..."}
-              </p>
+          <section className="setup-step setup-verification">
+            <header>
+              <span>3</span>
+              <h3>Verify your connection</h3>
+            </header>
+            {testConversation ? (
+              <div role="status">
+                <Status value={replied ? "connected" : "waiting"} />
+                <p>
+                  {replied
+                    ? "Reply received from " + session.agent.name + "."
+                    : "Waiting for your worker’s reply..."}
+                </p>
+                <Button
+                  onClick={() => {
+                    onClose();
+                    navigate("/conversations/" + testConversation);
+                  }}
+                >
+                  Open test conversation
+                </Button>
+              </div>
+            ) : (
               <Button
-                onClick={() => {
-                  onClose();
-                  navigate("/conversations/" + testConversation);
-                }}
+                disabled={op.pending}
+                onClick={() =>
+                  void op
+                    .run<{ conversation_id: string }>("/messages", {
+                      target: { kind: "instance", id: session.instance_id },
+                      body: "Beepgrid connection check. Please reply to this message.",
+                    })
+                    .then((r) => {
+                      if (r) setTestConversation(r.conversation_id);
+                    })
+                }
               >
-                Open test conversation
+                Send a test message
               </Button>
-            </div>
-          ) : (
-            <Button
-              disabled={op.pending}
-              onClick={() =>
-                void op
-                  .run<{ conversation_id: string }>("/messages", {
-                    target: { kind: "instance", id: session.instance_id },
-                    body: "Beepgrid connection check. Please reply to this message.",
-                  })
-                  .then((r) => {
-                    if (r) setTestConversation(r.conversation_id);
-                  })
-              }
-            >
-              Send a test message
-            </Button>
-          )}
-          <ErrorView error={replies.error} />
-          <ErrorView error={op.error} />
+            )}
+            <ErrorView error={replies.error} />
+            <ErrorView error={op.error} />
+          </section>
           <Button
             onClick={() => {
               onClose();
@@ -664,6 +632,14 @@ export function Connect({
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
+          <div className="field" role="group" aria-label="Connection method">
+            <span>Connection method</span>
+            <Tabs
+              value={runtime}
+              onChange={setRuntime}
+              options={connectionMethods}
+            />
+          </div>
           {!agent ? (
             <label className="inline-check">
               <input
@@ -685,8 +661,4 @@ export function Connect({
       )}
     </Modal>
   );
-}
-
-function shellQuote(value: string) {
-  return "'" + value.replaceAll("'", "'\\''") + "'";
 }

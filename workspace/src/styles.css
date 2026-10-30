@@ -3310,3 +3310,31 @@ a.mention-token:hover { text-decoration:underline }
 
 .chat-members-dialog{width:min(560px,calc(100vw - 32px))}.chat-details-name,.chat-member-row,.chat-member-actions{display:flex;align-items:center;gap:12px}.chat-details-name{padding-bottom:20px;border-bottom:1px solid var(--line)}.chat-details-name>div,.chat-member-row>div{flex:1;min-width:0}.chat-details-name strong,.chat-member-row strong{display:block;font-size:14px;font-weight:550;overflow-wrap:anywhere}.chat-details-name>div>span,.chat-member-row>div>span{display:block;margin-top:3px;font-size:12px;color:var(--sub)}.chat-member-list{max-height:50vh;overflow:auto;padding:6px 0}.chat-member-row{padding:12px 0}.chat-member-row .button{font-size:12px;padding:5px 9px}.chat-member-actions{justify-content:space-between;padding-top:18px;border-top:1px solid var(--line)}.chat-history-choice{display:flex;align-items:flex-start;gap:11px;padding:17px 0;margin-top:10px;border-top:1px solid var(--line);cursor:pointer}.chat-history-choice input{width:16px;height:16px;flex:none;margin-top:3px;accent-color:var(--ink)}.chat-history-choice strong{font-size:13px;font-weight:550}.chat-history-choice small{display:block;font-size:12px;line-height:1.5;margin-top:4px;color:var(--sub)}.chat-member-confirm{font-size:14px;color:var(--sub);line-height:1.6;margin:0 0 20px}.chat-head>.button{flex:none}.chat-heading{min-width:0;flex:1}.chat-heading>p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-members-dialog .dialog-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+
+/* Contact reachability uses the profile's existing list rhythm. */
+.contacts-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 8px }
+.contacts-toolbar .search { max-width:260px }
+.reachable-contact { display:flex; align-items:center; gap:12px; padding:16px 0; border-bottom:1px solid var(--line) }
+.reachable-contact > .identity-icon { flex:none }
+.reachable-contact > div:nth-child(2) { min-width:0; flex:1 }
+.reachable-contact strong { display:block; font-size:13px; font-weight:550 }
+.reachable-contact small { display:block; color:var(--sub); font-size:12px; margin-top:5px }
+.reachable-routes { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; max-width:50% }
+.contacts-pagination { justify-content:flex-end; margin-top:14px }
+@media(max-width:600px) { .contacts-toolbar { align-items:stretch; flex-direction:column; gap:10px } .contacts-toolbar .search { max-width:none } .reachable-contact { flex-wrap:wrap } .reachable-routes { max-width:100%; width:100%; justify-content:flex-start; padding-left:48px } }
+
+.agent-setup-guide { display:grid; gap:28px }
+.setup-step > header { display:flex; gap:10px; align-items:center; margin-bottom:12px }
+.setup-step > header > span { display:grid; place-items:center; flex:none; height:23px; width:23px; border:1px solid var(--line); border-radius:50%; color:var(--sub); font-size:11px; font-weight:600 }
+.setup-step > header h3 { margin:0; font-size:14px; font-weight:600 }
+.setup-step > p { color:var(--sub); font-size:12px; line-height:1.6; margin:10px 0 }
+.setup-code { border:1px solid var(--line); border-radius:9px; overflow:hidden; margin-top:12px }
+.setup-code > div { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; gap:12px; border-bottom:1px solid var(--line); color:var(--sub); font-size:11px }
+.setup-code .code-example { margin:0; border:0; border-radius:0; padding:12px; max-height:230px; overflow:auto; font-size:11px; line-height:1.7 }
+.setup-code .button { min-height:26px; padding:3px 8px; font-size:11px }
+.setup-token { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid var(--line); border-radius:9px }
+.setup-token small { display:block; font-size:11px; color:var(--sub); margin-top:4px }
+.setup-reference { margin-top:14px; color:var(--sub); font-size:12px }
+.setup-reference dl { display:grid; gap:8px; margin-top:12px; overflow-wrap:anywhere }
+.setup-reference dd { margin:0; color:var(--ink) }
+.setup-verification { padding-top:8px }

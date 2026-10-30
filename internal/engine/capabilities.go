@@ -86,6 +86,7 @@ func (s *Store) Capabilities(ctx context.Context, a Actor, in CapabilityInput) (
 			}
 			out.Operations["view"] = !p.Disabled && s.allowed(ctx, db, a, "view", t, in.ConnectionID, actionName, in.Descriptor)
 			out.Operations["manage"] = s.managesIdentity(ctx, db, a, p)
+			out.Operations["view_contact_access"] = s.inspectAccess(ctx, db, a, p)
 			out.Operations["issue_credential"] = !p.Disabled && s.mayIssueCredential(ctx, db, a, p)
 			out.Operations["link_account"] = p.Kind == "person" && !p.Disabled && s.mayLinkAccount(ctx, db, a, p.ID)
 			if in.ConnectionID != "" {

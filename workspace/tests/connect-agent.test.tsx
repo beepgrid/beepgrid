@@ -59,3 +59,39 @@ it("uses the existing worker credential and verifies its exact instance reply", 
     ).toBeInTheDocument(),
   );
 });
+
+it("guides the chosen MCP method without exposing a token in configuration or reenrolling", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string) =>
+      path.endsWith("/sessions")
+        ? json({
+            token: "test-only-secret-never-in-config",
+            agent,
+            instance_id: "ins_mcp",
+          })
+        : json({ items: [] }),
+    ),
+  );
+  const { Wrapper } = harness();
+  render(<Connect agent={{ ...agent, kind: "agent" }} onClose={vi.fn()} />, {
+    wrapper: Wrapper,
+  });
+  fireEvent.click(screen.getByRole("tab", { name: "MCP tools" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
+  await screen.findByRole("heading", { name: "Connect your tool host" });
+  expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).toHaveTextContent(
+    'NOTIF_TOKEN_FILE = "/absolute/path/worker-token"',
+  );
+  expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).not.toHaveTextContent(
+    "test-only-secret-never-in-config",
+  );
+  expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).not.toHaveTextContent(
+    "NOTIF_AGENT_ID",
+  );
+  expect(screen.getByText(/Tools do not wake an idle model/)).toBeVisible();
+  fireEvent.click(screen.getByRole("tab", { name: "Other MCP clients" }));
+  expect(screen.getByText(/"mcpServers"/)).toHaveTextContent(
+    '"args": [ "mcp" ]',
+  );
+});

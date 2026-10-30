@@ -33,6 +33,7 @@ import {
 import { GroupForm } from "./Groups";
 
 const Permissions = lazy(() => import("./Permissions"));
+const AgentContacts = lazy(() => import("./AgentContacts"));
 const providerNames: Record<string, string> = {
   slack: "Slack",
   email: "Email",
@@ -506,61 +507,68 @@ function ProfileChannels({ agent }: { agent: Identity }) {
     (r) => r.kind === "native",
   );
   return (
-    <section className="profile-section profile-channels">
-      <header>
-        <h2>Delivery channels</h2>
-        <Button icon="integrations" onClick={() => navigate("/integrations")}>
-          Manage integrations
-        </Button>
-      </header>
-      <ErrorView
-        error={
-          destinations.error ||
-          connections.error ||
-          (caps.data?.operations.message ? preview.error : null)
-        }
-      />
-      <div className="profile-channel-row">
-        <Icon name="agents" size={21} />
-        <div>
-          <strong>Agent runtime</strong>
-          <p>
-            Messages are saved in Beepgrid and received by this agent’s runtime.
-          </p>
-        </div>
-        <Badge>{native?.permitted ? "Available" : "Beepgrid"}</Badge>
-      </div>
-      {destinations.items.map((d) => {
-        const c = connections.items.find((c) => c.id === d.connection_id);
-        return (
-          <div className="profile-channel-row" key={d.id}>
-            <Icon
-              name={
-                c?.kind === "email"
-                  ? "mail"
-                  : c?.kind === "slack"
-                    ? "slack"
-                    : "integrations"
-              }
-              size={21}
-            />
-            <div>
-              <strong>{c?.name || "Delivery channel"}</strong>
-              <p>
-                {providerNames[c?.kind || ""] || "External channel"} · {d.mode}
-              </p>
-            </div>
-            <Badge>
-              {c ? (c.enabled ? "Configured" : "Disabled") : "Restricted"}
-            </Badge>
+    <>
+      <Suspense fallback={<Loading />}>
+        <AgentContacts agent={agent} />
+      </Suspense>
+      <section className="profile-section profile-channels">
+        <header>
+          <h2>Receiving messages</h2>
+          <Button icon="integrations" onClick={() => navigate("/integrations")}>
+            Manage integrations
+          </Button>
+        </header>
+        <ErrorView
+          error={
+            destinations.error ||
+            connections.error ||
+            (caps.data?.operations.message ? preview.error : null)
+          }
+        />
+        <div className="profile-channel-row">
+          <Icon name="agents" size={21} />
+          <div>
+            <strong>Agent runtime</strong>
+            <p>
+              Messages are saved in Beepgrid and received by this agent’s
+              runtime.
+            </p>
           </div>
-        );
-      })}
-      {!destinations.isPending && !destinations.items.length ? (
-        <p className="help">
-          No additional delivery channels are visible for this agent.
-        </p>
-      ) : null}
-    </section>
+          <Badge>{native?.permitted ? "Available" : "Beepgrid"}</Badge>
+        </div>
+        {destinations.items.map((d) => {
+          const c = connections.items.find((c) => c.id === d.connection_id);
+          return (
+            <div className="profile-channel-row" key={d.id}>
+              <Icon
+                name={
+                  c?.kind === "email"
+                    ? "mail"
+                    : c?.kind === "slack"
+                      ? "slack"
+                      : "integrations"
+                }
+                size={21}
+              />
+              <div>
+                <strong>{c?.name || "Delivery channel"}</strong>
+                <p>
+                  {providerNames[c?.kind || ""] || "External channel"} ·{" "}
+                  {d.mode}
+                </p>
+              </div>
+              <Badge>
+                {c ? (c.enabled ? "Configured" : "Disabled") : "Restricted"}
+              </Badge>
+            </div>
+          );
+        })}
+        {!destinations.isPending && !destinations.items.length ? (
+          <p className="help">
+            No additional delivery channels are visible for this agent.
+          </p>
+        ) : null}
+      </section>
+    </>
   );
 }
