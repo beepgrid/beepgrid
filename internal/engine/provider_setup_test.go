@@ -67,3 +67,21 @@ func TestSetupDiagnosticNeverPromotesSavedCredentialsToConnected(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDiscordSetupKeepsBotDMCommandAndInstallPermissionsBounded(t *testing.T) {
+	out, err := BuildProviderSetup(Connection{ID: "chn_discord", Kind: "discord", Secret: "never-export-this", Config: map[string]string{"application_id": "12345"}}, "https://example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(JSON(out))
+	if strings.Contains(raw, "never-export-this") || out.Mode != "byo_interactions" || out.Callbacks["interactions"] != "https://example.com/integrations/discord/chn_discord" {
+		t.Fatal(out, err)
+	}
+	command := out.Registration["command"].(map[string]any)
+	if command["contexts"].([]int)[0] != 1 || command["integration_types"].([]int)[0] != 0 || command["name"] != "beepgrid" {
+		t.Fatal(command)
+	}
+	if !strings.Contains(out.Registration["installation_url"].(string), "permissions=0") {
+		t.Fatal(out.Registration)
+	}
+}

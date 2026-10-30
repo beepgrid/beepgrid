@@ -16,6 +16,7 @@ type ProviderSetup struct {
 	Steps        []string             `json:"steps"`
 	Callbacks    map[string]string    `json:"callbacks"`
 	Manifest     map[string]any       `json:"manifest,omitempty"`
+	Registration map[string]any       `json:"registration,omitempty"`
 	Diagnostic   ConnectionDiagnostic `json:"diagnostic"`
 }
 
@@ -43,6 +44,15 @@ func BuildProviderSetup(c Connection, publicURL string) (ProviderSetup, error) {
 	}
 	base := strings.TrimRight(publicURL, "/")
 	switch c.Kind {
+	case "discord":
+		out.Mode = "byo_interactions"
+		out.Callbacks["interactions"] = base + "/integrations/discord/" + url.PathEscape(c.ID)
+		out.Registration = map[string]any{
+			"installation_url": "https://discord.com/oauth2/authorize?" + url.Values{"client_id": {c.Config["application_id"]}, "scope": {"bot applications.commands"}, "permissions": {"0"}, "integration_type": {"0"}}.Encode(),
+			"command_endpoint": "https://discord.com/api/v10/applications/" + url.PathEscape(c.Config["application_id"]) + "/commands",
+			"command":          map[string]any{"name": "beepgrid", "description": "Send a message to your BeepGrid agent", "type": 1, "contexts": []int{1}, "integration_types": []int{0}, "options": []any{map[string]any{"name": "message", "description": "Message text", "type": 3, "required": true, "max_length": 2000}}},
+		}
+		out.Steps = []string{"Create a dedicated Discord application. Save its immutable application_id, hexadecimal public_key and encrypted secret JSON containing bot_token. Never use a personal account token.", "Set the exact HTTPS Interactions Endpoint URL. Discord's signed PING must succeed and invalid signatures must fail. Keep all privileged Gateway intents disabled.", "Register only the supplied /beepgrid command on this dedicated application. The setup endpoint never registers commands or changes an existing app.", "Install the bot and applications.commands scopes in an authorized test server using the supplied URL with no guild permission bits. The first release accepts interactions in the bot DM only, not server or other private-channel contexts.", "Have the Person open the bot DM and initiate the interaction. An authorized identity administrator links immutable application_id and user_id. Add the exact linked user ID as a destination, then grant the required contact and decision authority separately.", "Queue a destination test, use Reply to submit its form and inspect the attributed canonical reply. Ordinary DM text is not ingested because this adapter has no Gateway listener. Test approval buttons separately.", "Disable the connection to block callbacks and queued sends. Revoke or uninstall the dedicated app in Discord separately. Rate limits can retry; unknown message outcomes require reconciliation."}
 	case "telegram":
 		out.Mode = "byo_webhook"
 		out.Callbacks["inbound"] = base + "/integrations/telegram/" + url.PathEscape(c.ID)

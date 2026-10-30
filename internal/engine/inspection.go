@@ -157,6 +157,7 @@ func ProviderCatalog() []ProviderCapability {
 		{Kind: "slack", Fields: []ProviderField{{"team_id", true, false}, {"bot_token", true, true}, {"signing_secret", true, true}, {"default_agent_id", false, false}}, InboundMessages: true, NativeApprovals: true, WebContinuation: true},
 		{Kind: "email", Fields: []ProviderField{{"smtp_addr", true, false}, {"from", true, false}, {"username", false, false}, {"secret", false, true}}, WebContinuation: true},
 		{Kind: "telegram", Fields: []ProviderField{{"bot_id", true, false}, {"bot_token", true, true}, {"webhook_secret", true, true}, {"default_agent_id", false, false}}, InboundMessages: true, NativeApprovals: true, WebContinuation: true},
+		{Kind: "discord", Fields: []ProviderField{{"application_id", true, false}, {"public_key", true, false}, {"bot_token", true, true}, {"default_agent_id", false, false}}, InboundMessages: true, NativeApprovals: true, WebContinuation: true},
 	}
 	for i := range out {
 		p := &out[i]
@@ -183,6 +184,10 @@ func ProviderCatalog() []ProviderCapability {
 			p.SetupModes = []string{"byo_webhook"}
 			p.Identity = "admin_linked_bot_and_user"
 			p.Constraints = []string{"Private bot chats only", "Reply to a mapped message to continue a conversation", "No native files or long polling", "Text replies are messages; final approvals use versioned buttons or the workspace"}
+		case "discord":
+			p.SetupModes = []string{"byo_interactions"}
+			p.Identity = "admin_linked_application_and_user"
+			p.Constraints = []string{"Bot DMs only", "Inbound text uses /beepgrid message or the Reply button form", "No Gateway listener, ordinary DM text, guild messages or native files", "No privileged Gateway intents required", "Private delivery depends on current Discord access and user action"}
 		case "webhook":
 			p.Identity = "bounded_service"
 			p.Constraints = []string{"Inbound sender is a configured Service", "Signed payloads do not grant contact or decision authority", "No native file transfer"}
@@ -256,6 +261,10 @@ func (s *Store) DiagnoseConnection(ctx context.Context, a Actor, id string) (Con
 	} else if c.Kind == "telegram" {
 		if _, err := parseTelegramSecret(string(plain), c.Config["bot_id"]); err != nil {
 			out.Issues = append(out.Issues, "Telegram requires this bot's token and a bounded webhook secret.")
+		}
+	} else if c.Kind == "discord" {
+		if _, err := parseDiscordSecret(string(plain)); err != nil || !validDiscordConfig(c.Config) {
+			out.Issues = append(out.Issues, "Discord requires this application's public key and bot token.")
 		}
 	}
 	out.ConfigurationValid = len(out.Issues) == 0

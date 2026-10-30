@@ -11,6 +11,20 @@ import (
 
 func (s *Server) channelRoutes() {
 	m := s.mux
+	m.HandleFunc("POST /integrations/discord/{id}", s.discordEvents)
+	m.HandleFunc("POST /api/v1/people/{id}/discord-account/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		return ok(w, map[string]bool{"removed": true}, s.Store.UnlinkDiscordAccount(r.Context(), actor(r), r.PathValue("id")))
+	}))
+	m.HandleFunc("POST /api/v1/people/{id}/discord-account", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			ApplicationID string `json:"application_id"`
+			UserID        string `json:"user_id"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		return ok(w, map[string]bool{"linked": true}, s.Store.LinkDiscordAccount(r.Context(), actor(r), r.PathValue("id"), in.ApplicationID, in.UserID))
+	}))
 	m.HandleFunc("POST /integrations/telegram/{id}", s.telegramEvents)
 	m.HandleFunc("POST /api/v1/people/{id}/telegram-account/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		return ok(w, map[string]bool{"removed": true}, s.Store.UnlinkTelegramAccount(r.Context(), actor(r), r.PathValue("id")))

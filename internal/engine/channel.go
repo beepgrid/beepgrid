@@ -125,7 +125,7 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 	if !ValidText(c.Name, 100) || len(JSON(c.Config)) > 8192 {
 		return c, Bad("A name and bounded configuration are required.")
 	}
-	if c.Kind != "webhook" && c.Kind != "slack" && c.Kind != "email" && c.Kind != "telegram" {
+	if c.Kind != "webhook" && c.Kind != "slack" && c.Kind != "email" && c.Kind != "telegram" && c.Kind != "discord" {
 		return c, Bad("Unsupported connection type.")
 	}
 	if c.Kind == "webhook" {
@@ -135,6 +135,16 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 	}
 	if c.Kind == "slack" && c.Config["team_id"] == "" {
 		return c, Bad("Slack team_id is required.")
+	}
+	if c.Kind == "discord" {
+		if !validDiscordConfig(c.Config) {
+			return c, Bad("Discord requires an immutable application_id and 32-byte hexadecimal public_key.")
+		}
+		if c.Secret != "" {
+			if _, err := parseDiscordSecret(c.Secret); err != nil {
+				return c, err
+			}
+		}
 	}
 	if c.Kind == "telegram" {
 		if !telegramID(c.Config["bot_id"]) {
@@ -206,6 +216,23 @@ func (s *Store) SaveConnection(ctx context.Context, a Actor, c Connection) (Conn
 			password, err := s.unseal(encrypted)
 			if err != nil || len(password) == 0 {
 				return Bad("SMTP password is required when a username is configured.")
+			}
+		}
+		if c.Kind == "discord" {
+			plain, err := s.unseal(encrypted)
+			if err != nil {
+				return err
+			}
+			if _, err = parseDiscordSecret(string(plain)); err != nil {
+				return err
+			}
+			var oldApp string
+			err = tx.QueryRow(ctx, `SELECT config->>'application_id' FROM connections WHERE scope=$1 AND id=$2`, a.Scope, c.ID).Scan(&oldApp)
+			if err != nil && err != pgx.ErrNoRows {
+				return err
+			}
+			if err == nil && oldApp != c.Config["application_id"] {
+				return Conflict("Create a new installation for a different Discord application.")
 			}
 		}
 		if c.Kind == "telegram" {
@@ -289,6 +316,9 @@ func (s *Store) SaveDestination(ctx context.Context, a Actor, d Destination) (De
 		}
 		if kind == "telegram" && !s.telegramDestination(ctx, tx, a.Scope, d.ConnectionID, d.PrincipalID, d.Address) {
 			return Bad("Telegram destinations must match the Person's currently linked private user ID and this bot.")
+		}
+		if kind == "discord" && !s.discordDestination(ctx, tx, a.Scope, d.ConnectionID, d.PrincipalID, d.Address) {
+			return Bad("Discord destinations must match the Person's currently linked private user ID and this application.")
 		}
 		if d.Mode == "primary" && !a.Admin {
 			var previous string
@@ -653,6 +683,13 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 		}
 		return nil, worked, e
 	}
+	if c.Kind == "discord" && !s.discordDestination(ctx, tx, scope, c.ID, d.RecipientID, d.Address) {
+		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Discord identity link changed' WHERE id=$1`, d.ID)
+		if e == nil {
+			e = tx.Commit(ctx)
+		}
+		return nil, worked, e
+	}
 	secret, e := s.unseal(encrypted)
 	if e != nil {
 		_, updateErr := tx.Exec(ctx, `UPDATE deliveries SET state='failed',last_error='Provider secret cannot be decrypted; verify encryption key' WHERE id=$1`, d.ID)
@@ -740,6 +777,9 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 	}
 	if c.Kind == "telegram" {
 		return s.deliverTelegram(ctx, c, d, text)
+	}
+	if c.Kind == "discord" {
+		return s.deliverDiscord(ctx, c, d, text)
 	}
 	destination := c.Config["url"]
 	body := JSON(d.Payload)
