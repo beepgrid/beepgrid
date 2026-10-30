@@ -255,3 +255,129 @@ it("offers people as recipients for person-linked messaging providers", async ()
   ).not.toBeInTheDocument();
   await screen.findByText("Taylor");
 });
+
+it("shows Discord registration without substituting acceptance for a working reply", async () => {
+  const discord = {
+    ...connection,
+    id: "cn_discord",
+    name: "Release bot",
+    kind: "discord",
+    config: { application_id: "12345", public_key: "fixture-public-key" },
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string) =>
+      path.endsWith("/capabilities")
+        ? json({ operations: { manage: true } })
+        : path.endsWith("/setup")
+          ? json({
+              callbacks: {
+                interactions:
+                  "https://app.example.test/integrations/discord/cn_discord",
+              },
+              steps: ["Use a dedicated bot."],
+              registration: {
+                installation_url:
+                  "https://discord.com/oauth2/authorize?client_id=12345",
+                command_endpoint:
+                  "https://discord.com/api/v10/applications/12345/commands",
+                command: { name: "beepgrid" },
+              },
+            })
+          : path.endsWith("/diagnostics")
+            ? json({
+                state: "configured",
+                qualification: "not_verified",
+                issues: [],
+              })
+            : json({ items: [] }),
+    ),
+  );
+  const { Wrapper } = harness();
+  render(<ConnectionDetail connection={discord} onClose={vi.fn()} />, {
+    wrapper: Wrapper,
+  });
+  expect(await screen.findByLabelText("Interactions endpoint URL")).toHaveValue(
+    "https://app.example.test/integrations/discord/cn_discord",
+  );
+  expect(
+    screen.getByRole("link", { name: /Install dedicated bot/ }),
+  ).toHaveAttribute(
+    "href",
+    "https://discord.com/oauth2/authorize?client_id=12345",
+  );
+  expect(
+    screen.queryByText("Connected", { exact: true }),
+  ).not.toBeInTheDocument();
+});
+
+it("links a Discord Person to the exact application and reuses their verified destination ID", async () => {
+  const discord = {
+    ...connection,
+    id: "cn_discord",
+    kind: "discord",
+    config: { application_id: "12345" },
+  };
+  const fn = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.endsWith("/capabilities"))
+      return json({ operations: { manage: true, link_account: true } });
+    if (path.endsWith("/discord-account")) return json({ linked: true });
+    const body = requestBody(init);
+    return json({
+      items:
+        body.collection === "people"
+          ? [
+              {
+                ...me.person,
+                metadata: {
+                  discord_user_id: "99",
+                  discord_application_id: "different-app",
+                },
+              },
+            ]
+          : body.collection === "connections"
+            ? [discord]
+            : [],
+    });
+  });
+  vi.stubGlobal("fetch", fn);
+  const { Wrapper } = harness();
+  render(
+    <DestinationForm
+      connection={discord}
+      destination={{
+        id: "dst_d",
+        connection_id: discord.id,
+        principal_id: me.person.id,
+        address: "99",
+        mode: "primary",
+        priority: 0,
+        version: 1,
+      }}
+      onClose={vi.fn()}
+    />,
+    { wrapper: Wrapper },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Link account" }));
+  fireEvent.change(screen.getByLabelText("Discord user ID"), {
+    target: { value: "56789" },
+  });
+  fireEvent.submit(
+    screen
+      .getByRole("dialog", { name: "Link Taylor to Discord" })
+      .querySelector("form")!,
+  );
+  await waitFor(() =>
+    expect(fn.mock.calls.some(([p]) => p.endsWith("/discord-account"))).toBe(
+      true,
+    ),
+  );
+  const call = fn.mock.calls.find(([p]) => p.endsWith("/discord-account"))!;
+  expect(requestBody(call[1])).toEqual({
+    application_id: "12345",
+    user_id: "56789",
+  });
+  expect(fn.mock.calls.some(([p]) => p.endsWith("/contact-permissions"))).toBe(
+    false,
+  );
+});

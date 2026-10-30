@@ -229,9 +229,10 @@ function Chat({ id }: { id: string }) {
     { conversation_id: id },
     !!q.data && !q.error,
   );
+  const decisions = related.items.filter((r) => r.response && r.resolved_at);
   useEffect(() => {
     if (pinned.current) end.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, related.items.length, id]);
+  }, [messages.length, related.items.length, decisions.length, id]);
   useEffect(() => {
     if (
       accessUnavailable(q.error) ||
@@ -319,14 +320,12 @@ function Chat({ id }: { id: string }) {
             id: r.id,
             value: r,
           })),
-          ...related.items
-            .filter((r) => r.response && r.resolved_at)
-            .map((r) => ({
-              kind: "decision" as const,
-              at: r.resolved_at!,
-              id: r.id + "/decision",
-              value: r,
-            })),
+          ...decisions.map((r) => ({
+            kind: "decision" as const,
+            at: r.resolved_at!,
+            id: r.id + "/decision",
+            value: r,
+          })),
         ]
           .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
           .map((item) =>
@@ -406,7 +405,7 @@ function Chat({ id }: { id: string }) {
               />
             ),
           )}
-        {!messages.length && !related.items.length ? (
+        {!messages.length && !related.items.length && !related.isPending ? (
           <Empty
             title={
               c.history_start ? "You’re in the chat" : "Start the conversation"
@@ -451,7 +450,9 @@ function Chat({ id }: { id: string }) {
       ) : null}
       <div className="composer">
         <ErrorView error={error} />
-        {caps.data?.operations.message && destination ? (
+        {caps.isPending ? (
+          <Loading label="Checking conversation access" />
+        ) : caps.data?.operations.message && destination ? (
           <MessageComposer
             conversation={id}
             participants={c.participants}

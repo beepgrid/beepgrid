@@ -50,6 +50,7 @@ import { renderToString } from 'react-dom/server';
 assert.equal(typeof new Client('http://localhost','fixture').uploadAttachment,'function');
 assert.equal(typeof new Client('http://localhost','fixture').stageAttachment,'function');
 assert.equal(typeof new Client('http://localhost','fixture').changeChatMembership,'function');
+assert.equal(typeof new Client('http://localhost','fixture').replaceRequest,'function');
 assert.equal(typeof browserClient('http://localhost').events,'function');
 assert.match(import.meta.resolve('@notif/react/styles.css'),/styles.css$/);
 assert.equal(typeof NotifConversation,'function');
@@ -65,7 +66,8 @@ const shared: StartChatInput = {targets:[{kind:"agent",id:"a"}],body:"👋 @Revi
 const draft: Promise<Attachment> = client.stageAttachment(new Blob(['x']),'brief.txt');
 const membership: ChatMembershipInput = {operation:'add',version:1,members:['peer'],share_history:false};
 const changed: Promise<ChatMembershipResult> = client.changeChatMembership('c',membership,'members-1');
-void [upload, draft, changed, events, shared, NotifRequest];
+const replaced: Promise<{previous: import('@notif/client').RequestItem; replacement: import('@notif/client').RequestItem}> = client.replaceRequest('r',{version:1,body:'Revised'},'key');
+void [upload, draft, changed, replaced, events, shared, NotifRequest];
 ''')
     run([root/"sdk/typescript/node_modules/.bin/tsc", "--noEmit", "--strict", "--module", "nodenext", "--target", "es2022", "consumer.ts"], cwd=node)
     wheel_stage = scratch / "python-source"

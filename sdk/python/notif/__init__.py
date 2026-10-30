@@ -141,6 +141,13 @@ class Client:
     def connection_setup(self, connection_id: str) -> dict[str, Any]:
         return self.call("GET", "/api/v1/connections/" + urllib.parse.quote(connection_id, safe="") + "/setup")
 
+    def replace_request(self, request_id: str, version: int, body: str, *, key: str | None = None, mentions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """Replace an own pending request. Retain key when retrying an unknown result."""
+        payload = {"version": version, "body": body}
+        if mentions is not None:
+            payload["mentions"] = mentions
+        return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/replace", payload, key=key or str(uuid.uuid4()))
+
     def cancel(self, request_id: str, version: int) -> dict[str, Any]:
         return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/cancel", {"version": version})
 

@@ -30,3 +30,14 @@ class SharedLifecycleTests(unittest.TestCase):
         with self.assertRaises(NotifError): reader.download_attachment(after["id"])
         owner.change_chat_membership(chat["conversation_id"], operation="add", version=changed["version"], members=[session["agent"]["id"]], share_history=True)
         self.assertEqual(reader.download_attachment(before["id"]), b"Before joining")
+
+    def test_request_replacement_is_atomic_with_stable_retry(self):
+        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        _, session = owner.connect("sdk/python-replace/" + str(uuid.uuid4()), "Replacement worker")
+        original = owner.ask(target={"kind":"agent", "id":session["agent"]["id"]}, body="Check staging now?", kind="approval")
+        key = str(uuid.uuid4())
+        result = owner.replace_request(original["id"], original["version"], "Check staging after the demo?", key=key)
+        self.assertEqual(result["previous"]["state"], "superseded")
+        self.assertEqual(result["replacement"]["state"], "open")
+        self.assertNotEqual(result["replacement"]["id"], original["id"])
+        self.assertEqual(owner.replace_request(original["id"], original["version"], "Check staging after the demo?", key=key)["replacement"]["id"], result["replacement"]["id"])

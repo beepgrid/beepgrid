@@ -56,3 +56,20 @@ func TestStagedFilesAndMembershipPreserveAuthorityAndExplicitHistory(t *testing.
 		t.Fatal("oversized stage reached backend", calls, err)
 	}
 }
+
+func TestReplaceRequestPreservesObservedVersionAndStableKey(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var input map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&input)
+		if r.URL.Path != "/api/v1/requests/req_one/replace" || r.Header.Get("Idempotency-Key") != "replace-one" || input["version"] != float64(7) || input["body"] != "Restart after the demo?" {
+			t.Error(r.URL.Path, input)
+		}
+		fmt.Fprint(w, `{"previous":{"id":"req_one","state":"superseded"},"replacement":{"id":"req_new","state":"open"}}`)
+	}))
+	defer backend.Close()
+	client := notif.New(backend.URL, "bounded-worker")
+	out, err := call(context.Background(), client, "replace_request", json.RawMessage(`{"id":"req_one","version":7,"body":"Restart after the demo?","idempotency_key":"replace-one"}`))
+	if err != nil || out.(notif.ReplacedRequest).Replacement.ID != "req_new" {
+		t.Fatal(out, err)
+	}
+}

@@ -7,3 +7,5 @@ Development namespace and versions remain pending a public release decision. No 
 The Go/TypeScript/Python StartChat helper now accepts the main engine's optional initial `mentions` field with Unicode code-point offsets. All shared members still receive the message. Older engines reject that additive input field; use the integrated 30 October engine contract before sending it.
 
 Runtime starter correction: omitted NOTIF_AGENT_ID now uses the supplied existing worker credential and original instance directly. Explicit IDs still select bounded launcher enrollment. Real HTTP checks cover both modes in Go/Python/TypeScript, exact-instance reply attribution, unchanged replica count and decoy isolation.
+
+Atomic pending-message replacement is available through TypeScript `replaceRequest`, Python `replace_request` and Go `ReplaceRequest`, plus the local MCP `replace_request` tool. Stable keys, current versions and preserved audiences/files require the integrated engine endpoint. A replacement always needs a fresh decision.

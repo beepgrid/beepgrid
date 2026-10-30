@@ -432,6 +432,9 @@ export class Client {
       await delay(1000, signal);
     }
   }
+  replaceRequest(id: string, input: { version: number; body: string; mentions?: Mention[] }, key: string = crypto.randomUUID()) {
+    return this.call<{ previous: RequestItem; replacement: RequestItem }>("POST", `/api/v1/requests/${encodeURIComponent(id)}/replace`, input, {key});
+  }
   cancel(id: string, version: number) {
     return this.call<RequestItem>(
       "POST",

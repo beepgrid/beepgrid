@@ -169,3 +169,57 @@ it("makes answer management reachable for a delegated publisher without exposing
     screen.queryByRole("button", { name: "Activity log" }),
   ).not.toBeInTheDocument();
 });
+
+it("edits an own pending message through one atomic replacement and retains a failed draft", async () => {
+  const fetcher = vi.fn(async (path: string, _init?: RequestInit) =>
+    path.endsWith("/capabilities")
+      ? json({ operations: { replace: true } })
+      : json(
+          {
+            error: {
+              code: "CONFLICT",
+              message:
+                "This message received a response. Refresh before replacing it.",
+            },
+          },
+          409,
+        ),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const { Wrapper } = harness();
+  render(
+    <RequestCard
+      request={{ ...question, kind: "approval" }}
+      sender={agent as Identity}
+    />,
+    { wrapper: Wrapper },
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Edit and resend" }),
+  );
+  expect(fetcher.mock.calls.some(([p]) => p.endsWith("/replace"))).toBe(false);
+  expect(
+    screen.getByText("A fresh approval is required for the updated message."),
+  ).toBeVisible();
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+    target: { value: "Can staging restart after the demo?" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Send replacement" }));
+  await screen.findByRole("alert");
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue(
+    "Can staging restart after the demo?",
+  );
+  const call = fetcher.mock.calls.find(([p]) =>
+    p.endsWith("/requests/req_one/replace"),
+  )!;
+  expect(requestBody(call[1])).toEqual({
+    version: 7,
+    body: "Can staging restart after the demo?",
+    mentions: [],
+  });
+  expect(
+    fetcher.mock.calls.some(
+      ([p]) => p.endsWith("/cancel") || p.endsWith("/requests"),
+    ),
+  ).toBe(false);
+});

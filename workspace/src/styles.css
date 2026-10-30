@@ -3173,7 +3173,10 @@ dialog > header h2 {
   .message-compose .compose-bottom > .actions > .button {
     font-size: 10px;
     padding: 6px;
+    min-height:36px;
   }
+  .message-compose .compose-bottom > .actions { display:contents }
+  .message-compose .message-input { min-height:84px;resize:none }
 }
 
 .compose-dialog .recipient-picker { grid-template-columns:minmax(0,1.35fr) minmax(160px,1fr); gap:10px }

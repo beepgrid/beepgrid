@@ -28,6 +28,7 @@ import urllib.request
 
 root = pathlib.Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--automatic", action="store_true", help="Qualify automatic specialist delegation, partial replies and summary recovery with four identities")
 parser.add_argument("--ui", action="store_true", help="Wait for real UI group send and Coordinator confirmation")
 parser.add_argument("--model", default="gpt-6-luna", help="Saved-subscription model; no API fallback")
 args = parser.parse_args()
@@ -47,7 +48,7 @@ local = root / ".local" / ("coordinator-codex-" + run)
 local.mkdir(parents=True, mode=0o700)
 (root / ".local/coordinator-codex-current").write_text(str(local))
 model = args.model
-report = {"auth": "saved-chatgpt-subscription", "model": model, "reasoning": "medium", "real_agents": 25,
+report = {"auth": "saved-chatgpt-subscription", "model": model, "reasoning": "medium", "real_agents": 4 if args.automatic else 25,
           "model_parallelism": 4, "vendor_api": False, "ui": args.ui, "steps": [], "turns": [], "deliveries": []}
 report_lock = threading.RLock()
 
@@ -141,7 +142,8 @@ def object_schema(properties):
 schemas = {
     "overseer_plan": object_schema({"operation": {"type": "string", "enum": ["status", "question", "message", "task"]},
                                    "agent_ids": {"type": "array", "items": {"type": "string"}},
-                                   "body": {"type": "string"}, "summary": {"type": "string"}}),
+                                   "body": {"type": "string"}, "summary": {"type": "string"},
+                                   "instructions": {"type": "array", "items": object_schema({"agent_id": {"type": "string"}, "operation": {"type": "string", "enum": ["question", "task", "message"]}, "body": {"type": "string"}})}}),
     "overseer_summary": object_schema({"summary": {"type": "string"}}),
 }
 
@@ -281,6 +283,69 @@ def run_worker(index, client, session, dispatches):
     print("REAL AGENT COMPLETE:", index, flush=True)
 
 
+def qualify_automatic():
+    global provider_failure
+    specs = [
+        ("Builder 7", "Owns the checkout V2 migration and client changes", {"migration": "ready", "endpoint": "/v2/payments"}),
+        ("DevOps 2", "Owns staging worker pools and deployment scheduling", {"staging": "available", "worker_pool": "checkout-v2", "concurrency": 8}),
+        ("Reviewer 3", "Owns API contract review and rollback checks", {"contracts": "passed", "rollback": "V1 fallback retained"}),
+        ("Billing 2", "Owns settlement ledger records, unrelated to this rollout", {}),
+    ]
+    for index, (name, purpose, facts) in enumerate(specs, 1):
+        client, session = owner.connect("qa/%s/%02d" % (run, index), name, ["message", "request"], {"description": purpose, "test": "subscription"})
+        workers.append((index, client, session))
+    role = owner.call("POST", "/api/v1/roles", {"name": "Reply to qualification owner", "rules": [{"action": action, "target_kind": "person", "target_id": person} for action in ("view", "message", "ask")]})
+    for index, client, session in workers:
+        owner.call("POST", "/api/v1/role-bindings", {"role_id": role["id"], "subject_kind": "principal", "subject_id": session["agent"]["id"]})
+        threading.Thread(target=listen, args=(index, client), daemon=True).start()
+    owner.update_assistance(overseer=True)
+    prompt = "Prepare the checkout V2 rollout: ask Builder 7 to confirm the migration endpoint, DevOps 2 to reserve the correct staging pool and report its concurrency limit, and Reviewer 3 to verify contract and rollback readiness. Collect a separate answer from each. Billing is unrelated. These are communication instructions, not permission to execute deployment."
+    plan = owner.coordinate(prompt, key=run + "/automatic")
+    assert plan["automatic"] and not plan["requires_confirmation"] and len(plan["dispatches"]) == 3
+    expected = {x[2]["agent"]["id"] for x in workers[:3]}
+    assert {d["agent_id"] for d in plan["dispatches"]} == expected
+    assert len({i["body"] for i in plan["instructions"]}) == 3
+    replay = owner.coordinate(prompt, key=run + "/automatic")
+    assert replay["dispatches"] == plan["dispatches"]
+    passed("Real subscription judge assigns three distinct instructions, excludes unrelated Billing and replay creates no duplicate dispatch")
+    for index, client, session in workers[:3]:
+        if index == 3:
+            partial = owner.overseer_plan(plan["id"])
+            assert sum(r["state"] == "resolved" for r in partial["replies"]) == 2
+            assert partial.get("reply_summary", "") == ""
+            passed("Two actual specialist replies stay visible while the third is pending; no fabricated completion")
+            provider_failure = True
+        request = next(d for d in plan["dispatches"] if d["agent_id"] == session["agent"]["id"])
+        facts = specs[index - 1][2]
+        turn("specialist-%02d" % index,
+             "You are " + session["agent"]["name"] + " in a synthetic local test. Use get_request for " + request["request_id"] +
+             ". Read the individual instruction. Your authorized test facts are " + json.dumps(facts) +
+             ". Call reply with this request ID, its current version, outcome answered and an answer containing these facts. "
+             "Do not create other work or claim to have executed a deployment. A text answer without the reply tool is insufficient.",
+             session={**session, "reply_only": True})
+        result = client.get_request(request["request_id"])
+        assert result["state"] == "resolved" and result["response"]["responder_instance_id"] == session["instance_id"]
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        result = owner.overseer_plan(plan["id"])
+        if result.get("summary_error"):
+            break
+        time.sleep(.3)
+    else:
+        raise RuntimeError("Automatic summary failure was not recorded")
+    assert len(result["replies"]) == 3 and all(r["state"] == "resolved" for r in result["replies"])
+    passed("Provider outage preserves all canonical answers and exposes a retryable synthesis error")
+    provider_failure = False
+    result = owner.summarize_overseer(plan["id"])
+    assert result["reply_summary"] and not result.get("summary_error")
+    calls = provider_calls
+    assert owner.summarize_overseer(plan["id"])["reply_summary"] == result["reply_summary"] and provider_calls == calls
+    assert len(owner.overseer_plans()) == 1
+    report["plan_id"] = plan["id"]
+    passed("Real subscription judge synthesizes all three canonical answers after recovery; cached retry does not repeat model work or dispatch")
+    owner.update_assistance(overseer=False)
+
+
 with (local / "server.log").open("w") as log:
     server = subprocess.Popen([str(binary), "serve", "--dev"], cwd=local, env=engine_env, stdout=log, stderr=log)
     try:
@@ -297,80 +362,83 @@ with (local / "server.log").open("w") as log:
         owner = Client(url, engine_env["NOTIF_BOOTSTRAP_TOKEN"], timeout=45)
         (local / "owner-token").write_text(engine_env["NOTIF_BOOTSTRAP_TOKEN"])
         person = owner.call("GET", "/api/v1/me")["person"]["id"]
-        for index in range(1, 26):
-            client, session = owner.connect("qa/%s/%02d" % (run, index), "Agent %02d" % index, ["message", "request"], {"test": "subscription", "index": index})
-            workers.append((index, client, session))
-        ids = [session["agent"]["id"] for _, _, session in workers]
-        groups = [owner.call("POST", "/api/v1/groups", {"name": "QA %02d agents" % count, "members": ids[:count]}) for count in (1, 3, 25)]
-        role = owner.call("POST", "/api/v1/roles", {"name": "QA reply to test owner", "rules": [{"action": action, "target_kind": "person", "target_id": person} for action in ("view", "message", "ask")]})
-        for index, client, session in workers:
-            owner.call("POST", "/api/v1/role-bindings", {"role_id": role["id"], "subject_kind": "principal", "subject_id": session["agent"]["id"]})
-            threading.Thread(target=listen, args=(index, client), daemon=True).start()
-        assert provider_calls == 0 and not owner.assistance()["overseer"]
-        passed("25 distinct real worker identities enrolled; 1/3/25 groups; flags default off")
-        for group, count in zip(groups, (1, 3, 25)):
-            preview = owner.dispatch_preview([{"kind": "group", "id": group["id"]}], "message")
-            assert preview["count"] == count
-        passed("Exact direct group previews include 1, 3 and 25 permitted recipients without model calls")
-        owner.update_assistance(overseer=True)
-        (local / "ready.json").write_text(json.dumps({"url": url, "groups": groups, "agents": ids}))
-        print("READY:", local, flush=True)
-        if not args.ui:
-            owner.send(target={"kind": "group", "id": groups[-1]["id"]}, body="25-agent direct: explain durable recovery", key=run + "/direct")
-            plan = owner.plan_overseer("Ask all 25 agents to report their index and its square. Each agent should compute its own value.", target={"kind": "group", "id": groups[-1]["id"]}, key=run + "/plan")
-            assert not plan["dispatches"] and len(plan["sources"]) == 25
-            owner.confirm_overseer(plan["id"])
-        deadline = time.monotonic() + 900
-        while time.monotonic() < deadline:
-            plans = owner.overseer_plans()
-            confirmed = [p for p in plans if len(p.get("dispatches") or []) == 25]
-            with jobs_lock:
-                direct = sum(any(d.get("payload", {}).get("message", {}).get("body", "").startswith("25-agent direct") for d in items.values()) for items in jobs.values())
-                incoming = sum(any(d.get("payload", {}).get("request") for d in items.values()) for items in jobs.values())
-            if confirmed and direct == 25 and incoming == 25:
-                plan = confirmed[0]
-                break
-            time.sleep(2)
+        if args.automatic:
+            qualify_automatic()
         else:
-            raise RuntimeError("Did not observe UI/direct and confirmed Coordinator work for all 25 agents")
-        report["plan_id"] = plan["id"]
-        assert len({d["request_id"] for d in plan["dispatches"]}) == 25
-        replay = owner.confirm_overseer(plan["id"])
-        assert replay["dispatches"] == plan["dispatches"]
-        passed("25 direct notifications and 25 confirmed Coordinator requests arrived; confirmation replay creates no duplicate work")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-            futures = [pool.submit(run_worker, index, client, session, plan["dispatches"]) for index, client, session in workers]
-            for future in concurrent.futures.as_completed(futures):
-                future.result()
-        passed("All 25 subscription-backed agents read and answered canonical requests and sent their own direct conversation replies through MCP")
-        complete = owner.overseer_plan(plan["id"])
-        assert len(complete["replies"]) == 25 and all(q["state"] == "resolved" for q in complete["replies"])
-        time.sleep(1.1)
-        summary = owner.summarize_overseer(plan["id"])
-        assert summary["reply_summary"]
-        passed("Real tool-free judge summarizes 25 actual canonical agent answers")
-        # Keep canonical results visible for inspection; this sentinel contains no secret.
-        (local / "models-complete").touch()
-        if args.ui:
-            print("UI RESULTS READY; create inspect-complete after checking canonical UI results", flush=True)
-            for _ in range(300):
-                if (local / "inspect-complete").exists():
+            for index in range(1, 26):
+                client, session = owner.connect("qa/%s/%02d" % (run, index), "Agent %02d" % index, ["message", "request"], {"test": "subscription", "index": index})
+                workers.append((index, client, session))
+            ids = [session["agent"]["id"] for _, _, session in workers]
+            groups = [owner.call("POST", "/api/v1/groups", {"name": "QA %02d agents" % count, "members": ids[:count]}) for count in (1, 3, 25)]
+            role = owner.call("POST", "/api/v1/roles", {"name": "QA reply to test owner", "rules": [{"action": action, "target_kind": "person", "target_id": person} for action in ("view", "message", "ask")]})
+            for index, client, session in workers:
+                owner.call("POST", "/api/v1/role-bindings", {"role_id": role["id"], "subject_kind": "principal", "subject_id": session["agent"]["id"]})
+                threading.Thread(target=listen, args=(index, client), daemon=True).start()
+            assert provider_calls == 0 and not owner.assistance()["overseer"]
+            passed("25 distinct real worker identities enrolled; 1/3/25 groups; flags default off")
+            for group, count in zip(groups, (1, 3, 25)):
+                preview = owner.dispatch_preview([{"kind": "group", "id": group["id"]}], "message")
+                assert preview["count"] == count
+            passed("Exact direct group previews include 1, 3 and 25 permitted recipients without model calls")
+            owner.update_assistance(overseer=True)
+            (local / "ready.json").write_text(json.dumps({"url": url, "groups": groups, "agents": ids}))
+            print("READY:", local, flush=True)
+            if not args.ui:
+                owner.send(target={"kind": "group", "id": groups[-1]["id"]}, body="25-agent direct: explain durable recovery", key=run + "/direct")
+                plan = owner.plan_overseer("Ask all 25 agents to report their index and its square. Each agent should compute its own value.", target={"kind": "group", "id": groups[-1]["id"]}, key=run + "/plan")
+                assert not plan["dispatches"] and len(plan["sources"]) == 25
+                owner.confirm_overseer(plan["id"])
+            deadline = time.monotonic() + 900
+            while time.monotonic() < deadline:
+                plans = owner.overseer_plans()
+                confirmed = [p for p in plans if len(p.get("dispatches") or []) == 25]
+                with jobs_lock:
+                    direct = sum(any(d.get("payload", {}).get("message", {}).get("body", "").startswith("25-agent direct") for d in items.values()) for items in jobs.values())
+                    incoming = sum(any(d.get("payload", {}).get("request") for d in items.values()) for items in jobs.values())
+                if confirmed and direct == 25 and incoming == 25:
+                    plan = confirmed[0]
                     break
-                time.sleep(1)
-        provider_failure = True
-        time.sleep(1.1)
-        try:
-            owner.plan_overseer("Give status without dispatch", key=run + "/provider-down")
-            raise AssertionError("Provider failure produced a plan")
-        except NotifError as error:
-            assert error.status >= 400
-        assert len(owner.overseer_plans()) == len(plans)
-        passed("Judge outage creates no accepted plan or dispatch; ordinary engine remains available")
-        owner.update_assistance(overseer=False)
-        assert not owner.assistance()["overseer"]
-        passed("Optional features disabled after test; original workspace untouched")
-        lags = sorted(d["lag_ms"] for d in report["deliveries"] if d["lag_ms"] is not None)
-        report["delivery_latency_ms"] = {"count": len(lags), "p50": lags[len(lags)//2], "p95": lags[min(len(lags)-1, int(len(lags)*.95))], "max": max(lags)} if lags else {}
+                time.sleep(2)
+            else:
+                raise RuntimeError("Did not observe UI/direct and confirmed Coordinator work for all 25 agents")
+            report["plan_id"] = plan["id"]
+            assert len({d["request_id"] for d in plan["dispatches"]}) == 25
+            replay = owner.confirm_overseer(plan["id"])
+            assert replay["dispatches"] == plan["dispatches"]
+            passed("25 direct notifications and 25 confirmed Coordinator requests arrived; confirmation replay creates no duplicate work")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                futures = [pool.submit(run_worker, index, client, session, plan["dispatches"]) for index, client, session in workers]
+                for future in concurrent.futures.as_completed(futures):
+                    future.result()
+            passed("All 25 subscription-backed agents read and answered canonical requests and sent their own direct conversation replies through MCP")
+            complete = owner.overseer_plan(plan["id"])
+            assert len(complete["replies"]) == 25 and all(q["state"] == "resolved" for q in complete["replies"])
+            time.sleep(1.1)
+            summary = owner.summarize_overseer(plan["id"])
+            assert summary["reply_summary"]
+            passed("Real tool-free judge summarizes 25 actual canonical agent answers")
+            # Keep canonical results visible for inspection; this sentinel contains no secret.
+            (local / "models-complete").touch()
+            if args.ui:
+                print("UI RESULTS READY; create inspect-complete after checking canonical UI results", flush=True)
+                for _ in range(300):
+                    if (local / "inspect-complete").exists():
+                        break
+                    time.sleep(1)
+            provider_failure = True
+            time.sleep(1.1)
+            try:
+                owner.plan_overseer("Give status without dispatch", key=run + "/provider-down")
+                raise AssertionError("Provider failure produced a plan")
+            except NotifError as error:
+                assert error.status >= 400
+            assert len(owner.overseer_plans()) == len(plans)
+            passed("Judge outage creates no accepted plan or dispatch; ordinary engine remains available")
+            owner.update_assistance(overseer=False)
+            assert not owner.assistance()["overseer"]
+            passed("Optional features disabled after test; original workspace untouched")
+            lags = sorted(d["lag_ms"] for d in report["deliveries"] if d["lag_ms"] is not None)
+            report["delivery_latency_ms"] = {"count": len(lags), "p50": lags[len(lags)//2], "p95": lags[min(len(lags)-1, int(len(lags)*.95))], "max": max(lags)} if lags else {}
     except Exception as error:
         report["failure"] = {"type": type(error).__name__, "message": str(error)[:1000]}
         raise

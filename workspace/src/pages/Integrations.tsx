@@ -51,6 +51,11 @@ type Setup = {
   steps: string[];
   callbacks: Record<string, string>;
   manifest?: Record<string, unknown>;
+  registration?: {
+    installation_url?: string;
+    command_endpoint?: string;
+    command?: Record<string, unknown>;
+  };
 };
 const states: Record<string, string> = {
   configured: "Configured",
@@ -65,6 +70,7 @@ const names: Record<string, string> = {
   webhook: "Webhooks",
   slack: "Slack",
   telegram: "Telegram",
+  discord: "Discord",
   email: "Email (SMTP)",
 };
 const descriptions: Record<string, string> = {
@@ -73,6 +79,7 @@ const descriptions: Record<string, string> = {
   slack: "Messages, threads and verified interactive responses.",
   email: "Send messages by email. Continue the conversation in your workspace.",
   telegram: "Private bot messages, replies and in-chat approvals.",
+  discord: "Bot DMs, message commands and in-chat approvals.",
 };
 const labels: Record<string, string> = {
   url: "Endpoint URL",
@@ -80,6 +87,8 @@ const labels: Record<string, string> = {
   team_id: "Slack team ID",
   bot_token: "Bot token",
   bot_id: "Bot ID",
+  application_id: "Application ID",
+  public_key: "Public key",
   webhook_secret: "Webhook secret",
   signing_secret: "Signing secret",
   default_agent_id: "Default agent ID",
@@ -124,9 +133,11 @@ export default function Integrations() {
                             ? "mail"
                             : p.kind === "slack"
                               ? "slack"
-                              : p.kind === "telegram"
-                                ? "send"
-                                : "webhook"
+                              : p.kind === "discord"
+                                ? "conversations"
+                                : p.kind === "telegram"
+                                  ? "send"
+                                  : "webhook"
                         }
                         size={21}
                       />
@@ -280,6 +291,19 @@ export function ConnectionForm({
             Use a dedicated bot from BotFather. Its numeric ID is the part
             before the colon in its token. Save to get the webhook setup
             instructions.
+          </p>
+        ) : p.kind === "discord" ? (
+          <p className="help">
+            Create a dedicated bot with no privileged intents. Save its
+            application ID, public key and bot token to get the callback and
+            installation steps.{" "}
+            <a
+              href="https://discord.com/developers/applications"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open Discord developer settings ↗
+            </a>
           </p>
         ) : p.kind === "email" ? (
           <p className="help">
@@ -494,15 +518,51 @@ export function ConnectionDetail({
                 <Copy value={JSON.stringify(setup.data.manifest, null, 2)} />
               </div>
             ) : null}
+            {c.kind === "discord" && setup.data?.registration ? (
+              <div className="field">
+                <strong>Discord bot setup</strong>
+                {setup.data.registration.installation_url?.startsWith(
+                  "https://discord.com/oauth2/authorize?",
+                ) ? (
+                  <a
+                    className="button"
+                    href={setup.data.registration.installation_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Install dedicated bot ↗
+                  </a>
+                ) : null}
+                <p className="help">
+                  Register this command on your dedicated application. Messages
+                  and replies use the bot DM.
+                </p>
+                <Copy
+                  value={JSON.stringify(
+                    setup.data.registration.command,
+                    null,
+                    2,
+                  )}
+                />
+                {setup.data.registration.command_endpoint ? (
+                  <div className="actions">
+                    <code>{setup.data.registration.command_endpoint}</code>
+                    <Copy value={setup.data.registration.command_endpoint} />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {Object.entries(setup.data?.callbacks || {}).map(
               ([name, value]) => (
                 <div className="field" key={name}>
                   <label htmlFor={"callback-" + name}>
-                    {name === "interactivity"
-                      ? "Interactive actions URL"
-                      : name === "events"
-                        ? "Events URL"
-                        : "Inbound webhook URL"}
+                    {name === "interactions"
+                      ? "Interactions endpoint URL"
+                      : name === "interactivity"
+                        ? "Interactive actions URL"
+                        : name === "events"
+                          ? "Events URL"
+                          : "Inbound webhook URL"}
                   </label>
                   <div className="actions">
                     <input id={"callback-" + name} readOnly value={value} />
@@ -814,8 +874,11 @@ export function DestinationForm({
     (selectedConnection.kind === "telegram"
       ? person.items[0]?.metadata?.telegram_bot_id ===
         selectedConnection.config.bot_id
-      : person.items[0]?.metadata?.slack_team_id ===
-        selectedConnection.config.team_id);
+      : selectedConnection.kind === "discord"
+        ? person.items[0]?.metadata?.discord_application_id ===
+          selectedConnection.config.application_id
+        : person.items[0]?.metadata?.slack_team_id ===
+          selectedConnection.config.team_id);
   const recipient = useCapabilities(
     d ? { kind: "destination", id: d.id } : target[0],
     undefined,
@@ -880,12 +943,12 @@ export function DestinationForm({
             allowInstances={false}
             peopleOnly={
               !!selectedConnection &&
-              ["slack", "telegram"].includes(selectedConnection.kind)
+              ["slack", "telegram", "discord"].includes(selectedConnection.kind)
             }
           />
         )}
         {selectedConnection &&
-        ["slack", "telegram"].includes(selectedConnection.kind) &&
+        ["slack", "telegram", "discord"].includes(selectedConnection.kind) &&
         person.items[0] ? (
           <div className="section">
             <strong>{names[selectedConnection.kind]} account</strong>
@@ -904,9 +967,11 @@ export function DestinationForm({
           hint={
             selectedConnection?.kind === "telegram"
               ? "Use the linked person’s numeric Telegram user ID. Private bot chats only."
-              : selectedConnection?.kind === "slack"
-                ? "Use their Slack DM channel ID."
-                : undefined
+              : selectedConnection?.kind === "discord"
+                ? "Use the linked person’s Discord user ID. The bot must be able to message them."
+                : selectedConnection?.kind === "slack"
+                  ? "Use their Slack DM channel ID."
+                  : undefined
           }
         >
           <input
@@ -916,11 +981,16 @@ export function DestinationForm({
             onChange={(e) => setAddress(e.target.value)}
           />
         </Field>
-        {selectedConnection?.kind === "telegram" && linkedAccount ? (
+        {["telegram", "discord"].includes(selectedConnection?.kind || "") &&
+        linkedAccount ? (
           <Button
             onClick={() =>
               setAddress(
-                String(person.items[0]?.metadata?.telegram_user_id || ""),
+                String(
+                  person.items[0]?.metadata?.[
+                    selectedConnection!.kind + "_user_id"
+                  ] || "",
+                ),
               )
             }
           >
@@ -1001,7 +1071,9 @@ function AccountLink({
               user_id: user,
               ...(kind === "telegram"
                 ? { bot_id: connection.config.bot_id }
-                : { team_id: connection.config.team_id }),
+                : kind === "discord"
+                  ? { application_id: connection.config.application_id }
+                  : { team_id: connection.config.team_id }),
             })
             .then((r) => {
               if (r !== undefined) onClose();
@@ -1013,7 +1085,13 @@ function AccountLink({
           does not grant message or approval permissions.
         </p>
         <Field
-          label={kind === "telegram" ? "Telegram user ID" : "Slack member ID"}
+          label={
+            kind === "telegram"
+              ? "Telegram user ID"
+              : kind === "discord"
+                ? "Discord user ID"
+                : "Slack member ID"
+          }
         >
           <input
             required

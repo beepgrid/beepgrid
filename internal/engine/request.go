@@ -120,6 +120,18 @@ func (s *Store) Ask(ctx context.Context, a Actor, in AskInput, key string) (Requ
 	return out, err
 }
 func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key string, out *Request) error {
+	return s.askContinuedTx(ctx, tx, a, in, key, out, nil)
+}
+
+// A continuation is built only by the fenced replacement operation. It preserves
+// private audience projections and accepted files without exposing a public bypass.
+type requestContinuation struct {
+	recipients  []recipient
+	projections map[string]string
+	files       []Attachment
+}
+
+func (s *Store) askContinuedTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key string, out *Request, continuation *requestContinuation) error {
 	stable := in
 	if in.Kind == "" {
 		in.Kind = "question"
@@ -166,7 +178,7 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 	if in.Kind != "question" && in.SharedKey != "" {
 		return Bad("Only informational questions may use shared keys.")
 	}
-	return idempotent(ctx, tx, a, "ask", key, stable, out, func() error {
+	work := func() error {
 		if in.PreviewToken != "" {
 			if in.ConversationID != "" {
 				return Bad("Recipient previews apply to new dispatches.")
@@ -178,7 +190,9 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 
 		var rs []recipient
 		var e error
-		if in.ConversationID != "" {
+		if continuation != nil {
+			rs = continuation.recipients
+		} else if in.ConversationID != "" {
 			rs, e = s.conversationRecipients(ctx, tx, a, in.ConversationID, "ask", in.Action)
 		} else {
 			rs, e = s.resolve(ctx, tx, a, in.Target, "ask", "", in.Action)
@@ -231,6 +245,9 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 		if err != nil {
 			return err
 		}
+		if continuation != nil {
+			files = append(append([]Attachment(nil), continuation.files...), files...)
+		}
 		for i := range files {
 			files[i].ConversationID = conv
 			files[i].RequestID = out.ID
@@ -239,13 +256,16 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 		if err = linkAttachments(ctx, tx, a.Scope, conv, "", out.ID, files); err != nil {
 			return err
 		}
-		if in.ConversationID == "" && in.SharedKey == "" {
+		if continuation == nil && in.ConversationID == "" && in.SharedKey == "" {
 			if e = s.newRequestAudience(ctx, tx, a, *out, rs); e != nil {
 				return e
 			}
 		} else {
 			for _, r := range rs {
 				projection := conv
+				if continuation != nil {
+					projection = continuation.projections[r.ID]
+				}
 				if in.ConversationID == "" && len(rs) > 1 {
 					projection, e = newConversation(ctx, tx, a, in.Title, r.ID)
 					if e != nil {
@@ -281,7 +301,11 @@ func (s *Store) askTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key 
 			return e
 		}
 		return nil
-	})
+	}
+	if continuation != nil {
+		return work()
+	}
+	return idempotent(ctx, tx, a, "ask", key, stable, out, work)
 }
 func (s *Store) Respond(ctx context.Context, a Actor, id string, in Response) (Request, error) {
 	var out Request

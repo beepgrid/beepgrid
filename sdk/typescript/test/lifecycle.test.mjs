@@ -26,3 +26,13 @@ test('real staged files and shared membership retain history defaults and curren
  await owner.changeChatMembership(chat.conversation_id,{operation:'add',version:changed.version,members:[members[2].session.agent.id],share_history:true});
  assert.equal(await (await reader.downloadAttachment(before.id)).text(),'Before joining');
 });
+
+test('real request replacement preserves old history and stable retries',{skip:!process.env.NOTIF_SDK_TEST_URL},async()=>{
+ const owner=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
+ const {session}=await owner.connect('sdk/ts-replace/'+crypto.randomUUID(),'Replacement worker');
+ const original=await owner.ask({target:{kind:'agent',id:session.agent.id},body:'Check staging now?',kind:'approval'});
+ const input={version:original.version,body:'Check staging after the demo?'};const key=crypto.randomUUID();
+ const result=await owner.replaceRequest(original.id,input,key);
+ assert.equal(result.previous.state,'superseded');assert.equal(result.replacement.state,'open');assert.notEqual(result.replacement.id,original.id);
+ assert.equal((await owner.replaceRequest(original.id,input,key)).replacement.id,result.replacement.id);
+});

@@ -119,3 +119,30 @@ func TestRealStagedFilesAndSharedMembership(t *testing.T) {
 		}
 	}
 }
+
+func TestRealRequestReplacementIsAtomicAndReplaysCurrentState(t *testing.T) {
+	base := os.Getenv("NOTIF_SDK_TEST_URL")
+	if base == "" {
+		t.Skip("Requires real HTTP engine")
+	}
+	c := New(base, os.Getenv("NOTIF_SDK_TEST_TOKEN"))
+	ctx := context.Background()
+	_, session, err := c.Enroll(ctx, EnrollInput{Agent: "sdk/go-replace/" + Key(), Name: "Replacement worker"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := c.Ask(ctx, AskInput{Target: Target{Kind: "agent", ID: session.Agent.ID}, Body: "Check staging now?", Kind: "approval"}, Key())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ReplaceRequestInput{Version: original.Version, Body: "Check staging after the demo?"}
+	key := Key()
+	result, err := c.ReplaceRequest(ctx, original.ID, input, key)
+	if err != nil || result.Previous.State != "superseded" || result.Replacement.ID == original.ID || result.Replacement.State != "open" {
+		t.Fatal(result, err)
+	}
+	again, err := c.ReplaceRequest(ctx, original.ID, input, key)
+	if err != nil || again.Replacement.ID != result.Replacement.ID {
+		t.Fatal(again, err)
+	}
+}

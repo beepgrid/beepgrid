@@ -623,6 +623,7 @@ func (s *Store) SummarizeOverseer(ctx context.Context, a Actor, id string) (Over
 		}
 		out.ReplySummary = summary
 		out.ReplyDigest = digest
+		out.SummaryError = ""
 		return event(ctx, tx, a, "overseer.summarized", "", a.ID, map[string]any{"id": id, "reply_count": len(replies)})
 	})
 	if err != nil {

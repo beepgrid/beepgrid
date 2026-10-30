@@ -39,6 +39,7 @@ const providerNames: Record<string, string> = {
   email: "Email",
   webhook: "Webhook",
   telegram: "Telegram",
+  discord: "Discord",
   native: "Beepgrid",
 };
 

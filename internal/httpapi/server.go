@@ -453,6 +453,14 @@ func (s *Server) routes() {
 		x, e := s.Store.Respond(r.Context(), actor(r), r.PathValue("id"), in)
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/requests/{id}/replace", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.ReplaceRequestInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.ReplaceRequest(r.Context(), actor(r), r.PathValue("id"), in, r.Header.Get("Idempotency-Key"))
+		return ok(w, x, e)
+	}))
 	for _, operation := range []struct{ path, state string }{{"cancel", "cancelled"}, {"supersede", "superseded"}} {
 		state := operation.state
 		m.HandleFunc("POST /api/v1/requests/{id}/"+operation.path, s.protect(func(w http.ResponseWriter, r *http.Request) error {

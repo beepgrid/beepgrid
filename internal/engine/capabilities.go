@@ -36,6 +36,7 @@ func (s *Store) Capabilities(ctx context.Context, a Actor, in CapabilityInput) (
 			out.Operations["view"] = true
 			out.Operations["cancel"] = r.State == "open" && (a.Admin || r.RequesterID == a.ID)
 			out.Operations["supersede"] = out.Operations["cancel"]
+			out.Operations["replace"] = r.State == "open" && r.RequesterID == a.ID
 			out.Operations["respond"] = r.State == "open" && s.responseAuthorization(ctx, db, a, r) == nil
 			if out.Operations["respond"] {
 				switch r.Kind {

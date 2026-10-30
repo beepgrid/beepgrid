@@ -189,3 +189,21 @@ func (c *Client) Cancel(ctx context.Context, id string, version int) (Request, e
 	err := c.Do(ctx, "POST", "/api/v1/requests/"+url.PathEscape(id)+"/cancel", map[string]int{"version": version}, &out, "")
 	return out, err
 }
+
+// ReplaceRequest retires an own pending request and sends a fresh decision to
+// its unchanged audience. Keep the key stable when retrying an unknown result.
+type ReplaceRequestInput struct {
+	Version  int       `json:"version"`
+	Body     string    `json:"body"`
+	Mentions []Mention `json:"mentions,omitempty"`
+}
+type ReplacedRequest struct {
+	Previous    Request `json:"previous"`
+	Replacement Request `json:"replacement"`
+}
+
+func (c *Client) ReplaceRequest(ctx context.Context, id string, in ReplaceRequestInput, key string) (ReplacedRequest, error) {
+	var out ReplacedRequest
+	err := c.Do(ctx, "POST", "/api/v1/requests/"+url.PathEscape(id)+"/replace", in, &out, key)
+	return out, err
+}

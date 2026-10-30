@@ -1,8 +1,8 @@
 import { FileLinks } from "./Attachments";
-import { MentionText } from "./Mentions";
+import { MentionEditor, MentionText } from "./Mentions";
 import { useState } from "react";
 import { useCapabilities, useOperation, useSession } from "./data";
-import type { Request, Identity, Target } from "./contracts";
+import type { Request, Identity, Target, Mention } from "./contracts";
 import { TargetPicker } from "./TargetPicker";
 import {
   Badge,
@@ -31,7 +31,8 @@ export function RequestCard({
     me = useSession();
   const [answer, setAnswer] = useState(""),
     [confirm, setConfirm] = useState(""),
-    [sharing, setSharing] = useState(false);
+    [sharing, setSharing] = useState(false),
+    [replacing, setReplacing] = useState(false);
   async function respond(outcome: string) {
     const result = await op.run("/requests/" + r.id + "/responses", {
       version: r.version,
@@ -85,7 +86,9 @@ export function RequestCard({
                   ? "Approved"
                   : r.response?.outcome === "answered"
                     ? "Answered"
-                    : r.state}
+                    : r.state === "superseded"
+                      ? "Replaced"
+                      : r.state}
             </Badge>
           ) : caps.data?.operations.respond ? (
             <>
@@ -224,6 +227,11 @@ export function RequestCard({
             </div>
           ) : null}
           <div className="actions request-tools">
+            {caps.data?.operations.replace ? (
+              <Button disabled={op.pending} onClick={() => setReplacing(true)}>
+                Edit and resend
+              </Button>
+            ) : null}
             {r.kind === "question" &&
             r.shared_key &&
             me.can_publish_answers &&
@@ -257,7 +265,89 @@ export function RequestCard({
           onClose={() => setSharing(false)}
         />
       ) : null}
+      {replacing ? (
+        <ReplaceMessage
+          request={r}
+          participants={participants}
+          onClose={() => setReplacing(false)}
+        />
+      ) : null}
     </article>
+  );
+}
+
+function ReplaceMessage({
+  request: r,
+  participants,
+  onClose,
+}: {
+  request: Request;
+  participants: Identity[];
+  onClose: () => void;
+}) {
+  const op = useOperation("replace:" + r.id);
+  const previous = op.previous<{ body: string; mentions?: Mention[] }>(
+    `/requests/${r.id}/replace`,
+  );
+  const [body, setBody] = useState(previous?.body || r.body || r.title),
+    [mentions, setMentions] = useState<Mention[]>(
+      previous?.mentions || r.mentions || [],
+    );
+  return (
+    <Modal title="Replace pending message" onClose={onClose}>
+      <Form
+        onSubmit={async () => {
+          const result = await op.run(`/requests/${r.id}/replace`, {
+            version: r.version,
+            body,
+            mentions,
+          });
+          if (result) onClose();
+        }}
+      >
+        <p className="help">
+          Send an updated message to the same recipients. The original stays in
+          history.
+        </p>
+        <MentionEditor
+          value={body}
+          onChange={setBody}
+          mentions={mentions}
+          onMentions={setMentions}
+          participants={participants}
+          onKeyDown={() => {}}
+        />
+        {r.choices?.length ? (
+          <div className="actions">
+            {r.choices.map((choice) => (
+              <Badge key={choice}>{choice}</Badge>
+            ))}
+          </div>
+        ) : null}
+        <FileLinks files={r.attachments} />
+        {r.kind === "approval" ? (
+          <small className="muted">
+            A fresh approval is required for the updated message.
+          </small>
+        ) : null}
+        {r.action ? (
+          <Details label="Unchanged action" value={r.action} />
+        ) : null}
+        <ErrorView error={op.error} />
+        <div className="form-actions">
+          <Button onClick={onClose}>Back</Button>
+          <Button
+            primary
+            type="submit"
+            disabled={
+              op.pending || !body.trim() || body === (r.body || r.title)
+            }
+          >
+            Send replacement
+          </Button>
+        </div>
+      </Form>
+    </Modal>
   );
 }
 

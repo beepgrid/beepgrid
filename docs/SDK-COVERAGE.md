@@ -11,6 +11,7 @@
 | Durable question/approval/task | Ask | ask | ask | ask/approve/task / ask |
 | Final typed decision and clarification | Respond / Send | respond / send | respond / send | respond/send / reply/send |
 | Wait, pending, trace, cancel | Wait/GetRequest/RequestTrace/Cancel | wait/getRequest/requestTrace/cancel | wait/get_request/request_trace/cancel | wait/list/API / get_request/request_status |
+| Atomic own pending-message replacement | ReplaceRequest | replaceRequest | replace_request | JSON API / replace_request |
 | Worker receive/ack/restart | Inbox/Ack/Run | inbox/ack/run | inbox/ack/run | API / receive/acknowledge |
 | Canonical full events and resume | StreamEvents | events | events | API event snapshots; host polling is explicit |
 | Current-access workspace files | UploadAttachment/Attachments/DownloadAttachment | uploadAttachment/attachments/downloadAttachment | upload_attachment/attachments/download_attachment | files/file-upload/file-download / bounded file tools |

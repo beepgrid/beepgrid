@@ -238,6 +238,12 @@ func TestCoordinatorSummaryRetryAndRevokedAuthority(t *testing.T) {
 				}
 				return
 			}
+			// The direct retry response must clear the old error immediately,
+			// without relying on a later GET to repair stale UI state.
+			direct, retryErr := s.SummarizeOverseer(ctx, owner, plan.ID)
+			if retryErr != nil || direct.SummaryError != "" || direct.ReplySummary != "Eight workers fit." {
+				t.Fatal(direct, retryErr)
+			}
 			if _, e = s.Pool.Exec(ctx, `UPDATE overseer_plans SET summary_next_at=now() WHERE scope=$1 AND id=$2`, owner.Scope, plan.ID); e != nil {
 				t.Fatal(e)
 			}
