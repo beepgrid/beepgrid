@@ -57,7 +57,7 @@ The authorized person can answer in the workspace or through the CLI. Save `resp
 NOTIF_TOKEN_FILE=.local/owner-token .local/notif respond --input response.json REQUEST_ID
 ```
 
-`approve --input` and `task --input` use the same request schema with kind `approval` and `task`. `ask` accepts the request schema's explicit kind too. Action approvals require the complete action descriptor and current policy; approval is not proof of execution. Use the [SDK/MCP execution flow](INTEGRATIONS.md) to redeem and report protected actions.
+`approve --input` and `task --input` use the same request schema with kind `approval` and `task`. `ask` accepts the request schema's explicit kind too. Optional bound action approvals require the complete action descriptor and current policy; approval is not proof of execution. Use the [SDK/MCP execution flow](INTEGRATIONS.md) to redeem and report protected actions.
 
 `send agent|person|group ID MESSAGE` remains available. `send --input file.json --key stable-key` accepts the SDK message schema, including `conversation_id` for replies. Use explicit stable keys for recoverable creation operations. An omitted key generates a fresh operation and cannot recover a previous command after a restart.
 

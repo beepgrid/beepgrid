@@ -1,0 +1,407 @@
+[
+  {
+    "python": "call",
+    "go": "Do",
+    "typescript": "call",
+    "family": "setup",
+    "purpose": "Call a supported HTTP endpoint without a named SDK helper.",
+    "returns": "The endpoint's JSON response; Go decodes into out. Use nil for ignored output.",
+    "recovery": "Keep the /api/v1/ prefix. A keyed write may be retried after a transport error with the same body and key; an unkeyed write is not safe to retry blindly."
+  },
+  {
+    "python": "connect",
+    "go": "Enroll",
+    "typescript": "connect",
+    "family": "setup",
+    "purpose": "Enroll one numbered runtime using a bounded launcher or operator credential.",
+    "returns": "A new worker Client and Session containing token, agent, instance_id and expires_at.",
+    "recovery": "Enrollment is privileged. Save the worker token securely and discard the launcher from the running worker. Existing worker tokens construct Client directly."
+  },
+  {
+    "python": "directory",
+    "go": "Directory",
+    "typescript": "directory",
+    "family": "messages",
+    "purpose": "Find currently visible people, agents or services by kind and optional search.",
+    "returns": "QueryPage: items, optional next_cursor, order. Follow query pagination for more contacts.",
+    "recovery": "No display-name uniqueness is implied. Use returned IDs. A hidden contact does not become reachable because its name is known."
+  },
+  {
+    "python": "send",
+    "go": "Send",
+    "typescript": "send",
+    "family": "messages",
+    "purpose": "Send a normal message to a target or an existing conversation.",
+    "returns": "SendResult: conversation_id and the accepted Message objects.",
+    "recovery": "Acceptance is durable storage, not external delivery or business execution. Reuse a saved key for an unknown outcome; reuse_direct is explicitly false by default."
+  },
+  {
+    "python": "notify",
+    "go": "Notify",
+    "typescript": "notify",
+    "family": "messages",
+    "purpose": "Send the same durable message with a compact acceptance receipt.",
+    "returns": "SendReceipt: conversation_id and message_count, without message bodies.",
+    "recovery": "Call send with the identical body and saved key to recover the full result. This is not a transient or fire-and-forget delivery mode."
+  },
+  {
+    "python": "dispatch_preview",
+    "go": "DispatchPreview",
+    "typescript": "dispatchPreview",
+    "family": "messages",
+    "purpose": "Resolve the intended audience and routes before sending.",
+    "returns": "Recipients, visible and hidden counts, sends=false, token and expires_at.",
+    "recovery": "A preview sends nothing and grants no permission. Supply its token to the matching send; if membership or routing changed, refresh the preview rather than bypassing the conflict."
+  },
+  {
+    "python": "send_batch",
+    "go": "SendBatch",
+    "typescript": "sendBatch",
+    "family": "messages",
+    "purpose": "Send one private message to each explicitly selected recipient.",
+    "returns": "Array of {target, result: SendResult}; separate conversation IDs.",
+    "recovery": "1 to 100 explicit targets, deduplicated and committed atomically. Nested group expansion is not accepted here. Do not label these histories a shared group chat."
+  },
+  {
+    "python": "ask_batch",
+    "go": "AskBatch",
+    "typescript": "askBatch",
+    "family": "requests",
+    "purpose": "Open an independent requested decision for each selected recipient.",
+    "returns": "Array of {target, request: Request}; each has its own state and response.",
+    "recovery": "Nested request omits target and conversation_id. All-or-nothing creation does not mean all-or-nothing decisions. A saved key recovers the same requests."
+  },
+  {
+    "python": "ask",
+    "go": "Ask",
+    "typescript": "ask",
+    "family": "requests",
+    "purpose": "Ask for a durable, typed final answer, approval or task result.",
+    "returns": "Request with id, conversation_id, kind, state=open, version and expires_at.",
+    "recovery": "kind defaults to question. Question, approval and task have different allowed outcomes. Normal follow-up messages do not close it. Ordinary communication has no implicit deadline. Bound action approvals default to seven days. An explicit expiry must be within ninety days."
+  },
+  {
+    "python": "get_request",
+    "go": "GetRequest",
+    "typescript": "getRequest",
+    "family": "requests",
+    "purpose": "Read the current visible request before deciding or inspecting its result.",
+    "returns": "Request, including optional response and current version.",
+    "recovery": "A 404 can mean not visible. Read again after a version conflict; never assume a stale decision can overwrite a newer one."
+  },
+  {
+    "python": "respond",
+    "go": "Respond",
+    "typescript": "respond",
+    "family": "requests",
+    "purpose": "Record an authorized final typed decision using the current version.",
+    "returns": "Updated Request, including response and terminal state.",
+    "recovery": "question: answered; approval: approved/denied; task: completed/failed/rejected. A choice answer must match an offered choice. A competing or stale decision conflicts."
+  },
+  {
+    "python": "wait",
+    "go": "Wait",
+    "typescript": "wait",
+    "family": "requests",
+    "purpose": "Poll until a request leaves open, without blocking the server's work.",
+    "returns": "The current terminal Request; inspect state and response, not only successful HTTP.",
+    "recovery": "Python timeout is seconds; Go context and TypeScript AbortSignal stop local waiting only. Omitted Python timeout waits indefinitely. Cancel explicitly to withdraw a request."
+  },
+  {
+    "python": "cancel",
+    "go": "Cancel",
+    "typescript": "cancel",
+    "family": "requests",
+    "purpose": "Withdraw your own open request with its current version.",
+    "returns": "Request with state=cancelled.",
+    "recovery": "No response can be added after a terminal transition. Cancellation does not undo external actions or already sent information."
+  },
+  {
+    "python": "replace_request",
+    "go": "ReplaceRequest",
+    "typescript": "replaceRequest",
+    "family": "requests",
+    "purpose": "Replace the body of your own pending request while retaining an audit trail.",
+    "returns": "{previous: Request, replacement: Request}; use replacement.id for future decisions.",
+    "recovery": "The old request is superseded. Keep the operation key for retries. Version mismatches or terminal requests conflict; replacement is not an edit to a recorded response."
+  },
+  {
+    "python": "set_request_blocking",
+    "go": "SetRequestBlocking",
+    "typescript": "setRequestBlocking",
+    "family": "requests",
+    "purpose": "Declare or clear an agent's dependency on a reply from one other agent.",
+    "returns": "Updated Request with blocking true or false.",
+    "recovery": "Only the requesting agent can mark its own open agent-to-individual-agent request. An ordinary open question is not automatically a dependency or deadlock."
+  },
+  {
+    "python": "start_chat",
+    "go": "StartChat",
+    "typescript": "startChat",
+    "family": "chats",
+    "purpose": "Create one shared conversation for the chosen participants and its first message.",
+    "returns": "SendResult; an approval or choices on the first message also creates a requested decision.",
+    "recovery": "Participants share the history they can currently access. Use individual targets with mutual view permission. Mentions address members without hiding messages from others."
+  },
+  {
+    "python": "conversation",
+    "go": "Conversation",
+    "typescript": "conversation",
+    "family": "chats",
+    "purpose": "Read a currently authorized conversation and its visible history.",
+    "returns": "Conversation with participants, messages, shared, version, manager_id and history_start where applicable.",
+    "recovery": "New members normally see future history only. Current removal or policy changes can revoke messages and files. Conversation version controls membership changes, not request decisions."
+  },
+  {
+    "python": "change_chat_membership",
+    "go": "ChangeChatMembership",
+    "typescript": "changeChatMembership",
+    "family": "chats",
+    "purpose": "Add or remove members, rename, leave, or transfer management of a shared chat.",
+    "returns": "ChatMembershipResult: conversation_id, version, and optional left.",
+    "recovery": "operation is add/remove/rename/leave. members contains principal IDs. share_history defaults false and must be an intentional disclosure. On leave or removal of the manager, supply next_manager when required. Refetch version on conflict."
+  },
+  {
+    "python": "attachments",
+    "go": "Attachments",
+    "typescript": "attachments",
+    "family": "files",
+    "purpose": "List the files currently visible in a conversation.",
+    "returns": "Array of Attachment metadata, not file bytes.",
+    "recovery": "Attachment access follows current history visibility. Knowing a file ID never bypasses conversation or membership checks."
+  },
+  {
+    "python": "stage_attachment",
+    "go": "StageAttachment",
+    "typescript": "stageAttachment",
+    "family": "files",
+    "purpose": "Upload a private draft before creating its message, request, chat or batch.",
+    "returns": "Attachment with id to place in attachment_ids.",
+    "recovery": "1 byte to 5 MiB. Unused drafts expire after 24 hours and can be claimed by one initial operation. Uploads are not automatically retried after an unknown outcome."
+  },
+  {
+    "python": "upload_attachment",
+    "go": "UploadAttachment",
+    "typescript": "uploadAttachment",
+    "family": "files",
+    "purpose": "Upload a file into an already authorized conversation.",
+    "returns": "Attachment with id, file_name, media_type, size and sha256.",
+    "recovery": "Go/Python take bytes plus name/media; TypeScript takes Blob plus name. Do not repeat an unknown upload blindly: list visible attachments and reconcile metadata first."
+  },
+  {
+    "python": "download_attachment",
+    "go": "DownloadAttachment",
+    "typescript": "downloadAttachment",
+    "family": "files",
+    "purpose": "Download the bytes of a currently visible attachment.",
+    "returns": "Go []byte, Python bytes, TypeScript Blob.",
+    "recovery": "Requires current file/history access. A removed participant may lose access even to an old ID. Transfers are bounded at 5 MiB."
+  },
+  {
+    "python": "query",
+    "go": "Query",
+    "typescript": "query",
+    "family": "queries",
+    "purpose": "Page through an authorized collection with supported filters and search.",
+    "returns": "QueryPage: items, next_cursor when more scanning remains, order.",
+    "recovery": "Default limit 50, range 1 to 200. Cursor expires after 24 hours and is tied to actor, scope and query. Continue even if items is empty when next_cursor is present."
+  },
+  {
+    "python": "capabilities",
+    "go": "Capabilities",
+    "typescript": "capabilities",
+    "family": "queries",
+    "purpose": "Check which operations are available for a target, request, connection or descriptor.",
+    "returns": "observed_at, operations map, request_version and allowed outcomes where applicable.",
+    "recovery": "This is a current snapshot, not a reservation or permission grant. The actual mutation checks authorization and version again."
+  },
+  {
+    "python": "access",
+    "go": "Access",
+    "typescript": "access",
+    "family": "queries",
+    "purpose": "Inspect effective role assignments for yourself or an authorized subject.",
+    "returns": "Authorized access projection including roles and assignment information.",
+    "recovery": "Other subjects require management rights. Directory groups, policy roles and chat membership have distinct effects; do not substitute one for another."
+  },
+  {
+    "python": "request_trace",
+    "go": "RequestTrace",
+    "typescript": "requestTrace",
+    "family": "queries",
+    "purpose": "Inspect a request's current delivery evidence and execution reports.",
+    "returns": "Request trace projection; delivery evidence may include a next cursor.",
+    "recovery": "Supply delivery cursor to continue paging. Queued, provider-accepted, replied and executed are different facts. Visibility is projected for the caller."
+  },
+  {
+    "python": "workspace",
+    "go": "Workspace",
+    "typescript": "workspace",
+    "family": "queries",
+    "purpose": "Read the authenticated workspace's identity and deployment metadata.",
+    "returns": "JSON with scope, company, environment, deployment and schema metadata.",
+    "recovery": "This endpoint is available to headless OSS clients too; it is not a browser-only feature."
+  },
+  {
+    "python": "account",
+    "go": "Account",
+    "typescript": "account",
+    "family": "queries",
+    "purpose": "Read account access and runtime-applied service limits.",
+    "returns": "JSON account projection including applied state.",
+    "recovery": "Person-only with account view authority, or operator. Self-hosted account state differs from managed billing and does not require a paid offering."
+  },
+  {
+    "python": "provider_catalog",
+    "go": "ProviderCatalog",
+    "typescript": "providerCatalog",
+    "family": "queries",
+    "purpose": "Read the providers actually supported by this engine and their setup fields.",
+    "returns": "Array of provider capabilities, field definitions and setup modes.",
+    "recovery": "A catalog entry describes supported functionality, not a configured or live-qualified connection. Generic webhooks are not native adapters."
+  },
+  {
+    "python": "connection_setup",
+    "go": "ConnectionSetup",
+    "typescript": "connectionSetup",
+    "family": "queries",
+    "purpose": "Obtain setup instructions and safe callback/manifest information for one connection.",
+    "returns": "ProviderSetup with supported steps and safe setup values.",
+    "recovery": "Requires current connection authority. Credentials are not returned as setup text. Provider installation, account linking and contact permissions remain separate."
+  },
+  {
+    "python": "inbox",
+    "go": "Inbox",
+    "typescript": "inbox",
+    "family": "workers",
+    "purpose": "Lease pending deliveries assigned to this worker runtime.",
+    "returns": "Array of Delivery with id, generation, kind and payload.",
+    "recovery": "The lease is temporary. Process or durably hand off before Ack. A lease expiry or reconnect can redeliver, so deduplicate canonical message/request IDs in your handler."
+  },
+  {
+    "python": "ack",
+    "go": "Ack",
+    "typescript": "ack",
+    "family": "workers",
+    "purpose": "Acknowledge the delivery lease generation after safe handling.",
+    "returns": "No domain object; the HTTP helper receives an acknowledgment receipt.",
+    "recovery": "Pass the whole delivery to retain its id and generation. Stale lease acknowledgments conflict. Ack is not a request decision or proof of a business effect."
+  },
+  {
+    "python": "heartbeat",
+    "go": "Heartbeat",
+    "typescript": "heartbeat",
+    "family": "workers",
+    "purpose": "Refresh runtime presence and optionally report application-supplied progress.",
+    "returns": "No domain object; heartbeat acknowledgment.",
+    "recovery": "Progress is explicit metadata supplied by your runtime, not inferred model execution. Heartbeat does not finish requests or acknowledge deliveries."
+  },
+  {
+    "python": "run",
+    "go": "Run",
+    "typescript": "run",
+    "family": "workers",
+    "purpose": "Run the SDK's receive/handle/ack loop with long polling.",
+    "returns": "Runs until local cancellation, stop, handler failure or non-retryable error.",
+    "recovery": "Handler completion precedes Ack. Transient transport/5xx/429 failures retry; auth failures stop. Do not acknowledge before durable handoff. Stop controls are local, not request cancellation."
+  },
+  {
+    "python": "events",
+    "go": "StreamEvents",
+    "typescript": "events",
+    "family": "events",
+    "purpose": "Consume authorized canonical events with reconnect and a sequence checkpoint.",
+    "returns": "Python iterator or TypeScript async iterator of events; Go callback with error return.",
+    "recovery": "Persist a checkpoint after applying each event. Go options add conversation filtering; Python supports conversation_id; TypeScript EventOptions exposes after, summary and signal. Summary streams omit full bodies. A denial stops reconnecting."
+  },
+  {
+    "python": "assistance",
+    "go": "Assistance",
+    "typescript": "assistance",
+    "family": "coordinator",
+    "purpose": "Read OSS Coordinator enablement and provider configuration status.",
+    "returns": "AssistanceSettings: overseer, version, overseer_configured.",
+    "recovery": "Provider configured and workspace enabled are separate states. The wire name overseer is retained for SDK/API compatibility; the product calls it Coordinator."
+  },
+  {
+    "python": "update_assistance",
+    "go": "UpdateAssistance",
+    "typescript": "updateAssistance",
+    "family": "coordinator",
+    "purpose": "Enable or disable Coordinator through the public API, without the UI.",
+    "returns": "Current AssistanceSettings after the update.",
+    "recovery": "A person needs manage assistance:workspace. Configure a provider on the engine first. Use version to reject stale updates; disabling invalidates unconfirmed plans."
+  },
+  {
+    "python": "plan_overseer",
+    "go": "PlanOverseer",
+    "typescript": "planOverseer",
+    "family": "coordinator",
+    "purpose": "Prepare a reviewable Coordinator plan using the caller's authorized specialist context.",
+    "returns": "OverseerPlan with operation, sources, selected agents, instructions, expiry and requires_confirmation.",
+    "recovery": "Does not automatically dispatch the plan. Model failures send no instructions. Retain the key for a transport-unknown result; optional target narrows scope and previous_plan_id supplies permitted prior context."
+  },
+  {
+    "python": "overseer_plans",
+    "go": "OverseerPlans",
+    "typescript": "overseerPlans",
+    "family": "coordinator",
+    "purpose": "List Coordinator plans visible to the current person.",
+    "returns": "Array of OverseerPlan.",
+    "recovery": "Another person's plans are not implicitly shared. Plans do not grant permission; current access is rechecked on use."
+  },
+  {
+    "python": "overseer_plan",
+    "go": "OverseerPlan",
+    "typescript": "overseerPlan",
+    "family": "coordinator",
+    "purpose": "Read one Coordinator plan and its current dispatch/reply state.",
+    "returns": "OverseerPlan, with dispatches, replies and any reply_summary.",
+    "recovery": "A returned request may still be open. Do not present an instruction's acceptance as finished specialist work."
+  },
+  {
+    "python": "confirm_overseer",
+    "go": "ConfirmOverseer",
+    "typescript": "confirmOverseer",
+    "family": "coordinator",
+    "purpose": "Dispatch a still-valid reviewed plan.",
+    "returns": "OverseerPlan containing attributed dispatches.",
+    "recovery": "Uses only the saved server plan ID. Rechecks current permissions, scope, enablement and expiry. Repeating confirmation reuses that plan's dispatch, not a new arbitrary model command."
+  },
+  {
+    "python": "summarize_overseer",
+    "go": "SummarizeOverseer",
+    "typescript": "summarizeOverseer",
+    "family": "coordinator",
+    "purpose": "Ask the configured model to summarize currently authorized specialist replies.",
+    "returns": "Updated OverseerPlan with reply_summary, replies, digest or summary_error.",
+    "recovery": "Pending and missing replies must stay explicit. Summary is not an action or independent factual verification. Provider billing and the per-person rate limit apply."
+  },
+  {
+    "python": "coordinate",
+    "go": "Coordinate",
+    "typescript": "coordinate",
+    "family": "coordinator",
+    "purpose": "Let Coordinator choose specialists and dispatch permitted communication automatically.",
+    "returns": "OverseerPlan marked automatic, with attributed instructions/dispatches or a status answer.",
+    "recovery": "No UI preview is required. Uses the caller's current rights, not an operator override. It cannot approve business actions, change identities or grant permissions. Model execution is billed by the configured provider."
+  },
+  {
+    "python": "redeem",
+    "go": "Redeem",
+    "typescript": "redeem",
+    "family": "execution",
+    "purpose": "Redeem an optional bound approval for the exact declared action.",
+    "returns": "Execution with authorized state and stable operation_key.",
+    "recovery": "Advanced opt-in contract, not necessary for a normal approval message. The resource owner must enforce operation-key and resource-version fences. Approval never proves execution."
+  },
+  {
+    "python": "report_execution",
+    "go": "ReportExecution",
+    "typescript": "reportExecution",
+    "family": "execution",
+    "purpose": "Report what the executor actually observed for an authorized operation.",
+    "returns": "Updated Execution with state and result.",
+    "recovery": "Allowed reports: running, succeeded, failed, unknown. Terminal reports cannot be overwritten. Use unknown when the external result cannot be established; never turn a timeout into success."
+  }
+]

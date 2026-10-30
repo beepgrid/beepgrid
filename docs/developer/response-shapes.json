@@ -1,0 +1,743 @@
+{
+  "POST /api/v1/people/{id}/status": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/agents/{id}/status": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/services/{id}/status": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/role-bindings": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/worker/heartbeat": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/auth/login": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/auth/logout": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/destinations/{id}/remove": {
+    "type": "object",
+    "properties": {
+      "removed": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/people/{id}/telegram-account/remove": {
+    "type": "object",
+    "properties": {
+      "removed": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/people/{id}/discord-account/remove": {
+    "type": "object",
+    "properties": {
+      "removed": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/credentials/{id}/revoke": {
+    "type": "object",
+    "properties": {
+      "revoked": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/worker/inbox/{id}/ack": {
+    "type": "object",
+    "properties": {
+      "received": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/deliveries/{id}/retry": {
+    "type": "object",
+    "properties": {
+      "queued": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/answers/{id}/invalidate": {
+    "type": "object",
+    "properties": {
+      "invalidated": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/people/{id}/slack-account": {
+    "type": "object",
+    "properties": {
+      "linked": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/people/{id}/oidc-account": {
+    "type": "object",
+    "properties": {
+      "linked": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/people/{id}/telegram-account": {
+    "type": "object",
+    "properties": {
+      "linked": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/people/{id}/discord-account": {
+    "type": "object",
+    "properties": {
+      "linked": {
+        "type": "boolean",
+        "description": "True after the operation succeeds."
+      }
+    }
+  },
+  "POST /api/v1/credentials": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "New credential ID."
+      },
+      "token": {
+        "type": "string",
+        "description": "One-time secret; save in a protected credential file."
+      },
+      "kind": {
+        "type": "string",
+        "description": "Issued credential kind: api or enrollment."
+      }
+    }
+  },
+  "GET /api/v1/workspace": {
+    "type": "object",
+    "properties": {
+      "scope": {
+        "type": "string",
+        "description": "Selected workspace scope ID."
+      },
+      "company": {
+        "type": "string",
+        "description": "Workspace display name."
+      },
+      "environment": {
+        "type": "string",
+        "description": "Selected environment label."
+      },
+      "can_read_account": {
+        "type": "boolean",
+        "description": "Whether this caller may inspect the account projection."
+      }
+    }
+  },
+  "GET /api/v1/workspace/account": {
+    "type": "object",
+    "properties": {
+      "scope": {
+        "type": "string",
+        "description": "Selected workspace scope ID."
+      },
+      "company": {
+        "type": "string",
+        "description": "Workspace display name."
+      },
+      "environment": {
+        "type": "string",
+        "description": "Selected environment label."
+      },
+      "can_read_account": {
+        "type": "boolean",
+        "description": "Whether this caller may inspect the account projection."
+      },
+      "suspended": {
+        "type": "boolean",
+        "description": "Whether the workspace is suspended."
+      },
+      "recovery_hold": {
+        "type": "boolean",
+        "description": "Whether restore reconciliation holds outbound work."
+      },
+      "access_until": {
+        "type": "string",
+        "description": "Optional access cutoff.",
+        "format": "date-time"
+      },
+      "control_version": {
+        "type": "integer",
+        "description": "Applied control revision."
+      },
+      "budget": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "description": "Applied budget revision."
+          },
+          "messages": {
+            "type": "integer",
+            "description": "Monthly canonical recipient-message allowance; -1 means unlimited."
+          },
+          "requests": {
+            "type": "integer",
+            "description": "Monthly requested-reply allowance; -1 means unlimited."
+          },
+          "upload_bytes": {
+            "type": "integer",
+            "description": "Monthly accepted-upload byte allowance; -1 means unlimited."
+          }
+        },
+        "description": "Applied runtime budget, or null when none is configured."
+      },
+      "usage": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "string",
+              "description": "UTC month boundary.",
+              "format": "date-time"
+            },
+            "metric": {
+              "type": "string",
+              "description": "Counted usage category."
+            },
+            "units": {
+              "type": "integer",
+              "description": "Recorded canonical units."
+            }
+          }
+        },
+        "description": "Recorded usage, not provider attempts or CPU/memory."
+      },
+      "metered": {
+        "type": "boolean",
+        "description": "Whether an applied budget is configured."
+      },
+      "source": {
+        "type": "string",
+        "description": "applied_runtime for the OSS store; a configured account bridge may supply its own source."
+      }
+    }
+  },
+  "POST /api/v1/dispatch-preview": {
+    "type": "object",
+    "properties": {
+      "recipients": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "$ref": "#/components/schemas/Target"
+            },
+            "name": {
+              "type": "string",
+              "description": "Visible recipient display name."
+            },
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "description": "Connection/provider kind."
+                  },
+                  "mode": {
+                    "type": "string",
+                    "description": "Destination routing mode."
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Connection enabled state."
+                  },
+                  "permitted": {
+                    "type": "boolean",
+                    "description": "Current policy result."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Reason for the routing result."
+                  }
+                }
+              },
+              "description": "Permitted and rejected visible routes."
+            }
+          }
+        },
+        "description": "Recipients visible to this caller."
+      },
+      "count": {
+        "type": "integer",
+        "description": "Total eligible recipient count."
+      },
+      "hidden_recipients": {
+        "type": "integer",
+        "description": "Recipient count whose metadata is not disclosed."
+      },
+      "token": {
+        "type": "string",
+        "description": "Short-lived audience/route fingerprint for the matching write."
+      },
+      "expires_at": {
+        "type": "string",
+        "description": "Token expiry.",
+        "format": "date-time"
+      },
+      "sends": {
+        "type": "boolean",
+        "description": "Always false; preview does not dispatch."
+      }
+    }
+  },
+  "POST /api/v1/route-preview": {
+    "type": "object",
+    "properties": {
+      "recipients": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/Person"
+            },
+            {
+              "$ref": "#/components/schemas/Agent"
+            },
+            {
+              "$ref": "#/components/schemas/Service"
+            }
+          ]
+        },
+        "description": "Visible resolved recipients."
+      },
+      "count": {
+        "type": "integer",
+        "description": "Total eligible recipients."
+      },
+      "hidden_recipients": {
+        "type": "integer",
+        "description": "Eligible recipients whose metadata is hidden."
+      },
+      "mode": {
+        "type": "string",
+        "description": "private_per_recipient."
+      },
+      "sends": {
+        "type": "boolean",
+        "description": "Always false."
+      }
+    }
+  },
+  "GET /api/v1/requests/{id}/trace": {
+    "type": "object",
+    "properties": {
+      "request": {
+        "$ref": "#/components/schemas/Request"
+      },
+      "deliveries": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {},
+            "description": "Authorized records returned by this page."
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Opaque next-page cursor. Continue even when the current items array is empty."
+          },
+          "order": {
+            "type": "string",
+            "description": "Documented ordering for this collection."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "executions": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {},
+            "description": "Authorized records returned by this page."
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Opaque next-page cursor. Continue even when the current items array is empty."
+          },
+          "order": {
+            "type": "string",
+            "description": "Documented ordering for this collection."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "evidence": {
+        "type": "string",
+        "description": "Explains transport versus executor-reported business evidence."
+      }
+    }
+  },
+  "POST /api/v1/roles/preview": {
+    "type": "object",
+    "properties": {
+      "can_save": {
+        "type": "boolean",
+        "description": "Whether current authority permits this proposal."
+      },
+      "version": {
+        "type": "integer",
+        "description": "Current role revision."
+      },
+      "affected_assignments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Binding"
+        },
+        "description": "Existing bindings affected by this role."
+      },
+      "checks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "check": {
+              "type": "object",
+              "properties": {
+                "subject_id": {
+                  "type": "string",
+                  "description": "Principal whose effective grants are simulated."
+                },
+                "action": {
+                  "type": "string",
+                  "description": "Permission action."
+                },
+                "target": {
+                  "$ref": "#/components/schemas/Target"
+                },
+                "connection_id": {
+                  "type": "string",
+                  "description": "Optional route condition."
+                },
+                "action_name": {
+                  "type": "string",
+                  "description": "Optional business action name."
+                },
+                "descriptor": {
+                  "$ref": "#/components/schemas/Action"
+                }
+              }
+            },
+            "before": {
+              "type": "boolean",
+              "description": "Current effective permission."
+            },
+            "after": {
+              "type": "boolean",
+              "description": "Effective permission under the proposed role."
+            }
+          }
+        },
+        "description": "Bounded permission comparisons."
+      },
+      "basis": {
+        "type": "string",
+        "description": "effective_role_grants; administrator bypass is excluded from simulation."
+      },
+      "saves": {
+        "type": "boolean",
+        "description": "Always false."
+      }
+    }
+  },
+  "GET /api/v1/me": {
+    "type": "object",
+    "properties": {
+      "identity_type": {
+        "type": "string",
+        "description": "person, agent or service."
+      },
+      "person": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Person"
+          },
+          {
+            "$ref": "#/components/schemas/Agent"
+          },
+          {
+            "$ref": "#/components/schemas/Service"
+          }
+        ]
+      },
+      "agent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Person"
+          },
+          {
+            "$ref": "#/components/schemas/Agent"
+          },
+          {
+            "$ref": "#/components/schemas/Service"
+          }
+        ]
+      },
+      "service": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Person"
+          },
+          {
+            "$ref": "#/components/schemas/Agent"
+          },
+          {
+            "$ref": "#/components/schemas/Service"
+          }
+        ]
+      },
+      "instance_id": {
+        "type": "string",
+        "description": "Current exact runtime ID, or empty for a non-runtime credential."
+      },
+      "admin": {
+        "type": "boolean",
+        "description": "Whether the actual credential has administrator authority."
+      },
+      "can_publish_answers": {
+        "type": "boolean",
+        "description": "Current answer-publication capability."
+      },
+      "company": {
+        "type": "string",
+        "description": "Workspace display name."
+      },
+      "environment": {
+        "type": "string",
+        "description": "Environment label."
+      }
+    }
+  },
+  "POST /api/v1/fleet/status": {
+    "type": "object",
+    "properties": {
+      "agents": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "agent": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Person"
+                },
+                {
+                  "$ref": "#/components/schemas/Agent"
+                },
+                {
+                  "$ref": "#/components/schemas/Service"
+                }
+              ]
+            },
+            "instances": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/Instance"
+              },
+              "description": "Visible runtime observations."
+            },
+            "fresh": {
+              "type": "boolean",
+              "description": "At least one valid runtime is currently connected."
+            }
+          }
+        },
+        "description": "At most 100 selected/visible agents."
+      },
+      "deadlocks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "dependencies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "description": "Explicitly blocking open request."
+                  },
+                  "conversation_id": {
+                    "type": "string",
+                    "description": "Its current authorized history."
+                  },
+                  "from": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Person"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Agent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Service"
+                      }
+                    ]
+                  },
+                  "to": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Person"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Agent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Service"
+                      }
+                    ]
+                  }
+                }
+              },
+              "description": "Explicit blocking-request edges in this cycle."
+            }
+          }
+        },
+        "description": "Currently visible communication cycles."
+      },
+      "total": {
+        "type": "integer",
+        "description": "Number of included agents."
+      },
+      "fresh": {
+        "type": "integer",
+        "description": "Number with a connected instance."
+      },
+      "missing_or_stale": {
+        "type": "integer",
+        "description": "Number without a currently connected instance."
+      },
+      "as_of": {
+        "type": "string",
+        "description": "Observation time.",
+        "format": "date-time"
+      },
+      "summary": {
+        "type": "string",
+        "description": "Human-readable presence summary."
+      },
+      "mode": {
+        "type": "string",
+        "description": "read_only."
+      },
+      "commands_supported": {
+        "type": "boolean",
+        "description": "False; this endpoint does not dispatch work."
+      }
+    }
+  },
+  "GET /healthz": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "description": "Process/readiness result."
+      }
+    }
+  },
+  "GET /readyz": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "description": "Process/readiness result."
+      }
+    }
+  },
+  "GET /api/v1/auth/methods": {
+    "type": "object",
+    "properties": {
+      "token": {
+        "type": "boolean",
+        "description": "Token login is available."
+      },
+      "oidc": {
+        "type": "boolean",
+        "description": "Whether OIDC is configured."
+      }
+    }
+  }
+}

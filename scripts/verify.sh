@@ -19,6 +19,8 @@ go vet ./...
 go test -race ./... -count=1
 go test -race -tags headless ./... -count=1
 python3 scripts/sdk-integration.py
+python3 scripts/documentation-check.py
+python3 scripts/documentation-inventory-check.py
 python3 -m unittest discover -s scripts -p test_codex_capacity.py
 python3 scripts/release-audit.py
 GOFLAGS=-buildvcs=false go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

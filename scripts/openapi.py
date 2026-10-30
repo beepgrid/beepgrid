@@ -188,5 +188,51 @@ for header in ['X-Signature-Timestamp','X-Signature-Ed25519']:
     paths['/integrations/discord/{id}']['post']['parameters'].append({'name':header,'in':'header','required':True,'schema':S})
 
 spec={'openapi':'3.1.0','info':{'title':'Beep Grid open source API','version':'0.1.0-dev','license':{'name':'Apache-2.0'}},'servers':[{'url':'/'}], 'security':[{'bearer':[]},{'session':[]}], 'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'},'session':{'type':'apiKey','in':'cookie','name':'notif_session'}}}}
+status_descriptions = {'400': 'Invalid input', '401': 'Authentication required', '403': 'Permission denied', '404': 'Not found or not visible', '409': 'Conflict with current state', '413': 'Payload too large', '429': 'Rate limit exceeded', '500': 'Server error', '503': 'Service unavailable'}
+for methods in paths.values():
+    for operation in methods.values():
+        for status, response in operation.get('responses', {}).items():
+            if response.get('description') == 'Success' and status in status_descriptions:
+                response['description'] = status_descriptions[status]
+# Break shared shorthand dictionaries before adding per-field descriptions.
+spec=json.loads(json.dumps(spec))
+paths=spec['paths'];schemas=spec['components']['schemas']
+# Human-reviewed response projections include map-based endpoints and acknowledgments.
+for route, shape in json.loads((root/'docs/developer/response-shapes.json').read_text()).items():
+    method, path = route.split(' ', 1)
+    paths[path][method.lower()]['responses']['200']['content']['application/json']['schema'] = shape
+# Human-reviewed usage metadata is shared with the rendered reference.
+usage=json.loads((root/'docs/developer/operations.json').read_text())
+field_notes=json.loads((root/'docs/developer/fields.json').read_text())
+paths['/api/v1/events']['get']['parameters'].append({'name':'conversation_id','in':'query','schema':S,'description':'Optional conversation filter for stream=1 and summary=1; does not narrow the full-payload stream.'})
+paths['/api/v1/worker/inbox']['get']['parameters'].append({'name':'wait_ms','in':'query','schema':{'type':'integer','minimum':0,'maximum':20000,'default':0},'description':'Optional long-poll wait in milliseconds.'})
+for path, methods in paths.items():
+    for method, operation in methods.items():
+        note=usage[method.upper()+' '+path]
+        operation['summary']=note['description'].split('. ')[0].rstrip('.')
+        operation['description']=note['description']+'\n\n'+note['audience']+'\n\nReturns: '+note['returns']+'\n\nRecovery: '+note['errors']
+        operation['tags']=[note['family']]
+def describe_fields(node):
+    if not isinstance(node,dict): return
+    for name, field in node.get('properties',{}).items():
+        if name in field_notes and not field.get('description'): field['description']=field_notes[name]
+        describe_fields(field)
+    if isinstance(node.get('items'),dict): describe_fields(node['items'])
+schemas['SharedAnswer']=obj({'id':{'type':'string'},'key':{'type':'string'},'context_hash':{'type':'string'},'question':{'type':'string'},'answer':{},'author_id':{'type':'string'},'publisher_id':{'type':'string'},'audience':array({'type':'string'}),'valid_until':{'type':'string','format':'date-time'},'invalidated':{'type':'boolean'},'source_request':{'type':'string'}})
+for model in schemas.values(): describe_fields(model)
+for methods in paths.values():
+    for operation in methods.values():
+        for media in operation.get('requestBody',{}).get('content',{}).values(): describe_fields(media.get('schema',{}))
+        for reply in operation.get('responses',{}).values():
+            for media in reply.get('content',{}).values(): describe_fields(media.get('schema',{}))
+# The actual limit counts UTF-8 bytes, which is not JSON Schema maxLength.
+schemas['SendInput']['properties']['body'].pop('maxLength',None)
+schemas['Rule']['properties']['action']['description']='Directional permission action: view, message, ask, decide, manage or an explicitly granted wildcard.'
+paths['/api/v1/route-preview']['post']['requestBody']['content']['application/json']['schema']['properties']['action']['description']='Communication action to inspect, for example message or ask; not a bound business Action descriptor.'
+schemas['Request']['properties']['kind']['enum']=['question','approval','task']
+schemas['Execution']['properties']['state']['enum']=['authorized','running','succeeded','failed','unknown']
+schemas['AskInput']['properties']['kind']['default']='question'
+schemas['SendInput']['properties']['reuse_direct']['default']=False
+schemas['AskInput']['properties']['reuse_direct']['default']=False
 (root/'api/openapi.json').write_text(json.dumps(spec,indent=2)+'\n')
 print(f'Generated {sum(len(p) for p in paths.values())} API operations.')

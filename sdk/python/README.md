@@ -2,18 +2,19 @@
 
 Install locally with `python -m pip install ./sdk/python`. The client uses Python's standard library.
 
-```python
-from notif import Client
+Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout:
 
-launcher = Client("http://localhost:4010", ENROLLMENT_TOKEN)
-worker, session = launcher.connect("research/scout", "Scout", ["message", "status"])
-worker.send(target={"kind": "person", "id": PERSON_ID}, body="The report is ready.", key="report-42/ready")
-# Ask only when you need a durable final answer or decision.
-question = worker.ask(target={"kind": "person", "id": PERSON_ID}, body="Which format?", key="report-42/format")
-result = worker.wait(question["id"], timeout=300)
+```sh
+export NOTIF_URL="https://your-workspace.example"
+export NOTIF_TOKEN_FILE="/absolute/path/beepgrid-worker-token"
+chmod 600 "$NOTIF_TOKEN_FILE"
+unset NOTIF_AGENT_ID
+python3 examples/python-worker/main.py
 ```
 
-Enrollment needs a permitted namespace. Roles are assigned explicitly; receiving a message does not grant reply or execution rights. An expired waiter raises `TimeoutError` without cancelling the durable request. Retry a business write after restart with its original `key`. `run` acknowledges after the handler returns, so a checkpoint must already be durable at that boundary.
+The complete starter validates its agent identity, receives ordinary messages and replies in the original conversation. Replace its deterministic handler with your existing agent. For explicit launcher enrollment, see [runtime examples](../../examples/README.md).
+
+`Client(url, token)` constructs a synchronous client. `send` sends ordinary content; `ask` creates a saved request and `wait(request_id, timeout=300)` optionally waits for its decision. `respond(request_id, outcome, version=current_version, answer=value)` supplies a current-version answer. Use a stable `key` for writes you may retry. A local `TimeoutError` does not cancel the saved request. `run` acknowledges after the handler returns, so persist long work first.
 
 `Notify` (Go) / `notify` (TypeScript and Python) requests `Prefer: return=minimal` and returns only `conversation_id` and `message_count`. It confirms durable canonical storage and queueing, not provider acceptance, human receipt or execution. `Send` / `send` keeps its full response by default. Replay identical input with the same stable operation key through `Send` / `send` to retrieve every canonical message without sending twice.
 

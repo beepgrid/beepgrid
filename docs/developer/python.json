@@ -1,0 +1,232 @@
+[
+  {
+    "name": "__init__",
+    "signature": "__init__(self, base_url: str, token: str, timeout: float=20)",
+    "doc": ""
+  },
+  {
+    "name": "call",
+    "signature": "call(self, method: str, path: str, data: Any=None, *, key: str | None=None, minimal: bool=False, timeout: float | None=None)",
+    "doc": ""
+  },
+  {
+    "name": "events",
+    "signature": "events(self, **options: Any)",
+    "doc": "Yield canonical events. Save sequence only after applying each event."
+  },
+  {
+    "name": "start_chat",
+    "signature": "start_chat(self, *, targets: list[dict[str, str]], body: str, title: str='', approval: bool=False, choices: list[str] | None=None, mentions: list[dict[str, Any]] | None=None, attachment_ids: list[str] | None=None, key: str | None=None)",
+    "doc": "Start shared history. Mention offsets are code points; all members receive it."
+  },
+  {
+    "name": "change_chat_membership",
+    "signature": "change_chat_membership(self, conversation_id: str, *, operation: str, version: int, title: str='', members: list[str] | None=None, share_history: bool=False, next_manager: str='', key: str | None=None)",
+    "doc": "Change shared disclosure, never IAM. Earlier history is shared only by explicit opt-in."
+  },
+  {
+    "name": "attachments",
+    "signature": "attachments(self, conversation_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "upload_attachment",
+    "signature": "upload_attachment(self, conversation_id: str, name: str, media: str, data: bytes)",
+    "doc": "No automatic retry: list attachments after an unknown upload outcome."
+  },
+  {
+    "name": "stage_attachment",
+    "signature": "stage_attachment(self, name: str, media: str, data: bytes)",
+    "doc": "Private draft for attachment_ids. No automatic retry; unused drafts expire after 24 hours."
+  },
+  {
+    "name": "download_attachment",
+    "signature": "download_attachment(self, attachment_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "directory",
+    "signature": "directory(self, kind: str, search: str='')",
+    "doc": ""
+  },
+  {
+    "name": "conversation",
+    "signature": "conversation(self, conversation_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "provider_catalog",
+    "signature": "provider_catalog(self)",
+    "doc": ""
+  },
+  {
+    "name": "connection_setup",
+    "signature": "connection_setup(self, connection_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "replace_request",
+    "signature": "replace_request(self, request_id: str, version: int, body: str, *, key: str | None=None, mentions: list[dict[str, Any]] | None=None)",
+    "doc": "Replace an own pending request. Retain key when retrying an unknown result."
+  },
+  {
+    "name": "cancel",
+    "signature": "cancel(self, request_id: str, version: int)",
+    "doc": ""
+  },
+  {
+    "name": "query",
+    "signature": "query(self, collection: str, **options: Any)",
+    "doc": ""
+  },
+  {
+    "name": "capabilities",
+    "signature": "capabilities(self, **options: Any)",
+    "doc": ""
+  },
+  {
+    "name": "access",
+    "signature": "access(self, subject_id: str='')",
+    "doc": ""
+  },
+  {
+    "name": "dispatch_preview",
+    "signature": "dispatch_preview(self, targets: list[dict[str, str]], operation: str, **options: Any)",
+    "doc": ""
+  },
+  {
+    "name": "send_batch",
+    "signature": "send_batch(self, targets: list[dict[str, str]], body: str, *, key: str | None=None, **options: Any)",
+    "doc": ""
+  },
+  {
+    "name": "ask_batch",
+    "signature": "ask_batch(self, targets: list[dict[str, str]], request: dict[str, Any], *, key: str | None=None, **options: Any)",
+    "doc": ""
+  },
+  {
+    "name": "request_trace",
+    "signature": "request_trace(self, request_id: str, cursor: str='')",
+    "doc": ""
+  },
+  {
+    "name": "workspace",
+    "signature": "workspace(self)",
+    "doc": ""
+  },
+  {
+    "name": "account",
+    "signature": "account(self)",
+    "doc": ""
+  },
+  {
+    "name": "connect",
+    "signature": "connect(self, agent: str, name: str, capabilities: list[str] | None=None, metadata: dict[str, Any] | None=None)",
+    "doc": ""
+  },
+  {
+    "name": "send",
+    "signature": "send(self, *, body: str, target: dict[str, str] | None=None, conversation_id: str='', title: str='', key: str | None=None, minimal: bool=False, preview_token: str='', mentions: list[dict[str, Any]] | None=None, reuse_direct: bool=False, attachment_ids: list[str] | None=None)",
+    "doc": ""
+  },
+  {
+    "name": "notify",
+    "signature": "notify(self, **options: Any)",
+    "doc": "Durable acceptance only. send with the same input/key recovers the full receipt."
+  },
+  {
+    "name": "ask",
+    "signature": "ask(self, *, target: dict[str, str], title: str='', key: str | None=None, **options: Any)",
+    "doc": ""
+  },
+  {
+    "name": "set_request_blocking",
+    "signature": "set_request_blocking(self, request_id: str, blocking: bool)",
+    "doc": ""
+  },
+  {
+    "name": "coordinate",
+    "signature": "coordinate(self, prompt: str, *, key: str | None=None, **options: Any)",
+    "doc": ""
+  },
+  {
+    "name": "get_request",
+    "signature": "get_request(self, request_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "respond",
+    "signature": "respond(self, request_id: str, outcome: str, *, version: int, answer: Any=None)",
+    "doc": ""
+  },
+  {
+    "name": "assistance",
+    "signature": "assistance(self)",
+    "doc": ""
+  },
+  {
+    "name": "update_assistance",
+    "signature": "update_assistance(self, *, overseer: bool | None=None, version: int | None=None)",
+    "doc": ""
+  },
+  {
+    "name": "plan_overseer",
+    "signature": "plan_overseer(self, prompt: str, target: dict[str, str] | None=None, *, previous_plan_id: str | None=None, key: str | None=None)",
+    "doc": ""
+  },
+  {
+    "name": "overseer_plans",
+    "signature": "overseer_plans(self)",
+    "doc": ""
+  },
+  {
+    "name": "overseer_plan",
+    "signature": "overseer_plan(self, plan_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "confirm_overseer",
+    "signature": "confirm_overseer(self, plan_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "summarize_overseer",
+    "signature": "summarize_overseer(self, plan_id: str)",
+    "doc": ""
+  },
+  {
+    "name": "redeem",
+    "signature": "redeem(self, request_id: str, action: dict[str, Any])",
+    "doc": "Recheck authorization; the business tool must enforce operation/version fences."
+  },
+  {
+    "name": "report_execution",
+    "signature": "report_execution(self, execution_id: str, state: str, result: Any=None)",
+    "doc": "Report observed state without equating delivery or approval with execution."
+  },
+  {
+    "name": "wait",
+    "signature": "wait(self, request_id: str, timeout: float | None=None, interval: float=1)",
+    "doc": ""
+  },
+  {
+    "name": "inbox",
+    "signature": "inbox(self)",
+    "doc": ""
+  },
+  {
+    "name": "ack",
+    "signature": "ack(self, delivery: dict[str, Any])",
+    "doc": ""
+  },
+  {
+    "name": "heartbeat",
+    "signature": "heartbeat(self, **progress: Any)",
+    "doc": ""
+  },
+  {
+    "name": "run",
+    "signature": "run(self, handler: Callable[[dict[str, Any]], None], stop: Callable[[], bool]=lambda: False)",
+    "doc": ""
+  }
+]

@@ -1,0 +1,2637 @@
+[
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "Assistance",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) (AssistanceSettings, error)"
+  },
+  {
+    "definition": "struct {\n\tOverseer           bool  `json:\"overseer\"`\n\tVersion            int64 `json:\"version\"`\n\tOverseerConfigured bool  `json:\"overseer_configured\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Overseer",
+        "tag": "`json:\"overseer\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "OverseerConfigured",
+        "tag": "`json:\"overseer_configured\"`",
+        "type": "bool"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "AssistanceSettings"
+  },
+  {
+    "definition": "struct {\n\tVersion  int64 `json:\"version,omitempty\"`\n\tOverseer *bool `json:\"overseer,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version,omitempty\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "Overseer",
+        "tag": "`json:\"overseer,omitempty\"`",
+        "type": "*bool"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "AssistanceUpdate"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "ConfirmOverseer",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) (OverseerPlan, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "Coordinate",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "OverseerInput"
+      },
+      {
+        "name": "keys",
+        "type": "...string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in OverseerInput, keys ...string) (OverseerPlan, error)"
+  },
+  {
+    "definition": "struct {\n\tAgent     Agent      `json:\"agent\"`\n\tInstances []Instance `json:\"instances\"`\n\tFresh     bool       `json:\"fresh\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Agent",
+        "tag": "`json:\"agent\"`",
+        "type": "Agent"
+      },
+      {
+        "doc": "",
+        "name": "Instances",
+        "tag": "`json:\"instances\"`",
+        "type": "[]Instance"
+      },
+      {
+        "doc": "",
+        "name": "Fresh",
+        "tag": "`json:\"fresh\"`",
+        "type": "bool"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "FleetAgent"
+  },
+  {
+    "definition": "struct {\n\tID           string         `json:\"id\"`\n\tAgentID      string         `json:\"agent_id\"`\n\tPresence     string         `json:\"presence\"`\n\tLastSeen     time.Time      `json:\"last_seen\"`\n\tCapabilities []string       `json:\"capabilities\"`\n\tProgress     map[string]any `json:\"progress\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "AgentID",
+        "tag": "`json:\"agent_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Presence",
+        "tag": "`json:\"presence\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "LastSeen",
+        "tag": "`json:\"last_seen\"`",
+        "type": "time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Capabilities",
+        "tag": "`json:\"capabilities\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Progress",
+        "tag": "`json:\"progress\"`",
+        "type": "map[string]any"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "Instance"
+  },
+  {
+    "definition": "struct {\n\tAgentID        string `json:\"agent_id\"`\n\tConversationID string `json:\"conversation_id\"`\n\tRequestID      string `json:\"request_id,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "AgentID",
+        "tag": "`json:\"agent_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "RequestID",
+        "tag": "`json:\"request_id,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "OverseerDispatch"
+  },
+  {
+    "definition": "struct {\n\tPreviousPlanID string  `json:\"previous_plan_id,omitempty\"`\n\tPrompt         string  `json:\"prompt\"`\n\tTarget         *Target `json:\"target,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "PreviousPlanID",
+        "tag": "`json:\"previous_plan_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Prompt",
+        "tag": "`json:\"prompt\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Target",
+        "tag": "`json:\"target,omitempty\"`",
+        "type": "*Target"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "OverseerInput"
+  },
+  {
+    "definition": "struct {\n\tAgentID   string `json:\"agent_id\"`\n\tOperation string `json:\"operation\"`\n\tBody      string `json:\"body\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "AgentID",
+        "tag": "`json:\"agent_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Operation",
+        "tag": "`json:\"operation\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "OverseerInstruction"
+  },
+  {
+    "definition": "struct {\n\tAutomatic            bool                  `json:\"automatic,omitempty\"`\n\tInstructions         []OverseerInstruction `json:\"instructions,omitempty\"`\n\tSummaryError         string                `json:\"summary_error,omitempty\"`\n\tPreviousPlanID       string                `json:\"previous_plan_id,omitempty\"`\n\tTarget               *Target               `json:\"target,omitempty\"`\n\tID                   string                `json:\"id\"`\n\tPrompt               string                `json:\"prompt\"`\n\tContextIDs           []string              `json:\"context_agent_ids\"`\n\tOperation            string                `json:\"operation\"`\n\tSummary              string                `json:\"summary\"`\n\tBody                 string                `json:\"body,omitempty\"`\n\tSources              []FleetAgent          `json:\"sources\"`\n\tRequiresConfirmation bool                  `json:\"requires_confirmation\"`\n\tCreatedAt            time.Time             `json:\"created_at\"`\n\tExpiresAt            time.Time             `json:\"expires_at\"`\n\tDispatches           []OverseerDispatch    `json:\"dispatches\"`\n\tReplies              []Request             `json:\"replies\"`\n\tReplySummary         string                `json:\"reply_summary,omitempty\"`\n\tReplyDigest          string                `json:\"reply_digest,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Automatic",
+        "tag": "`json:\"automatic,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "Instructions",
+        "tag": "`json:\"instructions,omitempty\"`",
+        "type": "[]OverseerInstruction"
+      },
+      {
+        "doc": "",
+        "name": "SummaryError",
+        "tag": "`json:\"summary_error,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "PreviousPlanID",
+        "tag": "`json:\"previous_plan_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Target",
+        "tag": "`json:\"target,omitempty\"`",
+        "type": "*Target"
+      },
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Prompt",
+        "tag": "`json:\"prompt\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ContextIDs",
+        "tag": "`json:\"context_agent_ids\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Operation",
+        "tag": "`json:\"operation\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Summary",
+        "tag": "`json:\"summary\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Sources",
+        "tag": "`json:\"sources\"`",
+        "type": "[]FleetAgent"
+      },
+      {
+        "doc": "",
+        "name": "RequiresConfirmation",
+        "tag": "`json:\"requires_confirmation\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "CreatedAt",
+        "tag": "`json:\"created_at\"`",
+        "type": "time.Time"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at\"`",
+        "type": "time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Dispatches",
+        "tag": "`json:\"dispatches\"`",
+        "type": "[]OverseerDispatch"
+      },
+      {
+        "doc": "",
+        "name": "Replies",
+        "tag": "`json:\"replies\"`",
+        "type": "[]Request"
+      },
+      {
+        "doc": "",
+        "name": "ReplySummary",
+        "tag": "`json:\"reply_summary,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ReplyDigest",
+        "tag": "`json:\"reply_digest,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "type",
+    "name": "OverseerPlan"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "OverseerPlan",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) (OverseerPlan, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "OverseerPlans",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) ([]OverseerPlan, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "PlanOverseer",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "OverseerInput"
+      },
+      {
+        "name": "keys",
+        "type": "...string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in OverseerInput, keys ...string) (OverseerPlan, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "SummarizeOverseer",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) (OverseerPlan, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/assistance.go",
+    "kind": "method",
+    "name": "UpdateAssistance",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "AssistanceUpdate"
+      }
+    ],
+    "signature": "func(ctx context.Context, in AssistanceUpdate) (AssistanceSettings, error)"
+  },
+  {
+    "definition": "struct {\n\tCode    string `json:\"code\"`\n\tMessage string `json:\"message\"`\n\tStatus  int    `json:\"-\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Code",
+        "tag": "`json:\"code\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Message",
+        "tag": "`json:\"message\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Status",
+        "tag": "`json:\"-\"`",
+        "type": "int"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "APIError"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Ack",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "d",
+        "type": "Delivery"
+      }
+    ],
+    "signature": "func(ctx context.Context, d Delivery) error"
+  },
+  {
+    "definition": "struct {\n\tName            string         `json:\"name\"`\n\tExecutorID      string         `json:\"executor_id\"`\n\tResource        string         `json:\"resource\"`\n\tResourceVersion string         `json:\"resource_version\"`\n\tArguments       map[string]any `json:\"arguments\"`\n\tOperationKey    string         `json:\"operation_key\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Name",
+        "tag": "`json:\"name\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExecutorID",
+        "tag": "`json:\"executor_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Resource",
+        "tag": "`json:\"resource\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ResourceVersion",
+        "tag": "`json:\"resource_version\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Arguments",
+        "tag": "`json:\"arguments\"`",
+        "type": "map[string]any"
+      },
+      {
+        "doc": "",
+        "name": "OperationKey",
+        "tag": "`json:\"operation_key\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Action"
+  },
+  {
+    "definition": "struct {\n\tID         string         `json:\"id\"`\n\tName       string         `json:\"name\"`\n\tExternalID string         `json:\"external_id\"`\n\tMetadata   map[string]any `json:\"metadata\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Name",
+        "tag": "`json:\"name\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExternalID",
+        "tag": "`json:\"external_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Metadata",
+        "tag": "`json:\"metadata\"`",
+        "type": "map[string]any"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Agent"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Ask",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "AskInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in AskInput, key string) (Request, error)"
+  },
+  {
+    "definition": "struct {\n\tAttachmentIDs  []string   `json:\"attachment_ids,omitempty\"`\n\tMentions       []Mention  `json:\"mentions,omitempty\"`\n\tBlocking       bool       `json:\"blocking,omitempty\"`\n\tReuseDirect    bool       `json:\"reuse_direct,omitempty\"`\n\tPreviewToken   string     `json:\"preview_token,omitempty\"`\n\tTarget         Target     `json:\"target\"`\n\tConversationID string     `json:\"conversation_id,omitempty\"`\n\tKind           string     `json:\"kind,omitempty\"`\n\tTitle          string     `json:\"title,omitempty\"`\n\tBody           string     `json:\"body,omitempty\"`\n\tChoices        []string   `json:\"choices,omitempty\"`\n\tExpiresAt      *time.Time `json:\"expires_at,omitempty\"`\n\tAction         *Action    `json:\"action,omitempty\"`\n\tSharedKey      string     `json:\"shared_key,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "AttachmentIDs",
+        "tag": "`json:\"attachment_ids,omitempty\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Mentions",
+        "tag": "`json:\"mentions,omitempty\"`",
+        "type": "[]Mention"
+      },
+      {
+        "doc": "",
+        "name": "Blocking",
+        "tag": "`json:\"blocking,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "ReuseDirect",
+        "tag": "`json:\"reuse_direct,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "PreviewToken",
+        "tag": "`json:\"preview_token,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Target",
+        "tag": "`json:\"target\"`",
+        "type": "Target"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Kind",
+        "tag": "`json:\"kind,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Title",
+        "tag": "`json:\"title,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Choices",
+        "tag": "`json:\"choices,omitempty\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at,omitempty\"`",
+        "type": "*time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Action",
+        "tag": "`json:\"action,omitempty\"`",
+        "type": "*Action"
+      },
+      {
+        "doc": "",
+        "name": "SharedKey",
+        "tag": "`json:\"shared_key,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "AskInput"
+  },
+  {
+    "doc": "AttentionFor is an addressing hint, never an exclusive responder rule.\n",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "AttentionFor",
+    "parameters": [
+      {
+        "name": "recipient",
+        "type": "string"
+      }
+    ],
+    "signature": "func(recipient string) string"
+  },
+  {
+    "definition": "struct {\n\tBaseURL string\n\tToken   string\n\tHTTP    *http.Client\n\t// AssistanceTimeout applies only to model-backed planning and summaries.\n\t// Zero uses 40 seconds; a shorter caller context still takes precedence.\n\tAssistanceTimeout time.Duration\n\t// MaxResponseBytes bounds decoded responses. Zero uses 256 MiB, covering the\n\t// API's bounded 1000-recipient fan-out even with JSON escaping. Decoding streams.\n\tMaxResponseBytes int64\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "BaseURL",
+        "tag": "",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Token",
+        "tag": "",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "HTTP",
+        "tag": "",
+        "type": "*http.Client"
+      },
+      {
+        "doc": "AssistanceTimeout applies only to model-backed planning and summaries.\nZero uses 40 seconds; a shorter caller context still takes precedence.\n",
+        "name": "AssistanceTimeout",
+        "tag": "",
+        "type": "time.Duration"
+      },
+      {
+        "doc": "MaxResponseBytes bounds decoded responses. Zero uses 256 MiB, covering the\nAPI's bounded 1000-recipient fan-out even with JSON escaping. Decoding streams.\n",
+        "name": "MaxResponseBytes",
+        "tag": "",
+        "type": "int64"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Client"
+  },
+  {
+    "definition": "struct {\n\tID         string `json:\"id\"`\n\tGeneration int64  `json:\"generation\"`\n\tPayload    struct {\n\t\tType           string   `json:\"type\"`\n\t\tConversationID string   `json:\"conversation_id\"`\n\t\tMessage        *Message `json:\"message,omitempty\"`\n\t\tRequest        *Request `json:\"request,omitempty\"`\n\t} `json:\"payload\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Generation",
+        "tag": "`json:\"generation\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "Payload",
+        "tag": "`json:\"payload\"`",
+        "type": "struct {\n\tType           string   `json:\"type\"`\n\tConversationID string   `json:\"conversation_id\"`\n\tMessage        *Message `json:\"message,omitempty\"`\n\tRequest        *Request `json:\"request,omitempty\"`\n}"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Delivery"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Do",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "method",
+        "type": "string"
+      },
+      {
+        "name": "path",
+        "type": "string"
+      },
+      {
+        "name": "in",
+        "type": "any"
+      },
+      {
+        "name": "out",
+        "type": "any"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, method, path string, in, out any, key string) error"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Enroll",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "EnrollInput"
+      }
+    ],
+    "signature": "func(ctx context.Context, in EnrollInput) (*Client, Session, error)"
+  },
+  {
+    "definition": "struct {\n\tParentID     string         `json:\"parent_id,omitempty\"`\n\tAgent        string         `json:\"agent\"`\n\tName         string         `json:\"name\"`\n\tCapabilities []string       `json:\"capabilities\"`\n\tMetadata     map[string]any `json:\"metadata,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ParentID",
+        "tag": "`json:\"parent_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Agent",
+        "tag": "`json:\"agent\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Name",
+        "tag": "`json:\"name\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Capabilities",
+        "tag": "`json:\"capabilities\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Metadata",
+        "tag": "`json:\"metadata,omitempty\"`",
+        "type": "map[string]any"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "EnrollInput"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Error",
+    "parameters": [],
+    "signature": "func() string"
+  },
+  {
+    "definition": "struct {\n\tID           string `json:\"id\"`\n\tRequestID    string `json:\"request_id\"`\n\tExecutorID   string `json:\"executor_id\"`\n\tOperationKey string `json:\"operation_key\"`\n\tAction       Action `json:\"action\"`\n\tState        string `json:\"state\"`\n\tResult       any    `json:\"result\"`\n}",
+    "doc": "Execution is an authorization intent and worker report, not proof of an external effect.\n",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "RequestID",
+        "tag": "`json:\"request_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExecutorID",
+        "tag": "`json:\"executor_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "OperationKey",
+        "tag": "`json:\"operation_key\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Action",
+        "tag": "`json:\"action\"`",
+        "type": "Action"
+      },
+      {
+        "doc": "",
+        "name": "State",
+        "tag": "`json:\"state\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Result",
+        "tag": "`json:\"result\"`",
+        "type": "any"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Execution"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "GetRequest",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) (Request, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Heartbeat",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "progress",
+        "type": "map[string]any"
+      }
+    ],
+    "signature": "func(ctx context.Context, progress map[string]any) error"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Inbox",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) ([]Delivery, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "function",
+    "name": "Key",
+    "parameters": [],
+    "signature": "func() string"
+  },
+  {
+    "definition": "struct {\n\tPrincipalID string `json:\"principal_id\"`\n\tStart       int    `json:\"start\"`\n\tEnd         int    `json:\"end\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "PrincipalID",
+        "tag": "`json:\"principal_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Start",
+        "tag": "`json:\"start\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "End",
+        "tag": "`json:\"end\"`",
+        "type": "int"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Mention"
+  },
+  {
+    "definition": "struct {\n\tAttachments    []Attachment `json:\"attachments,omitempty\"`\n\tMentions       []Mention    `json:\"mentions,omitempty\"`\n\tID             string       `json:\"id\"`\n\tConversationID string       `json:\"conversation_id\"`\n\tBody           string       `json:\"body\"`\n\tSenderID       string       `json:\"sender_id\"`\n\tInstanceID     string       `json:\"instance_id,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Attachments",
+        "tag": "`json:\"attachments,omitempty\"`",
+        "type": "[]Attachment"
+      },
+      {
+        "doc": "",
+        "name": "Mentions",
+        "tag": "`json:\"mentions,omitempty\"`",
+        "type": "[]Mention"
+      },
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "SenderID",
+        "tag": "`json:\"sender_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "InstanceID",
+        "tag": "`json:\"instance_id,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Message"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "function",
+    "name": "New",
+    "parameters": [
+      {
+        "name": "baseURL",
+        "type": "string"
+      },
+      {
+        "name": "token",
+        "type": "string"
+      }
+    ],
+    "signature": "func(baseURL, token string) *Client"
+  },
+  {
+    "doc": "Notify avoids retransmitting canonical messages the caller already sent.\nSend with the same input and key recovers the complete receipt without a resend.\n",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Notify",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "SendInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in SendInput, key string) (SendReceipt, error)"
+  },
+  {
+    "definition": "struct {\n\tID         string         `json:\"id\"`\n\tName       string         `json:\"name\"`\n\tExternalID string         `json:\"external_id\"`\n\tMetadata   map[string]any `json:\"metadata\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Name",
+        "tag": "`json:\"name\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExternalID",
+        "tag": "`json:\"external_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Metadata",
+        "tag": "`json:\"metadata\"`",
+        "type": "map[string]any"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Person"
+  },
+  {
+    "doc": "Redeem rechecks current authority and returns the same intent for repeated calls.\nA protected business tool must still enforce OperationKey and ResourceVersion.\n",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Redeem",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "type": "Action"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, action Action) (Execution, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "ReportExecution",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "state",
+        "type": "string"
+      },
+      {
+        "name": "result",
+        "type": "any"
+      }
+    ],
+    "signature": "func(ctx context.Context, id, state string, result any) (Execution, error)"
+  },
+  {
+    "definition": "struct {\n\tAttachments         []Attachment `json:\"attachments,omitempty\"`\n\tMentions            []Mention    `json:\"mentions,omitempty\"`\n\tBlocking            bool         `json:\"blocking,omitempty\"`\n\tRequesterInstanceID string       `json:\"requester_instance_id,omitempty\"`\n\tID                  string       `json:\"id\"`\n\tConversationID      string       `json:\"conversation_id\"`\n\tRequesterID         string       `json:\"requester_id\"`\n\tKind                string       `json:\"kind\"`\n\tTitle               string       `json:\"title\"`\n\tBody                string       `json:\"body\"`\n\tChoices             []string     `json:\"choices\"`\n\tState               string       `json:\"state\"`\n\tVersion             int          `json:\"version\"`\n\tResponse            *Response    `json:\"response,omitempty\"`\n\tAction              *Action      `json:\"action,omitempty\"`\n\tExpiresAt           time.Time    `json:\"expires_at\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Attachments",
+        "tag": "`json:\"attachments,omitempty\"`",
+        "type": "[]Attachment"
+      },
+      {
+        "doc": "",
+        "name": "Mentions",
+        "tag": "`json:\"mentions,omitempty\"`",
+        "type": "[]Mention"
+      },
+      {
+        "doc": "",
+        "name": "Blocking",
+        "tag": "`json:\"blocking,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "RequesterInstanceID",
+        "tag": "`json:\"requester_instance_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "RequesterID",
+        "tag": "`json:\"requester_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Kind",
+        "tag": "`json:\"kind\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Title",
+        "tag": "`json:\"title\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Choices",
+        "tag": "`json:\"choices\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "State",
+        "tag": "`json:\"state\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "Response",
+        "tag": "`json:\"response,omitempty\"`",
+        "type": "*Response"
+      },
+      {
+        "doc": "",
+        "name": "Action",
+        "tag": "`json:\"action,omitempty\"`",
+        "type": "*Action"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at\"`",
+        "type": "time.Time"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Request"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Respond",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "in",
+        "type": "Response"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, in Response) (Request, error)"
+  },
+  {
+    "definition": "struct {\n\tResponderInstanceID string `json:\"responder_instance_id,omitempty\"`\n\tSourceAnswerID      string `json:\"source_answer_id,omitempty\"`\n\tReuseMethod         string `json:\"reuse_method,omitempty\"`\n\tReuseReason         string `json:\"reuse_reason,omitempty\"`\n\tSourceInvalidated   bool   `json:\"source_invalidated,omitempty\"`\n\tOutcome             string `json:\"outcome\"`\n\tAnswer              any    `json:\"answer,omitempty\"`\n\tVersion             int    `json:\"version\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ResponderInstanceID",
+        "tag": "`json:\"responder_instance_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "SourceAnswerID",
+        "tag": "`json:\"source_answer_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ReuseMethod",
+        "tag": "`json:\"reuse_method,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ReuseReason",
+        "tag": "`json:\"reuse_reason,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "SourceInvalidated",
+        "tag": "`json:\"source_invalidated,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "Outcome",
+        "tag": "`json:\"outcome\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Answer",
+        "tag": "`json:\"answer,omitempty\"`",
+        "type": "any"
+      },
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Response"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Run",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "handler",
+        "type": "func(context.Context, Delivery) error"
+      }
+    ],
+    "signature": "func(ctx context.Context, handler func(context.Context, Delivery) error) error"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Send",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "SendInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in SendInput, key string) (SendResult, error)"
+  },
+  {
+    "definition": "struct {\n\tAttachmentIDs  []string  `json:\"attachment_ids,omitempty\"`\n\tMentions       []Mention `json:\"mentions,omitempty\"`\n\tReuseDirect    bool      `json:\"reuse_direct,omitempty\"`\n\tPreviewToken   string    `json:\"preview_token,omitempty\"`\n\tTarget         Target    `json:\"target\"`\n\tConversationID string    `json:\"conversation_id,omitempty\"`\n\tBody           string    `json:\"body\"`\n\tTitle          string    `json:\"title,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "AttachmentIDs",
+        "tag": "`json:\"attachment_ids,omitempty\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Mentions",
+        "tag": "`json:\"mentions,omitempty\"`",
+        "type": "[]Mention"
+      },
+      {
+        "doc": "",
+        "name": "ReuseDirect",
+        "tag": "`json:\"reuse_direct,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "PreviewToken",
+        "tag": "`json:\"preview_token,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Target",
+        "tag": "`json:\"target\"`",
+        "type": "Target"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Title",
+        "tag": "`json:\"title,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "SendInput"
+  },
+  {
+    "definition": "struct {\n\tConversationID string `json:\"conversation_id\"`\n\tMessageCount   int    `json:\"message_count\"`\n}",
+    "doc": "SendReceipt confirms durable acceptance, not delivery or execution.\n",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "MessageCount",
+        "tag": "`json:\"message_count\"`",
+        "type": "int"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "SendReceipt"
+  },
+  {
+    "definition": "struct {\n\tConversationID string    `json:\"conversation_id\"`\n\tMessages       []Message `json:\"messages\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Messages",
+        "tag": "`json:\"messages\"`",
+        "type": "[]Message"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "SendResult"
+  },
+  {
+    "definition": "struct {\n\tToken      string    `json:\"token\"`\n\tAgent      Agent     `json:\"agent\"`\n\tInstanceID string    `json:\"instance_id\"`\n\tExpiresAt  time.Time `json:\"expires_at\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Token",
+        "tag": "`json:\"token\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Agent",
+        "tag": "`json:\"agent\"`",
+        "type": "Agent"
+      },
+      {
+        "doc": "",
+        "name": "InstanceID",
+        "tag": "`json:\"instance_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at\"`",
+        "type": "time.Time"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Session"
+  },
+  {
+    "doc": "SetRequestBlocking declares whether this agent needs the answer to continue.\nIt does not cancel work or infer a dependency from an ordinary open request.\n",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "SetRequestBlocking",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "blocking",
+        "type": "bool"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, blocking bool) (Request, error)"
+  },
+  {
+    "definition": "struct {\n\tKind string `json:\"kind\"`\n\tID   string `json:\"id\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Kind",
+        "tag": "`json:\"kind\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/client.go",
+    "kind": "type",
+    "name": "Target"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/client.go",
+    "kind": "method",
+    "name": "Wait",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) (Request, error)"
+  },
+  {
+    "definition": "struct {\n\tSequence       int64           `json:\"sequence\"`\n\tKind           string          `json:\"kind\"`\n\tActorID        string          `json:\"actor_id\"`\n\tConversationID string          `json:\"conversation_id\"`\n\tRecipientID    string          `json:\"recipient_id\"`\n\tData           json.RawMessage `json:\"data\"`\n\tCreatedAt      time.Time       `json:\"created_at\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Sequence",
+        "tag": "`json:\"sequence\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "Kind",
+        "tag": "`json:\"kind\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ActorID",
+        "tag": "`json:\"actor_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "RecipientID",
+        "tag": "`json:\"recipient_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Data",
+        "tag": "`json:\"data\"`",
+        "type": "json.RawMessage"
+      },
+      {
+        "doc": "",
+        "name": "CreatedAt",
+        "tag": "`json:\"created_at\"`",
+        "type": "time.Time"
+      }
+    ],
+    "file": "sdk/go/notif/events.go",
+    "kind": "type",
+    "name": "Event"
+  },
+  {
+    "definition": "struct {\n\tAfter          int64\n\tSummary        bool\n\tConversationID string\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "After",
+        "tag": "",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "Summary",
+        "tag": "",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/events.go",
+    "kind": "type",
+    "name": "EventOptions"
+  },
+  {
+    "doc": "StreamEvents reconnects from the last completely handled frame. Persist your\ncursor only after applying the event. A handler error stops without advancing.\nCancellation only closes the local stream and never cancels durable requests.\n",
+    "file": "sdk/go/notif/events.go",
+    "kind": "method",
+    "name": "StreamEvents",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "options",
+        "type": "EventOptions"
+      },
+      {
+        "name": "handle",
+        "type": "func(Event) error"
+      }
+    ],
+    "signature": "func(ctx context.Context, options EventOptions, handle func(Event) error) error"
+  },
+  {
+    "definition": "struct {\n\tID             string    `json:\"id\"`\n\tConversationID string    `json:\"conversation_id\"`\n\tMessageID      string    `json:\"message_id,omitempty\"`\n\tRequestID      string    `json:\"request_id,omitempty\"`\n\tFileName       string    `json:\"file_name\"`\n\tMediaType      string    `json:\"media_type\"`\n\tSize           int64     `json:\"size\"`\n\tSHA256         string    `json:\"sha256\"`\n\tCreatedAt      time.Time `json:\"created_at\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "MessageID",
+        "tag": "`json:\"message_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "RequestID",
+        "tag": "`json:\"request_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "FileName",
+        "tag": "`json:\"file_name\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "MediaType",
+        "tag": "`json:\"media_type\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Size",
+        "tag": "`json:\"size\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "SHA256",
+        "tag": "`json:\"sha256\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "CreatedAt",
+        "tag": "`json:\"created_at\"`",
+        "type": "time.Time"
+      }
+    ],
+    "file": "sdk/go/notif/files.go",
+    "kind": "type",
+    "name": "Attachment"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/files.go",
+    "kind": "method",
+    "name": "Attachments",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "conversationID",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, conversationID string) ([]Attachment, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/files.go",
+    "kind": "method",
+    "name": "DownloadAttachment",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) ([]byte, error)"
+  },
+  {
+    "doc": "StageAttachment creates a private draft for the next send/ask/start operation.\nIt is never automatically retried. Unused drafts expire after 24 hours.\n",
+    "file": "sdk/go/notif/files.go",
+    "kind": "method",
+    "name": "StageAttachment",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "media",
+        "type": "string"
+      },
+      {
+        "name": "data",
+        "type": "[]byte"
+      }
+    ],
+    "signature": "func(ctx context.Context, name, media string, data []byte) (Attachment, error)"
+  },
+  {
+    "doc": "UploadAttachment never automatically retries a non-idempotent upload. Inspect\nAttachments after an unknown response before creating another object.\n",
+    "file": "sdk/go/notif/files.go",
+    "kind": "method",
+    "name": "UploadAttachment",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "conversationID",
+        "type": "string"
+      },
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "media",
+        "type": "string"
+      },
+      {
+        "name": "data",
+        "type": "[]byte"
+      }
+    ],
+    "signature": "func(ctx context.Context, conversationID, name, media string, data []byte) (Attachment, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Access",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "subject",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, subject string) (json.RawMessage, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Account",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) (json.RawMessage, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "AskBatch",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "AskBatchInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in AskBatchInput, key string) ([]AskBatchItem, error)"
+  },
+  {
+    "definition": "struct {\n\tTargets      []Target `json:\"targets\"`\n\tRequest      AskInput `json:\"request\"`\n\tPreviewToken string   `json:\"preview_token,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Targets",
+        "tag": "`json:\"targets\"`",
+        "type": "[]Target"
+      },
+      {
+        "doc": "",
+        "name": "Request",
+        "tag": "`json:\"request\"`",
+        "type": "AskInput"
+      },
+      {
+        "doc": "",
+        "name": "PreviewToken",
+        "tag": "`json:\"preview_token,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "AskBatchInput"
+  },
+  {
+    "definition": "struct {\n\tTarget  Target  `json:\"target\"`\n\tRequest Request `json:\"request\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Target",
+        "tag": "`json:\"target\"`",
+        "type": "Target"
+      },
+      {
+        "doc": "",
+        "name": "Request",
+        "tag": "`json:\"request\"`",
+        "type": "Request"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "AskBatchItem"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Cancel",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "version",
+        "type": "int"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, version int) (Request, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Capabilities",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "CapabilityInput"
+      }
+    ],
+    "signature": "func(ctx context.Context, in CapabilityInput) (CapabilityResult, error)"
+  },
+  {
+    "definition": "struct {\n\tTarget       *Target `json:\"target,omitempty\"`\n\tRequestID    string  `json:\"request_id,omitempty\"`\n\tConnectionID string  `json:\"connection_id,omitempty\"`\n\tDescriptor   *Action `json:\"descriptor,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Target",
+        "tag": "`json:\"target,omitempty\"`",
+        "type": "*Target"
+      },
+      {
+        "doc": "",
+        "name": "RequestID",
+        "tag": "`json:\"request_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ConnectionID",
+        "tag": "`json:\"connection_id,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Descriptor",
+        "tag": "`json:\"descriptor,omitempty\"`",
+        "type": "*Action"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "CapabilityInput"
+  },
+  {
+    "definition": "struct {\n\tObservedAt     time.Time       `json:\"observed_at\"`\n\tOperations     map[string]bool `json:\"operations\"`\n\tRequestVersion int             `json:\"request_version,omitempty\"`\n\tOutcomes       []string        `json:\"outcomes\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ObservedAt",
+        "tag": "`json:\"observed_at\"`",
+        "type": "time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Operations",
+        "tag": "`json:\"operations\"`",
+        "type": "map[string]bool"
+      },
+      {
+        "doc": "",
+        "name": "RequestVersion",
+        "tag": "`json:\"request_version,omitempty\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "Outcomes",
+        "tag": "`json:\"outcomes\"`",
+        "type": "[]string"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "CapabilityResult"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "ChangeChatMembership",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "conversationID",
+        "type": "string"
+      },
+      {
+        "name": "in",
+        "type": "ChatMembershipInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, conversationID string, in ChatMembershipInput, key string) (ChatMembershipResult, error)"
+  },
+  {
+    "definition": "struct {\n\tOperation    string   `json:\"operation\"`\n\tVersion      int      `json:\"version\"`\n\tTitle        string   `json:\"title,omitempty\"`\n\tMembers      []string `json:\"members,omitempty\"`\n\tShareHistory bool     `json:\"share_history,omitempty\"`\n\tNextManager  string   `json:\"next_manager,omitempty\"`\n}",
+    "doc": "Membership controls disclosure, never IAM or the original request audience.\nShareHistory is false unless the caller explicitly opts in for additions.\n",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Operation",
+        "tag": "`json:\"operation\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "Title",
+        "tag": "`json:\"title,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Members",
+        "tag": "`json:\"members,omitempty\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "ShareHistory",
+        "tag": "`json:\"share_history,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "NextManager",
+        "tag": "`json:\"next_manager,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "ChatMembershipInput"
+  },
+  {
+    "definition": "struct {\n\tConversationID string `json:\"conversation_id\"`\n\tVersion        int    `json:\"version\"`\n\tLeft           bool   `json:\"left,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ConversationID",
+        "tag": "`json:\"conversation_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "Left",
+        "tag": "`json:\"left,omitempty\"`",
+        "type": "bool"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "ChatMembershipResult"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "ConnectionSetup",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) (json.RawMessage, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Conversation",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string) (json.RawMessage, error)"
+  },
+  {
+    "doc": "Directory keeps people, agents and services explicit and permission filtered.\n",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Directory",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "kind",
+        "type": "string"
+      },
+      {
+        "name": "search",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, kind, search string) (QueryPage, error)"
+  },
+  {
+    "definition": "struct {\n\tRecipients       []json.RawMessage `json:\"recipients\"`\n\tCount            int               `json:\"count\"`\n\tHiddenRecipients int               `json:\"hidden_recipients\"`\n\tToken            string            `json:\"token\"`\n\tExpiresAt        time.Time         `json:\"expires_at\"`\n\tSends            bool              `json:\"sends\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Recipients",
+        "tag": "`json:\"recipients\"`",
+        "type": "[]json.RawMessage"
+      },
+      {
+        "doc": "",
+        "name": "Count",
+        "tag": "`json:\"count\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "HiddenRecipients",
+        "tag": "`json:\"hidden_recipients\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "Token",
+        "tag": "`json:\"token\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at\"`",
+        "type": "time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Sends",
+        "tag": "`json:\"sends\"`",
+        "type": "bool"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "DispatchPreview"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "DispatchPreview",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "DispatchPreviewInput"
+      }
+    ],
+    "signature": "func(ctx context.Context, in DispatchPreviewInput) (DispatchPreview, error)"
+  },
+  {
+    "definition": "struct {\n\tTargets    []Target `json:\"targets\"`\n\tOperation  string   `json:\"operation\"`\n\tDescriptor *Action  `json:\"descriptor,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Targets",
+        "tag": "`json:\"targets\"`",
+        "type": "[]Target"
+      },
+      {
+        "doc": "",
+        "name": "Operation",
+        "tag": "`json:\"operation\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Descriptor",
+        "tag": "`json:\"descriptor,omitempty\"`",
+        "type": "*Action"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "DispatchPreviewInput"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "ProviderCatalog",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) (json.RawMessage, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Query",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "QueryInput"
+      }
+    ],
+    "signature": "func(ctx context.Context, in QueryInput) (QueryPage, error)"
+  },
+  {
+    "definition": "struct {\n\tCollection string            `json:\"collection\"`\n\tSearch     string            `json:\"search,omitempty\"`\n\tFilters    map[string]string `json:\"filters,omitempty\"`\n\tLimit      int               `json:\"limit,omitempty\"`\n\tCursor     string            `json:\"cursor,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Collection",
+        "tag": "`json:\"collection\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Search",
+        "tag": "`json:\"search,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Filters",
+        "tag": "`json:\"filters,omitempty\"`",
+        "type": "map[string]string"
+      },
+      {
+        "doc": "",
+        "name": "Limit",
+        "tag": "`json:\"limit,omitempty\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "Cursor",
+        "tag": "`json:\"cursor,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "QueryInput"
+  },
+  {
+    "definition": "struct {\n\tItems      []json.RawMessage `json:\"items\"`\n\tNextCursor string            `json:\"next_cursor,omitempty\"`\n\tOrder      string            `json:\"order\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Items",
+        "tag": "`json:\"items\"`",
+        "type": "[]json.RawMessage"
+      },
+      {
+        "doc": "",
+        "name": "NextCursor",
+        "tag": "`json:\"next_cursor,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Order",
+        "tag": "`json:\"order\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "QueryPage"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "ReplaceRequest",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "in",
+        "type": "ReplaceRequestInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, in ReplaceRequestInput, key string) (ReplacedRequest, error)"
+  },
+  {
+    "definition": "struct {\n\tVersion  int       `json:\"version\"`\n\tBody     string    `json:\"body\"`\n\tMentions []Mention `json:\"mentions,omitempty\"`\n}",
+    "doc": "ReplaceRequest retires an own pending request and sends a fresh decision to\nits unchanged audience. Keep the key stable when retrying an unknown result.\n",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Mentions",
+        "tag": "`json:\"mentions,omitempty\"`",
+        "type": "[]Mention"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "ReplaceRequestInput"
+  },
+  {
+    "definition": "struct {\n\tPrevious    Request `json:\"previous\"`\n\tReplacement Request `json:\"replacement\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Previous",
+        "tag": "`json:\"previous\"`",
+        "type": "Request"
+      },
+      {
+        "doc": "",
+        "name": "Replacement",
+        "tag": "`json:\"replacement\"`",
+        "type": "Request"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "ReplacedRequest"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "RequestTrace",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "cursor",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, id, cursor string) (json.RawMessage, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "SendBatch",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "SendBatchInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in SendBatchInput, key string) ([]SendBatchItem, error)"
+  },
+  {
+    "definition": "struct {\n\tAttachmentIDs []string `json:\"attachment_ids,omitempty\"`\n\tTargets       []Target `json:\"targets\"`\n\tBody          string   `json:\"body\"`\n\tTitle         string   `json:\"title,omitempty\"`\n\tPreviewToken  string   `json:\"preview_token,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "AttachmentIDs",
+        "tag": "`json:\"attachment_ids,omitempty\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Targets",
+        "tag": "`json:\"targets\"`",
+        "type": "[]Target"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Title",
+        "tag": "`json:\"title,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "PreviewToken",
+        "tag": "`json:\"preview_token,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "SendBatchInput"
+  },
+  {
+    "definition": "struct {\n\tTarget Target     `json:\"target\"`\n\tResult SendResult `json:\"result\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Target",
+        "tag": "`json:\"target\"`",
+        "type": "Target"
+      },
+      {
+        "doc": "",
+        "name": "Result",
+        "tag": "`json:\"result\"`",
+        "type": "SendResult"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "SendBatchItem"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "StartChat",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "StartChatInput"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, in StartChatInput, key string) (SendResult, error)"
+  },
+  {
+    "definition": "struct {\n\tAttachmentIDs []string  `json:\"attachment_ids,omitempty\"`\n\tTargets       []Target  `json:\"targets\"`\n\tBody          string    `json:\"body\"`\n\tTitle         string    `json:\"title,omitempty\"`\n\tApproval      bool      `json:\"approval,omitempty\"`\n\tChoices       []string  `json:\"choices,omitempty\"`\n\tMentions      []Mention `json:\"mentions,omitempty\"`\n}",
+    "doc": "Mentions address existing participants. Offsets count Unicode code points,\nand never narrow the shared audience or grant contact/decision authority.\n",
+    "fields": [
+      {
+        "doc": "",
+        "name": "AttachmentIDs",
+        "tag": "`json:\"attachment_ids,omitempty\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Targets",
+        "tag": "`json:\"targets\"`",
+        "type": "[]Target"
+      },
+      {
+        "doc": "",
+        "name": "Body",
+        "tag": "`json:\"body\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Title",
+        "tag": "`json:\"title,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Approval",
+        "tag": "`json:\"approval,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "Choices",
+        "tag": "`json:\"choices,omitempty\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Mentions",
+        "tag": "`json:\"mentions,omitempty\"`",
+        "type": "[]Mention"
+      }
+    ],
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "type",
+    "name": "StartChatInput"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/workspace.go",
+    "kind": "method",
+    "name": "Workspace",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) (json.RawMessage, error)"
+  }
+]

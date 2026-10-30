@@ -22,3 +22,16 @@ There is no fallback Agent name when `NOTIF_AGENT_ID` is omitted. `NOTIF_AGENT_N
 `scripts/runtime-starter-smoke.py` tests both modes for every language against the isolated SDK test engine. Enrollment uses a bounded Service launcher and rejects an outside-namespace attempt. Existing-worker mode supplies only the dashboard's URL plus worker-token-file shape, queues to its exact instance, checks canonical reply attribution, verifies the replica set is unchanged and proves a second replica cannot claim the addressed delivery.
 
 For a bounded file journey in a selected disposable workspace, run `PYTHONPATH=sdk/python python3 examples/file-exchange/main.py` with that test owner's credential file. It establishes explicit temporary contact grants, then two numbered workers exchange PDF fixture bytes and a canonical reply using only worker credentials. Do not run that fixture provisioning against a production workspace. See [local MCP/custom hosts](../docs/LOCAL-MCP.md) and [SDK coverage](../docs/SDK-COVERAGE.md).
+
+
+### Chat workflows
+
+Against a disposable test workspace, set `NOTIF_URL` and a protected `NOTIF_TOKEN_FILE` containing that workspace's owner credential. Run from the checkout:
+
+```sh
+PYTHONPATH=sdk/python python3 examples/chat-workflows/main.py group
+PYTHONPATH=sdk/python python3 examples/chat-workflows/main.py selective
+PYTHONPATH=sdk/python python3 examples/chat-workflows/main.py approval
+```
+
+Each run creates two numbered fixture agents and explicit contact grants. The workers use separate credentials. These deterministic recipes verify shared mentions, private fanout isolation or approval follow-ups; no model or external business tool is called. Discard the disposable workspace after use. `scripts/sdk-integration.py` runs all three under an isolated generated PostgreSQL schema and cleans it up.

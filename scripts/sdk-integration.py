@@ -44,6 +44,15 @@ try:
     else:
         raise RuntimeError("SDK test server did not become ready")
     subprocess.run(["python3", "examples/file-exchange/main.py"], cwd=root, env={**environment, "NOTIF_URL": origin, "NOTIF_TOKEN": environment["NOTIF_BOOTSTRAP_TOKEN"]}, check=True, timeout=40)
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="beepgrid-doc-recipes-") as scratch:
+        credential = pathlib.Path(scratch) / "owner-token"
+        credential.touch(mode=0o600)
+        credential.write_text(environment["NOTIF_BOOTSTRAP_TOKEN"])
+        for workflow in ["group", "selective", "approval"]:
+            subprocess.run(["python3", "examples/chat-workflows/main.py", workflow], cwd=root,
+                           env={**environment, "NOTIF_URL": origin, "NOTIF_TOKEN_FILE": str(credential)},
+                           check=True, timeout=40)
     subprocess.run(["python3", "scripts/runtime-starter-smoke.py"], cwd=root, env=environment, check=True, timeout=90)
     subprocess.run(["go", "test", "-buildvcs=false", "./sdk/go/notif", "-count=1"], cwd=root, env=environment, check=True)
     subprocess.run(["npm", "--prefix", "sdk/typescript", "test"], cwd=root, env=environment, check=True)
