@@ -16,6 +16,31 @@ import (
 	"testing"
 )
 
+func TestFaviconDeclarationsAndImageResponses(t *testing.T) {
+	h := Handler()
+	for _, route := range []string{"/", "/conversations/example"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", route, nil))
+		for _, name := range []string{"icon.svg", "favicon.ico", "favicon-96x96.png", "apple-touch-icon.png"} {
+			if w.Code != 200 || !strings.Contains(w.Body.String(), "/"+name+"?v=2") {
+				t.Fatalf("missing favicon declaration on %s: %s", route, name)
+			}
+		}
+	}
+	for name, signature := range map[string][]byte{
+		"icon.svg":             []byte("<svg"),
+		"favicon.ico":          {0, 0, 1, 0},
+		"favicon-96x96.png":    {137, 80, 78, 71, 13, 10, 26, 10},
+		"apple-touch-icon.png": {137, 80, 78, 71, 13, 10, 26, 10},
+	} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", "/"+name+"?v=2", nil))
+		if w.Code != 200 || !strings.HasPrefix(w.Header().Get("Content-Type"), "image/") || !bytes.HasPrefix(w.Body.Bytes(), signature) {
+			t.Fatalf("favicon is not a usable image: %s %d %s", name, w.Code, w.Header().Get("Content-Type"))
+		}
+	}
+}
+
 func TestEmbeddedTypographyFontsAndLicenses(t *testing.T) {
 	root, _ := fs.Sub(assets, "dist")
 	raw, err := fs.ReadFile(root, "fonts/manifest.json")
@@ -167,7 +192,7 @@ func TestIndependentWorkspaceEntrypointAndPrivateBuildFiles(t *testing.T) {
 	for _, route := range []string{"/agents", "/inbox", "/conversations/con_test", "/settings/managed"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest("GET", route, nil))
-		if rec.Code != 200 || !strings.Contains(rec.Body.String(), `src="/theme.js"`) || !strings.Contains(rec.Body.String(), `href="/icon.svg"`) {
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), `src="/theme.js"`) || !strings.Contains(rec.Body.String(), `href="/icon.svg?v=2"`) {
 			t.Fatalf("workspace deep link %s: %d", route, rec.Code)
 		}
 	}
