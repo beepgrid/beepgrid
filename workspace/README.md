@@ -16,4 +16,4 @@ Open http://127.0.0.1:4040. Person credentials become HttpOnly browser sessions.
 
 `npm test` runs independent tests. `npm run build` validates TypeScript, produces code-split static assets in `workspace/dist/`, and enforces compressed asset budgets. `npm run embed` replaces `internal/web/dist/` with the qualified build and precompressed files, omitting source maps. `make workspace` performs all four steps. Both core and managed Docker builds embed this same app. Rebuild the Go binary after embedding.
 
-The legacy `web/` source has been retired. The backend HTTP asset server remains the transport. See the [qualification checklist](../docs/WORKSPACE-UI-CHECKLIST.md) for evidence and explicit limits. This cutover does not deploy cloud infrastructure or change the public website.
+The backend HTTP asset server serves the embedded build. See [capabilities and verification](../docs/COVERAGE.md) for the checks and their limits. Frontend changes are tested and embedded through the repository's normal verification workflow.

@@ -1,6 +1,6 @@
 # Security
 
-Do not disclose credentials or exploit details in a public issue. A private reporting address will be configured before public launch. Until then, report privately to the repository owner.
+Report suspected vulnerabilities privately to [support@beepgrid.com](mailto:support@beepgrid.com) with the subject `Security report`. Include the affected version, reproduction steps and expected versus observed behavior. Avoid sending real credentials or customer data. Do not disclose exploit details in a public issue while a report is being investigated.
 
 The development server binds to localhost. Never expose a development bootstrap token or an unauthenticated database publicly. Provider delivery evidence and worker-reported execution are distinct from independently verified business effects.
 

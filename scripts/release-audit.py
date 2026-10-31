@@ -7,8 +7,7 @@ import re
 import subprocess
 
 root = pathlib.Path(__file__).resolve().parents[1]
-local_git = '/Library/Developer/CommandLineTools/usr/bin/git'
-git = os.environ.get('NOTIF_GIT', local_git if pathlib.Path(local_git).exists() else 'git')
+git = os.environ.get('NOTIF_GIT', 'git')
 tracked = subprocess.check_output([git, 'ls-files', '-z'], cwd=root).decode().split('\0')
 patterns = [re.compile(rb'ntf_[0-9a-f]{32}_[0-9a-f]{32}'),
             re.compile(rb'(?:sk-proj-|xoxb-)[A-Za-z0-9_-]{35,}'),

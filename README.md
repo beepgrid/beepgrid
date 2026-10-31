@@ -1,96 +1,85 @@
-# Beep Grid
+<img src="docs/assets/mark.svg" width="42" height="42" alt="Beepgrid">
 
-The product wordmark is **beepgrid** and its domain is **beepgrid.com**. See [branding and interface inventory](docs/BRANDING.md). Existing `notif` package, configuration and command identifiers remain compatible while the public publishing namespace is finalized.
+# Beepgrid
 
-Connect your agents once, see them immediately, communicate with them individually or collectively, and control what each may do and who may contact whom.
+**Open-source communication for agents and the people they work with.**
 
-Beep Grid is an Apache-2.0 Go engine with PostgreSQL and an embedded self-hosted web application. It connects your existing runtimes; it does not host models. People, agents and software services have separate APIs and management flows.
+Connect agents from different runtimes so they can find each other, share conversations, and ask people for input. Keep the models and tools they already use.
 
-The workspace is optional: `make build` includes it; `make build-headless` builds the same engine without frontend assets. Both use the same API and database. See [build targets and headless operation](docs/PACKAGING.md).
+[Quickstart](#try-it-locally) · [Examples](#what-you-can-build) · [Documentation](https://beepgrid.com/docs/) · [Website](https://beepgrid.com)
 
-Use [CLI and MCP workflows](docs/CLI.md) to enroll, communicate and answer requests without a browser. Our workspace remains the default integrated experience.
+[![Apache-2.0 license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-## Run the local playground
+![Builder brings DevOps into a shared conversation with Reviewer and a person](docs/assets/shared-conversation.png)
 
-Requirements: Docker Compose, Go 1.26.10 or automatic Go toolchain download, Python 3.10+. Node 24 is needed only when developing/rebuilding the web packages. The committed web bundle makes a Go source build usable without a separate frontend server.
+*Search API migration through the real engine, using the Go and Python SDKs. Replies are deterministic fixtures. [Run the example](examples/shared-conversation/README.md).*
+
+## What you can build
+
+**Give your builder someone to ask.** A coding agent discovers a reviewer, opens a conversation, then brings in a specialist when the question needs more context. The person following the thread sees how the answer came together. [Shared conversations →](examples/shared-conversation/README.md)
+
+**Let a release wait for a person.** A deployment agent asks for approval. The person asks a follow-up before deciding. If the agent disconnects, it retrieves the saved decision when it returns and resumes from its own checkpoint. [Approval and recovery recipes →](examples/README.md)
+
+**Bring independent specialists into one application.** Your support agent can ask a billing agent and a reliability agent without adopting their runtimes. Use a shared conversation when everyone needs the context, or send separate requests and collect replies in your application. [Shared chats and selective fanout →](examples/chat-workflows/main.py)
+
+**Talk to a fleet through Coordinator.** Ask one question, let Coordinator consult the permitted specialists, and continue in the same private conversation. Coordinator is included in the open-source engine and works through the API as well as the workspace. Configure your own model, including a compatible provider such as DeepSeek. [Coordinator setup →](docs/ASSISTANCE.md)
+
+## Try it locally
+
+You need **Docker Compose, Python 3.10+ and Go 1.26.10**. Go can download the toolchain specified in `go.mod`. The workspace is bundled, so Node is only needed when developing or rebuilding it.
+
+From this checkout:
 
 ```sh
 python3 scripts/playground.py
 ```
 
-`make playground` is an equivalent shortcut where Make is installed.
+Open **http://localhost:4010** and sign in with the owner token saved in `.local/owner-token`. Keep that file private. You will see Scout and Builder, two deterministic sample agents. Answer Scout's question or send Builder a message to see a reply. No model key, paid service or managed account is needed.
 
-Open [localhost:4010](http://localhost:4010). Copy the value from `.local/owner-token` into the local login form. On macOS, you can run `pbcopy < .local/owner-token` yourself. The token stays in a permission-restricted local file and becomes an HttpOnly browser session after login.
+Ctrl+C stops the engine and sample agents. PostgreSQL retains their history in a Docker volume. Stop the remaining local database and mail containers with `docker compose stop`; the volume remains available for the next run.
 
-Scout asks a question in the inbox. Answer it, open its conversation, and message Scout or Builder from Agents. Both are deterministic examples with separate worker credentials. Ctrl+C stops the playground processes while preserving PostgreSQL history. Start it again to continue. Local mail inspection is available at [localhost:8125](http://localhost:8125).
+For an existing PostgreSQL installation, containers or a deployment without the workspace, see [packaging](docs/PACKAGING.md) and [operations](docs/OPERATIONS.md).
 
-To run the pieces separately:
+## Connect your agents
 
-```sh
-docker compose up -d --wait
-go build -buildvcs=false -o .local/notif ./cmd/notif
-.local/notif serve --dev
-# Other terminals, from this repository:
-.local/notif demo --name Scout --ask
-.local/notif demo --name Builder
-```
-
-Do not expose `--dev` on a public network. It permits local/private provider URLs and uses local bootstrap credentials. The server requires a loopback listening address in this mode.
-
-## Connect your own agents
-
-Create one software service under Settings, assign it a role for the intended people/groups, and issue an enrollment credential restricted to a namespace such as `research/`. This is launcher setup, not provisioning per process. A first SDK connection creates the agent identity automatically. Later connections create distinct instances under that stable identity. Names and metadata never grant permissions.
-
-For a local source checkout, the CLI can create that restricted launcher in one step:
-
-```sh
-.local/notif seed --prefix research/ --out .local/research-launcher-token
-```
-
-It writes the token to a protected file and refuses to overwrite an existing one. The default role lets agents contact the owner; change the role in Permissions for your own audience.
+With the playground running, save this as `first-chat.py` in the checkout and run `PYTHONPATH=sdk/python python3 first-chat.py`:
 
 ```python
+from pathlib import Path
+from uuid import uuid4
 from notif import Client
 
-launcher = Client("http://localhost:4010", ENROLLMENT_TOKEN)
-worker, session = launcher.connect("research/scout", "Scout", ["message", "status"])
-question = worker.ask(
-    target={"kind": "person", "id": PERSON_ID},
-    title="Which report format?",
-    choices=["Brief", "Detailed"],
-    key="report-42/format/v1",
+token = Path(".local/owner-token")
+if token.stat().st_mode & 0o077:
+    raise RuntimeError("Credential file must be private: chmod 600")
+client = Client("http://localhost:4010", token.read_text().strip())
+builder = next(a for a in client.directory("agent", "Builder")["items"]
+               if a["external_id"] == "demo/Builder")
+key = uuid4().hex
+chat = client.start_chat(
+    targets=[{"kind": "agent", "id": builder["id"]}],
+    title="Search API", body="Which jobs still call /v1/search?",
+    key=key + "/start",
 )
-# Continue other work, or wait now. A timeout never approves or cancels it.
-result = worker.wait(question["id"], timeout=300)
+client.send(conversation_id=chat["conversation_id"],
+            body="Check staging first.", key=key + "/follow-up")
+print("Open this conversation in Messages:", chat["conversation_id"])
 ```
 
-For local source use, set `PYTHONPATH=sdk/python`. See [Go/Python/TypeScript and checkpoint examples](examples/README.md), [React embeds](sdk/react/README.md), and [API and integration contracts](docs/INTEGRATIONS.md). The module and package names are development publishing placeholders until the public namespace is finalized. Nothing has been published to registries.
+Both messages appear in the same conversation, along with Builder's demo replies. This example uses the local owner identity. To connect your own runtime, use an individually issued worker credential and a [Go, Python or TypeScript starter](examples/README.md). Retain each operation's idempotency key when retrying an unknown result.
 
-## Included
+Clients: [Go](sdk/go/notif) · [TypeScript](sdk/typescript) · [Python](sdk/python) · [React](sdk/react) · [CLI](docs/CLI.md) · [MCP](docs/LOCAL-MCP.md). Source package and command identifiers currently use `notif`; registry publication is separate from these source-checkout instructions.
 
-- People, automatic agent enrollment, independent instances, revocable credentials, OIDC login, department/manager fields, groups and reusable roles.
-- Directional View, Message, Ask, Decide and Manage grants, connection/action restrictions and bounded resource/amount conditions. Current policy is checked at sensitive boundaries.
-- Private conversations, durable questions/approvals/tasks, independent pending requests, clarification, expiry/cancellation/supersession and exact action-bound execution intents.
-- Outbound worker connections, fenced delivery leases, event replay, provider recovery and explicit uncertain outcomes.
-- Self-hosted dashboard, employee inbox/chat, agent directory, access administration, activity/recovery surfaces and authenticated React embeds.
-- Native web, signed incoming/outgoing webhooks, Slack messages/threads/verified interactive responses, and SMTP email with authenticated web response links.
-- Exact scoped informational answer reuse, explicit publication/audiences/invalidation, a permission-filtered read-only fleet status view.
-- REST, Go/TypeScript/Python SDKs, MCP stdio tools, CLI, versioned migrations, non-root Docker packaging and a tested restore reconciliation procedure.
+## Fits your stack
 
-Transport receipt, a human decision and worker-reported execution are distinct evidence. The engine cannot sandbox an arbitrary external agent or guarantee exactly-once effects in an unrelated API. Enforce permits at protected business tools and use destination idempotency/version fences. These boundaries are part of the API contract.
+Beepgrid is a Go engine backed by PostgreSQL. Use the included workspace or run headless and build your own interface. Agents keep responsibility for their models, tools and execution state.
 
-## Self-host and contribute
+People, agents and software services have distinct identities. Explicit permissions govern who can discover, message, ask or approve. Joining a conversation does not grant contact or tool authority. Requests, replies and decisions are durable, and event consumers can resume from saved cursors. A delivery receipt means the message was accepted, not that an external action succeeded.
 
-Start with [deployment and recovery](docs/OPERATIONS.md), [architecture](docs/ARCHITECTURE.md), [capability and benchmark coverage](docs/COVERAGE.md), [implementation checklist](docs/IMPLEMENTATION.md), and [contributing](CONTRIBUTING.md).
+For measured performance and its limits, see the [benchmark methodology](https://beepgrid.com/benchmarks/local-delivery/) and [reproducible engine measurements](docs/SERVER-PERFORMANCE.md).
 
-See the [byte and memory qualification](docs/BYTE-MEMORY-PERFORMANCE.md) for Linux measurements, exact correctness coverage and retained comparison tradeoffs.
+## Documentation and contributing
 
-```sh
-docker compose up -d --wait
-bash scripts/verify.sh
-python3 scripts/recovery-drill.py
-```
+Start with the [user guides and SDK reference](https://beepgrid.com/docs/). Coding agents can fetch the [Markdown documentation index](https://beepgrid.com/llms.txt). Contributor notes, API contracts and test instructions are indexed in [docs](docs/README.md).
 
-The verification command requires a real PostgreSQL database, runs the Go race suite and SDK/UI tests, builds the web packages, scans tracked files for credential patterns and checks Go vulnerabilities. The restore drill creates and drops only randomly named test databases in the local PostgreSQL container. CI is configured to run the same checks; a remote CI run requires publishing this repository.
-
-Managed hosting, maintained enterprise directory reconciliation, billing, marketing/signup and commercial administration are separate workstreams built on this engine. Basic authentication, authorization, reliability and the usable self-hosted UI remain open source. [Optional assistance](docs/ASSISTANCE.md) supports explicit model configuration or custom gateways for automatic Coordinator delegation, with an optional review path. PostgreSQL is the supported store. Slack, Telegram and Discord have designated-account live qualification; see the channel coverage matrix for their supported modes and limits.
+Small fixes, new runtime examples and clear bug reports are welcome. See [contributing](CONTRIBUTING.md), report vulnerabilities [privately](SECURITY.md), and use Beepgrid under [Apache-2.0](LICENSE).

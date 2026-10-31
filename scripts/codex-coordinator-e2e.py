@@ -197,7 +197,7 @@ provider.daemon_threads = True
 threading.Thread(target=provider.serve_forever, daemon=True).start()
 binary = root / ".local/notif-coordinator-e2e"
 subprocess.run(["go", "build", "-buildvcs=false", "-o", str(binary), "./cmd/notif"], cwd=root, check=True)
-database = os.environ.get("NOTIF_TEST_DATABASE_URL", "postgres://sasi@127.0.0.1:5552/beepgrid_workspace_ui?sslmode=disable")
+database = os.environ.get("NOTIF_TEST_DATABASE_URL", "postgres://notif:notif@127.0.0.1:5499/notif?sslmode=disable")
 schema_name = "coordinator_e2e_" + run
 engine_env = dict(environment, NOTIF_DATABASE_URL=database, NOTIF_SCHEMA=schema_name,
                   NOTIF_WORKSPACE="Coordinator qualification", NOTIF_COMPANY="25 real agents",

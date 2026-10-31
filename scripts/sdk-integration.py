@@ -53,6 +53,9 @@ try:
             subprocess.run(["python3", "examples/chat-workflows/main.py", workflow], cwd=root,
                            env={**environment, "NOTIF_URL": origin, "NOTIF_TOKEN_FILE": str(credential)},
                            check=True, timeout=40)
+        subprocess.run(["python3", "examples/shared-conversation/main.py"], cwd=root,
+                       env={**environment, "NOTIF_URL": origin, "NOTIF_TOKEN_FILE": str(credential)},
+                       check=True, timeout=60)
     subprocess.run(["python3", "scripts/runtime-starter-smoke.py"], cwd=root, env=environment, check=True, timeout=90)
     subprocess.run(["go", "test", "-buildvcs=false", "./sdk/go/notif", "-count=1"], cwd=root, env=environment, check=True)
     subprocess.run(["npm", "--prefix", "sdk/typescript", "test"], cwd=root, env=environment, check=True)

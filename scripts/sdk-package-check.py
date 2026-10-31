@@ -74,7 +74,7 @@ void [upload, draft, changed, replaced, events, shared, NotifRequest];
     shutil.copytree(root / "sdk/python", wheel_stage, ignore=shutil.ignore_patterns("__pycache__", "*.egg-info", "build", "dist"))
     wheel_output = scratch / "wheel-output"
     wheel_output.mkdir()
-    run([python, "-m", "pip", "wheel", "--no-deps", "--no-build-isolation", "--wheel-dir", wheel_output, wheel_stage])
+    run([python, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", wheel_output, wheel_stage])
     candidates = list(wheel_output.glob("*.whl"))
     assert len(candidates) == 1
     wheel = output / candidates[0].name
@@ -97,8 +97,7 @@ func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ 
 ''')
     run(["go", "run", "-buildvcs=false", "."], cwd=go)
 
-fallback = pathlib.Path("/Users/sasi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback/git")
-git = os.environ.get("NOTIF_GIT", str(fallback) if fallback.exists() else "git")
+git = os.environ.get("NOTIF_GIT", "git")
 commit = run([git, "rev-parse", "HEAD"], capture_output=True).stdout.strip()
 dirty = bool(run([git, "status", "--porcelain"], capture_output=True).stdout.strip())
 manifest = {"source_commit":commit,"source_dirty":dirty,"published":False,"namespaces":"development placeholders pending public release decision","artifacts":[{"file":path.name,"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size} for path in artifacts],"verified_consumers":["Node ESM","TypeScript declarations","React SSR and stylesheet export","Python wheel in clean venv","Go external module with local replace"],"limitations":["No registry namespace availability or registry installation claim","No publication, deployment or provider account mutation","Go import path remains pending final public repository decision"]}
