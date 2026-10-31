@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 	"net/http"
 )
 

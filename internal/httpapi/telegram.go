@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 func (s *Server) telegramEvents(w http.ResponseWriter, r *http.Request) {

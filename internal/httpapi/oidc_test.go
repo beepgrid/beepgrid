@@ -8,7 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 	"io"
 	"math/big"
 	"net/http"

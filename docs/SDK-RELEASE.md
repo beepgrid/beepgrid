@@ -1,6 +1,6 @@
 # SDK artifact preparation
 
-No packages are published by this workflow. TypeScript `@notif/client`, React `@notif/react`, Python `notif-client` and Go `github.com/notif-dev/notif` remain development names pending the public namespace/repository decision. Existing imports remain compatible. Selecting final names, checking registry availability, choosing a release version, public source location and security contact are gates before publication.
+No packages are published by this workflow. The canonical Go module is `github.com/beepgrid/beepgrid`. TypeScript `@notif/client`, React `@notif/react` and Python `notif-client` remain development names pending registry decisions. Selecting final names, verifying ownership and choosing release versions remain gates before publication. See the [ordered SDK and CLI publishing plan](PUBLISHING-PLAN.md).
 
 Run `python3 scripts/sdk-package-check.py`. The Python interpreter selected with `NOTIF_PACKAGE_PYTHON` must have setuptools 77 or newer, wheel and pip. It builds the two npm tarballs and Python wheel, checks licenses/readmes/changelogs, and installs them into temporary consumers outside the repository. It exercises Node ESM exports, TypeScript declarations, React SSR/styles, a clean Python venv, and a separate Go module with an explicit local replace. It never publishes, modifies provider accounts, runs models or deploys. The local Go replace verifies consumer compatibility, not registry availability.
 

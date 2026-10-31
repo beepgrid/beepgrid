@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/notif-dev/notif/internal/aimodel"
+	"github.com/beepgrid/beepgrid/internal/aimodel"
 )
 
 func nativeAssistanceFixture(t *testing.T, s *Store, provider string, respond func(string, map[string]any) any) *atomic.Int32 {

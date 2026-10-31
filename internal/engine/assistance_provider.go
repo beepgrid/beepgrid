@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/notif-dev/notif/internal/aimodel"
+	"github.com/beepgrid/beepgrid/internal/aimodel"
 )
 
 // assistanceCaller is provider-neutral. Only the bounded authorized payload crosses

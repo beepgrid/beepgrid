@@ -2,7 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
-	"github.com/notif-dev/notif/api"
+	"github.com/beepgrid/beepgrid/api"
 	"net/http/httptest"
 	"os"
 	"path/filepath"

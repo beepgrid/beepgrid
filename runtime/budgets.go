@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 type WorkspaceBudget = engine.WorkspaceBudget

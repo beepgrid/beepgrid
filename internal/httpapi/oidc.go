@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/beepgrid/beepgrid/internal/engine"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/notif-dev/notif/internal/engine"
 	"golang.org/x/oauth2"
 )
 

@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 	"io"
 )
 

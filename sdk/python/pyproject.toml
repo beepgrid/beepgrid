@@ -10,5 +10,10 @@ license-files = ["LICENSE"]
 keywords = ["beepgrid", "agents", "communication"]
 requires-python = ">=3.10"
 license = "Apache-2.0"
+[project.urls]
+Homepage = "https://beepgrid.com/"
+Documentation = "https://beepgrid.com/docs/sdks/python/"
+Repository = "https://github.com/beepgrid/beepgrid"
+Issues = "https://github.com/beepgrid/beepgrid/issues"
 [tool.setuptools]
 packages = ["notif"]

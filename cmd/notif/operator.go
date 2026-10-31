@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 	"os"
 	"path/filepath"
 )

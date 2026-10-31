@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 // Encode a large receipt one bounded message at a time. json.Encoder otherwise

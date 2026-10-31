@@ -3,10 +3,10 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	sdk "github.com/beepgrid/beepgrid/sdk/go/notif"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/notif-dev/notif/internal/engine"
-	sdk "github.com/notif-dev/notif/sdk/go/notif"
 	"net/http/httptest"
 	"testing"
 	"time"

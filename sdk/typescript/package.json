@@ -34,5 +34,14 @@
     "beepgrid",
     "agents",
     "communication"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beepgrid/beepgrid.git",
+    "directory": "sdk/typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/beepgrid/beepgrid/issues"
+  },
+  "homepage": "https://beepgrid.com/docs/sdks/typescript/"
 }

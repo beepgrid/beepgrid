@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 func TestTelegramIngressVerifiesSecretAndDisabledInstallation(t *testing.T) {

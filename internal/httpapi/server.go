@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/notif-dev/notif/api"
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/api"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 type actorKey struct{}

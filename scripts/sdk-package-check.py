@@ -90,9 +90,9 @@ void [upload, draft, changed, replaced, events, shared, NotifRequest];
     run([vpython, "-c", "from notif import Client; from notif.events import read_frames; assert callable(Client.start_chat); assert callable(Client.events); assert callable(Client.upload_attachment); assert callable(Client.download_attachment); assert callable(Client.stage_attachment); assert callable(Client.change_chat_membership)"], cwd=scratch)
     go = scratch / "go"
     go.mkdir()
-    (go / "go.mod").write_text('module example.com/beepgrid-consumer\n\ngo 1.26.0\n\nrequire github.com/notif-dev/notif v0.0.0\nreplace github.com/notif-dev/notif => ' + json.dumps(str(root)) + '\n')
+    (go / "go.mod").write_text('module example.com/beepgrid-consumer\n\ngo 1.26.0\n\nrequire github.com/beepgrid/beepgrid v0.0.0\nreplace github.com/beepgrid/beepgrid => ' + json.dumps(str(root)) + '\n')
     (go / "main.go").write_text('''package main
-import "github.com/notif-dev/notif/sdk/go/notif"
+import "github.com/beepgrid/beepgrid/sdk/go/notif"
 func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ = c.StageAttachment;_ = c.ChangeChatMembership;_ = notif.ChatMembershipInput{Operation:"add",Version:1,Members:[]string{"peer"}};_ = c.StreamEvents;_ = c.Directory;_ = c.Cancel;_ = c.StartChat;_ = notif.StartChatInput{AttachmentIDs:[]string{"draft"},Mentions:[]notif.Mention{{PrincipalID:"a",Start:2,End:13}}}}
 ''')
     run(["go", "run", "-buildvcs=false", "."], cwd=go)
@@ -100,6 +100,6 @@ func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ 
 git = os.environ.get("NOTIF_GIT", "git")
 commit = run([git, "rev-parse", "HEAD"], capture_output=True).stdout.strip()
 dirty = bool(run([git, "status", "--porcelain"], capture_output=True).stdout.strip())
-manifest = {"source_commit":commit,"source_dirty":dirty,"published":False,"namespaces":"development placeholders pending public release decision","artifacts":[{"file":path.name,"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size} for path in artifacts],"verified_consumers":["Node ESM","TypeScript declarations","React SSR and stylesheet export","Python wheel in clean venv","Go external module with local replace"],"limitations":["No registry namespace availability or registry installation claim","No publication, deployment or provider account mutation","Go import path remains pending final public repository decision"]}
+manifest = {"source_commit":commit,"source_dirty":dirty,"published":False,"namespaces":"development placeholders pending public release decision","artifacts":[{"file":path.name,"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size} for path in artifacts],"verified_consumers":["Node ESM","TypeScript declarations","React SSR and stylesheet export","Python wheel in clean venv","Go external module with local replace"],"limitations":["No registry namespace availability or registry installation claim","No publication, deployment or provider account mutation","Go source uses the canonical repository; public version tags and proxy installation remain unverified"]}
 (output / "manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
 print("PASS: packed TypeScript/React, Python wheel and clean Go consumer. Artifacts:", output)

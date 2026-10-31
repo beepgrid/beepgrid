@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/notif-dev/notif/internal/engine"
-	"github.com/notif-dev/notif/internal/web"
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/web"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 )
 
 func TestOptionalWorkspaceUsesSameEngineAndAuthorization(t *testing.T) {

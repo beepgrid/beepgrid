@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 func TestDiscordHTTPVerifiesSignaturesAppAndDisabledInstallation(t *testing.T) {

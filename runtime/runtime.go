@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/notif-dev/notif/internal/engine"
-	"github.com/notif-dev/notif/internal/httpapi"
-	"github.com/notif-dev/notif/internal/web"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/httpapi"
+	"github.com/beepgrid/beepgrid/internal/web"
 )
 
 type ManagedAccountReader = httpapi.ManagedAccountReader

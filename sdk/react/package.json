@@ -47,5 +47,14 @@
     "beepgrid",
     "agents",
     "communication"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beepgrid/beepgrid.git",
+    "directory": "sdk/react"
+  },
+  "bugs": {
+    "url": "https://github.com/beepgrid/beepgrid/issues"
+  },
+  "homepage": "https://beepgrid.com/docs/sdks/react/"
 }

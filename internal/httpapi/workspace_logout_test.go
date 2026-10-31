@@ -2,7 +2,7 @@ package httpapi
 
 import (
 	"context"
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 	"net/http"
 	"strings"
 	"testing"

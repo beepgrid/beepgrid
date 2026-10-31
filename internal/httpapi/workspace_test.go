@@ -3,8 +3,8 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"github.com/notif-dev/notif/internal/engine"
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 	"net/http"
 	"strings"
 	"testing"

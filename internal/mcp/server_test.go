@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 	"io"
 	"net/http"
 	"net/http/httptest"

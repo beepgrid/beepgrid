@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 // VerifiedPerson is an immutable identity already verified by a trusted host.

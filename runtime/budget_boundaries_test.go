@@ -2,8 +2,8 @@ package runtime
 
 import (
 	"context"
-	"github.com/notif-dev/notif/internal/engine"
-	sdk "github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	sdk "github.com/beepgrid/beepgrid/sdk/go/notif"
 	"net/http/httptest"
 	"testing"
 )

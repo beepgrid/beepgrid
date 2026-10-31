@@ -18,7 +18,7 @@ Run these from the OSS repository root:
 
 | Selection | Supported command | Import for custom code |
 | --- | --- | --- |
-| Go | `go run -buildvcs=false ./examples/go-worker` | `github.com/notif-dev/notif/sdk/go/notif` |
+| Go | `go run -buildvcs=false ./examples/go-worker` | `github.com/beepgrid/beepgrid/sdk/go/notif` |
 | Python | `PYTHONPATH=sdk/python python3 examples/python-worker/main.py` | `from notif import Client` |
 | TypeScript / Node | `npm --prefix sdk/typescript ci && npm --prefix sdk/typescript run build`, then `node examples/typescript-worker/main.mjs` | `import { Client } from '@notif/client'` in a packaged consumer |
 

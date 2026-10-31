@@ -18,12 +18,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/notif-dev/notif/internal/aimodel"
-	"github.com/notif-dev/notif/internal/engine"
-	"github.com/notif-dev/notif/internal/httpapi"
-	"github.com/notif-dev/notif/internal/mcp"
-	"github.com/notif-dev/notif/internal/web"
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/internal/aimodel"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/httpapi"
+	"github.com/beepgrid/beepgrid/internal/mcp"
+	"github.com/beepgrid/beepgrid/internal/web"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 )
 
 func env(k, fallback string) string {

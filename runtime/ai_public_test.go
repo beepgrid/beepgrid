@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	server "github.com/notif-dev/notif/runtime"
+	server "github.com/beepgrid/beepgrid/runtime"
 )
 
 func TestModelConfigurationIsUsableWithoutInternalPackages(t *testing.T) {

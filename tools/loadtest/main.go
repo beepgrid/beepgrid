@@ -15,7 +15,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 	"io"
 	"math"
 	"net"
@@ -35,8 +35,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 	"github.com/jackc/pgx/v5"
-	"github.com/notif-dev/notif/sdk/go/notif"
 )
 
 type job struct {

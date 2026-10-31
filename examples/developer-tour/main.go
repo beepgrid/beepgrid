@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	notif "github.com/notif-dev/notif/sdk/go/notif"
+	notif "github.com/beepgrid/beepgrid/sdk/go/notif"
 	"os"
 	"strings"
 	"time"

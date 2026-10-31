@@ -1,6 +1,6 @@
 package runtime
 
-import "github.com/notif-dev/notif/internal/aimodel"
+import "github.com/beepgrid/beepgrid/internal/aimodel"
 
 // AIConfig selects an optional assistance provider. Neither provider nor model
 // has a default. Credentials stay in the server process.

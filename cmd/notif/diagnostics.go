@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 // Profiling is opt-in, on a separate literal loopback listener. Never mount it on

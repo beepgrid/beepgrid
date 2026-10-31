@@ -1,4 +1,4 @@
-module github.com/notif-dev/notif
+module github.com/beepgrid/beepgrid
 
 go 1.26.0
 

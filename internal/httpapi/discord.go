@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 )
 
 func (s *Server) discordEvents(w http.ResponseWriter, r *http.Request) {

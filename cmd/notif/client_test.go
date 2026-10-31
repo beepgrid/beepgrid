@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 )
 
 func TestClientCommandsShareSDKContracts(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/notif-dev/notif/internal/engine"
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 )
 
 func TestAssistanceSDKHTTPJourney(t *testing.T) {

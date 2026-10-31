@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/notif-dev/notif/internal/engine"
-	"github.com/notif-dev/notif/internal/httpapi"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/httpapi"
 	"net/http/httptest"
 	"os"
 	"path/filepath"

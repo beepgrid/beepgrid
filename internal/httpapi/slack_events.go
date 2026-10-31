@@ -2,7 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
-	"github.com/notif-dev/notif/internal/engine"
+	"github.com/beepgrid/beepgrid/internal/engine"
 	"io"
 	"net/http"
 	"time"

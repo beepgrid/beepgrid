@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/notif-dev/notif/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go/notif"
 )
 
 func main() {
