@@ -7,7 +7,7 @@ import {
   type FormEvent,
 } from "react";
 import { APIError, readable, timestamp } from "./client";
-import type { Identity } from "./contracts";
+import type { Identity, Request } from "./contracts";
 import { AgentMark, identitySeed } from "./AgentMark";
 
 const paths: Record<string, string> = {
@@ -259,6 +259,56 @@ export function Badge({
   tone?: string;
 }) {
   return <span className={`badge ${tone}`}>{children}</span>;
+}
+const requestStates: Record<string, { label: string; tone: string }> = {
+  open: { label: "Awaiting reply", tone: "warn" },
+  clarification: { label: "Needs context", tone: "accent" },
+  resolved: { label: "Resolved", tone: "good" },
+  answered: { label: "Answered", tone: "good" },
+  approved: { label: "Approved", tone: "good" },
+  completed: { label: "Completed", tone: "good" },
+  denied: { label: "Declined", tone: "danger" },
+  declined: { label: "Declined", tone: "danger" },
+  rejected: { label: "Rejected", tone: "danger" },
+  failed: { label: "Failed", tone: "danger" },
+  expired: { label: "Expired", tone: "neutral" },
+  cancelled: { label: "Cancelled", tone: "neutral" },
+  superseded: { label: "Replaced", tone: "neutral" },
+};
+export function RequestStatus({
+  request,
+}: {
+  request: Pick<Request, "state" | "response">;
+}) {
+  const value =
+    request.state === "resolved"
+      ? request.response?.outcome || request.state
+      : request.state;
+  const status = requestStates[value];
+  return (
+    <Badge tone={status?.tone}>
+      {status?.label || value.replaceAll("_", " ")}
+    </Badge>
+  );
+}
+// The conversation API uses exact outcome labels as its latest preview.
+// Only style complete labels; never infer a state from message substrings.
+export function ConversationPreview({ body }: { body: string }) {
+  const status = [
+    "answered",
+    "approved",
+    "denied",
+    "completed",
+    "failed",
+    "rejected",
+  ].includes(body)
+    ? requestStates[body]
+    : undefined;
+  return status ? (
+    <Badge tone={status.tone}>{status.label}</Badge>
+  ) : (
+    <>{body}</>
+  );
 }
 export function Status({ value }: { value: string }) {
   const good = [

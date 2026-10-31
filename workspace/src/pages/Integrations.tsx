@@ -92,7 +92,7 @@ const labels: Record<string, string> = {
   public_key: "Public key",
   webhook_secret: "Webhook secret",
   signing_secret: "Signing secret",
-  default_agent_id: "Default agent ID",
+  default_agent_id: "Default Agent ID",
   smtp_addr: "SMTP host:port",
   from: "Sender email",
   username: "SMTP username",

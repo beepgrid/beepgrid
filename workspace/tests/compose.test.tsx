@@ -206,6 +206,14 @@ it("attaches a removable approval preview without claiming it was sent", () => {
   expect(screen.getByLabelText("Approval flow preview")).toBeInTheDocument();
   for (const label of ["Approve", "Decline", "Ask for context"])
     expect(screen.getByText(label, { exact: true })).toBeInTheDocument();
+  const options = screen
+    .getByLabelText("Approval flow preview")
+    .querySelectorAll(".preview-action");
+  expect(options).toHaveLength(3);
+  for (const option of options) {
+    expect(option.querySelector("svg")).toBeNull();
+    expect(option).not.toHaveAttribute("aria-pressed");
+  }
   expect(screen.queryByText("Approval requested")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Remove approval flow" }));
   expect(

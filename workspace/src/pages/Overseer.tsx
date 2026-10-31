@@ -21,6 +21,7 @@ import {
   IdentityIcon,
   Icon,
   Loading,
+  RequestStatus,
   unavailable,
 } from "../ui";
 
@@ -49,7 +50,7 @@ function CoordinatorResults({ turn }: { turn: Plan }) {
       ))}
       {turn.replies?.map((r) => (
         <section className="section" key={r.id}>
-          <Badge>{r.state}</Badge>{" "}
+          <RequestStatus request={r} />{" "}
           <strong>
             {turn.sources.find(
               (s) =>
@@ -77,7 +78,7 @@ function CoordinatorResults({ turn }: { turn: Plan }) {
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
       <summary>
-        {count} agent{count === 1 ? "" : "s"} ·{" "}
+        {count} Agent{count === 1 ? "" : "s"} ·{" "}
         {turn.replies?.length
           ? `${settled} of ${turn.replies.length} replies received`
           : "messages accepted"}{" "}
@@ -159,6 +160,7 @@ export default function Overseer() {
     history.error,
     turns.length,
     latest?.reply_summary,
+    freshTopic,
   ]);
   async function ask() {
     if (!prompt.trim()) return;
@@ -219,13 +221,13 @@ export default function Overseer() {
         </details>
         {enabled ? (
           <Button
-            disabled={busy}
+            disabled={busy || freshTopic}
             onClick={() => {
               planning.forget();
               setFreshTopic(true);
-              setNotice(
-                "Your next message starts a new topic. Saved history stays here.",
-              );
+              setNotice("");
+              pinned.current = true;
+              promptControl.current?.focus();
             }}
           >
             New topic
@@ -252,14 +254,14 @@ export default function Overseer() {
         ) : !enabled ? (
           <div className="coordinator-welcome">
             <OverseerMark />
-            <span className="coordinator-eyebrow">Your built-in agent</span>
+            <span className="coordinator-eyebrow">Your built-in Agent</span>
             <h2>
               One place to coordinate
               <br />
-              your agents.
+              your Agents.
             </h2>
             <p>
-              Bring together updates, find the right agents and prepare work for
+              Bring together updates, find the right Agents and prepare work for
               your fleet.
             </p>
             <div className="coordinator-setup">
@@ -302,10 +304,10 @@ export default function Overseer() {
             {!turns.length ? (
               <div className="coordinator-welcome">
                 <OverseerMark />
-                <span className="coordinator-eyebrow">Your built-in agent</span>
+                <span className="coordinator-eyebrow">Your built-in Agent</span>
                 <h2>What would you like to do?</h2>
                 <p>
-                  Bring together updates, find the right agents and prepare work
+                  Bring together updates, find the right Agents and prepare work
                   for your fleet.
                 </p>
                 <div className="coordinator-starters">
@@ -313,12 +315,12 @@ export default function Overseer() {
                     [
                       "conversations",
                       "Check release blockers",
-                      "Find out which agents are waiting on release blockers and summarize what needs my attention.",
+                      "Find out which Agents are waiting on release blockers and summarize what needs my attention.",
                     ],
                     [
                       "task",
-                      "Prepare tasks for my agents",
-                      "Help me split the next release into tasks and find the right agents for each one.",
+                      "Prepare tasks for my Agents",
+                      "Help me split the next release into tasks and find the right Agents for each one.",
                     ],
                   ].map(([icon, label, text]) => (
                     <button
@@ -337,163 +339,202 @@ export default function Overseer() {
                 </div>
               </div>
             ) : null}
-            {turns.map((turn) => (
-              <div className="overseer-turn" key={turn.id}>
-                <article className="message">
-                  <IdentityIcon
-                    kind="person"
-                    id={me.person.id}
-                    label={me.person.name}
-                  />
-                  <div className="message-body">
-                    <div className="message-meta">
-                      <strong>You</strong>
+            <div className="coordinator-thread">
+              {turns.map((turn, index) => (
+                <div className="overseer-turn" key={turn.id}>
+                  {!turn.previous_plan_id || index === 0 ? (
+                    <div
+                      className="coordinator-topic"
+                      role="separator"
+                      aria-label={
+                        !turn.previous_plan_id ? "Topic" : "Earlier topic"
+                      }
+                    >
+                      <span>
+                        {!turn.previous_plan_id ? "Topic" : "Earlier topic"}
+                      </span>
                       <DateValue value={turn.created_at} />
                     </div>
-                    <p>{turn.prompt}</p>
-                  </div>
-                </article>
-                <article className="message">
-                  <OverseerMark />
-                  <div className="message-body">
-                    <div className="message-meta">
-                      <strong>{assistantName}</strong>
-                      <Badge>
-                        {turn.operation === "status"
-                          ? "Interpretation"
-                          : turn.dispatches?.length
-                            ? "Sent"
-                            : "Proposal"}
-                      </Badge>
-                    </div>
-                    <p>{turn.summary}</p>
-                    {turn.instructions?.length ? (
-                      <div className="coordinator-instructions">
-                        {turn.instructions.map((i) => (
-                          <div key={i.agent_id}>
-                            <IdentityIcon kind="agent" id={i.agent_id} />
-                            <div>
-                              <strong>
-                                {turn.sources.find(
-                                  (s) => s.agent.id === i.agent_id,
-                                )?.agent.name || "Specialist"}
-                              </strong>
-                              <p>{i.body}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    {turn.summary_error ? (
-                      <small>{turn.summary_error}</small>
-                    ) : null}
-                    <Details
-                      defer
-                      label={`Sources and freshness (${turn.sources.length})`}
-                      value={turn.sources}
+                  ) : null}
+                  <article className="message">
+                    <IdentityIcon
+                      kind="person"
+                      id={me.person.id}
+                      label={me.person.name}
                     />
-                    {turn.operation !== "status" &&
-                    (!turn.dispatches?.length || !turn.instructions?.length) ? (
-                      <section className="approval">
-                        <h3>
-                          {turn.dispatches?.length
-                            ? "Accepted instruction"
-                            : "Review exact instruction"}
-                        </h3>
-                        <p>
-                          <strong>{turn.operation}</strong> to{" "}
-                          {turn.sources.map((s) => s.agent.name).join(", ")}
-                        </p>
-                        {turn.body ? <pre>{turn.body}</pre> : null}
-                        {!turn.dispatches?.length ? (
-                          <>
-                            <small>
-                              {Date.parse(turn.expires_at) <= clock ? (
-                                "This proposal expired. Ask again to prepare a fresh one."
-                              ) : (
-                                <>
-                                  Expires <DateValue value={turn.expires_at} />
-                                </>
-                              )}
-                            </small>
-                            <div className="form-actions">
-                              <Button
-                                primary
-                                disabled={
-                                  busy ||
-                                  Date.parse(turn.expires_at) <= clock ||
-                                  !turn.requires_confirmation
-                                }
-                                onClick={() =>
-                                  void op
-                                    .run<Plan>("/fleet/command", {
-                                      plan_id: turn.id,
-                                    })
-                                    .then((p) => {
-                                      if (p)
-                                        setNotice(
-                                          "Instruction accepted. Delivery and replies are tracked separately.",
-                                        );
-                                    })
-                                }
-                              >
-                                Confirm exact instruction
-                              </Button>
+                    <div className="message-body">
+                      <div className="message-meta">
+                        <strong>You</strong>
+                        <DateValue value={turn.created_at} />
+                      </div>
+                      <p>{turn.prompt}</p>
+                    </div>
+                  </article>
+                  <article className="message">
+                    <OverseerMark />
+                    <div className="message-body">
+                      <div className="message-meta">
+                        <strong>{assistantName}</strong>
+                        <Badge
+                          tone={turn.dispatches?.length ? "good" : "accent"}
+                        >
+                          {turn.operation === "status"
+                            ? "Interpretation"
+                            : turn.dispatches?.length
+                              ? "Sent"
+                              : "Proposal"}
+                        </Badge>
+                      </div>
+                      <p>{turn.summary}</p>
+                      {turn.instructions?.length ? (
+                        <div className="coordinator-instructions">
+                          {turn.instructions.map((i) => (
+                            <div key={i.agent_id}>
+                              <IdentityIcon kind="agent" id={i.agent_id} />
+                              <div>
+                                <strong>
+                                  {turn.sources.find(
+                                    (s) => s.agent.id === i.agent_id,
+                                  )?.agent.name || "Specialist"}
+                                </strong>
+                                <p>{i.body}</p>
+                              </div>
                             </div>
-                          </>
-                        ) : null}
-                      </section>
-                    ) : null}
-                    <CoordinatorResults turn={turn} />
-                    {turn.replies?.length &&
-                    (!turn.automatic || turn.summary_error) ? (
-                      <Button
-                        disabled={
-                          busy ||
-                          !turn.replies.some(
-                            (r) =>
-                              r.state !== "open" && r.state !== "clarification",
-                          )
-                        }
-                        onClick={() =>
-                          void op
-                            .run<Plan>(
-                              "/fleet/plans/" + turn.id + "/summary",
-                              {},
+                          ))}
+                        </div>
+                      ) : null}
+                      {turn.summary_error ? (
+                        <small>{turn.summary_error}</small>
+                      ) : null}
+                      <Details
+                        defer
+                        label={`Sources and freshness (${turn.sources.length})`}
+                        value={turn.sources}
+                      />
+                      {turn.operation !== "status" &&
+                      (!turn.dispatches?.length ||
+                        !turn.instructions?.length) ? (
+                        <section className="approval">
+                          <h3>
+                            {turn.dispatches?.length
+                              ? "Accepted instruction"
+                              : "Review exact instruction"}
+                          </h3>
+                          <p>
+                            <strong>{turn.operation}</strong> to{" "}
+                            {turn.sources.map((s) => s.agent.name).join(", ")}
+                          </p>
+                          {turn.body ? <pre>{turn.body}</pre> : null}
+                          {!turn.dispatches?.length ? (
+                            <>
+                              <small>
+                                {Date.parse(turn.expires_at) <= clock ? (
+                                  "This proposal expired. Ask again to prepare a fresh one."
+                                ) : (
+                                  <>
+                                    Expires{" "}
+                                    <DateValue value={turn.expires_at} />
+                                  </>
+                                )}
+                              </small>
+                              <div className="form-actions">
+                                <Button
+                                  primary
+                                  disabled={
+                                    busy ||
+                                    Date.parse(turn.expires_at) <= clock ||
+                                    !turn.requires_confirmation
+                                  }
+                                  onClick={() =>
+                                    void op
+                                      .run<Plan>("/fleet/command", {
+                                        plan_id: turn.id,
+                                      })
+                                      .then((p) => {
+                                        if (p)
+                                          setNotice(
+                                            "Instruction accepted. Delivery and replies are tracked separately.",
+                                          );
+                                      })
+                                  }
+                                >
+                                  Confirm exact instruction
+                                </Button>
+                              </div>
+                            </>
+                          ) : null}
+                        </section>
+                      ) : null}
+                      <CoordinatorResults turn={turn} />
+                      {turn.replies?.length &&
+                      (!turn.automatic || turn.summary_error) ? (
+                        <Button
+                          disabled={
+                            busy ||
+                            !turn.replies.some(
+                              (r) =>
+                                r.state !== "open" &&
+                                r.state !== "clarification",
                             )
-                            .then((p) => {
-                              if (p) setNotice("");
-                            })
-                        }
-                      >
-                        {turn.summary_error
-                          ? "Retry summary"
-                          : "Summarize replies"}
-                      </Button>
-                    ) : null}
-                    {turn.automatic &&
-                    turn.replies?.length &&
-                    !turn.reply_summary &&
-                    !turn.summary_error ? (
-                      <small className="muted">
-                        {turn.replies.some(
-                          (r) =>
-                            r.state === "open" || r.state === "clarification",
-                        )
-                          ? "Waiting for replies"
-                          : "Bringing the replies together..."}
-                      </small>
-                    ) : null}
-                    {turn.reply_summary ? (
-                      <section className="section">
-                        <h3>Combined reply</h3>
-                        <p>{turn.reply_summary}</p>
-                      </section>
-                    ) : null}
+                          }
+                          onClick={() =>
+                            void op
+                              .run<Plan>(
+                                "/fleet/plans/" + turn.id + "/summary",
+                                {},
+                              )
+                              .then((p) => {
+                                if (p) setNotice("");
+                              })
+                          }
+                        >
+                          {turn.summary_error
+                            ? "Retry summary"
+                            : "Summarize replies"}
+                        </Button>
+                      ) : null}
+                      {turn.automatic &&
+                      turn.replies?.length &&
+                      !turn.reply_summary &&
+                      !turn.summary_error ? (
+                        <small className="muted">
+                          {turn.replies.some(
+                            (r) =>
+                              r.state === "open" || r.state === "clarification",
+                          )
+                            ? "Waiting for replies"
+                            : "Bringing the replies together..."}
+                        </small>
+                      ) : null}
+                      {turn.reply_summary ? (
+                        <section className="section">
+                          <h3>Combined reply</h3>
+                          <p>{turn.reply_summary}</p>
+                        </section>
+                      ) : null}
+                    </div>
+                  </article>
+                </div>
+              ))}
+              {freshTopic ? (
+                <div className="coordinator-topic-draft" role="status">
+                  <div>
+                    <strong>New topic</strong>
+                    <span>Start a separate conversation with Coordinator.</span>
                   </div>
-                </article>
-              </div>
-            ))}
+                  {latest && (latest.target?.id || "") === group ? (
+                    <Button
+                      onClick={() => {
+                        setFreshTopic(false);
+                        promptControl.current?.focus();
+                      }}
+                    >
+                      Continue previous topic
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </>
         )}
       </div>
@@ -532,7 +573,7 @@ export default function Overseer() {
                       setFreshTopic(true);
                     }}
                   >
-                    <option value="">All permitted agents (up to 100)</option>
+                    <option value="">All permitted Agents (up to 100)</option>
                     {group && !groups.items.some((g) => g.id === group) ? (
                       <option disabled value={group}>
                         Saved group (not loaded)

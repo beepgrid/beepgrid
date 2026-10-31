@@ -13,6 +13,7 @@ import {
   Form,
   IdentityIcon,
   Modal,
+  RequestStatus,
 } from "./ui";
 
 export function RequestCard({
@@ -75,23 +76,21 @@ export function RequestCard({
           r.title &&
           r.title !== r.body &&
           !r.body.startsWith(r.title) ? (
-            <small>{r.title}</small>
+            r.title.startsWith("Coordinator: ") ? (
+              <aside
+                className="coordinator-context"
+                aria-label="Coordinator context"
+              >
+                <Badge tone="accent">Coordinator</Badge>
+                <p>{r.title.slice("Coordinator: ".length)}</p>
+              </aside>
+            ) : (
+              <small>{r.title}</small>
+            )
           ) : null}
           <ErrorView error={op.error} />
           {r.state !== "open" ? (
-            <Badge
-              tone={r.response?.outcome === "approved" ? "good" : "neutral"}
-            >
-              {r.response?.outcome === "denied"
-                ? "Declined"
-                : r.response?.outcome === "approved"
-                  ? "Approved"
-                  : r.response?.outcome === "answered"
-                    ? "Answered"
-                    : r.state === "superseded"
-                      ? "Replaced"
-                      : r.state}
-            </Badge>
+            <RequestStatus request={r} />
           ) : caps.data?.operations.respond ? (
             <>
               {r.kind === "task" ? (

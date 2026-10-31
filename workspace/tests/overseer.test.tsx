@@ -94,7 +94,7 @@ it("keeps a 25-agent result compact and reveals canonical per-agent details on d
   const { Wrapper } = harness();
   render(<Overseer />, { wrapper: Wrapper });
   const summary = await screen.findByText(
-    "25 agents · 3 of 25 replies received · Details",
+    "25 Agents · 3 of 25 replies received · Details",
   );
   expect(screen.queryByText("Result 0")).not.toBeInTheDocument();
   fireEvent.click(summary);
@@ -151,7 +151,7 @@ it("lets a Coordinator starter fill a draft without sending it", async () => {
   expect(
     screen.getByRole("textbox", { name: "Message Coordinator" }),
   ).toHaveValue(
-    "Find out which agents are waiting on release blockers and summarize what needs my attention.",
+    "Find out which Agents are waiting on release blockers and summarize what needs my attention.",
   );
   expect(
     screen.getByRole("textbox", { name: "Message Coordinator" }),
@@ -210,6 +210,18 @@ it("reloads private chronological turns, sends bounded follow-up identity and cl
   );
   expect(posts.some((p) => p.path.endsWith("/fleet/command"))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "New topic" }));
+  expect(screen.getByRole("status")).toHaveTextContent("New topic");
+  expect(
+    screen.getByRole("textbox", { name: "New topic for Coordinator" }),
+  ).toHaveFocus();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Continue previous topic" }),
+  );
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("textbox", { name: "Message Coordinator" }),
+  ).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "New topic" }));
   fireEvent.change(
     screen.getByRole("textbox", { name: "New topic for Coordinator" }),
     { target: { value: "New question" } },
@@ -224,6 +236,9 @@ it("reloads private chronological turns, sends bounded follow-up identity and cl
   const next = harness();
   render(<Overseer />, { wrapper: next.Wrapper });
   await screen.findByText("Explain that");
+  expect(
+    screen.getAllByRole("separator", { name: "Topic" }),
+  ).toHaveLength(2);
   expect(
     posts
       .filter((p) => p.path.endsWith("/query"))
@@ -275,7 +290,7 @@ it("keeps a proposed exact instruction separate from direct chat and requires ex
     { path: "/api/v1/fleet/command", body: { plan_id: "ovr_first" } },
   ]);
   const details = screen
-    .getByText("1 agent · messages accepted · Details")
+    .getByText("1 Agent · messages accepted · Details")
     .closest("details")!;
   details.open = true;
   fireEvent(details, new Event("toggle"));

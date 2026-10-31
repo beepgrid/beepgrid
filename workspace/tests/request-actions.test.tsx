@@ -25,6 +25,29 @@ afterEach(() => {
   history.replaceState(null, "", "/agents");
 });
 
+it("separates Coordinator context from the exact request and preserves other titles", () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => json({ operations: {} })),
+  );
+  const { Wrapper } = harness();
+  const { rerender } = render(
+    <RequestCard
+      request={{ ...question, title: "Coordinator: Review release readiness" }}
+    />,
+    { wrapper: Wrapper },
+  );
+  expect(screen.getByLabelText("Coordinator context")).toHaveTextContent(
+    "Review release readiness",
+  );
+  expect(screen.getByText(question.body)).toBeVisible();
+  rerender(<RequestCard request={{ ...question, title: "Other context" }} />);
+  expect(
+    screen.queryByLabelText("Coordinator context"),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("Other context")).toBeVisible();
+});
+
 it("confirms cancellation with the observed version and keeps history on a stale decision", async () => {
   const fetcher = vi.fn(async (path: string, _init?: RequestInit) =>
     path.endsWith("/capabilities")

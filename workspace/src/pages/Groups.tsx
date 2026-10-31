@@ -49,7 +49,7 @@ export default function Groups({
           <Button primary icon="plus" onClick={() => setCreate(true)}>
             Create{" "}
             {purpose === "agent_role"
-              ? "agent role"
+              ? "Agent role"
               : purpose === "team"
                 ? "team"
                 : "contact group"}
@@ -70,7 +70,7 @@ export default function Groups({
                 <small>
                   {g.members.length}
                   {g.members_complete ? "" : " visible"}{" "}
-                  {purpose === "agent_role" ? "agents" : "members"}
+                  {purpose === "agent_role" ? "Agents" : "members"}
                 </small>
               </div>
               <Badge>
@@ -126,7 +126,7 @@ function GroupDetail({
           <Button onClick={() => setEdit(true)}>
             Edit{" "}
             {g.purpose === "agent_role"
-              ? "agent role"
+              ? "Agent role"
               : g.purpose === "team"
                 ? "team"
                 : "contact group"}
@@ -197,7 +197,7 @@ export function GroupForm({
   const op = useOperation();
   return (
     <Modal
-      title={`${g ? "Edit" : "Create"} ${purpose === "agent_role" ? "agent role" : purpose === "team" ? "team" : "contact group"}`}
+      title={`${g ? "Edit" : "Create"} ${purpose === "agent_role" ? "Agent role" : purpose === "team" ? "team" : "contact group"}`}
       onClose={onClose}
     >
       <Form
@@ -253,7 +253,7 @@ export function GroupForm({
           <Button primary type="submit" disabled={op.pending}>
             Save{" "}
             {purpose === "agent_role"
-              ? "agent role"
+              ? "Agent role"
               : purpose === "team"
                 ? "team"
                 : "group"}

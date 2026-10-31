@@ -110,7 +110,7 @@ export default function Directory({
           agents ? (
             caps.data?.operations.enroll_agent ? (
               <Button primary icon="plus" onClick={() => setConnect(true)}>
-                Connect agent
+                Connect Agent
               </Button>
             ) : null
           ) : caps.data?.operations.create_person ? (
@@ -155,7 +155,7 @@ export default function Directory({
             {agents ? (
               <>
                 <select
-                  aria-label="Filter by agent role"
+                  aria-label="Filter by Agent role"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                 >
@@ -181,7 +181,7 @@ export default function Directory({
             <Search
               value={search}
               onChange={setSearch}
-              placeholder={agents ? "Search agents" : "Search people"}
+              placeholder={agents ? "Search Agents" : "Search people"}
             />
           </div>
         ) : null}
@@ -197,7 +197,7 @@ export default function Directory({
               search
                 ? "No matches"
                 : agents
-                  ? "Connect your first agent"
+                  ? "Connect your first Agent"
                   : "No people yet"
             }
           >
@@ -556,7 +556,7 @@ export function Connect({
   }
   return (
     <Modal
-      title={agent ? `Connect ${agent.name}` : "Connect an agent"}
+      title={agent ? `Connect ${agent.name}` : "Connect an Agent"}
       onClose={onClose}
       className="agent-connect-dialog"
     >
@@ -658,7 +658,7 @@ export function Connect({
                 checked={contact}
                 onChange={(e) => setContact(e.target.checked)}
               />
-              Allow this agent to contact me
+              Allow this Agent to contact me
             </label>
           ) : null}
           <ErrorView error={op.error} />

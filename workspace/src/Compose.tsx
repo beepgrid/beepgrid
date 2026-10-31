@@ -278,10 +278,7 @@ export function MessageComposer({
             </button>
             <span className="approval-preview-label">Approval flow</span>
             <div className="approval-preview-actions">
-              <span className="preview-action">
-                <Icon name="check" size={14} />
-                Approve
-              </span>
+              <span className="preview-action">Approve</span>
               <span className="preview-action">Decline</span>
               <span className="preview-action">Ask for context</span>
             </div>

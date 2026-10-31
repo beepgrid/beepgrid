@@ -177,7 +177,7 @@ it("uses role and current-presence filters without confusing roles with runtime 
   render(<Directory section="agents" />, { wrapper: Wrapper });
   await screen.findByRole("option", { name: "Builders" });
   fireEvent.change(
-    screen.getByRole("combobox", { name: "Filter by agent role" }),
+    screen.getByRole("combobox", { name: "Filter by Agent role" }),
     { target: { value: "grp_one" } },
   );
   fireEvent.change(

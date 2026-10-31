@@ -18,7 +18,7 @@ afterEach(() => {
 });
 function open() {
   fireEvent.click(
-    screen.getByRole("button", { name: "Open agent icon picker" }),
+    screen.getByRole("button", { name: "Open Agent icon picker" }),
   );
 }
 it("persists icon choices independently of typography and theme, including across remount", () => {
@@ -59,7 +59,7 @@ it("keeps the two preview panels mutually exclusive and supports keyboard dismis
     screen.queryByRole("region", { name: "Agent icon picker" }),
   ).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Open agent icon picker" }),
+    screen.getByRole("button", { name: "Open Agent icon picker" }),
   ).toHaveFocus();
 });
 it("steps through all five distinct packs and resets to the reference style", () => {

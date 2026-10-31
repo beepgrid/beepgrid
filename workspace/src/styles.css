@@ -804,6 +804,10 @@ main#main {
   background: color-mix(in srgb, var(--warn) 8%, var(--surface));
   border-color: color-mix(in srgb, var(--warn) 18%, var(--line));
 }
+.badge.danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+}
 .badge.accent {
   color: var(--accent);
   background: var(--accent-soft);
@@ -1858,7 +1862,41 @@ dialog {
 }
 .coordinator-messages {
   background: var(--surface);
+  padding-inline: 20px;
+  scrollbar-gutter: stable both-edges;
 }
+.coordinator-thread {
+  width: 100%;
+  max-width: 780px;
+  margin-inline: auto;
+}
+.coordinator-topic {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 26px;
+  color: var(--sub);
+  font-size: var(--type-caption);
+}
+.coordinator-topic::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+.coordinator-topic > span { font-weight: var(--type-strong); color: var(--ink); }
+.coordinator-topic-draft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--strong);
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.coordinator-topic-draft strong { display: block; font-size: var(--type-secondary); }
+.coordinator-topic-draft span { display: block; color: var(--sub); margin-top: 4px; font-size: var(--type-small); }
 .coordinator-intro {
   display: flex;
   flex-direction: column;
@@ -1930,7 +1968,12 @@ dialog {
 }
 .coordinator-composer {
   background: var(--surface);
+  overflow: hidden;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
 }
+.coordinator-composer > .notice,
+.coordinator-composer > .error,
 .coordinator-composer form {
   max-width: 780px;
   margin-inline: auto;
@@ -2258,6 +2301,20 @@ dialog {
   color: var(--ink);
   white-space: pre-wrap;
 }
+.coordinator-context {
+  padding: 14px 16px;
+  margin: 2px -18px;
+  border-block: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.coordinator-context > p {
+  margin-top: 8px;
+  color: var(--sub);
+  font-size: var(--type-small);
+  line-height: 1.65;
+}
+.decision-answer { display: block; margin-top: 8px; }
+.profile-history-hint { margin-bottom: 18px; color: var(--sub); font-size: var(--type-small); max-width: 650px; }
 .decision-card > .badge {
   justify-self: start;
 }
@@ -2657,7 +2714,7 @@ dialog > header h2 {
   color: var(--sub);
   margin-right: auto;
 }
-.approval-preview-actions { display:flex;gap:6px }
+.approval-preview-actions { display:flex;gap:6px;flex-wrap:wrap }
 .preview-action {
   display: flex;
   align-items: center;
@@ -2668,11 +2725,6 @@ dialog > header h2 {
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 12px;
-}
-.preview-action:first-child {
-  background: var(--button);
-  border-color: var(--button);
-  color: var(--button-ink);
 }
 .message-choices {
   margin: 0 14px;
@@ -2817,8 +2869,8 @@ dialog > header h2 {
 .coordinator-entry-title strong {
   flex: 0 1 auto;
 }
-.overseer-entry .conversation-copy > p {
-  font-size: 11px;
+.overseer-entry .conversation-copy > p .badge {
+  text-transform: none;
 }
 .overseer-entry .overseer-mark {
   --avatar-size: 36px;
@@ -2893,7 +2945,7 @@ dialog > header h2 {
   min-width: 140px;
 }
 .fleet-summary span {
-  font-size: 12px;
+  font-size: var(--type-secondary);
   color: var(--sub);
   display: flex;
   align-items: center;
@@ -2928,7 +2980,7 @@ dialog > header h2 {
   min-height: 36px;
 }
 .fleet-layout h2 {
-  font-size: 14px;
+  font-size: var(--type-h3);
   font-weight: 600;
   letter-spacing: -0.2px;
 }
@@ -2941,18 +2993,16 @@ dialog > header h2 {
 }
 .fleet-agents td {
   padding: 15px 10px;
-  font-size: 12px;
+  font-size: var(--type-secondary);
 }
 .fleet-agents th {
   padding: 10px;
-  font-size: 11px;
+  font-size: var(--type-small);
   background: var(--sidebar);
 }
 .fleet-agents td .button {
-  border: 0;
-  box-shadow: none;
-  padding: 5px;
-  font-size: 11px;
+  padding: 7px 12px;
+  font-size: var(--type-small);
 }
 .fleet-identity {
   display: flex;
@@ -2960,18 +3010,19 @@ dialog > header h2 {
   gap: 10px;
 }
 .fleet-identity .identity-icon {
-  --avatar-size: 32px;
+  --avatar-size: 36px;
 }
 .fleet-identity strong {
   display: block;
-  font-size: 12px;
+  font-size: var(--type-name);
 }
 .fleet-identity small {
   display: block;
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
+.fleet-agents .status { font-size: var(--type-small); }
 .fleet-wait {
-  font-size: 11px;
+  font-size: var(--type-small);
   color: var(--sub);
 }
 .fleet-waiting {
@@ -2989,7 +3040,7 @@ dialog > header h2 {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--type-small);
   color: var(--sub);
   flex-wrap: wrap;
 }
@@ -2998,16 +3049,16 @@ dialog > header h2 {
   font-weight: 550;
 }
 .fleet-request .identity-icon {
-  --avatar-size: 22px;
+  --avatar-size: 28px;
 }
 .fleet-request p {
-  font-size: 12px;
+  font-size: var(--type-secondary);
   margin: 9px 0;
   color: var(--ink);
   line-height: 1.6;
 }
 .fleet-request .badge {
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .fleet-request:hover p {
   color: var(--accent);
@@ -3027,7 +3078,7 @@ dialog > header h2 {
   color: var(--ink);
 }
 .fleet-empty p {
-  font-size: 12px;
+  font-size: var(--type-secondary);
 }
 @media (max-width: 1100px) {
   .fleet-layout {
@@ -3088,7 +3139,7 @@ dialog > header h2 {
     flex: 1;
   }
   .fleet-summary span {
-    font-size: 10px;
+    font-size: var(--type-caption);
   }
   .fleet-summary strong {
     font-size: 26px;
@@ -3133,10 +3184,10 @@ a.mention-token:hover { text-decoration:underline }
 
 .fleet-deadlock { border:1px solid color-mix(in srgb,var(--warn) 30%,var(--line)); border-radius:12px; padding:18px; margin-bottom:24px }
 .fleet-deadlock > header { display:flex; align-items:center; gap:9px; color:var(--warn); flex-wrap:wrap }
-.fleet-deadlock h2 { font-size:14px; color:var(--ink) }
-.fleet-deadlock p { font-size:12px; margin:10px 0 14px }
+.fleet-deadlock h2 { font-size:var(--type-h3); color:var(--ink) }
+.fleet-deadlock p { font-size:var(--type-secondary); margin:10px 0 14px }
 .fleet-deadlock > div { display:flex; gap:8px; flex-wrap:wrap }
-.fleet-deadlock button { display:flex; align-items:center; gap:7px; padding:8px 10px; border-radius:7px; background:var(--raised); font-size:12px }
+.fleet-deadlock button { display:flex; align-items:center; gap:7px; padding:8px 10px; border-radius:7px; background:var(--raised); border:1px solid var(--line); font-size:var(--type-small) }
 .fleet-deadlock .identity-icon { --avatar-size:24px }
 .dependency-notice { display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:12px; background:color-mix(in srgb,var(--warn) 6%,var(--surface)); color:var(--warn); border-radius:8px; margin-bottom:16px; font-size:12px }
 .dependency-notice > span { margin-left:auto }
@@ -3144,10 +3195,10 @@ a.mention-token:hover { text-decoration:underline }
 .coordinator-instructions { display:grid; gap:10px; margin:14px 0 }
 .coordinator-instructions > div { display:flex; gap:10px; padding:12px; border:1px solid var(--line); border-radius:8px }
 .coordinator-instructions .identity-icon { --avatar-size:28px }
-.coordinator-instructions strong { font-size:12px }
-.coordinator-instructions p { font-size:12px; margin-top:5px }
-.coordinator-review { display:flex; gap:6px; align-items:center; font-size:11px; color:var(--sub); margin-right:auto }
-.coordinator-review input { width:13px; height:13px; min-height:13px; accent-color:var(--ink) }
+.coordinator-instructions strong { font-size:var(--type-secondary) }
+.coordinator-instructions p { font-size:var(--type-secondary); margin-top:5px }
+.coordinator-review { display:flex; gap:9px; align-items:center; font-size:var(--type-secondary); font-weight:var(--type-medium); color:var(--ink); margin-right:auto; min-height:40px; cursor:pointer }
+.coordinator-review input { width:17px; height:17px; min-height:17px; accent-color:var(--ink); cursor:pointer }
 
 .directory-filters { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
 .directory-filters select { width:auto; min-height:32px; padding:6px 28px 6px 10px; font-size:12px; border-color:var(--line); background:var(--surface) }
@@ -3161,8 +3212,8 @@ a.mention-token:hover { text-decoration:underline }
 .agent-profile-title h1 { font-size:26px; font-weight:600; letter-spacing:-.8px; line-height:1.25; margin:0 }
 .agent-profile-title p { color:var(--sub); font-size:13px; margin:7px 0 0 }
 .agent-role-line { display:flex; align-items:center; gap:8px; min-height:28px; color:var(--sub); font-size:12px; margin:0 0 22px; flex-wrap:wrap }
-.text-action { display:inline-flex; align-items:center; gap:6px; padding:3px 0; color:var(--sub); font-size:12px }
-.text-action:hover { color:var(--ink) }
+.text-action { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 12px; min-height:34px; border:1px solid var(--strong); border-radius:8px; background:var(--surface); color:var(--ink); font-size:var(--type-small); font-weight:var(--type-medium) }
+.text-action:hover { background:var(--hover); border-color:var(--faint) }
 .agent-role-line .text-action { margin-left:5px }
 .agent-overview { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr); gap:36px }
 .agent-overview > * { min-width:0 }
@@ -3194,7 +3245,7 @@ a.mention-token:hover { text-decoration:underline }
 .profile-runtime-meta { display:flex; justify-content:space-between; color:var(--sub); font-size:12px; border-top:1px solid var(--line); padding-top:14px; margin-top:6px }
 .profile-runtime-meta strong { color:var(--ink); font-weight:500 }
 .profile-shortcuts h2 { margin-bottom:12px }
-.profile-shortcuts button { display:flex; align-items:center; gap:10px; font-size:13px; width:100%; padding:11px 4px; text-align:left; border-radius:6px }
+.profile-shortcuts button { display:flex; align-items:center; gap:10px; font-size:var(--type-small); width:100%; padding:10px 12px; margin-top:8px; text-align:left; border:1px solid var(--strong); border-radius:8px; background:var(--surface) }
 .profile-shortcuts button:hover { background:var(--raised) }
 .profile-shortcuts button span { flex:1 }
 .profile-shortcuts button svg { color:var(--sub) }

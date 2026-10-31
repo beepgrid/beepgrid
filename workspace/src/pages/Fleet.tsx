@@ -25,6 +25,7 @@ import {
   PageHeader,
   Search,
   Status,
+  RequestStatus,
 } from "../ui";
 
 export default function Fleet() {
@@ -67,7 +68,7 @@ export default function Fleet() {
         title="Fleet"
         actions={
           <Button icon="agents" onClick={() => navigate("/agents")}>
-            Manage agents
+            Manage Agents
           </Button>
         }
       />
@@ -82,7 +83,7 @@ export default function Fleet() {
         <>
           <div className="fleet-summary">
             <div>
-              <span>Visible agents</span>
+              <span>Visible Agents</span>
               <strong>{all.length}</strong>
             </div>
             <div>
@@ -105,10 +106,10 @@ export default function Fleet() {
               <header>
                 <Icon name="activity" size={18} />
                 <h2>Agents are waiting on each other</h2>
-                <Badge tone="warn">{cycles.size} agents blocked</Badge>
+                <Badge tone="warn">{cycles.size} Agents blocked</Badge>
               </header>
               <p>
-                These agents reported blocking dependencies. Open a conversation
+                These Agents reported blocking dependencies. Open a conversation
                 to reply or help them move forward.
               </p>
               {deadlocks.map((cycle, i) => (
@@ -138,7 +139,7 @@ export default function Fleet() {
                 <Search
                   value={search}
                   onChange={setSearch}
-                  placeholder="Find an agent"
+                  placeholder="Find an Agent"
                 />
               </header>
               {shown.length ? (
@@ -199,12 +200,12 @@ export default function Fleet() {
                             </td>
                             <td>
                               <Button
-                                icon="conversations"
+                                primary
                                 onClick={() =>
                                   navigate("/agents/" + a.agent.id)
                                 }
                               >
-                                View agent
+                                View Agent
                               </Button>
                             </td>
                           </tr>
@@ -217,7 +218,7 @@ export default function Fleet() {
                 <div className="fleet-empty">
                   <Icon name="agents" size={28} />
                   <h3>
-                    {search ? "No agents match" : "Your fleet starts here"}
+                    {search ? "No Agents match" : "Your fleet starts here"}
                   </h3>
                   {!search ? (
                     <Button
@@ -225,7 +226,7 @@ export default function Fleet() {
                       icon="plus"
                       onClick={() => navigate("/agents")}
                     >
-                      Connect an agent
+                      Connect an Agent
                     </Button>
                   ) : null}
                 </div>
@@ -259,9 +260,7 @@ export default function Fleet() {
                       </span>
                     </div>
                     <p>{r.body || r.title}</p>
-                    <Badge>
-                      {r.kind === "approval" ? "Approval" : "Reply needed"}
-                    </Badge>
+                    <RequestStatus request={r} />
                   </button>
                 ))
               ) : (

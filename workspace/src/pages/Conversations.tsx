@@ -31,9 +31,9 @@ import { MentionText } from "../Mentions";
 import { RequestCard } from "../RequestCard";
 import { Compose, MessageComposer } from "../Compose";
 import {
-  Badge,
   Button,
   ConversationAvatar,
+  ConversationPreview,
   conversationPeers,
   conversationLabel,
   Empty,
@@ -43,6 +43,7 @@ import {
   Loading,
   PageHeader,
   QueryState,
+  RequestStatus,
   Search,
 } from "../ui";
 
@@ -157,12 +158,16 @@ export default function Conversations() {
                         : c.title || "Group chat"}
                     </strong>
                     <p>
-                      {c.last_preview ||
-                        (c.shared
-                          ? "No messages yet"
-                          : c.title === "Conversation"
-                            ? "Start a conversation"
-                            : c.title)}
+                      <ConversationPreview
+                        body={
+                          c.last_preview ||
+                          (c.shared
+                            ? "No messages yet"
+                            : c.title === "Conversation"
+                              ? "Start a conversation"
+                              : c.title)
+                        }
+                      />
                     </p>
                     <div className="conversation-meta">
                       <span>
@@ -189,7 +194,7 @@ export default function Conversations() {
           )
         ) : (
           <Empty title="Choose a conversation" icon="conversations">
-            Start a message with a person, an agent or a group of recipients.
+            Start a message with a person, an Agent or a group of recipients.
           </Empty>
         )}
       </div>
@@ -417,18 +422,13 @@ function Chat({ id }: { id: string }) {
                           : ""
                       }
                     >
-                      {item.value.response?.outcome === "approved" ? (
-                        <Badge tone="good">
-                          <Icon name="check" size={14} />
-                          Approved
-                        </Badge>
-                      ) : item.value.response?.outcome === "denied" ? (
-                        "Declined"
-                      ) : typeof item.value.response?.answer === "string" ? (
-                        item.value.response.answer
-                      ) : (
-                        item.value.response?.outcome
-                      )}
+                      <RequestStatus request={item.value} />
+                      {typeof item.value.response?.answer === "string" &&
+                      item.value.response.answer ? (
+                        <span className="decision-answer">
+                          {item.value.response.answer}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                 </article>

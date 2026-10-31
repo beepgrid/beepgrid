@@ -304,7 +304,7 @@ export function TargetPicker({
                           ? (item as Group).purpose === "team"
                             ? "Team"
                             : (item as Group).purpose === "agent_role"
-                              ? `${(item as Group).members.length} agents`
+                              ? `${(item as Group).members.length} Agents`
                               : "Contact group"
                           : kind === "instance"
                             ? (item as Instance).presence

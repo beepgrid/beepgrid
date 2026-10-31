@@ -47,7 +47,7 @@ export default function AgentContacts({ agent }: { agent: Identity }) {
   return (
     <section className="profile-section reachable-contacts">
       <header>
-        <h2>Who this agent can reach</h2>
+        <h2>Who this Agent can reach</h2>
       </header>
       {caps.isPending ? (
         <Loading />

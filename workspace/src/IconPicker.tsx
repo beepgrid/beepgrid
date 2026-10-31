@@ -70,7 +70,7 @@ export function IconPicker({
         ref={trigger}
         type="button"
         className="type-trigger"
-        aria-label="Open agent icon picker"
+        aria-label="Open Agent icon picker"
         title="Agent icon styles"
         aria-expanded={open}
         aria-controls="agent-icon-panel"
@@ -90,7 +90,7 @@ export function IconPicker({
             <button
               type="button"
               className="type-icon"
-              aria-label="Close agent icon picker"
+              aria-label="Close Agent icon picker"
               onClick={() => {
                 onClose();
                 trigger.current?.focus();
@@ -99,7 +99,7 @@ export function IconPicker({
               <Icon name="close" size={17} />
             </button>
           </header>
-          <p className="type-intro">Preview across agents and conversations.</p>
+          <p className="type-intro">Preview across Agents and conversations.</p>
           <label className="type-label" htmlFor="agent-icon-preset">
             Icon pack & surface
           </label>
@@ -134,7 +134,7 @@ export function IconPicker({
             </button>
           </div>
           <p className="type-description">{preset.description}</p>
-          <div className="icon-samples" aria-label="Example agent icons">
+          <div className="icon-samples" aria-label="Example Agent icons">
             {["scout", "builder", "reviewer", "sentinel", "triage"].map(
               (name) => (
                 <IdentityIcon key={name} id={name} label={name} />

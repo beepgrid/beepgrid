@@ -1,7 +1,7 @@
 import { useResource } from "./data";
 import type { AssistanceSettings } from "./contracts";
 import { navigate } from "./navigation";
-import { Icon } from "./ui";
+import { Badge, Icon } from "./ui";
 
 export const assistantName = "Coordinator";
 
@@ -73,7 +73,9 @@ export function OverseerEntry({ selected = false }: { selected?: boolean }) {
             {state}
           </span>
         </div>
-        <p>Built-in agent</p>
+        <p>
+          <Badge tone="accent">Built-in Agent</Badge>
+        </p>
       </div>
       <Icon name="chevron" size={16} />
     </button>

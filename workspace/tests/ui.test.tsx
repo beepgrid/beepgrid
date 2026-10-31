@@ -10,8 +10,32 @@ import {
   Modal,
   QueryState,
   RequestKind,
+  RequestStatus,
+  ConversationPreview,
 } from "../src/ui";
 describe("shared primitives", () => {
+  it("labels recorded outcomes while keeping pending requests and ordinary previews distinct", () => {
+    const { rerender } = render(
+      <RequestStatus
+        request={{ state: "resolved", response: { outcome: "answered" } }}
+      />,
+    );
+    expect(screen.getByText("Answered")).toHaveClass("good");
+    rerender(
+      <RequestStatus
+        request={{ state: "expired", response: { outcome: "approved" } }}
+      />,
+    );
+    expect(screen.getByText("Expired")).not.toHaveClass("good");
+    rerender(
+      <ConversationPreview body="The request was answered yesterday." />,
+    );
+    expect(
+      screen.getByText("The request was answered yesterday."),
+    ).not.toHaveClass("badge");
+    rerender(<ConversationPreview body="open" />);
+    expect(screen.getByText("open")).not.toHaveClass("badge");
+  });
   it("returns keyboard focus to the opener after a dialog closes", () => {
     function Example() {
       const [open, setOpen] = useState(false);
@@ -164,7 +188,9 @@ it("bounds larger collages with an accurate remainder and uses a neutral empty f
   );
   expect(container.querySelectorAll(".agent-mark")).toHaveLength(3);
   expect(container.querySelector(".avatar-more")).toHaveTextContent("+4");
-  expect(container.querySelectorAll(".conversation-avatar > *")).toHaveLength(4);
+  expect(container.querySelectorAll(".conversation-avatar > *")).toHaveLength(
+    4,
+  );
   rerender(<ConversationAvatar participants={[]} currentId={self.id} />);
   expect(container.querySelector(".identity-conversation")).not.toBeNull();
   expect(container.querySelector(".agent-mark")).toBeNull();

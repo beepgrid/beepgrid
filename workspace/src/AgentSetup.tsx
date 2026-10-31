@@ -165,7 +165,7 @@ export function AgentSetup({
           <>
             <Code label="Start the connection" value={guide.run} />
             <p className="help">
-              The starter receives messages and replies. Put your agent’s logic
+              The starter receives messages and replies. Put your Agent’s logic
               in its handler; keep the worker running to receive new messages.
             </p>
           </>

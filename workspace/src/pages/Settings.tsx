@@ -514,7 +514,7 @@ function Assistance() {
           <OverseerMark />
           <div>
             <h2>Coordinator</h2>
-            <p>One private conversation for coordinating your agents.</p>
+            <p>One private conversation for coordinating your Agents.</p>
           </div>
         </div>
         <ErrorView error={op.error} />

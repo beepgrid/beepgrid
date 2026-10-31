@@ -21,6 +21,7 @@ import {
   Badge,
   Button,
   ConversationAvatar,
+  ConversationPreview,
   Details,
   ErrorView,
   Icon,
@@ -64,7 +65,7 @@ export default function AgentProfile({
         <span>/</span>
         <span>{p?.name || "Agent"}</span>
       </div>
-      <QueryState query={identity} empty="This agent is unavailable.">
+      <QueryState query={identity} empty="This Agent is unavailable.">
         {p ? <Profile key={p.id} agent={p} onConnect={onConnect} /> : null}
       </QueryState>
     </>
@@ -141,7 +142,6 @@ function Profile({
           {canMessage ? (
             <Button
               primary
-              icon="conversations"
               onClick={() => setCompose([{ kind: "agent", id: p.id }])}
             >
               Message
@@ -328,6 +328,10 @@ function Profile({
       ) : null}
       {tab === "conversations" ? (
         <section className="profile-section">
+          <p className="profile-history-hint">
+            Conversations with people and other Agents that you can access.
+            Workspace administrators can also view Agent-to-Agent conversations.
+          </p>
           <ConversationList query={history} agentID={p.id} />
         </section>
       ) : null}
@@ -345,13 +349,13 @@ function Profile({
         />
         {caps.data?.operations.manage ? (
           <Button danger={!p.disabled} onClick={() => setConfirm(true)}>
-            {p.disabled ? "Enable agent" : "Disable agent"}
+            {p.disabled ? "Enable Agent" : "Disable Agent"}
           </Button>
         ) : null}
       </details>
       {confirm ? (
         <Modal
-          title={p.disabled ? "Enable agent" : "Disable agent"}
+          title={p.disabled ? "Enable Agent" : "Disable Agent"}
           onClose={() => setConfirm(false)}
         >
           <p>
@@ -413,7 +417,11 @@ function ConversationList({
                 <strong>
                   {peers.length > 1 ? c.title : peers[0]?.name || c.title}
                 </strong>
-                <p>{c.last_preview || "Open conversation"}</p>
+                <p>
+                  <ConversationPreview
+                    body={c.last_preview || "Open conversation"}
+                  />
+                </p>
               </div>
               <time>
                 {new Date(
@@ -440,7 +448,7 @@ function AgentRoles({
   const [edit, setEdit] = useState<Group | null>(null);
   return (
     <Modal title={`Agent roles for ${agent.name}`} onClose={onClose}>
-      <QueryState query={groups} empty="No agent roles yet.">
+      <QueryState query={groups} empty="No Agent roles yet.">
         <div className="profile-role-list">
           {groups.items.map((g) => (
             <RoleMembership
@@ -531,7 +539,7 @@ function ProfileChannels({ agent }: { agent: Identity }) {
           <div>
             <strong>Agent runtime</strong>
             <p>
-              Messages are saved in Beepgrid and received by this agent’s
+              Messages are saved in Beepgrid and received by this Agent’s
               runtime.
             </p>
           </div>
@@ -566,7 +574,7 @@ function ProfileChannels({ agent }: { agent: Identity }) {
         })}
         {!destinations.isPending && !destinations.items.length ? (
           <p className="help">
-            No additional delivery channels are visible for this agent.
+            No additional delivery channels are visible for this Agent.
           </p>
         ) : null}
       </section>

@@ -107,7 +107,7 @@ export default function Permissions({
             <>
               {canManage ? (
                 <Button onClick={() => setChoosing(true)}>
-                  Choose a person, agent or team
+                  Choose a person, Agent or team
                 </Button>
               ) : null}
             </>
@@ -126,7 +126,7 @@ export default function Permissions({
             {selected.kind === "agent"
               ? "Agent"
               : selected.kind === "group"
-                ? "Team or agent role"
+                ? "Team or Agent role"
                 : "Person"}
           </p>
         </div>
