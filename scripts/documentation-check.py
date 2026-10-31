@@ -86,6 +86,8 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-doc-tour-') as scratch:
                 commands.append((['go', 'run', '-buildvcs=false', './examples/developer-tour/main.go'], 'go'))
             commands.append(([sys.executable, 'examples/developer-tour/advanced.py'], 'advanced'))
             commands.append(([sys.executable, 'examples/developer-tour/tools.py'], 'mcp'))
+            commands.append(([sys.executable, 'examples/a2a-workflows/api-migration.py'], 'api-migration'))
+            commands.append(([sys.executable, 'examples/a2a-workflows/incident.py'], 'incident-investigation'))
             evidence = []
             for command, language in commands:
                 if language in ['python','typescript','go']:
@@ -95,7 +97,12 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-doc-tour-') as scratch:
                 source = root / command[-1].removeprefix('./')
                 evidence.append({'language': language, 'file': str(source.relative_to(root)), 'sha256': hashlib.sha256(source.read_bytes()).hexdigest(), 'status': 'passed'})
             out = root / '.local/documentation-qualification.json'
-            out.write_text(json.dumps({'status': 'passed', 'environment': 'local PostgreSQL, real engine HTTP, deterministic model fixture', 'tours': evidence, 'source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['sdk/go/notif','sdk/typescript/src','sdk/python/notif','sdk/react/src'] for p in (root/folder).glob('*') if p.suffix in ['.go','.ts','.tsx','.py'] and not p.name.endswith('_test.go')}}, indent=2) + '\n')
+            recipe_names = {'api-migration', 'incident-investigation'}
+            out.write_text(json.dumps({'status': 'passed', 'environment': 'local PostgreSQL, real engine HTTP, deterministic model fixture',
+                'tours': [item for item in evidence if item['language'] not in recipe_names],
+                'recipes': [item for item in evidence if item['language'] in recipe_names],
+                'recipe_source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in (root/'examples/a2a-workflows').glob('*.py')},
+                'source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['sdk/go/notif','sdk/typescript/src','sdk/python/notif','sdk/react/src'] for p in (root/folder).glob('*') if p.suffix in ['.go','.ts','.tsx','.py'] and not p.name.endswith('_test.go')}}, indent=2) + '\n')
             print('PASS: documentation tours; evidence: .local/documentation-qualification.json')
         finally:
             server.terminate()

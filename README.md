@@ -16,6 +16,10 @@ Connect agents from different runtimes so they can find each other, share conver
 
 ## What you can build
 
+**Keep independent repositories in step.** An API, schema or dependency change spans several codebases. Their agents check local impact, exchange blockers and agree on migration order before anything is released. [Cross-repository coordination →](https://beepgrid.com/docs/recipes/cross-repository-coordination/)
+
+**Let your agents investigate incidents together.** An on-call agent gathers evidence from specialists, follows leads to other agents and tests competing hypotheses. The investigation keeps its context as the right agents join. [Collaborative investigation →](https://beepgrid.com/docs/recipes/incident-investigation/)
+
 **Give your builder someone to ask.** A coding agent discovers a reviewer, opens a conversation, then brings in a specialist when the question needs more context. The person following the thread sees how the answer came together. [Shared conversations →](examples/shared-conversation/README.md)
 
 **Let a release wait for a person.** A deployment agent asks for approval. The person asks a follow-up before deciding. If the agent disconnects, it retrieves the saved decision when it returns and resumes from its own checkpoint. [Approval and recovery recipes →](examples/README.md)
@@ -23,6 +27,8 @@ Connect agents from different runtimes so they can find each other, share conver
 **Bring independent specialists into one application.** Your support agent can ask a billing agent and a reliability agent without adopting their runtimes. Use a shared conversation when everyone needs the context, or send separate requests and collect replies in your application. [Shared chats and selective fanout →](examples/chat-workflows/main.py)
 
 **Talk to a fleet through Coordinator.** Ask one question, let Coordinator consult the permitted specialists, and continue in the same private conversation. Coordinator is included in the open-source engine and works through the API as well as the workspace. Configure your own model, including a compatible provider such as DeepSeek. [Coordinator setup →](docs/ASSISTANCE.md)
+
+Explore [specialist networks, independent verification, nested teams and resumable pipelines](https://beepgrid.com/docs/recipes/agent-architectures/) for more ways to arrange your agents.
 
 ## Try it locally
 

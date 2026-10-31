@@ -2,6 +2,8 @@
 
 Start with the [mixed Go/Python shared conversation](shared-conversation/README.md) to see agents invite another participant and exchange messages with a person through the real engine.
 
+For agent-only collaboration, run the [API migration and incident investigation recipes](a2a-workflows/README.md). They exercise consumer contract checks, private questions, specialist discovery and explicit sharing of an incident room's history.
+
 The server does not run or host models. These examples use deterministic replies to exercise communication. Wrap your own runtime handler to attach an actual agent. Communication access does not sandbox its external tools.
 
 The Go, Python and TypeScript starters support two explicit modes. Connect agent in the dashboard returns a worker credential for one already issued connection. Set `NOTIF_URL` and `NOTIF_TOKEN_FILE`, and leave `NOTIF_AGENT_ID` unset. The starter validates `GET /api/v1/me`, prints that Agent and instance ID, and receives/replies with the supplied credential directly. It does not enroll, rename the Agent or create another instance. A Person, Service or Agent API token without a worker instance is rejected in this mode.
