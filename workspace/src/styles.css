@@ -3476,7 +3476,7 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 .setup-policy label:has(input:checked) { background:var(--raised);border-color:var(--sub) }
 .setup-policy input { width:14px;height:14px;margin:0 }
 .setup-instruction { display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:9px;padding:12px }
-.setup-instruction > div { display:flex;gap:8px;align-items:center;font-size:13px }
+.setup-instruction > div { display:flex;gap:8px;align-items:baseline;font-size:13px }
 .setup-instruction > div > span { color:var(--sub);font-size:12px }
 .agent-setup-guide { gap:20px }
 @media(max-width:600px) { .setup-instruction { align-items:flex-start;flex-direction:column }.setup-instruction .button { width:100% } }
