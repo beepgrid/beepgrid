@@ -22,15 +22,13 @@ export function RequestCard({
   sender,
   participants = [],
   onFollowUp,
-  onReply,
-  replying = false,
+  conversational = false,
 }: {
   request: Request;
   sender?: Identity;
   participants?: Identity[];
   onFollowUp?: () => void;
-  onReply?: (request: Request) => void;
-  replying?: boolean;
+  conversational?: boolean;
 }) {
   const caps = useCapabilities(undefined, r.id),
     op = useOperation("response:" + r.id),
@@ -90,6 +88,7 @@ export function RequestCard({
             {r.requester_id === me.person.id
               ? "You"
               : sender?.name || "Participant"}
+            {viaCoordinator ? " via Coordinator" : ""}
           </strong>
           <Badge>
             {r.kind === "approval"
@@ -102,8 +101,11 @@ export function RequestCard({
           </Badge>
         </div>
         <div className="decision-card">
-          <div className="request-direction">
-            To {recipients || "the recipients"}
+          <div className="request-card-head">
+            <span className="request-direction">
+              To {recipients || "the recipients"}
+            </span>
+            <RequestStatus request={r} />
           </div>
           <p>
             <MentionText
@@ -121,9 +123,7 @@ export function RequestCard({
             <small>{r.title}</small>
           ) : null}
           <ErrorView error={op.error} />
-          {r.state !== "open" ? (
-            <RequestStatus request={r} />
-          ) : caps.data?.operations.respond && incoming ? (
+          {r.state === "open" && caps.data?.operations.respond && incoming ? (
             <>
               {r.kind === "task" ? (
                 <div className="decision-actions">
@@ -170,13 +170,7 @@ export function RequestCard({
                     </Button>
                   ) : null}
                 </div>
-              ) : onReply && !r.choices?.length ? (
-                replying ? (
-                  <Badge tone="warn">Awaiting your reply</Badge>
-                ) : (
-                  <Button onClick={() => onReply(r)}>Reply to request</Button>
-                )
-              ) : (
+              ) : conversational && !r.choices?.length ? null : (
                 <Form onSubmit={() => void respond("answered")}>
                   {r.choices?.length ? (
                     <fieldset className="reply-choices">
@@ -208,20 +202,12 @@ export function RequestCard({
                     disabled={op.pending || !answer.trim()}
                     type="submit"
                   >
-                    Send reply
+                    Send
                   </Button>
                 </Form>
               )}
             </>
-          ) : (
-            <small>
-              {caps.isPending
-                ? "Checking access..."
-                : incoming
-                  ? "Awaiting a reply"
-                  : `Waiting for ${recipients || "the recipients"}`}
-            </small>
-          )}
+          ) : null}
           {caps.data?.operations.cancel ? (
             <div className="actions">
               <Button
@@ -288,7 +274,9 @@ export function RequestCard({
             r.kind === "question" &&
             r.shared_key &&
             (r.state === "resolved" ||
-              (incoming && !onReply && caps.data?.operations.respond))) ? (
+              (incoming &&
+                !conversational &&
+                caps.data?.operations.respond))) ? (
             <details className="request-tools">
               <summary>Request actions</summary>
               <div className="actions">
@@ -306,7 +294,7 @@ export function RequestCard({
                 ((r.state === "open" &&
                   caps.data?.operations.respond &&
                   incoming &&
-                  !onReply) ||
+                  !conversational) ||
                   (r.state === "resolved" &&
                     r.response?.outcome === "answered")) ? (
                   <Button onClick={() => setSharing(true)}>
@@ -317,6 +305,17 @@ export function RequestCard({
                 ) : null}
               </div>
             </details>
+          ) : null}
+          {r.body && r.title.startsWith("Coordinator: ") ? (
+            <aside
+              className="coordinator-context"
+              aria-label="Your message to Coordinator"
+            >
+              <span className="coordinator-context-label">
+                You → Coordinator
+              </span>
+              <p>{r.title.slice("Coordinator: ".length)}</p>
+            </aside>
           ) : null}
         </div>
       </div>

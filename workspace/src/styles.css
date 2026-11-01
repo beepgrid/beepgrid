@@ -28,6 +28,8 @@
   --teal: #24756a;
   --amber: #91621c;
   --slate: #5d6b83;
+  --coordinator-ink:#294468;
+  --coordinator-surface:#eff3f8;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -52,6 +54,8 @@
   --teal: #8ac7ba;
   --amber: #d4b47d;
   --slate: #a8b6d0;
+  --coordinator-ink:#bacce8;
+  --coordinator-surface:#1b2534;
   color-scheme: dark;
 }
 * {
@@ -2310,14 +2314,17 @@ dialog {
   position:absolute;
   right:-5px;
   bottom:-5px;
-  border:2px solid var(--surface);
+  border:1px solid var(--strong);
   border-radius:7px;
+  box-shadow:0 0 0 2px var(--surface);
 }
+.request-card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap }
+.request-card-head>.badge { flex:none }
+.coordinator-context { padding:12px 18px; margin:0 -18px -16px; border-top:1px solid var(--strong); border-radius:0 0 9px 9px; background:var(--coordinator-surface) }
+.coordinator-context-label { color:var(--coordinator-ink); font-size:12px; font-weight:var(--type-strong) }
+.coordinator-context>p { color:var(--coordinator-ink); font-size:var(--type-small); margin-top:6px }
 .decision-answer { display: block; margin-top: 8px; }
 .profile-history-hint { margin-bottom: 18px; color: var(--sub); font-size: var(--type-small); max-width: 650px; }
-.decision-card > .badge {
-  justify-self: start;
-}
 .decision-actions {
   display: flex;
   gap: 8px;
@@ -2412,6 +2419,7 @@ dialog {
   .decision-card {
     padding: 14px;
   }
+  .coordinator-context { margin:0 -14px -14px; padding-inline:14px }
   .message-view {
     min-height: 480px;
   }
@@ -3405,9 +3413,9 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 
 .agent-role-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:5px; background:var(--raised); color:var(--ink); font-size:12px; font-weight:500 }
 .agent-role-badge:hover { background:var(--hover) }
-.reply-context { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--line); color:var(--sub); font-size:12px }
-.reply-context>div { flex:1; min-width:0 }.reply-context strong { color:var(--ink) }.reply-context p { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:3px 0 0 }
-.request-direction { font-size:12px; color:var(--sub); margin-bottom:6px }
+.reply-target { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px; color:var(--sub) }
+.reply-target>select { min-width:0; flex:1; min-height:32px; padding:5px 10px; font-size:12px }
+.request-direction { font-size:12px; color:var(--sub) }
 .request-tools>summary { font-size:12px; color:var(--sub); cursor:pointer }.request-tools .actions { margin-top:8px }
 
 .identity-edit { display:inline-flex; padding:0; border-radius:12px; flex:none; background:none }
@@ -3423,7 +3431,5 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .overseer-entry .badge { font-size:10px; padding:1px 5px; line-height:1.5 }
 @media(prefers-reduced-motion:reduce) { .waiting-dots i { animation:none; opacity:1 } }
 
-.reply-compose .message-input { min-height:60px; padding:10px 12px }
-.reply-compose .compose-bottom { padding:6px 10px 10px }
 .request-message .badge,.coordinator-instructions .badge { text-transform:none }
 .overseer-entry .badge.accent { color:color-mix(in srgb,var(--accent) 65%,var(--ink)) }

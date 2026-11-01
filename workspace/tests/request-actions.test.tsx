@@ -25,7 +25,7 @@ afterEach(() => {
   history.replaceState(null, "", "/agents");
 });
 
-it("shows one Coordinator instruction with attached sender attribution and preserves ordinary titles", () => {
+it("distinguishes the Coordinator instruction from the person's prompt, with status in the header", () => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => json({ operations: {} })),
@@ -37,6 +37,8 @@ it("shows one Coordinator instruction with attached sender attribution and prese
         ...question,
         requester_id: me.person.id,
         title: "Coordinator: Review release readiness",
+        state: "resolved",
+        response: { outcome: "answered", answer: "Ready." },
       }}
     />,
     { wrapper: Wrapper },
@@ -45,8 +47,13 @@ it("shows one Coordinator instruction with attached sender attribution and prese
   expect(sender.querySelector(".identity-person")).not.toBeNull();
   expect(sender.querySelector(".overseer-mark")).not.toBeNull();
   expect(
-    screen.queryByText("Review release readiness"),
-  ).not.toBeInTheDocument();
+    screen.getByLabelText("Your message to Coordinator"),
+  ).toHaveTextContent("You → Coordinator");
+  expect(screen.getByText("Review release readiness")).toBeVisible();
+  expect(screen.getByText("You via Coordinator")).toBeVisible();
+  expect(
+    screen.getByText("Replied").closest(".request-card-head"),
+  ).not.toBeNull();
   expect(screen.getByText(question.body)).toBeVisible();
   rerender(<RequestCard request={{ ...question, title: "Other context" }} />);
   expect(

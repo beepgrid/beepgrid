@@ -86,6 +86,7 @@ export function MentionEditor({
   rows = 3,
   label = "Message",
   placeholder,
+  disabled = false,
   onKeyDown,
 }: {
   value: string;
@@ -96,6 +97,7 @@ export function MentionEditor({
   rows?: number;
   label?: string;
   placeholder?: string;
+  disabled?: boolean;
   onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -195,6 +197,7 @@ export function MentionEditor({
         </div>
       ) : null}
       <textarea
+        disabled={disabled}
         ref={ref}
         className={`message-input ${mentions.length ? "has-mentions" : ""}`}
         aria-label={label}

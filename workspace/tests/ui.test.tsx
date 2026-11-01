@@ -20,7 +20,7 @@ describe("shared primitives", () => {
         request={{ state: "resolved", response: { outcome: "answered" } }}
       />,
     );
-    expect(screen.getByText("Answered")).toHaveClass("good");
+    expect(screen.getByText("Replied")).toHaveClass("good");
     rerender(
       <RequestStatus
         request={{ state: "expired", response: { outcome: "approved" } }}

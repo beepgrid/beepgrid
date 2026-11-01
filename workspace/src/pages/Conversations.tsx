@@ -251,9 +251,21 @@ function Chat({ id }: { id: string }) {
     { conversation_id: id },
     !!q.data && !q.error,
   );
+  // Reply routing must include open questions even when their history is on an
+  // older page. This shares the existing query cache and live invalidation.
+  const pending = useCollection<Request>(
+    "requests",
+    "",
+    {
+      conversation_id: id,
+      recipient_id: me.person.id,
+      state: "open",
+      kind: "question",
+    },
+    !!q.data && !q.error,
+  );
   const [selectedReply, setSelectedReply] = useState<string | null>(null);
-  const [separateMessage, setSeparateMessage] = useState(false);
-  const incoming = related.items.filter(
+  const incoming = pending.items.filter(
     (r) =>
       r.state === "open" &&
       r.kind === "question" &&
@@ -263,7 +275,12 @@ function Chat({ id }: { id: string }) {
   );
   const replyTo =
     incoming.find((r) => r.id === selectedReply) ||
-    (!separateMessage && incoming.length === 1 ? incoming[0] : undefined);
+    (incoming.length === 1 && !pending.hasNextPage ? incoming[0] : undefined);
+  const needsReplyChoice = incoming.length > 1 || pending.hasNextPage;
+  const choosingReply =
+    needsReplyChoice &&
+    !replyTo &&
+    !(selectedReply === "message" && caps.data?.operations.message);
   const replyCaps = usePostResource<Capability>(
     "/capabilities",
     { target: {}, request_id: replyTo?.id, connection_id: undefined },
@@ -483,14 +500,7 @@ function Chat({ id }: { id: string }) {
                   sender={knownParticipants.find(
                     (p) => p.id === item.value.requester_id,
                   )}
-                  replying={replying?.id === item.value.id}
-                  onReply={(r) => {
-                    setSelectedReply(r.id);
-                    setSeparateMessage(false);
-                    document
-                      .querySelector<HTMLTextAreaElement>(".composer textarea")
-                      ?.focus();
-                  }}
+                  conversational
                   onFollowUp={() =>
                     document
                       .querySelector<HTMLTextAreaElement>(".composer textarea")
@@ -546,26 +556,81 @@ function Chat({ id }: { id: string }) {
       ) : null}
       <div className="composer">
         <ErrorView error={error} />
-        {caps.isPending || (replyTo && replyCaps.isPending) ? (
+        {needsReplyChoice ? (
+          <div className="reply-target">
+            <span>Reply to</span>
+            <select
+              aria-label="Question to reply to"
+              value={
+                replyTo?.id ||
+                (selectedReply === "message" && caps.data?.operations.message
+                  ? "message"
+                  : "")
+              }
+              onChange={(e) => setSelectedReply(e.target.value)}
+            >
+              <option value="" disabled>
+                Choose a question
+              </option>
+              {incoming.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {knownParticipants.find((p) => p.id === r.requester_id)
+                    ?.name || "Participant"}
+                  : {(r.body || r.title).slice(0, 100)}
+                </option>
+              ))}
+              {caps.data?.operations.message ? (
+                <option value="message">Send a separate message</option>
+              ) : null}
+            </select>
+            {pending.hasNextPage ? (
+              <Button
+                disabled={pending.isFetchingNextPage}
+                onClick={() => void pending.fetchNextPage()}
+              >
+                More questions
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {pending.error ? (
+          <ErrorView
+            error={pending.error}
+            retry={() => void pending.refetch()}
+          />
+        ) : related.error ? (
+          <ErrorView
+            error={related.error}
+            retry={() => void related.refetch()}
+          />
+        ) : caps.isPending ||
+          related.isPending ||
+          pending.isPending ||
+          (replyTo && replyCaps.isPending) ? (
           <Loading label="Checking conversation access" />
-        ) : replying || (caps.data?.operations.message && destination) ? (
+        ) : replyTo && !replying ? (
+          replyCaps.error ? (
+            <ErrorView
+              error={replyCaps.error}
+              retry={() => void replyCaps.refetch()}
+            />
+          ) : (
+            <p>Replying to this question is no longer available.</p>
+          )
+        ) : replying ||
+          choosingReply ||
+          (caps.data?.operations.message && destination) ? (
           <MessageComposer
             key={replying?.id || "message"}
             replyTo={replying}
-            replyAuthor={
-              knownParticipants.find((p) => p.id === replying?.requester_id)
-                ?.name
-            }
-            onClearReply={() => {
-              setSelectedReply(null);
-              setSeparateMessage(true);
-            }}
+            disabled={choosingReply}
             conversation={id}
             participants={c.participants}
             targets={destination ? [destination] : []}
             canAsk={!!caps.data?.operations.ask}
             onSent={() => {
               pinned.current = true;
+              setSelectedReply(null);
             }}
           />
         ) : (

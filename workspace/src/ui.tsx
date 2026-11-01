@@ -289,7 +289,7 @@ const requestStates: Record<string, { label: string; tone: string }> = {
   open: { label: "Awaiting reply", tone: "warn" },
   clarification: { label: "Needs context", tone: "accent" },
   resolved: { label: "Resolved", tone: "good" },
-  answered: { label: "Answered", tone: "good" },
+  answered: { label: "Replied", tone: "good" },
   approved: { label: "Approved", tone: "good" },
   completed: { label: "Completed", tone: "good" },
   denied: { label: "Declined", tone: "danger" },

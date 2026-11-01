@@ -363,14 +363,13 @@ it("clears a reply draft and uncertain response on contact loss while preserving
     <MessageComposer
       conversation="con_private"
       replyTo={{ id: "req_private", version: 3, body: "When?" } as Request}
-      replyAuthor="Builder"
     />,
     { wrapper: Wrapper },
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Reply" }), {
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
     target: { value: "Private response draft" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await screen.findByRole("alert");
   expect(
     Object.keys(sessionStorage).some(
