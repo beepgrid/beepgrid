@@ -60,7 +60,7 @@ function conversationTransport(
           state: "resolved",
           resolved_by: me.person.id,
           resolved_at: "2026-11-01T00:01:00Z",
-          response: { outcome: "answered", answer: body.answer },
+          response: { outcome: body.outcome, answer: body.answer },
         });
         return json(request);
       }
@@ -509,4 +509,142 @@ it("keeps a failed answer bound to its question and never falls back to chat", a
   );
   expect(requests[0].state).toBe("open");
   expect(writes).toEqual(["/api/v1/requests/req_question/responses"]);
+});
+
+it("docks approvals alongside questions, preserves bound confirmation and jumps to the dated request", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const approval = {
+    ...question("req_approval", "2026-11-01T00:02:00Z"),
+    kind: "approval",
+    body: "May I update the sandbox report?",
+    action: {
+      name: "write_report",
+      executor_id: agent.id,
+      resource: "sandbox/report",
+      resource_version: "v1",
+      operation_key: "review-one",
+      arguments: {},
+    },
+  };
+  const writes = conversationTransport([question(), approval]);
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  const dock = await screen.findByRole("region", { name: "Pending questions" });
+  await within(dock).findByRole("button", { name: "Approve" });
+  expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1);
+  const card = document.getElementById("request-req_approval")!;
+  const scroll = vi.fn();
+  card.scrollIntoView = scroll;
+  expect(card.querySelector("time")).toHaveAttribute(
+    "datetime",
+    approval.created_at,
+  );
+  fireEvent.click(within(dock).getByRole("button", { name: approval.body }));
+  await waitFor(() => expect(scroll).toHaveBeenCalled());
+  expect(card).toHaveFocus();
+  expect(
+    within(dock).getByRole("button", { name: "Minimize questions" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  fireEvent.click(
+    within(dock).getByRole("button", { name: "Ask for context" }),
+  );
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
+  fireEvent.click(within(dock).getByRole("button", { name: "Approve" }));
+  await within(dock).findByRole("button", { name: "Confirm approval" });
+  expect(writes).toHaveLength(0);
+  fireEvent.click(
+    within(dock).getByRole("button", { name: "Confirm approval" }),
+  );
+  await waitFor(() =>
+    expect(writes[0]).toEqual({
+      path: "/api/v1/requests/req_approval/responses",
+      body: { version: 7, outcome: "approved" },
+    }),
+  );
+  await screen.findByRole("textbox", { name: "Answer question" });
+});
+
+it("shows the actual requester and icon in Needs attention", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) => {
+      const b = requestBody(init);
+      if (path.endsWith("/capabilities"))
+        return json({
+          operations: { view: true, message: true, respond: true },
+        });
+      if (path.endsWith("/query"))
+        return json({
+          items:
+            b.collection === "requests"
+              ? [question()]
+              : b.collection === "conversations"
+                ? [
+                    {
+                      id: "con_one",
+                      title: "Review",
+                      participants: [agent, me.person],
+                      created_at: question().created_at,
+                    },
+                  ]
+                : b.collection === "agents"
+                  ? [agent]
+                  : [],
+        });
+      return json({
+        id: "con_one",
+        participants: [agent, me.person],
+        messages: [],
+      });
+    }),
+  );
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  fireEvent.click(screen.getByRole("button", { name: "Needs attention" }));
+  const row = await screen.findByRole("button", {
+    name: /Research assistant.*When should the API freeze/,
+  });
+  expect(row.querySelector(".identity-agent")).not.toBeNull();
+  expect(within(row).getByText("question")).toBeVisible();
+});
+
+it("loads the request's older history page before jumping from the panel", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const old = question("req_old");
+  const cursors: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) => {
+      const b = requestBody(init);
+      if (path.endsWith("/capabilities"))
+        return json({
+          operations: { view: true, message: true, respond: true },
+        });
+      if (path.endsWith("/query")) {
+        if (b.collection !== "requests") return json({ items: [] });
+        if (b.filters.state === "open")
+          return json({ items: b.filters.kind === "question" ? [old] : [] });
+        cursors.push(b.cursor);
+        return json(
+          b.cursor
+            ? { items: [old] }
+            : { items: [], next_cursor: "older-request-page" },
+        );
+      }
+      return json({
+        id: "con_one",
+        participants: [agent, me.person],
+        messages: [],
+      });
+    }),
+  );
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  const dock = await screen.findByRole("region", { name: "Pending questions" });
+  fireEvent.click(within(dock).getByRole("button", { name: old.body }));
+  await waitFor(() =>
+    expect(document.getElementById("request-req_old")).toHaveFocus(),
+  );
+  expect(cursors).toContain("older-request-page");
 });

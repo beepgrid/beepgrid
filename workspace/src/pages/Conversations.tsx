@@ -22,6 +22,7 @@ import type {
   Message,
   Identity,
   Request,
+  Page,
 } from "../contracts";
 import { ChatMembers } from "../ChatMembers";
 import { FileLinks } from "../Attachments";
@@ -47,6 +48,7 @@ import {
   PageHeader,
   QueryState,
   RequestStatus,
+  RequestKind,
   Search,
 } from "../ui";
 
@@ -117,23 +119,11 @@ export default function Conversations() {
               {groupQuestions(attention.items).map((group) => {
                 const r = group[0];
                 return (
-                  <button
-                    className="conversation-row"
+                  <AttentionRow
                     key={r.id}
-                    onClick={() =>
-                      navigate("/conversations/" + r.conversation_id)
-                    }
-                  >
-                    <strong>{r.body || r.title}</strong>
-                    <p>
-                      {r.kind === "approval"
-                        ? "Approval requested"
-                        : "Waiting for your reply"}
-                      {group.length > 1 ? (
-                        <span> · {group.length} matching questions</span>
-                      ) : null}
-                    </p>
-                  </button>
+                    group={group}
+                    participants={q.items.flatMap((c) => c.participants || [])}
+                  />
                 );
               })}
             </QueryState>
@@ -212,13 +202,90 @@ export default function Conversations() {
     </>
   );
 }
+function AttentionRow({
+  group,
+  participants,
+}: {
+  group: Request[];
+  participants: Identity[];
+}) {
+  const r = group[0];
+  const me = useSession();
+  const kind = (id: string) =>
+    id.startsWith("agt_")
+      ? "agent"
+      : id.startsWith("svc_")
+        ? "service"
+        : "person";
+  const known = participants.find((p) => p.id === r.requester_id);
+  const profile = usePostResource<Page<Identity>>(
+    "/query",
+    {
+      collection:
+        kind(r.requester_id) === "agent"
+          ? "agents"
+          : kind(r.requester_id) === "service"
+            ? "services"
+            : "people",
+      filters: { id: r.requester_id },
+      limit: 1,
+    },
+    !known,
+  );
+  const author = known || profile.data?.items[0];
+  const senders = [
+    ...new Map(
+      group.map((item) => {
+        const person = participants.find((p) => p.id === item.requester_id) ||
+          (item.requester_id === author?.id ? author : undefined) || {
+            id: item.requester_id,
+            kind: kind(item.requester_id),
+            name: "Contact",
+            metadata: {},
+            external_id: "",
+            disabled: false,
+            created_at: item.created_at,
+          };
+        return [person.id, person] as const;
+      }),
+    ).values(),
+  ];
+  return (
+    <button
+      className="conversation-row conversation-preview"
+      onClick={() => navigate("/conversations/" + r.conversation_id)}
+    >
+      <ConversationAvatar participants={senders} currentId={me.person.id} />
+      <div className="conversation-copy">
+        <div className="conversation-row-title">
+          <strong>
+            {author?.name || "Workspace contact"}
+            {senders.length > 1 ? ` + ${senders.length - 1}` : ""}
+          </strong>
+          <time dateTime={r.created_at} title={timestamp(r.created_at)}>
+            {relative(r.created_at)}
+          </time>
+        </div>
+        <p>{r.body || r.title}</p>
+        <div className="conversation-meta">
+          <RequestKind kind={r.kind} />
+          {group.length > 1 ? (
+            <span>{group.length} matching questions</span>
+          ) : null}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function Chat({ id }: { id: string }) {
   const me = useSession(),
     q = useResource<Conversation>("/conversations/" + id),
     cache = useQueryClient();
   const [error, setError] = useState<Error | null>(null),
     [history, setHistory] = useState(false),
-    [membersOpen, setMembersOpen] = useState(false);
+    [membersOpen, setMembersOpen] = useState(false),
+    [jumpTo, setJumpTo] = useState<string | null>(null);
   const timeline = useRef<HTMLDivElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     pinned = useRef(true);
@@ -265,13 +332,53 @@ function Chat({ id }: { id: string }) {
     },
     !!q.data && !q.error,
   );
-  const incoming = pending.items.filter(
+  const approvals = useCollection<Request>(
+    "requests",
+    "",
+    {
+      conversation_id: id,
+      recipient_id: me.person.id,
+      state: "open",
+      kind: "approval",
+    },
+    !!q.data && !q.error,
+  );
+  const incoming = [
+    ...new Map(
+      [...pending.items, ...approvals.items].map((r) => [r.id, r]),
+    ).values(),
+  ].filter(
     (r) =>
       r.state === "open" &&
-      r.kind === "question" &&
+      (r.kind === "question" || r.kind === "approval") &&
       r.requester_id !== me.person.id &&
       q.data?.participants.some((p) => p.id === me.person.id),
   );
+  useEffect(() => {
+    if (!jumpTo) return;
+    const card = document.getElementById("request-" + jumpTo);
+    if (card) {
+      card.scrollIntoView?.({
+        block: "center",
+        behavior: matchMedia("(prefers-reduced-motion:reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
+      card.focus({ preventScroll: true });
+      setJumpTo(null);
+    } else if (related.error || (!related.hasNextPage && !related.isFetching)) {
+      setError(Error("This request is no longer available in the chat."));
+      setJumpTo(null);
+    } else if (related.hasNextPage && !related.isFetchingNextPage)
+      void related.fetchNextPage();
+  }, [
+    jumpTo,
+    related.items,
+    related.hasNextPage,
+    related.isFetchingNextPage,
+    related.isFetching,
+    related.error,
+  ]);
   const decisions = related.items.filter((r) => r.response && r.resolved_at);
   useLayoutEffect(() => {
     const el = scroll.current;
@@ -549,13 +656,34 @@ function Chat({ id }: { id: string }) {
             retry={() => void pending.refetch()}
           />
         ) : null}
+        {approvals.error ? (
+          <ErrorView
+            error={approvals.error}
+            retry={() => void approvals.refetch()}
+          />
+        ) : null}
         <PendingQuestions
           key={id}
-          questions={incoming}
+          questions={pending.isPending || approvals.isPending ? [] : incoming}
           participants={knownParticipants}
-          hasMore={pending.hasNextPage}
-          loadingMore={pending.isFetchingNextPage}
-          onMore={() => void pending.fetchNextPage()}
+          hasMore={pending.hasNextPage || approvals.hasNextPage}
+          loadingMore={
+            pending.isFetchingNextPage || approvals.isFetchingNextPage
+          }
+          onMore={() => {
+            if (pending.hasNextPage) void pending.fetchNextPage();
+            if (approvals.hasNextPage) void approvals.fetchNextPage();
+          }}
+          onJump={(request) => {
+            pinned.current = false;
+            setError(null);
+            setJumpTo(request.id);
+          }}
+          onFollowUp={() =>
+            document
+              .querySelector<HTMLTextAreaElement>(".composer .message-input")
+              ?.focus()
+          }
         />
         {caps.isPending ? (
           <Loading label="Checking conversation access" />

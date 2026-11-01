@@ -1,6 +1,7 @@
 import { FileLinks } from "./Attachments";
 import { MentionEditor, MentionText } from "./Mentions";
 import { useState } from "react";
+import { timestamp } from "./client";
 import { useCapabilities, useOperation, useSession } from "./data";
 import type { Request, Identity, Target, Mention } from "./contracts";
 import { TargetPicker } from "./TargetPicker";
@@ -68,7 +69,11 @@ export function RequestCard({
     }
   }
   return (
-    <article className="message request-message">
+    <article
+      className="message request-message"
+      id={`request-${r.id}`}
+      tabIndex={-1}
+    >
       {viaCoordinator ? (
         <span
           className="coordinator-sender"
@@ -99,6 +104,14 @@ export function RequestCard({
                   ? "Task"
                   : "Question"}
           </Badge>
+          {r.created_at ? (
+            <time dateTime={r.created_at} title={timestamp(r.created_at)}>
+              {new Date(r.created_at).toLocaleTimeString(undefined, {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </time>
+          ) : null}
         </div>
         <div className="decision-card">
           <div className="request-card-head">
@@ -142,34 +155,15 @@ export function RequestCard({
                   ))}
                 </div>
               ) : r.kind === "approval" ? (
-                <div className="decision-actions">
-                  <Button
-                    primary
-                    icon="check"
-                    disabled={op.pending}
-                    onClick={() =>
-                      r.action
-                        ? setConfirm("approved")
-                        : void respond("approved")
+                conversational ? null : (
+                  <ApprovalActions
+                    pending={op.pending}
+                    onFollowUp={onFollowUp}
+                    onDecision={(outcome) =>
+                      r.action ? setConfirm(outcome) : void respond(outcome)
                     }
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    icon="close"
-                    disabled={op.pending}
-                    onClick={() =>
-                      r.action ? setConfirm("denied") : void respond("denied")
-                    }
-                  >
-                    Decline
-                  </Button>
-                  {onFollowUp ? (
-                    <Button icon="conversations" onClick={onFollowUp}>
-                      Ask for context
-                    </Button>
-                  ) : null}
-                </div>
+                  />
+                )
               ) : conversational ? null : (
                 <Form onSubmit={() => void respond("answered")}>
                   {r.choices?.length ? (
@@ -219,38 +213,21 @@ export function RequestCard({
             </div>
           ) : null}
           {confirm ? (
-            <div className="bound-confirm">
-              <p>
-                {confirm === "cancel"
-                  ? "Cancel this request? It will stop accepting replies. The conversation stays in history; work already performed is not undone."
-                  : "Record this decision for the exact action below?"}
-              </p>
-              {confirm !== "cancel" ? (
-                <Details label="Action details" value={r.action} />
-              ) : null}
-              <div className="actions">
-                <Button onClick={() => setConfirm("")}>Back</Button>
-                <Button
-                  primary
-                  disabled={op.pending}
-                  onClick={() =>
-                    confirm === "cancel"
-                      ? void op
-                          .run(`/requests/${r.id}/cancel`, {
-                            version: r.version,
-                          })
-                          .then((result) => {
-                            if (result) setConfirm("");
-                          })
-                      : void respond(confirm)
-                  }
-                >
-                  {confirm === "cancel"
-                    ? "Cancel pending request"
-                    : `Confirm ${confirm === "approved" ? "approval" : "decline"}`}
-                </Button>
-              </div>
-            </div>
+            <DecisionConfirmation
+              request={r}
+              decision={confirm}
+              pending={op.pending}
+              onBack={() => setConfirm("")}
+              onConfirm={() =>
+                confirm === "cancel"
+                  ? void op
+                      .run(`/requests/${r.id}/cancel`, { version: r.version })
+                      .then((result) => {
+                        if (result) setConfirm("");
+                      })
+                  : void respond(confirm)
+              }
+            />
           ) : null}
           {r.response?.source_answer_id ? (
             <div className="answer-provenance">
@@ -335,6 +312,76 @@ export function RequestCard({
         />
       ) : null}
     </article>
+  );
+}
+
+export function ApprovalActions({
+  pending,
+  onDecision,
+  onFollowUp,
+}: {
+  pending: boolean;
+  onDecision: (outcome: string) => void;
+  onFollowUp?: () => void;
+}) {
+  return (
+    <div className="decision-actions">
+      <Button
+        primary
+        icon="check"
+        disabled={pending}
+        onClick={() => onDecision("approved")}
+      >
+        Approve
+      </Button>
+      <Button
+        icon="close"
+        disabled={pending}
+        onClick={() => onDecision("denied")}
+      >
+        Decline
+      </Button>
+      {onFollowUp ? (
+        <Button icon="conversations" onClick={onFollowUp}>
+          Ask for context
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+export function DecisionConfirmation({
+  request: r,
+  decision,
+  pending,
+  onBack,
+  onConfirm,
+}: {
+  request: Request;
+  decision: string;
+  pending: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="bound-confirm">
+      <p>
+        {decision === "cancel"
+          ? "Cancel this request? It will stop accepting replies. The conversation stays in history; work already performed is not undone."
+          : "Record this decision for the exact action below?"}
+      </p>
+      {decision !== "cancel" ? (
+        <Details label="Action details" value={r.action} />
+      ) : null}
+      <div className="actions">
+        <Button onClick={onBack}>Back</Button>
+        <Button primary disabled={pending} onClick={onConfirm}>
+          {decision === "cancel"
+            ? "Cancel pending request"
+            : `Confirm ${decision === "approved" ? "approval" : "decline"}`}
+        </Button>
+      </div>
+    </div>
   );
 }
 

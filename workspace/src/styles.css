@@ -3425,8 +3425,8 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .question-dock nav span { color:var(--sub); font-size:11px; font-variant-numeric:tabular-nums; margin-right:4px }
 .question-dock .icon-button { width:26px; height:26px; min-height:26px; padding:4px }
 .question-previous svg { transform:rotate(180deg) }
-.question-toggle svg { transform:rotate(-90deg); transition:transform .15s }
-.question-toggle[aria-expanded="false"] svg { transform:rotate(90deg) }
+.question-toggle svg { transform:rotate(90deg); transition:transform .15s }
+.question-toggle[aria-expanded="false"] svg { transform:rotate(-90deg) }
 .question-dock-body { padding:0 12px 10px; max-height:min(240px,35vh); overflow:auto }
 .question-prompt { margin:0 0 10px; max-height:72px; overflow:auto; font-size:14px; font-weight:500; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere }
 .question-dock .form { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:8px }
@@ -3451,10 +3451,19 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .appearance-grid button:hover,.appearance-grid button[aria-pressed="true"] { background:var(--raised); border-color:var(--ink) }
 .agent-role-badge .identity-icon { --avatar-size:19px; border:0; border-radius:4px }
 .agent-role-badge .identity-icon svg { width:13px; height:13px }
-.conversation-meta>.badge:first-child { color:var(--sub) }
+.conversation-meta>.badge:first-child { color:var(--sub); background:var(--surface); border:1px solid var(--line) }
 .coordinator-controls select { color:var(--ink); background:var(--surface) }
 .overseer-entry .badge { font-size:10px; padding:1px 5px; line-height:1.5 }
 @media(prefers-reduced-motion:reduce) { .waiting-dots i { animation:none; opacity:1 } }
 
 .request-message .badge,.coordinator-instructions .badge { text-transform:none }
 .overseer-entry .badge.accent { color:color-mix(in srgb,var(--accent) 65%,var(--ink)) }
+
+button.question-prompt { display:block; width:100%; text-align:left; padding:0; border:0; background:none; color:var(--ink) }
+button.question-prompt:hover { text-decoration:underline; text-underline-offset:3px }
+.request-message:focus { outline:none }
+.request-message:focus .decision-card { outline:2px solid var(--faint); outline-offset:2px }
+.question-dock .bound-confirm { margin:0 }
+.question-dock .bound-confirm p { margin-bottom:8px }
+
+.request-message .message-meta { flex-wrap:wrap; gap:6px 10px }

@@ -8,6 +8,7 @@ import {
   usePostResource,
 } from "./data";
 import { Button, ErrorView, Form, Icon, IdentityIcon, Loading } from "./ui";
+import { ApprovalActions, DecisionConfirmation } from "./RequestCard";
 
 // This lives outside the scrolling timeline. Chat text never resolves a request;
 // only the answer form for this exact request ID/version may do that.
@@ -17,12 +18,16 @@ export function PendingQuestions({
   hasMore,
   loadingMore,
   onMore,
+  onJump,
+  onFollowUp,
 }: {
   questions: Request[];
   participants: Identity[];
   hasMore: boolean;
   loadingMore: boolean;
   onMore: () => void;
+  onJump?: (request: Request) => void;
+  onFollowUp?: () => void;
 }) {
   const [selected, select] = useState<string | null>(null);
   const [collapsed, collapse] = useState(false);
@@ -61,14 +66,13 @@ export function PendingQuestions({
         <button
           className="question-heading"
           type="button"
-          aria-expanded={!collapsed}
-          aria-controls="pending-question-answer"
-          onClick={() => collapse(!collapsed)}
+          title="Show in chat"
+          onClick={() => onJump?.(current)}
         >
           <strong>
             {collapsed
               ? current.body || current.title
-              : `Question from ${author?.name || "Participant"}`}
+              : `${current.kind === "approval" ? "Approval" : "Question"} from ${author?.name || "Participant"}`}
           </strong>
         </button>
         <nav aria-label="Question navigation">
@@ -104,17 +108,28 @@ export function PendingQuestions({
           type="button"
           aria-label={collapsed ? "Expand questions" : "Minimize questions"}
           aria-expanded={!collapsed}
+          aria-controls="pending-question-answer"
           onClick={() => collapse(!collapsed)}
         >
           <Icon name="chevron" size={15} />
         </button>
       </header>
       <div id="pending-question-answer" hidden={collapsed}>
-        <QuestionAnswer
-          key={current.id}
-          request={current}
-          expanded={!collapsed}
-        />
+        {current.kind === "approval" ? (
+          <ApprovalAnswer
+            key={current.id}
+            request={current}
+            onJump={() => onJump?.(current)}
+            onFollowUp={onFollowUp}
+          />
+        ) : (
+          <QuestionAnswer
+            key={current.id}
+            request={current}
+            expanded={!collapsed}
+            onJump={() => onJump?.(current)}
+          />
+        )}
       </div>
     </section>
   );
@@ -123,9 +138,11 @@ export function PendingQuestions({
 export function QuestionAnswer({
   request: r,
   expanded = true,
+  onJump,
 }: {
   request: Request;
   expanded?: boolean;
+  onJump?: () => void;
 }) {
   const [answer, setAnswer] = useDraft(`reply:${r.conversation_id}:${r.id}`);
   const op = useOperation(`reply:${r.conversation_id}:${r.id}`);
@@ -168,7 +185,7 @@ export function QuestionAnswer({
   }
   return (
     <div className="question-dock-body">
-      <p className="question-prompt">{r.body || r.title}</p>
+      <RequestPrompt request={r} onJump={onJump} />
       {caps.isPending ? (
         <Loading label="Checking answer access" />
       ) : caps.error ? (
@@ -230,6 +247,85 @@ export function QuestionAnswer({
             {op.pending ? "Answering..." : "Answer"}
           </Button>
         </Form>
+      )}
+    </div>
+  );
+}
+
+function RequestPrompt({
+  request,
+  onJump,
+}: {
+  request: Request;
+  onJump?: () => void;
+}) {
+  return onJump ? (
+    <button
+      type="button"
+      className="question-prompt"
+      title="Show in chat"
+      onClick={onJump}
+    >
+      {request.body || request.title}
+    </button>
+  ) : (
+    <p className="question-prompt">{request.body || request.title}</p>
+  );
+}
+
+function ApprovalAnswer({
+  request: r,
+  onJump,
+  onFollowUp,
+}: {
+  request: Request;
+  onJump: () => void;
+  onFollowUp?: () => void;
+}) {
+  const caps = usePostResource<Capability>("/capabilities", {
+    target: {},
+    request_id: r.id,
+  });
+  const op = useOperation("response:" + r.id);
+  const [confirm, setConfirm] = useState("");
+  async function decide(outcome: string) {
+    if (!caps.data?.operations.respond || op.pending) return;
+    const result = await op.run(`/requests/${r.id}/responses`, {
+      version: r.version,
+      outcome,
+    });
+    if (result) setConfirm("");
+  }
+  return (
+    <div className="question-dock-body">
+      <RequestPrompt request={r} onJump={onJump} />
+      {caps.isPending ? (
+        <Loading label="Checking approval access" />
+      ) : caps.error ? (
+        <ErrorView error={caps.error} retry={() => void caps.refetch()} />
+      ) : !caps.data?.operations.respond ? (
+        <p>You can no longer decide this approval.</p>
+      ) : (
+        <>
+          <ErrorView error={op.error} />
+          {confirm ? (
+            <DecisionConfirmation
+              request={r}
+              decision={confirm}
+              pending={op.pending}
+              onBack={() => setConfirm("")}
+              onConfirm={() => void decide(confirm)}
+            />
+          ) : (
+            <ApprovalActions
+              pending={op.pending}
+              onFollowUp={onFollowUp}
+              onDecision={(outcome) =>
+                r.action ? setConfirm(outcome) : void decide(outcome)
+              }
+            />
+          )}
+        </>
       )}
     </div>
   );

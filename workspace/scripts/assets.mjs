@@ -40,8 +40,8 @@ for (const name of assets) {
 const budgets = {
   entry_js_gzip_kib: 96,
   all_js_gzip_kib: 145,
-  // Shared reply context, compact Coordinator controls and persisted icon chooser.
-  css_gzip_kib: 15,
+  // Shared request context, compact question/approval panel and icon chooser.
+  css_gzip_kib: 15.25,
   all_fonts_kib: 320,
   largest_font_kib: 96,
 };
