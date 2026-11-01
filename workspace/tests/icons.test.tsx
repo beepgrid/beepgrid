@@ -62,9 +62,13 @@ it("keeps the two preview panels mutually exclusive and supports keyboard dismis
     screen.getByRole("button", { name: "Open Agent icon picker" }),
   ).toHaveFocus();
 });
-it("steps through all five distinct packs and resets to the reference style", () => {
+it("defaults to solid Flat icons, steps through all packs and resets to Flat", () => {
   render(<TypographyPicker />);
   open();
+  expect(document.documentElement.dataset.agentIcons).toBe("geometric-flat");
+  fireEvent.change(screen.getByRole("combobox"), {
+    target: { value: "open-tabs" },
+  });
   expect(screen.getByRole("button", { name: "← Previous" })).toBeDisabled();
   for (const id of [
     "lucide-tint",
@@ -76,12 +80,12 @@ it("steps through all five distinct packs and resets to the reference style", ()
     expect(document.documentElement.dataset.agentIcons).toBe(id);
   }
   expect(screen.getByRole("button", { name: "Next →" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Reset to Outline" }));
-  expect(document.documentElement.dataset.agentIcons).toBe("open-tabs");
+  fireEvent.click(screen.getByRole("button", { name: "Reset to Flat" }));
+  expect(document.documentElement.dataset.agentIcons).toBe("geometric-flat");
 });
 it("falls back from obsolete preferences and handles denied storage without breaking preview", () => {
   localStorage.setItem(iconKey, "removed");
-  expect(savedIcons().id).toBe("open-tabs");
+  expect(savedIcons().id).toBe("geometric-flat");
   const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
     throw Error("Denied");
   });

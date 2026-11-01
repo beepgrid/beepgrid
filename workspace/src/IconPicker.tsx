@@ -3,13 +3,14 @@ import presets from "./icon-presets.json";
 import { Icon, IdentityIcon } from "./ui";
 
 export const iconKey = "beepgrid:workspace:agent-icons:v1";
+const defaultPreset = presets.find((p) => p.id === "geometric-flat")!;
 export function savedIcons() {
   try {
     return (
-      presets.find((p) => p.id === localStorage.getItem(iconKey)) || presets[0]
+      presets.find((p) => p.id === localStorage.getItem(iconKey)) || defaultPreset
     );
   } catch {
-    return presets[0];
+    return defaultPreset;
   }
 }
 export function IconPicker({
@@ -62,7 +63,7 @@ export function IconPicker({
     };
   }, [open, onClose]);
   function choose(id: string) {
-    setPreset(presets.find((p) => p.id === id) || presets[0]);
+    setPreset(presets.find((p) => p.id === id) || defaultPreset);
   }
   return (
     <>
@@ -142,8 +143,8 @@ export function IconPicker({
             )}
           </div>
           <div className="type-compare">
-            <button type="button" onClick={() => choose(presets[0].id)}>
-              Reset to Outline
+            <button type="button" onClick={() => choose(defaultPreset.id)}>
+              Reset to Flat
             </button>
           </div>
           <footer>
