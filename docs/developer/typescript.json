@@ -439,8 +439,14 @@
     "name": "Message",
     "doc": "",
     "kind": "TypeAliasDeclaration",
-    "definition": "export type Message = {\n attachments?:Attachment[];\n mentions?:Mention[];\n  id: string;\n  conversation_id: string;\n  sender_id: string;\n  instance_id?: string;\n  body: string;\n};",
+    "definition": "export type Message = {\n received_by?:string[];\n attachments?:Attachment[];\n mentions?:Mention[];\n  id: string;\n  conversation_id: string;\n  sender_id: string;\n  instance_id?: string;\n  body: string;\n};",
     "fields": [
+      {
+        "name": "received_by",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
       {
         "name": "attachments",
         "type": "Attachment[]",

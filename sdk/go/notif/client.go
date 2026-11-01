@@ -132,6 +132,7 @@ type SendInput struct {
 	Title          string    `json:"title,omitempty"`
 }
 type Message struct {
+	ReceivedBy     []string     `json:"received_by,omitempty"`
 	Attachments    []Attachment `json:"attachments,omitempty"`
 	Mentions       []Mention    `json:"mentions,omitempty"`
 	ID             string       `json:"id"`

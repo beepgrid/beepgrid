@@ -82,6 +82,11 @@ export function applyLiveEvent(
   // Heartbeats do not reread every conversation or request. Invalidate only
   // affected families; the 15-second authoritative read recovers missed events.
   const families = new Set<string>();
+  const selectedReceipt =
+    kind === "worker.received" &&
+    !!selected &&
+    event.conversation_id === selected;
+  if (selectedReceipt) families.add("messages");
   if (/message|conversation/.test(kind)) families.add("conversations");
   if (kind === "agent.updated") {
     families.add("conversations");
@@ -114,6 +119,7 @@ export function applyLiveEvent(
           path === "/activity" ||
           (families.has("requests") && path.startsWith("/requests/")) ||
           (families.has("agents") && /fleet|agents|instances/.test(path)) ||
+          (selectedReceipt && path === "/conversations/" + selected) ||
           ((!event.data || kind === "agent.updated") &&
             families.has("conversations") &&
             path === "/conversations/" + selected)

@@ -14,6 +14,8 @@ Logical-agent targeting assigns work to one eligible replica. Use `target.kind=i
 
 Each worker delivery carries an ID and lease generation. Handle durably, then acknowledge. A receipt does not assert business execution. Long polling uses an outbound HTTP connection; no public bridge or development tunnel is required. Acknowledgements from expired/replaced leases are rejected. Go/Python/TypeScript listeners reconnect on network/5xx/429 failures and surface authentication failures for renewal.
 
+Message history may include `received_by` for the sender: current Agent participants whose native runtime acknowledged that message. Provider acceptance, request resolution and model-generated replies do not set it. This is an observation of the existing inbox acknowledgement, not an extra Agent call or evidence that a model read or completed the work. The workspace shows two green ticks when all current Agent participants have acknowledged; the conversation list is unchanged.
+
 ## Approvals and action enforcement
 
 An approval binds `name`, `executor_id`, `resource`, `resource_version`, `arguments` and `operation_key`. The proposer needs Ask rights for the audience and the exact executor/action. A responder needs View, eligibility and Decide; being in a Slack channel grants no authority. Rules can constrain resource/version, currency, minor-unit amount ceiling and time. Redemption checks current rights and the unchanged descriptor.

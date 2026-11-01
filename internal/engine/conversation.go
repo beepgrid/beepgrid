@@ -194,7 +194,7 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	if e != nil {
 		return Conversation{}, e
 	}
-	rows, e := s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions,EXISTS(SELECT 1 FROM attachment_links l WHERE l.scope=m.scope AND l.message_id=m.id) FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 AND ($4 OR created_sequence >= COALESCE((SELECT history_start FROM participants WHERE scope=$1 AND conversation_id=$2 AND principal_id=$3 AND left_at IS NULL),9223372036854775807)) ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id, a.ID, a.Admin)
+	rows, e := s.Pool.Query(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions,`+messageReceivedSQL+`,EXISTS(SELECT 1 FROM attachment_links l WHERE l.scope=m.scope AND l.message_id=m.id) FROM (SELECT * FROM messages WHERE scope=$1 AND conversation_id=$2 AND ($4 OR created_sequence >= COALESCE((SELECT history_start FROM participants WHERE scope=$1 AND conversation_id=$2 AND principal_id=$3 AND left_at IS NULL),9223372036854775807)) ORDER BY created_at DESC,id DESC LIMIT 500) m ORDER BY created_at,id`, a.Scope, id, a.ID, a.Admin)
 	if e != nil {
 		return c, e
 	}
@@ -204,7 +204,7 @@ func (s *Store) Conversation(ctx context.Context, a Actor, id string) (Conversat
 	for rows.Next() {
 		var m Message
 		var files bool
-		if e = rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions, &files); e != nil {
+		if e = rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions, &m.ReceivedBy, &files); e != nil {
 			return c, e
 		}
 		hasFiles = hasFiles || files

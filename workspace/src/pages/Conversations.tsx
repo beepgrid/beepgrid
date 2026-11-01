@@ -717,6 +717,14 @@ const ChatMessage = memo(function ChatMessage({
   name: string;
   kind: string;
 }) {
+  const me = useSession();
+  const agents = participants.filter(
+    (p) => p.kind === "agent" && p.id !== m.sender_id,
+  );
+  const acknowledged =
+    m.sender_id === me.person.id &&
+    agents.length > 0 &&
+    agents.every((agent) => m.received_by?.includes(agent.id));
   return (
     <article className="message">
       <IdentityIcon
@@ -728,7 +736,7 @@ const ChatMessage = memo(function ChatMessage({
             ?.appearance_icon || "",
         )}
       />
-      <div className="message-body">
+      <div className={`message-body${acknowledged ? " has-receipt" : ""}`}>
         <div className="message-meta">
           <strong>{name}</strong>
           <time dateTime={m.created_at} title={timestamp(m.created_at)}>
@@ -746,6 +754,17 @@ const ChatMessage = memo(function ChatMessage({
           />
         </p>
         <FileLinks files={m.attachments} />
+        {acknowledged ? (
+          <span
+            className="message-receipt"
+            role="img"
+            aria-label="Agent runtime acknowledged receipt"
+            title="Acknowledged by the Agent runtime. This does not confirm that the model read it or completed the work."
+          >
+            <Icon name="check" size={16} />
+            <Icon name="check" size={16} />
+          </span>
+        ) : null}
       </div>
     </article>
   );

@@ -465,7 +465,7 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 		return nil, Missing()
 	case "messages":
 		var m Message
-		e := db.QueryRow(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=$2 AND chat_history_allows(scope,conversation_id,$3,$4,created_sequence)`, a.Scope, id, a.ID, a.Admin).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions)
+		e := db.QueryRow(ctx, `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions,`+messageReceivedSQL+` FROM messages m WHERE scope=$1 AND id=$2 AND chat_history_allows(scope,conversation_id,$3,$4,created_sequence)`, a.Scope, id, a.ID, a.Admin).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.InstanceID, &m.Body, &m.CreatedAt, &m.Mentions, &m.ReceivedBy)
 		if e != nil {
 			return nil, normalize(e)
 		}

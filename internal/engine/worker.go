@@ -138,10 +138,10 @@ func (s *Store) Ack(ctx context.Context, a Actor, id string, generation int64) e
 		return Denied()
 	}
 	return s.mutation(ctx, a, true, func(tx pgx.Tx) error {
-		var state, owner string
+		var state, owner, conversation string
 		var gen int64
 		var valid bool
-		e := tx.QueryRow(ctx, `SELECT state,owner_instance,generation,COALESCE(lease_until>now(),false) FROM deliveries WHERE scope=$1 AND id=$2 AND recipient_id=$3 AND connection_id='' FOR UPDATE`, a.Scope, id, a.ID).Scan(&state, &owner, &gen, &valid)
+		e := tx.QueryRow(ctx, `SELECT state,owner_instance,generation,COALESCE(lease_until>now(),false),CASE WHEN payload->>'type'='message' THEN COALESCE(payload->>'conversation_id','') ELSE '' END FROM deliveries WHERE scope=$1 AND id=$2 AND recipient_id=$3 AND connection_id='' FOR UPDATE`, a.Scope, id, a.ID).Scan(&state, &owner, &gen, &valid, &conversation)
 		if e != nil {
 			return e
 		}
@@ -157,7 +157,7 @@ func (s *Store) Ack(ctx context.Context, a Actor, id string, generation int64) e
 		if _, e = tx.Exec(ctx, `UPDATE deliveries SET state='received' WHERE scope=$1 AND id=$2`, a.Scope, id); e != nil {
 			return e
 		}
-		return event(ctx, tx, a, "worker.received", "", a.ID, map[string]any{"delivery_id": id, "instance_id": a.InstanceID})
+		return event(ctx, tx, a, "worker.received", conversation, a.ID, map[string]any{"delivery_id": id, "instance_id": a.InstanceID})
 	})
 }
 func (s *Store) Deliveries(ctx context.Context, a Actor) ([]Delivery, error) {

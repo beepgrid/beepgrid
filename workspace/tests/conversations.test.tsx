@@ -10,6 +10,63 @@ import { afterEach, expect, it, vi } from "vitest";
 import Conversations from "../src/pages/Conversations";
 import { agent, harness, json, me, requestBody } from "./fixtures";
 
+it("shows only two ticks on outgoing messages acknowledged by every Agent in the chat", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const second = { ...agent, id: "agt_second", name: "Reviewer" };
+  const messages = [
+    {
+      id: "msg_acked",
+      sender_id: me.person.id,
+      body: "Acknowledged message",
+      received_by: [agent.id, second.id],
+    },
+    {
+      id: "msg_partial",
+      sender_id: me.person.id,
+      body: "One Agent still pending",
+      received_by: [agent.id],
+    },
+    { id: "msg_queued", sender_id: me.person.id, body: "Queued message" },
+    {
+      id: "msg_incoming",
+      sender_id: agent.id,
+      body: "Incoming message",
+      received_by: [second.id],
+    },
+  ].map((message, index) => ({
+    ...message,
+    conversation_id: "con_one",
+    created_at: `2026-11-01T00:00:0${index}Z`,
+  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.endsWith("/capabilities"))
+        return json({ operations: { view: true, message: true } });
+      if (path.endsWith("/query"))
+        return json({
+          items: requestBody(init).collection === "messages" ? messages : [],
+        });
+      return json({
+        id: "con_one",
+        participants: [me.person, agent, second],
+        messages,
+      });
+    }),
+  );
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  const ticks = await screen.findByRole("img", {
+    name: "Agent runtime acknowledged receipt",
+  });
+  expect(ticks.querySelectorAll("svg")).toHaveLength(2);
+  expect(ticks.textContent).toBe("");
+  expect(ticks.closest("article")).toHaveTextContent("Acknowledged message");
+  expect(
+    screen.getAllByRole("img", { name: "Agent runtime acknowledged receipt" }),
+  ).toHaveLength(1);
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   sessionStorage.clear();

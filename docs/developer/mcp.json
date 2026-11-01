@@ -395,7 +395,7 @@
   },
   {
     "name": "ask",
-    "description": "Request a reply, choices or an approval decision, optionally with staged attachment_ids. Ordinary information and follow-ups use send. A title is optional. An approval without an action descriptor only communicates a decision and cannot be redeemed. The caller may continue working. Set blocking only when this agent cannot continue until one individual agent answers. Mentions address current conversation participants; all members receive the original message and may contribute.",
+    "description": "Request a reply, choices or an approval decision, optionally with staged attachment_ids. Ordinary information and follow-ups use send. If a response does not answer your question, ask again in the same conversation. A title is optional. An approval without an action descriptor only communicates a decision and cannot be redeemed. The caller may continue working. Set blocking only when this agent cannot continue until one individual agent answers. Mentions address current conversation participants; all members receive the original message and may contribute.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

@@ -52,6 +52,29 @@ describe("durable event cache", () => {
     applyLiveEvent(q, "scope", "c", { kind: "group.saved" });
     expect(q.getQueryData(key)).toBeUndefined();
   });
+  it("refreshes only selected message history for a conversation-scoped acknowledgement", () => {
+    const q = new QueryClient();
+    const selected = ["scope", "resource", "/conversations/c"];
+    const other = ["scope", "resource", "/conversations/other"];
+    const messages = [
+      "scope",
+      "collection",
+      "messages",
+      "",
+      { conversation_id: "c" },
+    ];
+    const conversations = ["scope", "collection", "conversations", "", {}];
+    for (const key of [selected, other, messages, conversations])
+      q.setQueryData(key, {});
+    applyLiveEvent(q, "scope", "c", {
+      kind: "worker.received",
+      conversation_id: "c",
+    });
+    expect(q.getQueryState(selected)?.isInvalidated).toBe(true);
+    expect(q.getQueryState(messages)?.isInvalidated).toBe(true);
+    expect(q.getQueryState(other)?.isInvalidated).toBe(false);
+    expect(q.getQueryState(conversations)?.isInvalidated).toBe(false);
+  });
 });
 it("groups only exact compatible ordinary questions, preserving independent IDs", () => {
   const base = {

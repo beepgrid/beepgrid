@@ -1077,9 +1077,15 @@
     "name": "SendInput"
   },
   {
-    "definition": "struct {\n\tAttachments    []Attachment `json:\"attachments,omitempty\"`\n\tMentions       []Mention    `json:\"mentions,omitempty\"`\n\tID             string       `json:\"id\"`\n\tConversationID string       `json:\"conversation_id\"`\n\tBody           string       `json:\"body\"`\n\tSenderID       string       `json:\"sender_id\"`\n\tInstanceID     string       `json:\"instance_id,omitempty\"`\n}",
+    "definition": "struct {\n\tReceivedBy     []string     `json:\"received_by,omitempty\"`\n\tAttachments    []Attachment `json:\"attachments,omitempty\"`\n\tMentions       []Mention    `json:\"mentions,omitempty\"`\n\tID             string       `json:\"id\"`\n\tConversationID string       `json:\"conversation_id\"`\n\tBody           string       `json:\"body\"`\n\tSenderID       string       `json:\"sender_id\"`\n\tInstanceID     string       `json:\"instance_id,omitempty\"`\n}",
     "doc": "",
     "fields": [
+      {
+        "doc": "",
+        "name": "ReceivedBy",
+        "tag": "`json:\"received_by,omitempty\"`",
+        "type": "[]string"
+      },
       {
         "doc": "",
         "name": "Attachments",

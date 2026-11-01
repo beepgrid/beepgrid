@@ -52,6 +52,7 @@ schemas['Mention']={'type': 'object', 'required': ['principal_id', 'start', 'end
 schemas['SendInput']['properties']['attachment_ids']={'type':'array','items':S,'maxItems':5,'uniqueItems':True}
 schemas['AskInput']['properties']['attachment_ids']={'type':'array','items':S,'maxItems':5,'uniqueItems':True}
 for name in ['Message','Request']: schemas[name]['properties']['attachments']=array(ref('Attachment'))
+schemas['Message']['properties']['received_by']={'type':'array','items':S,'description':'Read-only native Agent runtime acknowledgement IDs, visible only to the message sender for current Agent participants. Not evidence of model reading or business execution. Provider acceptance is excluded.'}
 for name in ['message_id','request_id']: schemas['Attachment']['properties'][name]=S
 schemas['Conversation']['properties'].update({'shared':{'type':'boolean'},'version':{'type':'integer'},'manager_id':S,'history_start':{'type':'integer'},'past_participants':array({'type':'object'})})
 paths={}

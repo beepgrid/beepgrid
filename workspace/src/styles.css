@@ -3467,3 +3467,6 @@ button.question-prompt:hover { text-decoration:underline; text-underline-offset:
 .question-dock .bound-confirm p { margin-bottom:8px }
 
 .request-message .message-meta { flex-wrap:wrap; gap:6px 10px }
+.message-body.has-receipt { position:relative; padding-right:28px }
+.message-receipt { position:absolute; right:0; bottom:3px; display:flex; color:var(--good); pointer-events:auto }
+.message-receipt svg+svg { margin-left:-9px }

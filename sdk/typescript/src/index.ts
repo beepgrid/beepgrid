@@ -87,6 +87,7 @@ export type AskInput = {
 };
 export type Mention = {principal_id:string;start:number;end:number};
 export type Message = {
+ received_by?:string[];
  attachments?:Attachment[];
  mentions?:Mention[];
   id: string;

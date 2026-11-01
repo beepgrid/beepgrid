@@ -12106,6 +12106,13 @@
               "$ref": "#/components/schemas/Attachment"
             },
             "description": "Currently visible attachment metadata."
+          },
+          "received_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Read-only native Agent runtime acknowledgement IDs, visible only to the message sender for current Agent participants. Not evidence of model reading or business execution. Provider acceptance is excluded."
           }
         },
         "required": [],

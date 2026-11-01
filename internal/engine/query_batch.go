@@ -204,7 +204,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		}
 		return out, rows.Err()
 	case "messages":
-		statement := `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions FROM messages WHERE scope=$1 AND id=ANY($2::text[]) AND chat_history_allows(scope,conversation_id,$3,$4,created_sequence)`
+		statement := `SELECT id,conversation_id,sender_id,COALESCE(instance_id,''),body,created_at,mentions,` + messageReceivedSQL + ` FROM messages m WHERE scope=$1 AND id=ANY($2::text[]) AND chat_history_allows(scope,conversation_id,$3,$4,created_sequence)`
 		rows, err := s.Pool.Query(ctx, statement, a.Scope, ids, a.ID, a.Admin)
 		if err != nil {
 			return nil, err
@@ -213,7 +213,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		pending := map[string]string{}
 		for rows.Next() {
 			var x Message
-			if err = rows.Scan(&x.ID, &x.ConversationID, &x.SenderID, &x.InstanceID, &x.Body, &x.CreatedAt, &x.Mentions); err != nil {
+			if err = rows.Scan(&x.ID, &x.ConversationID, &x.SenderID, &x.InstanceID, &x.Body, &x.CreatedAt, &x.Mentions, &x.ReceivedBy); err != nil {
 				rows.Close()
 				return nil, err
 			}
