@@ -1,7 +1,7 @@
 import { FileLinks } from "./Attachments";
 import { MentionEditor, MentionText } from "./Mentions";
 import { useState } from "react";
-import { timestamp } from "./client";
+import { readable, timestamp } from "./client";
 import { useCapabilities, useOperation, useSession } from "./data";
 import type { Request, Identity, Target, Mention } from "./contracts";
 import { TargetPicker } from "./TargetPicker";
@@ -532,7 +532,7 @@ function ShareAnswer({
             </Field>
           )
         ) : (
-          <p className="prose">{String(r.response?.answer ?? "")}</p>
+          <p className="prose">{readable(r.response?.answer ?? "")}</p>
         )}
         <div
           className="field"

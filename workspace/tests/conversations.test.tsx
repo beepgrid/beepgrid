@@ -307,6 +307,29 @@ it("labels a Coordinator request as outgoing and never offers an administrator a
   expect(location.pathname).toBe("/agents/" + agent.id);
 });
 
+it.each([
+  { value: { gate: "Keep the V1 fallback", concurrency: 8 } },
+  { value: ["Contract checks passed", "Human approval required"] },
+  { value: 0 },
+  { value: false },
+])("renders structured and scalar request answers without losing their content: $value", async ({ value }) => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const request = {
+    ...question(),
+    state: "resolved",
+    resolved_by: agent.id,
+    resolved_at: "2026-11-01T00:01:00Z",
+    response: { outcome: "answered", answer: value },
+  };
+  conversationTransport([request]);
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  const quote = await screen.findByRole("button", { name: /^Show original/ });
+  const answer = quote.closest("article")!.querySelector(".decision-answer");
+  expect(answer).toBeVisible();
+  expect(answer?.textContent).toBe(JSON.stringify(value, null, 2));
+});
+
 it("shows the latest question first and keeps separate drafts through navigation and collapse", async () => {
   history.replaceState(null, "", "/conversations/con_one");
   const requests = [

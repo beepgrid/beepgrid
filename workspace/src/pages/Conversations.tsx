@@ -26,7 +26,7 @@ import type {
 } from "../contracts";
 import { ChatMembers } from "../ChatMembers";
 import { FileLinks } from "../Attachments";
-import { relative, timestamp } from "../client";
+import { readable, relative, timestamp } from "../client";
 import { navigate, useRoute, workspaceURL } from "../navigation";
 import { MentionText } from "../Mentions";
 import { RequestCard } from "../RequestCard";
@@ -580,10 +580,9 @@ function Chat({ id }: { id: string }) {
                       {item.value.response?.outcome !== "answered" ? (
                         <RequestStatus request={item.value} />
                       ) : null}
-                      {typeof item.value.response?.answer === "string" &&
-                      item.value.response.answer ? (
-                        <p className="decision-answer">
-                          {item.value.response.answer}
+                      {item.value.response?.answer !== undefined ? (
+                        <p className="decision-answer prose">
+                          {readable(item.value.response.answer)}
                         </p>
                       ) : null}
                     </div>
