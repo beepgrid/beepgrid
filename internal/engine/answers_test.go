@@ -12,6 +12,7 @@ func TestExactAnswerReuseRequiresCurrentIntendedResponder(t *testing.T) {
 	second := testWorker(t, s, owner, "second")
 	alice := testPerson(t, s, owner, "alice")
 	bob := testPerson(t, s, owner, "bob")
+	grant(t, s, owner, bob, []Rule{{Action: "view", TargetKind: "agent", TargetID: "*"}})
 	for _, worker := range []Actor{first, second} {
 		grant(t, s, owner, worker, []Rule{{Action: "ask", TargetKind: "person", TargetID: alice.ID}, {Action: "ask", TargetKind: "person", TargetID: bob.ID}})
 	}
@@ -49,12 +50,12 @@ func TestExactAnswerReuseRequiresCurrentIntendedResponder(t *testing.T) {
 	if current, e := s.Ask(ctx, second, ask, "future-alice"); e != nil || current.State != "resolved" {
 		t.Fatal("authorized exact reuse failed", current, e)
 	}
-	authorRole.Rules = []Rule{{Action: "view", TargetKind: "agent", TargetID: "*"}}
+	authorRole.Rules = []Rule{{Action: "view", TargetKind: "agent", TargetID: "*"}, {Action: "message", TargetKind: "agent", TargetID: second.ID, Effect: "deny"}}
 	if _, err = s.SaveRole(ctx, owner, authorRole); err != nil {
 		t.Fatal(err)
 	}
-	if current, e := s.Ask(ctx, second, ask, "revoked-author"); e != nil || current.State != "open" {
-		t.Fatal("revoked author contact reused", current, e)
+	if current, e := s.Ask(ctx, second, ask, "revoked-author"); ErrorStatus(e) != 403 {
+		t.Fatal("blocked author accepted a new request", current, e)
 	}
 }
 

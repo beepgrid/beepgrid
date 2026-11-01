@@ -60,6 +60,9 @@ func TestBatchAtomicPrivateDeduplicatedAndConcurrentReplay(t *testing.T) {
 		t.Fatal(count, e)
 	}
 	// Ask returns independent requests instead of conflating separate decisions.
+	for _, person := range []Actor{p, q} {
+		grant(t, s, owner, person, []Rule{{Action: "view", TargetKind: "person", TargetID: owner.ID}})
+	}
 	requests, e := s.AskBatch(ctx, owner, AskBatchInput{Targets: targets, Request: AskInput{Title: "Which value?"}}, "questions")
 	if e != nil || len(requests) != 2 || requests[0].Request.ID == requests[1].Request.ID {
 		t.Fatal(requests, e)

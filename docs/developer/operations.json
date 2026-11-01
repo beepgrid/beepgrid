@@ -719,5 +719,12 @@
     "family": "callbacks",
     "audience": "Provider callback. Use its native signature/secret verification, not a worker bearer token.",
     "errors": "Invalid signatures or account linkage are rejected. Duplicate delivery is deduplicated; changed content under the same provider event identity conflicts."
+  },
+  "POST /api/v1/contact-permissions/preview": {
+    "description": "Preview current contact permissions or a proposed versioned edit without saving. Explicit blocks override matching role grants.",
+    "audience": "The subject, an authorized access inspector or the administrator. Proposed edits require current management and assignment authority.",
+    "returns": "The current direct policy, effective action cells and sources for up to 100 contacts, warnings and save eligibility.",
+    "errors": "Reload on version conflict. Visibility and assignment authority remain separate. A preview is never a grant.",
+    "family": "Permissions"
   }
 }

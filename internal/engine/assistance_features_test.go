@@ -207,11 +207,11 @@ func TestOverseerPermissionIntersectionAndReplySummary(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// A worker's reply is separately authorized; viewing a user never grants reply rights.
+			// A request grants its own reply path, while an explicit block still wins.
 			if _, err = s.Pool.Exec(ctx, `DELETE FROM role_bindings WHERE subject_id=$1`, one.ID); err != nil {
 				t.Fatal(err)
 			}
-			grant(t, s, owner, one, []Rule{{Action: "view", TargetKind: "person", TargetID: person.ID}})
+			replyRole := grant(t, s, owner, one, []Rule{{Action: "view", TargetKind: "person", TargetID: person.ID}, {Action: "message", TargetKind: "person", TargetID: person.ID, Effect: "deny"}})
 			outcome := "answered"
 			if operation == "task" {
 				outcome = "completed"
@@ -219,7 +219,10 @@ func TestOverseerPermissionIntersectionAndReplySummary(t *testing.T) {
 			if _, err = s.Respond(ctx, one, q.ID, Response{Outcome: outcome, Answer: "Completed 7 non-overlapping pages", Version: 1}); ErrorStatus(err) != 403 {
 				t.Fatal("view allowed a reply", err)
 			}
-			grant(t, s, owner, one, []Rule{{Action: "message", TargetKind: "person", TargetID: person.ID}})
+			replyRole.Rules = replyRole.Rules[:1]
+			if _, err = s.SaveRole(ctx, owner, replyRole); err != nil {
+				t.Fatal(err)
+			}
 			if _, err = s.Respond(ctx, one, q.ID, Response{Outcome: outcome, Answer: "Completed 7 non-overlapping pages", Version: 1}); err != nil {
 				t.Fatal(err)
 			}

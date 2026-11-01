@@ -157,6 +157,16 @@ class Client:
     def capabilities(self, **options: Any) -> dict[str, Any]:
         return self.call("POST", "/api/v1/capabilities", options)
 
+    def preview_contact_permissions(self, subject: dict[str, str], *, rules: list[dict[str, str]] | None = None,
+                                    version: int = 0, targets: list[dict[str, str]] | None = None) -> dict[str, Any]:
+        data: dict[str, Any] = {"subject": subject, "version": version, "targets": targets or []}
+        if rules is not None:
+            data["rules"] = rules
+        return self.call("POST", "/api/v1/contact-permissions/preview", data)
+
+    def save_contact_permissions(self, subject: dict[str, str], rules: list[dict[str, str]], *, version: int) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/contact-permissions", {"subject": subject, "rules": rules, "version": version})
+
     def access(self, subject_id: str = "") -> dict[str, Any]:
         return self.call("GET", "/api/v1/access?subject_id=" + urllib.parse.quote(subject_id, safe=""))
 

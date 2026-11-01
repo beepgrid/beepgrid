@@ -388,6 +388,14 @@ func (s *Server) routes() {
 		x, e := s.Store.StartChat(r.Context(), actor(r), in, r.Header.Get("Idempotency-Key"))
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/contact-permissions/preview", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.ContactPreviewInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.PreviewContactPermissions(r.Context(), actor(r), in)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("POST /api/v1/contact-permissions", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in engine.ContactPermissionsInput
 		if e := decode(r, &in); e != nil {

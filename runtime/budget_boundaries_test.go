@@ -62,6 +62,9 @@ func TestBudgetFanoutAttachmentsAndDeniedWorkAreAtomic(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	if _, e = s.store.SaveContactPermissions(ctx, actor, engine.ContactPermissionsInput{Subject: engine.Target{Kind: "agent", ID: one.Agent.ID}, Rules: []engine.Rule{{Action: "view", TargetKind: "person", TargetID: actor.ID}}}); e != nil {
+		t.Fatal(e)
+	}
 	s.store.AttachmentsRoot = t.TempDir()
 	if _, e = s.store.UploadAttachment(ctx, actor, msg.ConversationID, "too-big.txt", "text/plain", []byte("four")); engine.ErrorStatus(e) != 429 {
 		t.Fatal("upload over limit", e)

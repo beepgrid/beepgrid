@@ -292,9 +292,9 @@ export function RoleForm({
           />
         </Field>
         <p className="help">
-          Rules only grant the exact operations shown. A wildcard (*) is
-          organization-wide authority. Manage does not imply permission to read
-          message content, send, ask or decide.
+          Rules allow the exact operations shown unless explicitly blocked. A
+          wildcard (*) is organization-wide authority. Manage does not imply
+          permission to read message content, send, ask or decide.
         </p>
         {rules.map((r, i) => (
           <section className="rule" key={i}>
@@ -311,6 +311,17 @@ export function RoleForm({
               </Button>
             </div>
             <div className="form-grid">
+              <Field label="Effect">
+                <select
+                  value={r.effect || "allow"}
+                  onChange={(e) =>
+                    update(i, { effect: e.target.value as "allow" | "deny" })
+                  }
+                >
+                  <option value="allow">Allow</option>
+                  <option value="deny">Block</option>
+                </select>
+              </Field>
               <Field label="Action">
                 <select
                   value={r.action}

@@ -26,7 +26,11 @@ func TestReadPathsPreservePrivateProjectionsAndFreshPermissions(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	hiddenView := grant(t, s, owner, reader, []Rule{{Action: "view", TargetKind: "agent", TargetID: two.ID}})
 	if _, e = s.Ask(ctx, two, AskInput{Target: Target{"person", reader.ID}, Title: "Hidden requester"}, "hidden"); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.BindRole(ctx, owner, Binding{hiddenView.ID, "principal", reader.ID}, true); e != nil {
 		t.Fatal(e)
 	}
 	list, e := s.Requests(ctx, reader)

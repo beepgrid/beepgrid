@@ -16,7 +16,9 @@ export function TargetPicker({
   messaging = false,
   onIdentitiesChange,
   excludeIds = [],
+  showSelection = true,
 }: {
+  showSelection?: boolean;
   value: Target[];
   excludeIds?: string[];
   onChange: (v: Target[]) => void;
@@ -247,7 +249,7 @@ export function TargetPicker({
         onChange={setSearch}
         placeholder="Search by name"
       />
-      {value.length > 0 ? (
+      {showSelection && value.length > 0 ? (
         <div className="recipient-chips">
           {value.map((t) => (
             <button

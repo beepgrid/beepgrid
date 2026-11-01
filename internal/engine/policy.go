@@ -21,15 +21,68 @@ func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, targ
 		return false
 	}
 
-	for _, r := range all {
+	return s.rulesAllow(ctx, db, a, all, action, target, connection, actionName, descriptor...)
+}
+
+// Omitted effects remain allows. A matching explicit block wins across all
+// assignments, including group grants and wildcard allows.
+func (s *Store) rulesAllow(ctx context.Context, db DB, a Actor, rules []Rule, action string, target Target, connection, actionName string, descriptor ...*Action) bool {
+	for _, r := range rules {
+		if r.Effect == "deny" && s.ruleMatches(ctx, db, a, r, action, target, connection, actionName, descriptor...) {
+			return false
+		}
+	}
+	for _, r := range rules {
 		if s.ruleAllows(ctx, db, a, r, action, target, connection, actionName, descriptor...) {
 			return true
 		}
 	}
-
 	return false
 }
+
+func (s *Store) blocked(ctx context.Context, db DB, a Actor, action string, target Target) bool {
+	if a.Admin {
+		return false
+	}
+	rules, err := roleRules(ctx, db, a)
+	if err != nil {
+		return true
+	}
+	for _, r := range rules {
+		if r.Effect == "deny" && s.ruleMatches(ctx, db, a, r, action, target, "", "") {
+			return true
+		}
+	}
+	return false
+}
+
+// A group grant never bypasses an exception for an individual recipient.
+// Most policies contain no blocks, so the normal route needs no extra lookup.
+func (s *Store) recipientBlocked(ctx context.Context, db DB, a Actor, action, recipient string) bool {
+	if a.Admin {
+		return false
+	}
+	rules, err := roleRules(ctx, db, a)
+	if err != nil {
+		return true
+	}
+	for _, r := range rules {
+		if r.Effect != "deny" || r.Action != action {
+			continue
+		}
+		p, err := principal(ctx, db, a.Scope, recipient)
+		if err != nil {
+			return true
+		}
+		return s.blocked(ctx, db, a, action, Target{p.Kind, p.ID})
+	}
+	return false
+}
+
 func (s *Store) ruleAllows(ctx context.Context, db DB, a Actor, r Rule, action string, target Target, connection, actionName string, descriptor ...*Action) bool {
+	return r.Effect != "deny" && s.ruleMatches(ctx, db, a, r, action, target, connection, actionName, descriptor...)
+}
+func (s *Store) ruleMatches(ctx context.Context, db DB, a Actor, r Rule, action string, target Target, connection, actionName string, descriptor ...*Action) bool {
 	if r.Action != action && r.Action != "*" {
 		return false
 	}
@@ -133,6 +186,14 @@ func validateRole(in Role) error {
 		return Bad("A role name and at most 100 rules are required.")
 	}
 	for _, r := range in.Rules {
+		if r.Effect != "" && r.Effect != "allow" && r.Effect != "deny" {
+			return Bad("Rule effect must be allow or deny.")
+		}
+		if r.Effect == "deny" {
+			if (r.Action != "view" && r.Action != "message" && r.Action != "ask" && r.Action != "decide") || (r.TargetKind != "person" && r.TargetKind != "agent" && r.TargetKind != "service" && r.TargetKind != "group") || r.TargetID == "*" || r.TargetID == "$self" || r.ConnectionID != "" || r.ActionName != "" || r.Conditions != nil {
+				return Bad("Blocks apply to an explicit contact or group across all routes.")
+			}
+		}
 		if r.Conditions != nil {
 			if r.Action != "ask" && r.Action != "decide" {
 				return Bad("Action conditions apply only to ask and decide rules.")
@@ -373,14 +434,24 @@ func (s *Store) ExplainSubject(ctx context.Context, caller Actor, subject, actio
 		return nil, e
 	}
 	matches := []map[string]any{}
+	blocks := []map[string]any{}
 	for _, assignment := range access.Roles {
 		for index, rule := range assignment.Role.Rules {
-			if s.ruleAllows(ctx, s.Pool, a, rule, action, target, connection, actionName, descriptor...) {
-				matches = append(matches, map[string]any{"role_id": assignment.Role.ID, "subject_kind": assignment.SubjectKind, "subject_id": assignment.SubjectID, "rule_index": index})
+			if s.ruleMatches(ctx, s.Pool, a, rule, action, target, connection, actionName, descriptor...) {
+				source := map[string]any{"role_id": assignment.Role.ID, "subject_kind": assignment.SubjectKind, "subject_id": assignment.SubjectID, "rule_index": index}
+				if rule.Effect == "deny" {
+					blocks = append(blocks, source)
+				} else {
+					matches = append(matches, source)
+				}
 			}
 		}
 	}
 	result["matched_grants"] = matches
+	result["matched_blocks"] = blocks
+	if len(blocks) > 0 {
+		result["reason"] = "An explicit contact block overrides matching grants."
+	}
 	result["permission_only"] = true
 	if action == "manage" && target.Kind == "group" && s.manages(ctx, s.Pool, a, "group", target.ID) && !s.allowed(ctx, s.Pool, a, "manage", target, "", "") {
 		result["derived_authority"] = "created_group_with_current_managed_members"

@@ -131,6 +131,17 @@ func TestRealRequestReplacementIsAtomicAndReplaysCurrentState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var me struct {
+		Person struct {
+			ID string `json:"id"`
+		} `json:"person"`
+	}
+	if err = c.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.SaveContactPermissions(ctx, ContactPermissionsInput{Subject: Target{Kind: "agent", ID: session.Agent.ID}, Rules: []PermissionRule{{Action: "view", TargetKind: "person", TargetID: me.Person.ID}, {Action: "decide", TargetKind: "person", TargetID: me.Person.ID}}}); err != nil {
+		t.Fatal(err)
+	}
 	original, err := c.Ask(ctx, AskInput{Target: Target{Kind: "agent", ID: session.Agent.ID}, Body: "Check staging now?", Kind: "approval"}, Key())
 	if err != nil {
 		t.Fatal(err)

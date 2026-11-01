@@ -30,6 +30,8 @@ test('real staged files and shared membership retain history defaults and curren
 test('real request replacement preserves old history and stable retries',{skip:!process.env.NOTIF_SDK_TEST_URL},async()=>{
  const owner=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
  const {session}=await owner.connect('sdk/ts-replace/'+crypto.randomUUID(),'Replacement worker');
+ const me=await owner.call('GET','/api/v1/me');
+ await owner.saveContactPermissions({subject:{kind:'agent',id:session.agent.id},version:0,rules:['view','decide'].map(action=>({action,target_kind:'person',target_id:me.person.id}))});
  const original=await owner.ask({target:{kind:'agent',id:session.agent.id},body:'Check staging now?',kind:'approval'});
  const input={version:original.version,body:'Check staging after the demo?'};const key=crypto.randomUUID();
  const result=await owner.replaceRequest(original.id,input,key);

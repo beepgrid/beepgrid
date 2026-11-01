@@ -141,16 +141,8 @@ func (s *Store) PreviewRole(ctx context.Context, a Actor, in RolePreviewInput) (
 			before, after := prepared.before, prepared.after
 			comparison := PolicyComparison{Check: check}
 			if !p.Disabled {
-				for _, r := range before {
-					if s.ruleAllows(ctx, db, subject, r, check.Action, check.Target, check.ConnectionID, check.ActionName, check.Descriptor) {
-						comparison.Before = true
-					}
-				}
-				for _, r := range after {
-					if s.ruleAllows(ctx, db, subject, r, check.Action, check.Target, check.ConnectionID, check.ActionName, check.Descriptor) {
-						comparison.After = true
-					}
-				}
+				comparison.Before = s.rulesAllow(ctx, db, subject, before, check.Action, check.Target, check.ConnectionID, check.ActionName, check.Descriptor)
+				comparison.After = s.rulesAllow(ctx, db, subject, after, check.Action, check.Target, check.ConnectionID, check.ActionName, check.Descriptor)
 			}
 			out.Checks = append(out.Checks, comparison)
 		}

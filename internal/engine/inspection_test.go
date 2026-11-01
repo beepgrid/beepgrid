@@ -106,6 +106,7 @@ func TestDelegatedDeliveryRetryRequiresReadManageAndCurrentPolicy(t *testing.T) 
 	ctx := context.Background()
 	p := testPerson(t, s, owner, "recipient")
 	lead := testPerson(t, s, owner, "lead")
+	grant(t, s, owner, p, []Rule{{Action: "view", TargetKind: "person", TargetID: owner.ID}})
 	r, e := s.Ask(ctx, owner, AskInput{Target: Target{"person", p.ID}, Title: "Request"}, "retry")
 	if e != nil {
 		t.Fatal(e)

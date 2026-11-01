@@ -275,12 +275,7 @@ func (s *Store) deliveryReadRoutes(ctx context.Context, scope string, deliveries
 			out[d.ID] = true
 			continue
 		}
-		for _, r := range rules[a.ID] {
-			if s.ruleAllows(ctx, s.Pool, a, r, p.Action, p.Target, d.ConnectionID, p.ActionName, payloadAction(d.Payload)) {
-				out[d.ID] = true
-				break
-			}
-		}
+		out[d.ID] = s.rulesAllow(ctx, s.Pool, a, rules[a.ID], p.Action, p.Target, d.ConnectionID, p.ActionName, payloadAction(d.Payload)) && !s.recipientBlocked(ctx, s.Pool, a, p.Action, d.RecipientID)
 	}
 	return out, nil
 }

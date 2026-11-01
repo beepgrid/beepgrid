@@ -131,6 +131,10 @@ func TestWorkspaceSDKQueriesCapabilitiesAndPreviewedBatches(t *testing.T) {
 	if e != nil || len(page.Items) != 1 {
 		t.Fatal(page, e)
 	}
+	var contactPolicy map[string]any
+	if e = admin.Do(ctx, "POST", "/api/v1/contact-permissions", map[string]any{"subject": target, "rules": []map[string]string{{"action": "view", "target_kind": "person", "target_id": adminPersonID(t, admin)}}, "version": 0}, &contactPolicy, ""); e != nil {
+		t.Fatal(e)
+	}
 	requests, e := admin.AskBatch(ctx, notif.AskBatchInput{Targets: []notif.Target{target}, Request: notif.AskInput{Title: "Progress?"}}, "sdk-ask-batch")
 	if e != nil || len(requests) != 1 {
 		t.Fatal(requests, e)
@@ -151,4 +155,17 @@ func TestWorkspaceSDKQueriesCapabilitiesAndPreviewedBatches(t *testing.T) {
 	if _, e = admin.Account(ctx); e != nil {
 		t.Fatal(e)
 	}
+}
+
+func adminPersonID(t *testing.T, client *notif.Client) string {
+	t.Helper()
+	var me struct {
+		Person struct {
+			ID string `json:"id"`
+		} `json:"person"`
+	}
+	if err := client.Do(context.Background(), "GET", "/api/v1/me", nil, &me, ""); err != nil {
+		t.Fatal(err)
+	}
+	return me.Person.ID
 }

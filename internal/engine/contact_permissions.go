@@ -29,15 +29,12 @@ func (s *Store) SaveContactPermissions(ctx context.Context, a Actor, in ContactP
 		if target.Kind != subject.Kind {
 			return Bad("Subject type does not match.")
 		}
-		id := "rol_contacts_" + digestJSON([]any{a.Scope, subject})[:24]
+		id := contactPolicyID(a.Scope, subject)
 		out = Role{ID: id, Name: "Contacts " + subject.ID, Rules: in.Rules, Version: in.Version}
+		if e = validateContactRules(in.Rules); e != nil {
+			return e
+		}
 		for _, rule := range in.Rules {
-			if rule.Action != "view" && rule.Action != "message" && rule.Action != "ask" && rule.Action != "decide" {
-				return Bad("Only communication permissions can be edited here.")
-			}
-			if rule.TargetID == "*" || rule.TargetID == "$self" || rule.ConnectionID != "" || rule.ActionName != "" || rule.Conditions != nil {
-				return Bad("Choose explicit contacts for this policy.")
-			}
 			if rule.TargetKind == "group" {
 				var exists bool
 				if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE scope=$1 AND id=$2)`, a.Scope, rule.TargetID).Scan(&exists); e != nil {

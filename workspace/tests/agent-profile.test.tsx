@@ -155,6 +155,47 @@ it("conceals a previously loaded agent profile as soon as authority is lost", as
   ).not.toBeInTheDocument();
 });
 
+it("keeps the Access tab selected through a permission-triggered cache reset", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (path.endsWith("/query"))
+        return json({ items: body.collection === "agents" ? [agent] : [] });
+      if (path.endsWith("/contact-permissions/preview"))
+        return json({
+          policy: { id: "rol_contacts", version: 1, rules: [] },
+          contacts: [],
+          warnings: [],
+          can_save: true,
+        });
+      if (path.includes("/access?")) return json({ roles: [] });
+      if (path.endsWith("/role-bindings")) return json([]);
+      return json({ operations: { view: true }, outcomes: [] });
+    }),
+  );
+  const { Wrapper, query } = harness();
+  render(<AgentProfile id={agent.id} onConnect={() => {}} />, {
+    wrapper: Wrapper,
+  });
+  fireEvent.click(await screen.findByRole("tab", { name: "Access" }));
+  await screen.findByText(
+    "No individual contact access has been assigned yet.",
+  );
+  await act(() => query.resetQueries());
+  await waitFor(() =>
+    expect(screen.getByRole("tab", { name: "Access" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    ),
+  );
+  expect(
+    await screen.findByText(
+      "No individual contact access has been assigned yet.",
+    ),
+  ).toBeVisible();
+});
+
 it("uses role and current-presence filters without confusing roles with runtime replicas", async () => {
   const queries: any[] = [];
   vi.stubGlobal(

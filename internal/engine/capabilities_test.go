@@ -30,6 +30,7 @@ func TestCapabilitiesMatchCurrentResponseAuthorization(t *testing.T) {
 	proposerRole := grant(t, s, owner, agent, []Rule{{Action: "ask", TargetKind: "group", TargetID: group.ID}})
 	grant(t, s, owner, person, []Rule{{Action: "view", TargetKind: "agent", TargetID: agent.ID}, {Action: "message", TargetKind: "agent", TargetID: agent.ID}})
 	action := &Action{Name: "refund", ExecutorID: agent.ID, Resource: "invoice/1", ResourceVersion: "v1", OperationKey: "refund-1", Arguments: map[string]any{"amount_minor": int64(500), "currency": "USD"}}
+	decision := grant(t, s, owner, person, []Rule{{Action: "decide", TargetKind: "agent", TargetID: agent.ID}})
 	r, e := s.Ask(ctx, agent, AskInput{Target: Target{"group", group.ID}, Kind: "approval", Title: "Refund?", Action: action}, "caps-request")
 	if e != nil {
 		t.Fatal(e)
@@ -50,9 +51,13 @@ func TestCapabilitiesMatchCurrentResponseAuthorization(t *testing.T) {
 			}
 		}
 	}
+	decision.Rules = nil
+	if decision, e = s.SaveRole(ctx, owner, decision); e != nil {
+		t.Fatal(e)
+	}
 	check(false) // Message does not grant Decide.
 	limit := int64(400)
-	decision := grant(t, s, owner, person, []Rule{{Action: "decide", TargetKind: "agent", TargetID: agent.ID, ActionName: "refund", Conditions: &RuleConditions{Currency: "USD", MaxAmountMinor: &limit}}})
+	decision = grant(t, s, owner, person, []Rule{{Action: "decide", TargetKind: "agent", TargetID: agent.ID, ActionName: "refund", Conditions: &RuleConditions{Currency: "USD", MaxAmountMinor: &limit}}})
 	check(false)
 	decision.Rules[0].Conditions.MaxAmountMinor = nil
 	if decision, e = s.SaveRole(ctx, owner, decision); e != nil {
@@ -132,6 +137,7 @@ func TestScopedCapabilitiesAndAccessProvenance(t *testing.T) {
 		t.Fatal("revoked manager", e)
 	}
 	// Expired requests cannot be acted on even with current grants.
+	grant(t, s, owner, p, []Rule{{Action: "view", TargetKind: "person", TargetID: owner.ID}})
 	r, e := s.Ask(ctx, owner, AskInput{Target: Target{"person", p.ID}, Title: "Soon", ExpiresAt: time.Now().Add(time.Hour)}, "soon")
 	if e != nil {
 		t.Fatal(e)

@@ -19,6 +19,7 @@ func TestDeliveryReadRouteProofMatchesCurrentDispatchPolicy(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	grant(t, s, owner, p, []Rule{{Action: "view", TargetKind: "agent", TargetID: w.ID}})
 	r, e := s.Ask(ctx, w, AskInput{Target: Target{"person", p.ID}, Title: "Which release?"}, "request")
 	if e != nil {
 		t.Fatal(e)

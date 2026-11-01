@@ -184,6 +184,9 @@ export type QueryPage<T=unknown> = {items:T[]; next_cursor?:string; order:string
 export type CapabilityResult = {observed_at:string; operations:Record<string,boolean>; request_version?:number; outcomes:string[]};
 export type DispatchPreviewInput = {targets:Target[]; operation:"message"|"ask"; descriptor?:Action};
 export type DispatchPreview = {recipients:unknown[]; count:number; hidden_recipients:number; token:string; expires_at:string; sends:false};
+export type PermissionRule = {effect?: "allow" | "deny"; action: "view" | "message" | "ask" | "decide"; target_kind: Target["kind"]; target_id: string};
+export type ContactPermissionsInput = {subject: Target; rules: PermissionRule[]; version: number};
+export type ContactPreviewInput = {subject: Target; rules?: PermissionRule[]; version?: number; targets?: Target[]};
 export class Client {
   readonly baseURL: string;
   constructor(
@@ -255,6 +258,8 @@ export class Client {
   }
   query<T=unknown>(input:QueryInput) {return this.call<QueryPage<T>>("POST","/api/v1/query",input);}
   capabilities(input:{target?:{kind:string;id:string};request_id?:string;connection_id?:string;descriptor?:Action}={}) {return this.call<CapabilityResult>("POST","/api/v1/capabilities",input);}
+  previewContactPermissions(input: ContactPreviewInput) {return this.call<unknown>("POST","/api/v1/contact-permissions/preview",input);}
+  saveContactPermissions(input: ContactPermissionsInput) {return this.call<unknown>("POST","/api/v1/contact-permissions",input);}
   access(subject="") {return this.call<unknown>("GET","/api/v1/access?subject_id="+encodeURIComponent(subject));}
   dispatchPreview(input:DispatchPreviewInput) {return this.call<DispatchPreview>("POST","/api/v1/dispatch-preview",input);}
   sendBatch(input:{targets:Target[];body:string;title?:string;preview_token?:string;attachment_ids?:string[]},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;result:{conversation_id:string;messages:Message[]}}>>("POST","/api/v1/message-batches",input,{key});}

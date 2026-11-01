@@ -83,9 +83,8 @@ func TestAmountAndResourceLimitsAreRecheckedAtExecution(t *testing.T) {
 		}
 		return q
 	}
-	tooMuch := ask(10001, "over-limit")
-	if _, e := s.Respond(ctx, p, tooMuch.ID, Response{Outcome: "approved", Version: 1}); ErrorStatus(e) != 403 {
-		t.Fatal("amount ceiling bypass", e)
+	if _, err := s.Ask(ctx, w, AskInput{Target: Target{"person", p.ID}, Kind: "approval", Title: "Refund?", Action: &Action{Name: "refund", ExecutorID: w.ID, Resource: "invoice/1", ResourceVersion: "1", OperationKey: "over-limit", Arguments: map[string]any{"amount_minor": int64(10001), "currency": "USD"}}}, "over-limit"); ErrorStatus(err) != 403 {
+		t.Fatal("unusable approval accepted", err)
 	}
 	q := ask(9900, "within-limit")
 	if _, e := s.Respond(ctx, p, q.ID, Response{Outcome: "approved", Version: 1}); e != nil {

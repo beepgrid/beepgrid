@@ -242,14 +242,17 @@ func (s *Store) Access(ctx context.Context, a Actor, subject string) (AccessSumm
 // categories and identifiers, rather than suggesting arbitrary tool permissions.
 func PermissionCatalog() map[string]any {
 	return map[string]any{
-		"actions":                             []string{"view", "message", "ask", "decide", "manage"},
-		"communication_targets":               []string{"person", "agent", "service", "group", "instance"},
-		"management_targets":                  map[string]string{"person": "Person ID or explicit collection *", "agent": "Agent ID", "service": "Service ID or explicit collection *", "group": "Group ID or explicit collection *", "group_creation": "workspace, with current managed-member bounds", "role": "Role ID or explicit collection *", "role_binding": "Role ID plus separately manageable assignment subject", "credential": "Owning identity ID", "account": "Person ID for linking; view account:workspace for account status", "connection": "Installation ID or explicit collection *", "destination": "Recipient identity ID plus separately managed installation", "answer": "Publisher identity ID for publication, or answer ID for invalidation", "assistance": "workspace; Person administration only", "delivery": "Delivery ID with separate visibility and current route policy"},
-		"policy_inspection":                   "view access:<subject ID> plus identity visibility; self access is readable",
-		"conditions":                          []string{"resource", "resource_version", "currency", "max_amount_minor", "before"},
-		"conditions_apply_to":                 []string{"ask", "decide"},
-		"administrator_credential_bypass":     true,
-		"manage_does_not_grant_business_view": true,
-		"grants_tool_execution":               false,
+		"actions":      []string{"view", "message", "ask", "decide", "manage"},
+		"rule_effects": []string{"allow", "deny"},
+		"explicit_contact_blocks_override_grants": true,
+		"request_scoped_replies":                  true,
+		"communication_targets":                   []string{"person", "agent", "service", "group", "instance"},
+		"management_targets":                      map[string]string{"person": "Person ID or explicit collection *", "agent": "Agent ID", "service": "Service ID or explicit collection *", "group": "Group ID or explicit collection *", "group_creation": "workspace, with current managed-member bounds", "role": "Role ID or explicit collection *", "role_binding": "Role ID plus separately manageable assignment subject", "credential": "Owning identity ID", "account": "Person ID for linking; view account:workspace for account status", "connection": "Installation ID or explicit collection *", "destination": "Recipient identity ID plus separately managed installation", "answer": "Publisher identity ID for publication, or answer ID for invalidation", "assistance": "workspace; Person administration only", "delivery": "Delivery ID with separate visibility and current route policy"},
+		"policy_inspection":                       "view access:<subject ID> plus identity visibility; self access is readable",
+		"conditions":                              []string{"resource", "resource_version", "currency", "max_amount_minor", "before"},
+		"conditions_apply_to":                     []string{"ask", "decide"},
+		"administrator_credential_bypass":         true,
+		"manage_does_not_grant_business_view":     true,
+		"grants_tool_execution":                   false,
 	}
 }

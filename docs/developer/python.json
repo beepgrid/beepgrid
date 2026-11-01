@@ -85,6 +85,16 @@
     "doc": ""
   },
   {
+    "name": "preview_contact_permissions",
+    "signature": "preview_contact_permissions(self, subject: dict[str, str], *, rules: list[dict[str, str]] | None=None, version: int=0, targets: list[dict[str, str]] | None=None)",
+    "doc": ""
+  },
+  {
+    "name": "save_contact_permissions",
+    "signature": "save_contact_permissions(self, subject: dict[str, str], rules: list[dict[str, str]], *, version: int)",
+    "doc": ""
+  },
+  {
     "name": "access",
     "signature": "access(self, subject_id: str='')",
     "doc": ""

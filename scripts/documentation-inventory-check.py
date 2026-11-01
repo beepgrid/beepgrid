@@ -47,4 +47,4 @@ if binary.exists():
     message=json.dumps({'jsonrpc':'2.0','id':1,'method':'tools/list','params':{}})+'\n'
     process=subprocess.run([str(binary),'mcp'],input=message,text=True,capture_output=True,env=environment,check=True)
     assert json.loads(process.stdout)['result']['tools']==json.loads((metadata/'mcp.json').read_text()), 'MCP schemas changed; refresh tools and examples'
-print('PASS: public Python/TypeScript/React/Go exports, fields, 135 method mappings and 103 HTTP operation inventory')
+print(f'PASS: public Python/TypeScript/React/Go exports, fields, {len(methods)} method mappings and {len(operations)} HTTP operation inventory')

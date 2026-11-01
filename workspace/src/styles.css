@@ -3331,3 +3331,33 @@ a.mention-token:hover { text-decoration:underline }
 .setup-verify-state { padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--raised) }
 .setup-verify-state p { font-size:13px;color:var(--sub);margin:10px 0 }
 @media(max-width:600px) { .approval-preview { gap:8px }.approval-preview-label { display:block;flex:1 }.approval-preview-actions { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100% }.preview-action { min-height:40px;text-align:center }.agent-connect-dialog .form-actions { flex-wrap:wrap } }
+
+.contact-permission-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+.contact-permission-cell small {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--sub);
+  max-width: 125px;
+}
+.contact-permission-cell input { accent-color: var(--ink); cursor: pointer; }
+.contact-permission-cell.is-blocked small,
+.contact-blocked {
+  color: var(--danger);
+}
+.contact-change-review {
+  margin-top: 20px;
+}
+.contact-change-review p {
+  margin: 8px 0 0;
+}
+.contact-change-review ul { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.contact-change-review li { display: grid; gap: 4px; font-size: 13px; }
+
+dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x: hidden; }
+.contact-effective-matrix .identity { min-width: 160px; }
+.contact-editor-dialog .form-actions { position: sticky; bottom: 0; z-index: 1; padding: 16px 0; background: var(--surface); }

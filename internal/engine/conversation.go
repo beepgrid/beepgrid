@@ -50,7 +50,7 @@ func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, acti
 		}
 		for _, p := range people {
 			pt := Target{p.Kind, p.ID}
-			if allowedGroup || s.allowed(ctx, db, a, action, pt, "*", actionName, descriptor...) {
+			if (allowedGroup || s.allowed(ctx, db, a, action, pt, "*", actionName, descriptor...)) && !s.blocked(ctx, db, a, action, target) && !s.blocked(ctx, db, a, action, pt) {
 				if allowedGroup {
 					pt = target
 				}
@@ -334,6 +334,9 @@ func insertMessage(ctx context.Context, db DB, a Actor, conv, body string) (Mess
 	return m, event(ctx, db, a, "message.created", conv, "", m)
 }
 func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, conv, action string, payload map[string]any, expiry time.Time) error {
+	if s.recipientBlocked(ctx, db, a, action, r.ID) {
+		return Denied()
+	}
 	descriptor := payloadAction(payload)
 	actionName := ""
 	if descriptor != nil {

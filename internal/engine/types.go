@@ -139,6 +139,7 @@ type RuleConditions struct {
 	Before          *time.Time `json:"before,omitempty"`
 }
 type Rule struct {
+	Effect       string          `json:"effect,omitempty"`
 	Conditions   *RuleConditions `json:"conditions,omitempty"`
 	Action       string          `json:"action"`
 	TargetKind   string          `json:"target_kind"`

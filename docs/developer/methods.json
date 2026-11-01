@@ -403,5 +403,23 @@
     "purpose": "Report what the executor actually observed for an authorized operation.",
     "returns": "Updated Execution with state and result.",
     "recovery": "Allowed reports: running, succeeded, failed, unknown. Terminal reports cannot be overwritten. Use unknown when the external result cannot be established; never turn a timeout into success."
+  },
+  {
+    "python": "preview_contact_permissions",
+    "go": "PreviewContactPermissions",
+    "typescript": "previewContactPermissions",
+    "family": "queries",
+    "purpose": "Inspect effective contact access or preview a versioned draft without saving.",
+    "returns": "Current dedicated policy, effective contact actions and sources, warnings and can_save.",
+    "recovery": "Omit rules to observe; use an empty list to preview defaults. Reload on conflict. A preview grants no authority."
+  },
+  {
+    "python": "save_contact_permissions",
+    "go": "SaveContactPermissions",
+    "typescript": "saveContactPermissions",
+    "family": "identity",
+    "purpose": "Save the subject's dedicated contact defaults and exceptions atomically.",
+    "returns": "The saved policy and its new version.",
+    "recovery": "Use the observed version and preserve deny effects. Explicit blocks override other matching grants; omission restores defaults."
   }
 ]

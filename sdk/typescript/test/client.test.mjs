@@ -178,6 +178,9 @@ test("real workspace queries and preview-fenced batches",{skip:!process.env.NOTI
  const result=await c.sendBatch({targets:[target,target],body:"one",preview_token:preview.token},"batch-"+crypto.randomUUID());
  assert.equal(result.length,1);
  const page=await c.query({collection:"messages",filters:{conversation_id:result[0].result.conversation_id},limit:1});assert.equal(page.items.length,1);
+ const owner=await c.call("GET","/api/v1/me");
+ const before=await c.previewContactPermissions({subject:target});
+ await c.saveContactPermissions({subject:target,version:before.policy.version,rules:[{action:"view",target_kind:"person",target_id:owner.person.id}]});
  const requests=await c.askBatch({targets:[target],request:{title:"Progress?"}});assert.equal(requests.length,1);
  const caps=await c.capabilities({request_id:requests[0].request.id});assert.equal(caps.operations.cancel,true);
  assert.equal((await c.requestTrace(requests[0].request.id)).request.id,requests[0].request.id);

@@ -5175,6 +5175,128 @@
         ]
       }
     },
+    "/api/v1/contact-permissions/preview": {
+      "post": {
+        "operationId": "post_api_v1_contact_permissions_preview",
+        "description": "Preview current contact permissions or a proposed versioned edit without saving. Explicit blocks override matching role grants.\n\nThe subject, an authorized access inspector or the administrator. Proposed edits require current management and assignment authority.\n\nReturns: The current direct policy, effective action cells and sources for up to 100 contacts, warnings and save eligibility.\n\nRecovery: Reload on version conflict. Visibility and assignment authority remain separate. A preview is never a grant.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "$ref": "#/components/schemas/Target",
+                    "description": "Authorized subject projection of the access inspection."
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Rule"
+                    },
+                    "description": "Directional permission rules granted by this policy role."
+                  },
+                  "version": {
+                    "type": "integer",
+                    "description": "Current optimistic-concurrency version. Read the object before a guarded change; a stale version conflicts."
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Target"
+                    },
+                    "maxItems": 100,
+                    "description": "Explicit targets for a private batch or shared chat. These have different audience semantics."
+                  }
+                },
+                "required": [
+                  "subject"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Preview current contact permissions or a proposed versioned edit without saving",
+        "tags": [
+          "Permissions"
+        ]
+      }
+    },
     "/api/v1/contact-permissions": {
       "post": {
         "operationId": "post_api_v1_contact_permissions",
@@ -12238,6 +12360,13 @@
       "Rule": {
         "type": "object",
         "properties": {
+          "effect": {
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "description": "Omitted means allow. Explicit contact blocks override all matching role grants, except administrator credentials."
+          },
           "action": {
             "enum": [
               "view",

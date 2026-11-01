@@ -119,6 +119,9 @@ func (s *Store) bindingVisible(ctx context.Context, db DB, a Actor, b Binding) b
 // Group selectors are compared symbolically; today's membership is not a ceiling
 // for a permanent rule that would outlive a later membership change.
 func ruleContains(parent, child Rule, actorID, subjectID string) bool {
+	if parent.Effect == "deny" {
+		return false
+	}
 	if parent.Action != "*" && parent.Action != child.Action {
 		return false
 	}
@@ -176,6 +179,15 @@ func (s *Store) rulesWithin(ctx context.Context, db DB, a Actor, rules []Rule, s
 		return false
 	}
 	for _, child := range rules {
+		// Delegation cannot turn a blocked portion of a wildcard grant into a
+		// fresh allow. Group selectors may overlap as membership changes.
+		if child.Effect != "deny" {
+			for _, parent := range ceiling {
+				if parent.Effect == "deny" && ruleSelectorsOverlap(parent, child) {
+					return false
+				}
+			}
+		}
 		covered := false
 		for _, parent := range ceiling {
 			if ruleContains(parent, child, a.ID, subject) {
@@ -188,6 +200,19 @@ func (s *Store) rulesWithin(ctx context.Context, db DB, a Actor, rules []Rule, s
 		}
 	}
 	return true
+}
+
+func ruleSelectorsOverlap(a, b Rule) bool {
+	if a.Action != b.Action && a.Action != "*" && b.Action != "*" {
+		return false
+	}
+	if a.TargetKind == "group" || b.TargetKind == "group" {
+		return true
+	}
+	if a.TargetKind != b.TargetKind && a.TargetKind != "*" && b.TargetKind != "*" {
+		return false
+	}
+	return a.TargetID == b.TargetID || a.TargetID == "*" || b.TargetID == "*" || a.TargetID == "$self" || b.TargetID == "$self"
 }
 func (s *Store) mayEditRole(ctx context.Context, db DB, a Actor, r Role) bool {
 	target := r.ID

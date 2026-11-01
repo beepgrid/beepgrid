@@ -54,6 +54,7 @@ export default function AgentProfile({
   id: string;
   onConnect: (p: Identity) => void;
 }) {
+  const [tab, setTab] = useState("overview");
   const identity = useCollection<Identity>("agents", "", { id });
   const p = identity.items[0];
   return (
@@ -66,7 +67,15 @@ export default function AgentProfile({
         <span>{p?.name || "Agent"}</span>
       </div>
       <QueryState query={identity} empty="This Agent is unavailable.">
-        {p ? <Profile key={p.id} agent={p} onConnect={onConnect} /> : null}
+        {p ? (
+          <Profile
+            key={p.id}
+            agent={p}
+            onConnect={onConnect}
+            tab={tab}
+            setTab={setTab}
+          />
+        ) : null}
       </QueryState>
     </>
   );
@@ -75,12 +84,15 @@ export default function AgentProfile({
 function Profile({
   agent: p,
   onConnect,
+  tab,
+  setTab,
 }: {
   agent: Identity;
   onConnect: (p: Identity) => void;
+  tab: string;
+  setTab: (tab: string) => void;
 }) {
-  const [tab, setTab] = useState("overview"),
-    [compose, setCompose] = useState<Target[] | null>(null),
+  const [compose, setCompose] = useState<Target[] | null>(null),
     [editRoles, setEditRoles] = useState(false),
     [confirm, setConfirm] = useState(false);
   const caps = useCapabilities({ kind: "agent", id: p.id });

@@ -119,6 +119,7 @@ export type Group = {
   created_by: string;
 };
 export type Rule = {
+  effect?: "allow" | "deny";
   action: string;
   target_kind: string;
   target_id: string;

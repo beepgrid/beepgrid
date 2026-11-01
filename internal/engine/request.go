@@ -132,6 +132,7 @@ type requestContinuation struct {
 }
 
 func (s *Store) askContinuedTx(ctx context.Context, tx pgx.Tx, a Actor, in AskInput, key string, out *Request, continuation *requestContinuation) error {
+	ctx = withPolicySnapshot(ctx)
 	stable := in
 	if in.Kind == "" {
 		in.Kind = "question"
@@ -199,6 +200,16 @@ func (s *Store) askContinuedTx(ctx context.Context, tx pgx.Tx, a Actor, in AskIn
 		}
 		if e != nil {
 			return e
+		}
+		eligible := false
+		for _, r := range rs {
+			if s.requestRecipientCanRespond(ctx, tx, a, r.Principal, in.Kind, in.Action) {
+				eligible = true
+				break
+			}
+		}
+		if !eligible {
+			return &Error{"NO_ELIGIBLE_RESPONDER", "No recipient can respond to this request. Check their visibility and, for approvals, approval permission.", 403}
 		}
 		if in.Blocking && (a.Kind != "agent" || len(rs) != 1 || rs[0].Kind != "agent") {
 			return Bad("Blocking dependencies require one individual agent recipient and an agent requester.")
@@ -622,12 +633,42 @@ func (s *Store) responseAuthorization(ctx context.Context, db DB, a Actor, r Req
 	if originalTarget.Kind != "" {
 		proposer := Actor{Principal: requester, Scope: a.Scope}
 		_ = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, a.Scope, requester.ID).Scan(&proposer.Admin)
-		if requester.Disabled || !s.allowed(ctx, db, proposer, "ask", originalTarget, "*", actionName, r.Action) {
+		if requester.Disabled || !s.allowed(ctx, db, proposer, "ask", originalTarget, "*", actionName, r.Action) || s.recipientBlocked(ctx, db, proposer, "ask", a.ID) {
 			return Denied()
 		}
+	}
+	if requester.Disabled || !s.allowed(ctx, db, a, "view", Target{requester.Kind, requester.ID}, "", "") {
+		return Denied()
+	}
+	if r.Kind != "approval" && originalTarget.Kind != "" {
+		// Being in this request's audience permits its canonical answer, never a
+		// free-form message or another conversation. Explicit blocks still win.
+		if s.blocked(ctx, db, a, "message", Target{requester.Kind, requester.ID}) {
+			return Denied()
+		}
+		return nil
 	}
 	if !s.allowed(ctx, db, a, permission, Target{requester.Kind, requester.ID}, a.ProviderConnection, actionName, r.Action) {
 		return Denied()
 	}
 	return nil
+}
+
+func (s *Store) requestRecipientCanRespond(ctx context.Context, db DB, requester Actor, recipient Principal, kind string, action *Action) bool {
+	responder := Actor{Principal: recipient, Scope: requester.Scope}
+	if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM credentials WHERE scope=$1 AND principal_id=$2 AND kind='admin' AND NOT revoked AND (expires_at IS NULL OR expires_at>now()))`, requester.Scope, recipient.ID).Scan(&responder.Admin); err != nil {
+		return false
+	}
+	target := Target{requester.Kind, requester.ID}
+	if recipient.Disabled || !s.allowed(ctx, db, responder, "view", target, "", "") {
+		return false
+	}
+	if kind == "approval" {
+		name := ""
+		if action != nil {
+			name = action.Name
+		}
+		return s.allowed(ctx, db, responder, "decide", target, "*", name, action)
+	}
+	return !s.blocked(ctx, db, responder, "message", target)
 }

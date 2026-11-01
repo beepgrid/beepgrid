@@ -349,12 +349,9 @@ func TestManagementDoesNotExposeFleetProgressOrBusinessDecisions(t *testing.T) {
 	if _, e = s.Instances(ctx, lead, worker.ID); ErrorStatus(e) != 403 {
 		t.Fatal("instance visibility", e)
 	}
-	approval, e := s.Ask(ctx, worker, AskInput{Kind: "approval", Target: Target{"person", lead.ID}, Title: "Refund?", Action: &Action{Name: "refund", ExecutorID: worker.ID, Resource: "invoice", ResourceVersion: "1", OperationKey: "once"}}, "management-approval")
-	if e != nil {
-		t.Fatal(e)
-	}
-	if _, e = s.Respond(ctx, lead, approval.ID, Response{Outcome: "approved", Version: approval.Version}); ErrorStatus(e) != 404 && ErrorStatus(e) != 403 {
-		t.Fatal("manage became decide", e)
+	_, e = s.Ask(ctx, worker, AskInput{Kind: "approval", Target: Target{"person", lead.ID}, Title: "Refund?", Action: &Action{Name: "refund", ExecutorID: worker.ID, Resource: "invoice", ResourceVersion: "1", OperationKey: "once"}}, "management-approval")
+	if ErrorStatus(e) != 403 {
+		t.Fatal("manage admitted an unusable approval", e)
 	}
 }
 

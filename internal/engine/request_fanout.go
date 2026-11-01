@@ -20,6 +20,9 @@ func (s *Store) newRequestAudience(ctx context.Context, tx pgx.Tx, a Actor, requ
 	}
 	ids := []string{}
 	for _, r := range recipients {
+		if s.recipientBlocked(ctx, tx, a, "ask", r.ID) {
+			return Denied()
+		}
 		ids = append(ids, r.ID)
 	}
 	rows, err := tx.Query(ctx, `SELECT d.principal_id,d.connection_id,d.address FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) AND c.enabled AND d.mode IN ('primary','copy') ORDER BY d.priority,d.id`, a.Scope, ids)

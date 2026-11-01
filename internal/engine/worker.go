@@ -17,6 +17,7 @@ const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,at
 
 // currentDeliveryPolicy rechecks the originating credential, group membership and route grants before exposing content.
 func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, d Delivery) bool {
+	ctx = withPolicySnapshot(ctx)
 	conv, _ := d.Payload["conversation_id"].(string)
 	var policy struct {
 		CredentialID       string `json:"credential_id"`
@@ -63,7 +64,7 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 	if err != nil || !valid {
 		return false
 	}
-	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName, payloadAction(d.Payload))
+	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName, payloadAction(d.Payload)) && !s.recipientBlocked(ctx, db, sender, policy.Action, d.RecipientID)
 }
 func (s *Store) Inbox(ctx context.Context, a Actor) ([]Delivery, error) {
 	if a.InstanceID == "" {

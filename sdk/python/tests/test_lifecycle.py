@@ -34,6 +34,8 @@ class SharedLifecycleTests(unittest.TestCase):
     def test_request_replacement_is_atomic_with_stable_retry(self):
         owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
         _, session = owner.connect("sdk/python-replace/" + str(uuid.uuid4()), "Replacement worker")
+        person = owner.call("GET", "/api/v1/me")["person"]["id"]
+        owner.save_contact_permissions({"kind":"agent", "id":session["agent"]["id"]}, [{"action":action,"target_kind":"person","target_id":person} for action in ["view","decide"]], version=0)
         original = owner.ask(target={"kind":"agent", "id":session["agent"]["id"]}, body="Check staging now?", kind="approval")
         key = str(uuid.uuid4())
         result = owner.replace_request(original["id"], original["version"], "Check staging after the demo?", key=key)
