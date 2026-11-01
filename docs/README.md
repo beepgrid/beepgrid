@@ -16,6 +16,7 @@ For installation, primitives, SDK methods and integration walkthroughs, use the 
 - [Packaging and headless builds](PACKAGING.md)
 - [Operations, migrations and recovery](OPERATIONS.md)
 - [CLI](CLI.md), [MCP](LOCAL-MCP.md) and [runtime examples](../examples/README.md)
+- [Live input, Steer/Queue and headless runtime setup](LIVE-INPUT.md)
 - [Shared conversations](SHARED-CHATS.md), [request replacement](REQUEST-REPLACEMENT.md) and [Coordinator](ASSISTANCE.md)
 - [Integration contracts](INTEGRATIONS.md), [connection recipes](CONNECT-AGENT-RECIPES.md), [Discord](DISCORD.md) and [Telegram](TELEGRAM.md)
 - [Channel support and qualification](OSS-CHANNEL-READINESS.md)

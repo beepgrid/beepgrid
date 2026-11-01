@@ -3,6 +3,8 @@
 Keep your model, tools and runtime. Add a receiver that can accept input while
 the Agent is working, then use the runtime's own input queue or before-model hook.
 
+## Does a message interrupt my model?
+
 Choose **Steer** to handle new input at the next supported model boundary, or
 **Queue** to wait until current work finishes. Beepgrid never sends cancellation or cancel/replay as a substitute for input.
 Native steering follows the runtime's own boundary and tool behavior. The
@@ -10,6 +12,33 @@ recommended Claude SDK path waits for running tools; its ACP adapter may
 pre-empt generation, so qualify busy-tool behavior for the installed version. Answers and approval results resume their original wait in
 both modes through the host's result-resume handler. A new ordinary message never
 silently becomes an approval.
+
+Receiving a message and making a model consume it are separate operations. A
+long-running tool can delay the next input boundary. Plain MCP tools or a
+sequential worker do not acquire steering automatically. When the selected
+environment cannot steer, use Queue. This behavior is the same with or without
+the workspace UI.
+
+## What runs where?
+
+| Location | Additional work for live input |
+| --- | --- |
+| Beepgrid engine | Existing inbox leasing, long-poll connections and acknowledgements through the Go service and PostgreSQL. No additional server, broker, database service or model is required for steering. |
+| Agent host | A receiver independent of the model loop, a private durable inbox, native input/checkpoint calls and deduplication state. Framework integrations run in the existing host; ACP may also use the runtime's adapter subprocess. |
+| Model | No model call is needed to receive, store or acknowledge a delivery, or choose Steer versus Queue. Processing new input can use tokens and additional model steps according to the runtime. |
+
+This has overhead: active listeners hold connections and issue inbox/ACK calls;
+the Agent host performs journal reads/writes and lease bookkeeping. The reference
+receiver long-polls with up to a 15-second wait instead of polling the network
+before each model step. It takes durable custody before acknowledging delivery.
+That ACK is not proof that the model has read the input or completed the task.
+
+SQLite is embedded in the Agent process and needs a private persistent volume,
+not a separate database server. An ephemeral or serverless host must use its own
+durable store and wake/checkpoint mechanism; a suspended process cannot receive
+or steer until its host resumes it. Keep one intake owner per connection and one
+model-state writer per session. Resource use depends on active connections,
+message volume, retained state and the chosen runtime.
 
 ## Set up with your AI
 
@@ -100,6 +129,10 @@ launches an Agent nor reads a credential:
 node sdk/typescript/bin/setup.mjs ai-sdk \
   --url https://your-engine.example --instance ins_your_connection --mode steer
 ```
+
+Run `node sdk/typescript/bin/setup.mjs --help` to list environment IDs. Choose
+`--mode queue` for Queue-only environments or when you prefer to finish current
+work first. The generator neither needs nor reads the worker token.
 
 ## Headless setup
 
