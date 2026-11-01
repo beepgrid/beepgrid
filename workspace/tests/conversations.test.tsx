@@ -130,7 +130,7 @@ it("labels a Coordinator request as outgoing and never offers an administrator a
   );
   const { Wrapper } = harness();
   render(<Conversations />, { wrapper: Wrapper });
-  await screen.findByText("You via Coordinator");
+  await screen.findByRole("img", { name: "You via Coordinator" });
   await screen.findByText("Waiting for Research assistant");
   expect(screen.getByText("To Research assistant")).toBeVisible();
   expect(

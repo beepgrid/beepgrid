@@ -25,7 +25,7 @@ afterEach(() => {
   history.replaceState(null, "", "/agents");
 });
 
-it("separates Coordinator context from the exact request and preserves other titles", () => {
+it("shows one Coordinator instruction with attached sender attribution and preserves ordinary titles", () => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => json({ operations: {} })),
@@ -33,17 +33,24 @@ it("separates Coordinator context from the exact request and preserves other tit
   const { Wrapper } = harness();
   const { rerender } = render(
     <RequestCard
-      request={{ ...question, title: "Coordinator: Review release readiness" }}
+      request={{
+        ...question,
+        requester_id: me.person.id,
+        title: "Coordinator: Review release readiness",
+      }}
     />,
     { wrapper: Wrapper },
   );
-  expect(screen.getByLabelText("Coordinator context")).toHaveTextContent(
-    "Review release readiness",
-  );
+  const sender = screen.getByRole("img", { name: "You via Coordinator" });
+  expect(sender.querySelector(".identity-person")).not.toBeNull();
+  expect(sender.querySelector(".overseer-mark")).not.toBeNull();
+  expect(
+    screen.queryByText("Review release readiness"),
+  ).not.toBeInTheDocument();
   expect(screen.getByText(question.body)).toBeVisible();
   rerender(<RequestCard request={{ ...question, title: "Other context" }} />);
   expect(
-    screen.queryByLabelText("Coordinator context"),
+    screen.queryByRole("img", { name: "You via Coordinator" }),
   ).not.toBeInTheDocument();
   expect(screen.getByText("Other context")).toBeVisible();
 });
@@ -74,6 +81,7 @@ it("confirms cancellation with the observed version and keeps history on a stale
   fireEvent.click(
     await screen.findByRole("button", { name: "Cancel approval" }),
   );
+  expect(screen.queryByText("Request actions")).not.toBeInTheDocument();
   expect(fetcher.mock.calls.some(([path]) => path.endsWith("/cancel"))).toBe(
     false,
   );

@@ -28,9 +28,6 @@
   --teal: #24756a;
   --amber: #91621c;
   --slate: #5d6b83;
-  --coordinator-ink: #294468;
-  --coordinator-surface: #eff3f8;
-  --coordinator-line: #ced9e7;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -55,9 +52,6 @@
   --teal: #8ac7ba;
   --amber: #d4b47d;
   --slate: #a8b6d0;
-  --coordinator-ink: #bacce8;
-  --coordinator-surface: #1b2534;
-  --coordinator-line: #35485f;
   color-scheme: dark;
 }
 * {
@@ -2310,19 +2304,14 @@ dialog {
   color: var(--ink);
   white-space: pre-wrap;
 }
-.coordinator-context {
-  padding: 12px 18px;
-  margin: 0 -18px;
-  border-block: 1px solid var(--coordinator-line);
-  background: var(--coordinator-surface);
-  box-shadow: inset 3px 0 var(--coordinator-ink);
-}
-.coordinator-context-label { color:var(--coordinator-ink); font-size:12px; font-weight:var(--type-strong) }
-.coordinator-context > p {
-  margin-top: 6px;
-  color: var(--coordinator-ink);
-  font-size: var(--type-small);
-  line-height: 1.65;
+.coordinator-sender { position:relative; flex:none; width:32px; height:32px }
+.coordinator-sender > .overseer-mark {
+  --avatar-size:20px;
+  position:absolute;
+  right:-5px;
+  bottom:-5px;
+  border:2px solid var(--surface);
+  border-radius:7px;
 }
 .decision-answer { display: block; margin-top: 8px; }
 .profile-history-hint { margin-bottom: 18px; color: var(--sub); font-size: var(--type-small); max-width: 650px; }

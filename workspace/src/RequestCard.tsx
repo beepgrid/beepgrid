@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useCapabilities, useOperation, useSession } from "./data";
 import type { Request, Identity, Target, Mention } from "./contracts";
 import { TargetPicker } from "./TargetPicker";
+import { OverseerMark } from "./OverseerEntry";
 import {
   Badge,
   Button,
@@ -43,6 +44,16 @@ export function RequestCard({
     .filter((p) => p.id !== r.requester_id)
     .map((p) => (p.id === me.person.id ? "you" : p.name))
     .join(", ");
+  const author =
+    sender || (r.requester_id === me.person.id ? me.person : undefined);
+  const avatar = (
+    <IdentityIcon
+      kind={author?.kind || "agent"}
+      id={r.requester_id}
+      label={author?.name}
+      icon={String(author?.metadata?.appearance_icon || "")}
+    />
+  );
   const [answer, setAnswer] = useState(""),
     [confirm, setConfirm] = useState(""),
     [sharing, setSharing] = useState(false),
@@ -60,19 +71,25 @@ export function RequestCard({
   }
   return (
     <article className="message request-message">
-      <IdentityIcon
-        kind={sender?.kind || "agent"}
-        id={r.requester_id}
-        label={sender?.name}
-        icon={String(sender?.metadata?.appearance_icon || "")}
-      />
+      {viaCoordinator ? (
+        <span
+          className="coordinator-sender"
+          role="img"
+          aria-label="You via Coordinator"
+          title="Sent using Coordinator"
+        >
+          {avatar}
+          <OverseerMark />
+        </span>
+      ) : (
+        avatar
+      )}
       <div className="message-body">
         <div className="message-meta">
           <strong>
             {r.requester_id === me.person.id
               ? "You"
               : sender?.name || "Participant"}
-            {viaCoordinator ? " via Coordinator" : ""}
           </strong>
           <Badge>
             {r.kind === "approval"
@@ -99,18 +116,9 @@ export function RequestCard({
           {r.body &&
           r.title &&
           r.title !== r.body &&
-          !r.body.startsWith(r.title) ? (
-            r.title.startsWith("Coordinator: ") ? (
-              <aside
-                className="coordinator-context"
-                aria-label="Coordinator context"
-              >
-                <span className="coordinator-context-label">Coordinator</span>
-                <p>{r.title.slice("Coordinator: ".length)}</p>
-              </aside>
-            ) : (
-              <small>{r.title}</small>
-            )
+          !r.body.startsWith(r.title) &&
+          !r.title.startsWith("Coordinator: ") ? (
+            <small>{r.title}</small>
           ) : null}
           <ErrorView error={op.error} />
           {r.state !== "open" ? (
@@ -214,6 +222,16 @@ export function RequestCard({
                   : `Waiting for ${recipients || "the recipients"}`}
             </small>
           )}
+          {caps.data?.operations.cancel ? (
+            <div className="actions">
+              <Button
+                disabled={op.pending}
+                onClick={() => setConfirm("cancel")}
+              >
+                {r.kind === "approval" ? "Cancel approval" : "Cancel request"}
+              </Button>
+            </div>
+          ) : null}
           {confirm ? (
             <div className="bound-confirm">
               <p>
@@ -266,7 +284,6 @@ export function RequestCard({
             </div>
           ) : null}
           {caps.data?.operations.replace ||
-          caps.data?.operations.cancel ||
           (me.can_publish_answers &&
             r.kind === "question" &&
             r.shared_key &&
@@ -296,16 +313,6 @@ export function RequestCard({
                     {r.state === "open"
                       ? "Answer and share"
                       : "Save reusable answer"}
-                  </Button>
-                ) : null}
-                {caps.data?.operations.cancel ? (
-                  <Button
-                    disabled={op.pending}
-                    onClick={() => setConfirm("cancel")}
-                  >
-                    {r.kind === "approval"
-                      ? "Cancel approval"
-                      : "Cancel request"}
                   </Button>
                 ) : null}
               </div>
