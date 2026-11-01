@@ -213,8 +213,12 @@ class Client:
         """Durable acceptance only. send with the same input/key recovers the full receipt."""
         return self.send(**{**options, "minimal": True})
 
-    def ask(self, *, target: dict[str, str], title: str = "", key: str | None = None, **options: Any) -> dict[str, Any]:
-        return self.call("POST", "/api/v1/requests", {"target": target, "title": title, **options}, key=key or str(uuid.uuid4()))
+    def ask(self, *, target: dict[str, str] | None = None, title: str = "", key: str | None = None, **options: Any) -> dict[str, Any]:
+        """Use target for a new dispatch or conversation_id for an existing chat."""
+        data = {"title": title, **options}
+        if target is not None:
+            data["target"] = target
+        return self.call("POST", "/api/v1/requests", data, key=key or str(uuid.uuid4()))
 
     def set_request_blocking(self, request_id: str, blocking: bool) -> dict[str, Any]:
         return self.call("POST", "/api/v1/requests/" + urllib.parse.quote(request_id, safe="") + "/blocking", {"blocking": blocking})

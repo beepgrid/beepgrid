@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Client, NotifError } from "../dist/index.js";
+test("real question in existing chat without a redundant target", {skip: !process.env.NOTIF_SDK_TEST_URL}, async () => {
+  const owner = new Client(process.env.NOTIF_SDK_TEST_URL, process.env.NOTIF_SDK_TEST_TOKEN);
+  const me = await owner.call("GET", "/api/v1/me");
+  const {client: worker, session} = await owner.connect("sdk/ts-followup-" + crypto.randomUUID(), "Follow-up worker");
+  const target = {kind:"agent", id:session.agent.id};
+  await owner.saveContactPermissions({subject:target, version:0, rules:[{action:"view", target_kind:"person", target_id:me.person.id}]});
+  const chat = await owner.send({target, body:"Review the release"});
+  const question = await owner.ask({conversation_id:chat.conversation_id, body:"Which version?"});
+  assert.equal(question.conversation_id, chat.conversation_id);
+  await worker.respond(question.id, {outcome:"answered", version:question.version, answer:"v2"});
+  assert.equal((await owner.getRequest(question.id)).response.answer, "v2");
+});
 test("network retry preserves a single idempotency key", async () => {
   const keys = [];
   let tries = 0;

@@ -228,7 +228,7 @@ func (s *Store) askContinuedTx(ctx context.Context, tx pgx.Tx, a Actor, in AskIn
 				return Missing()
 			}
 			if !s.allowed(ctx, tx, a, "ask", Target{executor.Kind, executor.ID}, "*", in.Action.Name, in.Action) {
-				return Denied()
+				return &Error{"POLICY_DENIED", "The requester needs Ask permission for this action's executor, action name and resource.", 403}
 			}
 		}
 		conv := in.ConversationID

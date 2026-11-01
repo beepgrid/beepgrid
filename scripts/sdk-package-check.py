@@ -67,7 +67,8 @@ const draft: Promise<Attachment> = client.stageAttachment(new Blob(['x']),'brief
 const membership: ChatMembershipInput = {operation:'add',version:1,members:['peer'],share_history:false};
 const changed: Promise<ChatMembershipResult> = client.changeChatMembership('c',membership,'members-1');
 const replaced: Promise<{previous: import('@notif/client').RequestItem; replacement: import('@notif/client').RequestItem}> = client.replaceRequest('r',{version:1,body:'Revised'},'key');
-void [upload, draft, changed, replaced, events, shared, NotifRequest];
+const followup: Promise<import('@notif/client').RequestItem> = client.ask({conversation_id:'c',body:'Which version?'});
+void [upload, draft, changed, replaced, followup, events, shared, NotifRequest];
 ''')
     run([root/"sdk/typescript/node_modules/.bin/tsc", "--noEmit", "--strict", "--module", "nodenext", "--target", "es2022", "consumer.ts"], cwd=node)
     wheel_stage = scratch / "python-source"

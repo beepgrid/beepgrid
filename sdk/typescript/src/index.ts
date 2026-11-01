@@ -75,7 +75,8 @@ export type AskInput = {
  blocking?:boolean;
  reuse_direct?:boolean;
   preview_token?: string;
-  target: Target;
+  /** Omit when asking the current participants of conversation_id. */
+  target?: Target;
   title?: string;
   body?: string;
   kind?: "question" | "approval" | "task";

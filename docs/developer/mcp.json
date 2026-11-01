@@ -86,7 +86,7 @@
   },
   {
     "name": "stage_attachment",
-    "description": "Stage chosen file bytes privately for a subsequent send, ask or start_chat using attachment_ids. Unused drafts expire after 24 hours. Base64 is limited to 64 KiB decoded, with no host file access or automatic upload retry.",
+    "description": "Stage file bytes privately for one send, ask or start_chat operation using attachment_ids. For a different operation, stage a fresh copy, even with the same bytes or recipients. Retry an unknown send outcome with its original idempotency_key and inputs. Unused drafts expire after 24 hours. Base64 is limited to 64 KiB decoded, with no host file access or automatic upload retry.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

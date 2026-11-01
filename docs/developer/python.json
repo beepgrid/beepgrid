@@ -146,8 +146,8 @@
   },
   {
     "name": "ask",
-    "signature": "ask(self, *, target: dict[str, str], title: str='', key: str | None=None, **options: Any)",
-    "doc": ""
+    "signature": "ask(self, *, target: dict[str, str] | None=None, title: str='', key: str | None=None, **options: Any)",
+    "doc": "Use target for a new dispatch or conversation_id for an existing chat."
   },
   {
     "name": "set_request_blocking",

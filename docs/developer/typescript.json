@@ -319,7 +319,7 @@
     "name": "AskInput",
     "doc": "",
     "kind": "TypeAliasDeclaration",
-    "definition": "export type AskInput = {\n attachment_ids?:string[];\n mentions?:Mention[];\n blocking?:boolean;\n reuse_direct?:boolean;\n  preview_token?: string;\n  target: Target;\n  title?: string;\n  body?: string;\n  kind?: \"question\" | \"approval\" | \"task\";\n  conversation_id?: string;\n  choices?: string[];\n  action?: Action;\n  expires_at?: string;\n  shared_key?: string;\n};",
+    "definition": "export type AskInput = {\n attachment_ids?:string[];\n mentions?:Mention[];\n blocking?:boolean;\n reuse_direct?:boolean;\n  preview_token?: string;\n  /** Omit when asking the current participants of conversation_id. */\n  target?: Target;\n  title?: string;\n  body?: string;\n  kind?: \"question\" | \"approval\" | \"task\";\n  conversation_id?: string;\n  choices?: string[];\n  action?: Action;\n  expires_at?: string;\n  shared_key?: string;\n};",
     "fields": [
       {
         "name": "attachment_ids",
@@ -354,8 +354,8 @@
       {
         "name": "target",
         "type": "Target",
-        "optional": false,
-        "doc": ""
+        "optional": true,
+        "doc": "Omit when asking the current participants of conversation_id."
       },
       {
         "name": "title",

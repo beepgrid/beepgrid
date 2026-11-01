@@ -85,6 +85,19 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(calls,["saved-key","saved-key"])
 
     @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
+    def test_real_question_in_existing_chat_without_redundant_target(self):
+        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        person = owner.call("GET", "/api/v1/me")["person"]["id"]
+        worker, session = owner.connect("sdk/python-followup-" + str(uuid.uuid4()), "Follow-up worker")
+        target = {"kind": "agent", "id": session["agent"]["id"]}
+        owner.save_contact_permissions(target, [{"action": "view", "target_kind": "person", "target_id": person}], version=0)
+        chat = owner.send(target=target, body="Review the release")
+        question = owner.ask(conversation_id=chat["conversation_id"], body="Which version?", key=str(uuid.uuid4()))
+        self.assertEqual(question["conversation_id"], chat["conversation_id"])
+        worker.respond(question["id"], "answered", version=question["version"], answer="v2")
+        self.assertEqual(owner.get_request(question["id"])["response"]["answer"], "v2")
+
+    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
     def test_real_compact_receipt_and_full_replay(self):
         owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
         _, session = owner.connect("sdk/python-receipt-" + str(uuid.uuid4()), "Receipt worker")
