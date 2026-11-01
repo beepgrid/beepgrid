@@ -1,69 +1,83 @@
-import { useState } from "react";
-import { Copy, Tabs } from "./ui";
+import { Copy, Field } from "./ui";
+import { WorkerSetup } from "./WorkerSetup";
+import {
+  environments,
+  setupPrompt,
+} from "../../sdk/typescript/src/runtime/catalog";
+export { environments };
 
-export const connectionMethods = [
-  { id: "python", label: "Python" },
-  { id: "typescript", label: "TypeScript" },
-  { id: "go", label: "Go" },
-  { id: "mcp", label: "MCP tools" },
-];
-function quote(value: string) {
-  return "'" + value.replaceAll("'", "'\\''") + "'";
+export function EnvironmentPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const selected = environments.find((e) => e.id === value);
+  return (
+    <Field label="Your environment">
+      <select
+        aria-label="Your environment"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required
+      >
+        <option value="" disabled>
+          Choose your existing setup
+        </option>
+        {[...new Set(environments.map((e) => e.group))].map((group) => (
+          <optgroup label={group} key={group}>
+            {environments
+              .filter((e) => e.group === group)
+              .map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.label}
+                </option>
+              ))}
+          </optgroup>
+        ))}
+      </select>
+      {selected ? <span className="help">{selected.note}</span> : null}
+    </Field>
+  );
 }
-export function connectionGuide(method: string, base: string, host = "codex") {
-  const env = [
-    "NOTIF_URL=" + quote(base) + " \\",
-    "NOTIF_TOKEN_FILE='/absolute/path/worker-token' \\",
-  ];
-  if (method === "mcp") {
-    return {
-      prepare: "go build -buildvcs=false -o .local/beepgrid ./cmd/notif",
-      run:
-        host === "codex"
-          ? [
-              "[mcp_servers.beepgrid]",
-              'command = "/absolute/path/beepgrid"',
-              'args = ["mcp"]',
-              "",
-              "[mcp_servers.beepgrid.env]",
-              "NOTIF_URL = " + JSON.stringify(base),
-              'NOTIF_TOKEN_FILE = "/absolute/path/worker-token"',
-            ].join("\n")
-          : JSON.stringify(
-              {
-                mcpServers: {
-                  beepgrid: {
-                    command: "/absolute/path/beepgrid",
-                    args: ["mcp"],
-                    env: {
-                      NOTIF_URL: base,
-                      NOTIF_TOKEN_FILE: "/absolute/path/worker-token",
-                    },
-                  },
-                },
-              },
-              null,
-              2,
-            ),
-    };
-  }
-  return {
-    prepare:
-      method === "typescript"
-        ? "npm --prefix sdk/typescript ci\nnpm --prefix sdk/typescript run build"
-        : "",
-    run: [
-      ...env,
-      method === "python"
-        ? "PYTHONPATH=sdk/python python3 examples/python-worker/main.py"
-        : method === "go"
-          ? "go run -buildvcs=false ./examples/go-worker"
-          : "node examples/typescript-worker/main.mjs",
-    ].join("\n"),
-  };
+export function BusyPolicy({
+  environment,
+  value,
+  onChange,
+}: {
+  environment: string;
+  value: "steer" | "queue";
+  onChange: (value: "steer" | "queue") => void;
+}) {
+  const selected = environments.find((e) => e.id === environment);
+  if (!selected?.steer) return null;
+  return (
+    <fieldset className="setup-policy">
+      <legend>When the Agent is busy</legend>
+      <div>
+        {(["steer", "queue"] as const).map((mode) => (
+          <label key={mode}>
+            <input
+              type="radio"
+              name="busy-policy"
+              value={mode}
+              checked={value === mode}
+              onChange={() => onChange(mode)}
+            />
+            <span>{mode === "steer" ? "Steer" : "Queue"}</span>
+          </label>
+        ))}
+      </div>
+      <p className="help">
+        {value === "steer"
+          ? "Handle new input at the next model step. Running tools finish normally."
+          : "Handle new messages after current work. Answers and decisions still resume their request."}
+      </p>
+    </fieldset>
+  );
 }
-
-function Code({ value, label }: { value: string; label: string }) {
+function Code({ label, value }: { label: string; value: string }) {
   return (
     <div className="setup-code">
       <div>
@@ -74,112 +88,117 @@ function Code({ value, label }: { value: string; label: string }) {
     </div>
   );
 }
-
 export function AgentSetup({
   method,
   onMethodChange,
   base,
   token,
+  busyMode,
+  onBusyModeChange,
+  instanceId,
 }: {
   method: string;
   onMethodChange: (method: string) => void;
   base: string;
   token: string;
+  busyMode: "steer" | "queue";
+  onBusyModeChange: (mode: "steer" | "queue") => void;
+  instanceId: string;
 }) {
-  const [host, setHost] = useState("codex");
-  const guide = connectionGuide(method, base, host);
+  const environment = environments.find((e) => e.id === method);
+  if (!environment) return null;
+  const advanced = environment.group === "Advanced";
+  const mode = environment.steer ? busyMode : "queue";
+  const prompt = advanced ? "" : setupPrompt(method, base, mode, instanceId);
   return (
     <div className="agent-setup-guide">
-      <Tabs
-        value={method}
-        onChange={onMethodChange}
-        options={connectionMethods}
-      />
-      <section className="setup-step">
-        <header>
-          <span>1</span>
-          <h3>Save your connection token</h3>
-        </header>
-        <p>
-          Copy it into a file outside your source code. This token expires after
-          24 hours.
-        </p>
-        <div className="setup-token">
+      <details className="setup-environment">
+        <summary>
+          <strong>{environment.label}</strong>
           <span>
-            <code>worker-token</code>
-            <small>Shown once. Keep this file private.</small>
+            {advanced ? "Tools / worker" : mode === "steer" ? "Steer" : "Queue"}
           </span>
-          <Copy value={token} label="Copy token" />
-        </div>
-        <Code
-          label="Protect the token file"
-          value="chmod 600 /absolute/path/worker-token"
-        />
-      </section>
-      <section className="setup-step">
-        <header>
-          <span>2</span>
-          <h3>
-            {method === "mcp" ? "Connect your tool host" : "Run your worker"}
-          </h3>
-        </header>
-        <p>
-          From your Beepgrid source checkout. Use your token file’s absolute
-          path below.
-        </p>
-        {guide.prepare ? (
-          <Code
-            label={
-              method === "mcp"
-                ? "Build the local MCP server"
-                : "Prepare the SDK"
-            }
-            value={guide.prepare}
+          <span>Change</span>
+        </summary>
+        <div>
+          <EnvironmentPicker value={method} onChange={onMethodChange} />
+          <BusyPolicy
+            environment={method}
+            value={mode}
+            onChange={onBusyModeChange}
           />
-        ) : null}
-        {method === "mcp" ? (
-          <>
-            <Tabs
-              value={host}
-              onChange={setHost}
-              options={[
-                { id: "codex", label: "Codex" },
-                { id: "json", label: "Other MCP clients" },
-              ]}
-            />
-            <Code
-              label={
-                host === "codex"
-                  ? "Add to ~/.codex/config.toml"
-                  : "Add to your client’s MCP configuration"
-              }
-              value={guide.run}
-            />
-            <p className="help">
-              Replace the server path with the binary you built. Restart your
-              host, then ask it to receive and reply using Beepgrid. Tools do
-              not wake an idle model.
+        </div>
+      </details>
+      {advanced ? (
+        <WorkerSetup method={method} base={base} token={token} />
+      ) : (
+        <>
+          <section className="setup-step">
+            <header>
+              <span>1</span>
+              <h3>Save your connection token</h3>
+            </header>
+            <p>
+              Save it in a private file or your secret manager. This token
+              expires after 24 hours.
             </p>
-          </>
-        ) : (
-          <>
-            <Code label="Start the connection" value={guide.run} />
-            <p className="help">
-              The starter receives messages and replies. Put your Agent’s logic
-              in its handler; keep the worker running to receive new messages.
+            <div className="setup-token">
+              <span>
+                <code>worker-token</code>
+                <small>
+                  Shown once. Keep it out of source code and prompts.
+                </small>
+              </span>
+              <Copy value={token} label="Copy token" />
+            </div>
+            <div className="setup-command">
+              <code>chmod 600 /absolute/path/worker-token</code>
+              <Copy value="chmod 600 /absolute/path/worker-token" />
+            </div>
+          </section>
+          <section className="setup-step">
+            <header>
+              <span>2</span>
+              <h3>Connect {environment.label}</h3>
+            </header>
+            <p>
+              Copy the setup instruction into your coding assistant in the
+              Beepgrid checkout. It uses your existing model, tools and runtime.
             </p>
-          </>
-        )}
-        <details className="setup-reference">
-          <summary>Connection details</summary>
-          <dl>
-            <dt>Workspace URL</dt>
-            <dd>{base}</dd>
-            <dt>Credential</dt>
-            <dd>Existing worker connection. Do not enroll it again.</dd>
-          </dl>
-        </details>
-      </section>
+            <div className="setup-instruction">
+              <div>
+                <strong>{environment.label}</strong>
+                <span>{mode === "steer" ? "Steer" : "Queue"}</span>
+              </div>
+              <Copy value={prompt} label="Copy setup instruction" />
+            </div>
+            <details className="setup-reference">
+              <summary>Set up by hand</summary>
+              <p>
+                Use <code>{environment.binding}</code> from the source SDK. The
+                guide covers session routing, checkpoints and the wake handler.
+              </p>
+              <a
+                className="button"
+                href={`https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#${environment.guide}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open integration guide
+              </a>
+              <Code
+                label="Generate the instruction locally"
+                value={`node sdk/typescript/bin/setup.mjs ${method} \\\n  --url '${base.replaceAll("'", "'\\''")}' --instance '${instanceId}' --mode ${mode}`}
+              />
+            </details>
+            <p className="help">
+              The check below verifies replies from this connection. Your
+              runtime's supported input boundary determines when a busy Agent
+              can respond.
+            </p>
+          </section>
+        </>
+      )}
     </div>
   );
 }

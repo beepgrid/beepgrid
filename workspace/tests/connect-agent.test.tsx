@@ -35,6 +35,9 @@ it("uses the existing worker credential and verifies its exact instance reply", 
   render(<Connect agent={{ ...agent, kind: "agent" }} onClose={vi.fn()} />, {
     wrapper: Wrapper,
   });
+  fireEvent.change(screen.getByRole("combobox", { name: "Your environment" }), {
+    target: { value: "python" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Run your worker" });
   expect(screen.getByText(/NOTIF_TOKEN_FILE=/)).not.toHaveTextContent(
@@ -77,7 +80,9 @@ it("guides the chosen MCP method without exposing a token in configuration or re
   render(<Connect agent={{ ...agent, kind: "agent" }} onClose={vi.fn()} />, {
     wrapper: Wrapper,
   });
-  fireEvent.click(screen.getByRole("tab", { name: "MCP tools" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Your environment" }), {
+    target: { value: "mcp" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Connect your tool host" });
   expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).toHaveTextContent(
@@ -94,4 +99,64 @@ it("guides the chosen MCP method without exposing a token in configuration or re
   expect(screen.getByText(/"mcpServers"/)).toHaveTextContent(
     '"args": [ "mcp" ]',
   );
+});
+
+it("reveals only the chosen live integration and keeps credentials out of its setup instruction", async () => {
+  const writeText = vi.fn(async (_text: string) => {});
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+  const fn = vi.fn(async (path: string) =>
+    path.endsWith("/sessions")
+      ? json({
+          token: "secret-not-for-a-prompt",
+          agent,
+          instance_id: "ins_live",
+        })
+      : json({ items: [] }),
+  );
+  vi.stubGlobal("fetch", fn);
+  const { Wrapper } = harness();
+  render(<Connect agent={{ ...agent, kind: "agent" }} onClose={vi.fn()} />, {
+    wrapper: Wrapper,
+  });
+  expect(
+    screen.getByRole("button", { name: "Create connection" }),
+  ).toBeDisabled();
+  expect(
+    screen.queryByRole("radio", { name: "Steer" }),
+  ).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole("combobox", { name: "Your environment" }), {
+    target: { value: "ai-sdk" },
+  });
+  expect(screen.getByRole("radio", { name: "Steer" })).toBeChecked();
+  fireEvent.click(screen.getByRole("radio", { name: "Queue" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
+  await screen.findByRole("heading", { name: "Connect AI SDK" });
+  expect(
+    screen.queryByRole("heading", { name: "Run your worker" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("radio", { name: "Queue" }),
+  ).not.toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Copy setup instruction" }),
+  );
+  await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+  expect(writeText.mock.calls[0][0]).toContain("Queue");
+  expect(writeText.mock.calls[0][0]).toContain("ins_live");
+  expect(writeText.mock.calls[0][0]).not.toContain("secret-not-for-a-prompt");
+  expect(writeText.mock.calls[0][0]).toContain("aiSDKBinding");
+  fireEvent.click(screen.getByText("Change"));
+  fireEvent.change(screen.getByRole("combobox", { name: "Your environment" }), {
+    target: { value: "opencode" },
+  });
+  await screen.findByRole("heading", { name: "Connect OpenCode" });
+  expect(
+    screen.queryByRole("radio", { name: "Steer" }),
+  ).not.toBeInTheDocument();
+  expect(
+    fn.mock.calls.filter(([path]) => path.endsWith("/sessions")),
+  ).toHaveLength(1);
 });

@@ -6,7 +6,8 @@ the Agent is working, then use the runtime's own input queue or before-model hoo
 Choose **Steer** to handle new input at the next supported model boundary, or
 **Queue** to wait until current work finishes. Neither mode interrupts a running
 tool or cancels work. Answers and approval results resume their original wait in
-both modes. A new ordinary message never silently becomes an approval.
+both modes through the host's result-resume handler. A new ordinary message never
+silently becomes an approval.
 
 ## Setup
 
@@ -64,19 +65,25 @@ its existing native thread, persist that mapping, and track active turn IDs from
 native events. This does not attach to an arbitrary standalone terminal session.
 
 ```ts
-const binding = codexBinding({
+const binding = withResultResume(codexBinding({
   rpc: appServer.request.bind(appServer),
   route: sessions.threadForConversation,
   activeTurn: sessions.activeTurn,
   idle: sessions.waitUntilIdle,
   reconcile: sessions.findDeliveryInTranscript,
-});
+}), requestWaiters.resume);
 ```
 
 Steer uses `turn/steer` with `expectedTurnId`. Idle input uses `turn/start`. Queue
 waits for idle. A raced turn transition is reconciled, not cancelled and restarted.
 The stable delivery ID is also present in message content and client metadata.
 Keep native approvals, sandbox policies and tool authority in the host.
+`withResultResume(binding, resume)` works with every native binding. Its callback
+resolves the original Beepgrid request waiter; it must not translate a result into
+a new user approval or bypass the runtime's native approval flow. Without it,
+Steer-capable bindings can receive a result as structured turn input, but cannot
+promise to resume a host-blocked tool. Queue-only bindings leave such results
+durable and report the missing handler instead of waiting for idle forever.
 
 ## Pi
 
@@ -197,8 +204,8 @@ the same idle/final-boundary wake mechanism as your existing host.
 Use a durable remote implementation of `InboxStore` or a host checkpoint service
 for ephemeral/serverless instances. Local SQLite needs a persistent private volume.
 Pending custody is bounded at 1,000 entries; a full inbox pauses ACK rather than
-dropping input. Dedup records are retained longer than the engine's 30-day delivery
-lifetime. Custody is not a permanent workspace archive.
+dropping input. Accepted payloads are scrubbed immediately. Dedup IDs are retained longer than
+the engine's 30-day delivery lifetime. Custody is not a permanent workspace archive.
 
 ## MCP tools
 
@@ -228,3 +235,8 @@ Controlled framework checks are `scripts/runtime-ai-sdk-check.mjs` and
 model doubles without API spend. Engine integration checks include the receiver
 in `scripts/sdk-integration.py`; journal recovery, fencing and wire contracts
 also run in the ordinary SDK unit suites.
+
+The optional `BEEPGRID_CODEX_CHECK=1 node scripts/runtime-codex-check.mjs` uses an
+existing signed-in Codex CLI, with no API-key fallback, in a read-only ephemeral
+thread. It verifies a correction during active work and continuation to the end.
+It is intentionally excluded from automatic verification because it uses a model.

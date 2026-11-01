@@ -36,7 +36,7 @@ import { OverseerEntry } from "../OverseerEntry";
 import Groups from "./Groups";
 import type { AgentDeadlock } from "./Fleet";
 import AgentProfile from "./AgentProfile";
-import { AgentSetup, connectionMethods } from "../AgentSetup";
+import { AgentSetup, EnvironmentPicker, BusyPolicy, environments } from "../AgentSetup";
 export default function Directory({
   section,
   onAddPerson,
@@ -531,9 +531,14 @@ export function Connect({
       instance_id: string;
     } | null>(null),
     [contact, setContact] = useState(true),
-    [runtime, setRuntime] = useState("python"),
+    [runtime, setRuntime] = useState(""),
+    [busyMode, setBusyMode] = useState<"steer" | "queue">("steer"),
     [testConversation, setTestConversation] = useState("");
   const base = location.origin;
+  function chooseRuntime(value: string) {
+    setRuntime(value);
+    setBusyMode(environments.find(e=>e.id===value)?.steer ? "steer" : "queue");
+  }
   const replies = useCollection<Message>(
     "messages",
     "",
@@ -548,6 +553,7 @@ export function Connect({
         m.instance_id === session.instance_id,
     );
   async function prepare() {
+    if(!environments.some(e=>e.id===runtime))return;
     const result = await op.run<{
       token: string;
       agent: Identity;
@@ -588,7 +594,10 @@ export function Connect({
           </div>
           <AgentSetup
             method={runtime}
-            onMethodChange={setRuntime}
+            onMethodChange={chooseRuntime}
+            busyMode={busyMode}
+            onBusyModeChange={setBusyMode}
+            instanceId={session.instance_id}
             base={base}
             token={session.token}
           />
@@ -659,14 +668,8 @@ export function Connect({
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
-          <div className="field" role="group" aria-label="Connection method">
-            <span>Connection method</span>
-            <Tabs
-              value={runtime}
-              onChange={setRuntime}
-              options={connectionMethods}
-            />
-          </div>
+          <EnvironmentPicker value={runtime} onChange={chooseRuntime} />
+          <BusyPolicy environment={runtime} value={busyMode} onChange={setBusyMode} />
           {!agent ? (
             <label className="inline-check">
               <input
@@ -680,7 +683,7 @@ export function Connect({
           <ErrorView error={op.error} />
           <div className="form-actions">
             <Button onClick={onClose}>Cancel</Button>
-            <Button primary type="submit" disabled={op.pending || !name.trim()}>
+            <Button primary type="submit" disabled={op.pending || !name.trim() || !runtime}>
               Create connection
             </Button>
           </div>

@@ -7,7 +7,12 @@ npm --prefix sdk/typescript audit --package-lock-only --audit-level=moderate
 npm --prefix sdk/react audit --package-lock-only --audit-level=moderate
 npm --prefix workspace audit --package-lock-only --audit-level=moderate
 npm --prefix sdk/typescript ci --no-fund
-npm --prefix sdk/typescript run build
+npm --prefix sdk/typescript test
+npm --prefix tools/runtime-consumers ci --ignore-scripts --no-fund
+npm --prefix tools/runtime-consumers test
+python3 -m venv .local/runtime-consumer-venv
+.local/runtime-consumer-venv/bin/python -m pip install -q -r tools/runtime-consumers/requirements.txt
+PYTHONPATH=sdk/python .local/runtime-consumer-venv/bin/python scripts/runtime-langgraph-check.py
 npm --prefix sdk/react ci --no-fund
 npm --prefix sdk/react run build
 npm --prefix sdk/react test

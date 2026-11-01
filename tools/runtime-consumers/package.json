@@ -1,0 +1,8 @@
+{
+  "name": "beepgrid-runtime-consumer-checks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node ../../scripts/runtime-ai-sdk-check.mjs" },
+  "devDependencies": { "ai": "7.0.159" }
+}

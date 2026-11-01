@@ -3,6 +3,7 @@
 Use your existing model, tools and production checkpointer below. This module
 exports a helper rather than selecting a provider or installing a new runtime.
 """
+
 import os
 from pathlib import Path
 from notif import Client
@@ -10,10 +11,18 @@ from notif.runtime import LiveInbox, LangGraphBridge
 
 
 def connect():
-    client = Client(os.environ['NOTIF_URL'], Path(os.environ['NOTIF_TOKEN_FILE']).read_text().strip())
-    inbox = LiveInbox(client, os.environ['BEEPGRID_INBOX_PATH'], os.environ['BEEPGRID_CONNECTION_ID'],
-                      mode=os.environ.get('BEEPGRID_BUSY_MODE', 'steer'))
+    client = Client(
+        os.environ["NOTIF_URL"],
+        Path(os.environ["NOTIF_TOKEN_FILE"]).read_text().strip(),
+    )
+    inbox = LiveInbox(
+        client,
+        os.environ["BEEPGRID_INBOX_PATH"],
+        os.environ["BEEPGRID_CONNECTION_ID"],
+        mode=os.environ.get("BEEPGRID_BUSY_MODE", "steer"),
+    )
     return client, inbox, LangGraphBridge(inbox)
+
 
 # In your application:
 # client, inbox, bridge = connect()

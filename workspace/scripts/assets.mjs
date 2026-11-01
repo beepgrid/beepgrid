@@ -39,9 +39,10 @@ for (const name of assets) {
 }
 const budgets = {
   entry_js_gzip_kib: 96,
-  all_js_gzip_kib: 145,
+  // Environment-specific setup metadata and copyable integration instructions.
+  all_js_gzip_kib: 146,
   // Shared request context, compact question/approval panel and icon chooser.
-  css_gzip_kib: 15.25,
+  css_gzip_kib: 15.5,
   all_fonts_kib: 320,
   largest_font_kib: 96,
 };

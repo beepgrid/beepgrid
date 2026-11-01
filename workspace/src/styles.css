@@ -3461,3 +3461,22 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 .message-body.has-receipt { position:relative; padding-right:24px }
 .message-receipt { position:absolute; right:0; bottom:3px; display:flex; color:var(--good); pointer-events:auto }
 .message-receipt svg { stroke-width:2 }
+
+/* Environment-first setup: reveal one integration rather than all language tabs. */
+.setup-environment > summary { display:flex;gap:10px;align-items:center;cursor:pointer;font-size:13px;list-style:none }
+.setup-environment > summary > span { color:var(--sub);font-size:12px }
+.setup-environment > summary > span:last-child { margin-left:auto;text-decoration:underline;text-underline-offset:3px }
+.setup-environment > div { display:grid;gap:16px;padding-top:16px }
+.setup-command { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding:7px 10px;border-radius:7px;background:var(--raised);font-size:11px;overflow-wrap:anywhere }
+.setup-policy { border:0;padding:0;margin:0;min-width:0 }
+.setup-policy legend { font-size:13px;font-weight:550;margin-bottom:8px }
+.setup-policy > div { display:flex;gap:8px }
+.setup-policy label { display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;cursor:pointer }
+.setup-policy label:has(input:checked) { background:var(--raised);border-color:var(--sub) }
+.setup-policy input { width:14px;height:14px;accent-color:var(--ink);margin:0 }
+.setup-policy .help { margin:8px 0 0;line-height:1.6 }
+.setup-instruction { display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:9px;padding:12px }
+.setup-instruction > div { display:flex;gap:8px;align-items:center;font-size:13px }
+.setup-instruction > div > span { color:var(--sub);font-size:12px }
+.agent-setup-guide { gap:20px }
+@media(max-width:600px) { .setup-instruction { align-items:flex-start;flex-direction:column }.setup-instruction .button { width:100% } }

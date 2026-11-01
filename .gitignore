@@ -24,3 +24,7 @@ sdk/python/build/
 /domain-picker*/
 /naming-research/
 /naming-experiments*.zip
+
+# Source entry point, not a compiled binary.
+!sdk/typescript/bin/
+!sdk/typescript/bin/setup.mjs
