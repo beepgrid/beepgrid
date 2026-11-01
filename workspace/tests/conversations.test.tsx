@@ -59,7 +59,7 @@ it("shows only two ticks on outgoing messages acknowledged by every Agent in the
   const ticks = await screen.findByRole("img", {
     name: "Agent runtime acknowledged receipt",
   });
-  expect(ticks.querySelectorAll("svg")).toHaveLength(2);
+  expect(ticks.querySelectorAll("svg")).toHaveLength(1);
   expect(ticks.textContent).toBe("");
   expect(ticks.closest("article")).toHaveTextContent("Acknowledged message");
   expect(

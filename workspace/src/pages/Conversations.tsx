@@ -761,8 +761,7 @@ const ChatMessage = memo(function ChatMessage({
             aria-label="Agent runtime acknowledged receipt"
             title="Acknowledged by the Agent runtime. This does not confirm that the model read it or completed the work."
           >
-            <Icon name="check" size={16} />
-            <Icon name="check" size={16} />
+            <Icon name="checks" size={18} />
           </span>
         ) : null}
       </div>

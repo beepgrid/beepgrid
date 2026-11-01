@@ -38,6 +38,8 @@ const paths: Record<string, string> = {
   moon: "M21 13A9 9 0 0 1 11 3a9 9 0 1 0 10 10",
   arrow: "M4 12h16m-6-6 6 6-6 6",
   check: "m5 12 4 4L19 6",
+  // Tabler Icons checks (MIT), see public/agent-icons/tabler-LICENSE.txt.
+  checks: "m7 12 5 5L22 7 M2 12l5 5m5-5 5-5",
   logout: "M9 3H4v18h5 M10 12h11m-5-5 5 5-5 5",
   service: "M3 4h18v6H3z M3 14h18v6H3z M6 7h.01M6 17h.01",
   question:
