@@ -2,6 +2,13 @@
 
 Build with `npm ci && npm run build`. The package is a local development package until publication.
 
+For an Agent that is already running in a harness or framework, start with
+[live input](../../docs/LIVE-INPUT.md). The additive `runtime` subpaths provide
+independent receiving, durable custody and native Steer/Queue bindings. Keep
+your existing model, tools and session loop. The local SQLite helper requires
+Node 22.13 or later and a private persistent volume. The sequential worker
+starter below remains useful for independent jobs.
+
 Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout after building the package:
 
 ```sh

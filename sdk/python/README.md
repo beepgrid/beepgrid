@@ -1,5 +1,11 @@
 # Python client
 
+For an Agent that is already running in a framework or custom loop, see
+[live input](../../docs/LIVE-INPUT.md). `notif.runtime.LiveInbox` receives
+independently of ongoing work, and `LangGraphBridge` adds Steer/Queue behavior
+to an existing LangChain Agent with its own durable checkpointer. Framework
+packages remain optional. Keep the existing model, tools and runtime authority.
+
 Install locally with `python -m pip install ./sdk/python`. The client uses Python's standard library.
 
 Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout:
