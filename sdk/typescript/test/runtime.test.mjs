@@ -496,7 +496,10 @@ test("ACP negotiated steering accepts idle start without waiting for turn comple
   await binding.submit(liveInput(job("busy")), "steer");
   await binding.submit(liveInput(job("queued")), "queue");
   assert.equal(idle, 1);
-  assert.ok(calls.every(([method]) => method === "_session/steering"));
+  assert.deepEqual(
+    calls.map(([method]) => method),
+    ["_session/steering", "_session/steering", "session/prompt"],
+  );
   assert.ok(calls.every(([, params]) => params.sessionId === "same-session"));
   assert.match(calls[1][1].prompt[0].text, /delivery_id.*busy/);
   outcome = "promptRequired";
@@ -671,4 +674,22 @@ test("Goose new-run output releases admission even when the initial user message
   binding.observe({ sessionId: "s", update: { sessionUpdate: "tool_call" } });
   await pending;
   settle({ stopReason: "end_turn" });
+});
+
+test("Codex Queue never turns into steering when a native turn races idle", async () => {
+  const calls = [];
+  const binding = codexBinding({
+    route: async () => "thread-existing",
+    idle: async () => {},
+    activeTurn: () => "raced-turn",
+    rpc: async (method) => {
+      calls.push(method);
+      throw Error("Native busy race");
+    },
+  });
+  await assert.rejects(
+    binding.submit(liveInput(job("queued")), "queue"),
+    /busy race/,
+  );
+  assert.deepEqual(calls, ["turn/start"]);
 });

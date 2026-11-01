@@ -41,7 +41,9 @@ export function codexBinding(options: {
     async submit(input, mode, signal) {
       const threadId = await options.route(input.conversationId);
       if (mode === "queue") await options.idle(threadId);
-      const turn = options.activeTurn(threadId);
+      // Queue must never become a steer if another native turn races idle.
+      // turn/start may reject that race, leaving custody for reconciliation.
+      const turn = mode === "steer" ? options.activeTurn(threadId) : undefined;
       const content = [{ type: "text", text: inputText(input) }];
       if (turn)
         await options.rpc(
@@ -115,8 +117,7 @@ export function acpBinding(options: {
     reconcile: options.reconcile,
     async submit(input, mode, signal) {
       const sessionId = await options.route(input.conversationId);
-      if (nativeSteer) {
-        if (mode === "queue") await options.idle(sessionId);
+      if (nativeSteer && mode === "steer") {
         const result = (await options.rpc(
           "_session/steering",
           {

@@ -74,7 +74,7 @@ export function gooseBinding(options: {
       if (mode === "queue") await options.idle(sessionId);
       const text = inputText(input);
       const prompt = [{ type: "text", text }];
-      const run = runs.get(sessionId);
+      const run = mode === "steer" ? runs.get(sessionId) : undefined;
       if (run) {
         const receipt = (await options.rpc(
           "_goose/unstable/session/steer",

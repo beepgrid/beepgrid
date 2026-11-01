@@ -270,8 +270,8 @@ do not initialize or launch a second session merely to add Beepgrid.
 When advertised, `_session/steering` returns `injected` or `startedNewTurn`.
 Both are input acceptance, not successful task completion. The default idle
 behavior starts a turn, avoiding the ACP v1 trap where awaiting `session/prompt`
-until turn completion prevents sending subsequent steering. Queue first waits
-for idle. Unknown outcomes/errors remain uncertain for reconciliation; no automatic
+until turn completion prevents sending subsequent steering. Queue instead waits
+for idle and uses ordinary `session/prompt`; it never calls the steering extension. Unknown outcomes/errors remain uncertain for reconciliation; no automatic
 replay or cancellation follows. Continue consuming native completion/failure events.
 
 Without the extension, `acpBinding` offers Queue through idle `session/prompt`.
