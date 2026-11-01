@@ -370,9 +370,11 @@ function Profile({
         <Suspense fallback={<Loading />}>
           <Permissions profile={p} embedded />
           {caps.data?.operations.manage ? (
-            <Button danger={!p.disabled} onClick={() => setConfirm(true)}>
-              {p.disabled ? "Enable Agent" : "Disable Agent"}
-            </Button>
+            <div className="agent-access-actions">
+              <Button danger={!p.disabled} onClick={() => setConfirm(true)}>
+                {p.disabled ? "Enable Agent" : "Disable Agent"}
+              </Button>
+            </div>
           ) : null}
         </Suspense>
       ) : null}

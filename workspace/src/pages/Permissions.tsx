@@ -169,6 +169,12 @@ export default function Permissions({
       {effective.data?.contacts.length ? (
         <div className="table-wrap">
           <table className="permission-matrix contact-effective-matrix">
+            <colgroup>
+              <col className="contact-name-column" />
+              {actions.map(([action]) => (
+                <col key={action} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 <th>Contact</th>
@@ -198,18 +204,17 @@ export default function Permissions({
                           className="contact-permission-cell"
                           title={cell.sources.join(", ")}
                         >
-                          {cell.blocked ? (
-                            <span className="contact-blocked">Blocked</span>
-                          ) : cell.allowed ? (
-                            <Icon name="check" size={17} />
+                          {cell.blocked || cell.allowed ? (
+                            <PermissionMark blocked={cell.blocked} />
                           ) : cell.limited ? (
                             <span>Limited</span>
                           ) : (
                             <span className="permission-empty">·</span>
                           )}
-                          {cell.sources.length ? (
-                            <small>{cell.sources.join(", ")}</small>
-                          ) : null}
+                          <small>
+                            {cell.sources.join(", ") ||
+                              (cell.blocked ? "Blocked" : "")}
+                          </small>
                         </div>
                       </td>
                     );
@@ -331,14 +336,25 @@ export default function Permissions({
   );
 }
 function PermissionGrant({ rules }: { rules: Rule[] }) {
-  if (rules.some((r) => r.effect === "deny"))
-    return <span className="contact-blocked">Blocked</span>;
+  if (rules.some((r) => r.effect === "deny")) return <PermissionMark blocked />;
   if (!rules.length) return <span className="permission-empty">·</span>;
   if (rules.some((r) => !r.connection_id && !r.action_name && !r.conditions))
-    return <Icon name="check" size={17} />;
+    return <PermissionMark />;
   return (
     <span title="Restricted by connection, action or policy conditions">
       Limited
+    </span>
+  );
+}
+function PermissionMark({ blocked = false }: { blocked?: boolean }) {
+  return (
+    <span
+      className={`permission-mark ${blocked ? "is-blocked" : "is-allowed"}`}
+      role="img"
+      aria-label={blocked ? "Blocked" : "Allowed"}
+      title={blocked ? "Blocked" : "Allowed"}
+    >
+      <Icon name={blocked ? "close" : "check"} size={18} />
     </span>
   );
 }
@@ -525,7 +541,14 @@ function ContactEditor({
       ) : null}
       {contacts.length ? (
         <div className="table-wrap">
-          <table className="permission-matrix contact-effective-matrix">
+          <table className="permission-matrix contact-effective-matrix contact-edit-matrix">
+            <colgroup>
+              <col className="contact-name-column" />
+              {actions.map(([action]) => (
+                <col key={action} />
+              ))}
+              <col className="contact-defaults-column" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Contact</th>
@@ -606,7 +629,7 @@ function ContactEditor({
                                   setPermission(t, action, !checked)
                                 }
                               />
-                              {source ? <small>{source}</small> : null}
+                              <small>{source}</small>
                             </label>
                           </td>
                         );
