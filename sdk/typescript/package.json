@@ -10,13 +10,30 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js"
+    },
+    "./runtime/node": {
+      "types": "./dist/runtime/node.d.ts",
+      "import": "./dist/runtime/node.js"
+    },
+    "./runtime/bindings": {
+      "types": "./dist/runtime/bindings.d.ts",
+      "import": "./dist/runtime/bindings.js"
+    },
+    "./runtime/catalog": {
+      "types": "./dist/runtime/catalog.d.ts",
+      "import": "./dist/runtime/catalog.js"
     }
   },
   "files": [
     "dist",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "bin"
   ],
   "scripts": {
     "build": "tsc",
@@ -24,9 +41,10 @@
     "prepack": "npm run build"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "devDependencies": {
+    "@types/node": "22.20.5",
     "typescript": "5.9.3"
   },
   "sideEffects": false,
@@ -43,5 +61,8 @@
   "bugs": {
     "url": "https://github.com/beepgrid/beepgrid/issues"
   },
-  "homepage": "https://beepgrid.com/docs/sdks/typescript/"
+  "homepage": "https://beepgrid.com/docs/sdks/typescript/",
+  "bin": {
+    "beepgrid-setup": "bin/setup.mjs"
+  }
 }

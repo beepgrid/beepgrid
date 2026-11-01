@@ -449,8 +449,8 @@ export class Client {
       { version },
     );
   }
-  inbox(signal?: AbortSignal) {
-    return this.call<Delivery[]>("GET", "/api/v1/worker/inbox", undefined, {
+  inbox(signal?: AbortSignal, waitMs = 0) {
+    return this.call<Delivery[]>("GET", `/api/v1/worker/inbox?wait_ms=${Math.max(0, Math.min(15000, Math.floor(waitMs)))}`, undefined, {
       signal,
     });
   }

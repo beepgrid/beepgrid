@@ -152,3 +152,24 @@ func TestFileToolsPreserveBytesAndRejectOversizedInputs(t *testing.T) {
 		t.Fatal("mixed identity accepted")
 	}
 }
+
+func TestLiveInputOwnsInbox(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Live MCP must not poll or ACK the receiver's inbox")
+	}))
+	defer backend.Close()
+	input := strings.Join([]string{`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"receive","arguments":{}}}`, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"acknowledge","arguments":{"id":"del_1","generation":1}}}`}, "\n")
+	var out bytes.Buffer
+	if err := ServeWithInput(context.Background(), notif.New(backend.URL, "worker"), strings.NewReader(input), &out, true); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if strings.Contains(lines[0], `"name":"receive"`) || strings.Contains(lines[0], `"name":"acknowledge"`) || !strings.Contains(lines[0], `"name":"send"`) {
+		t.Fatal(lines[0])
+	}
+	for _, line := range lines[1:] {
+		if !strings.Contains(line, `"isError":true`) {
+			t.Fatal(line)
+		}
+	}
+}

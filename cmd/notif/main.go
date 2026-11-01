@@ -105,6 +105,11 @@ func run() error {
 	case "serve":
 		return serve(ctx, os.Args[2:])
 	case "mcp":
+		flags := flag.NewFlagSet("mcp", flag.ContinueOnError)
+		liveInput := flags.Bool("live-input", false, "Use a separate live receiver; disable MCP inbox intake")
+		if err := flags.Parse(os.Args[2:]); err != nil {
+			return err
+		}
 		c, err := clientFromEnv()
 		if err != nil {
 			return err
@@ -116,7 +121,7 @@ func run() error {
 			}
 			c = worker
 		}
-		return mcp.Serve(ctx, c, os.Stdin, os.Stdout)
+		return mcp.ServeWithInput(ctx, c, os.Stdin, os.Stdout, *liveInput)
 	case "demo":
 		return demo(ctx, os.Args[2:])
 	case "diagnose":

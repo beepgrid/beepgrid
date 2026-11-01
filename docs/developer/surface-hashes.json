@@ -1,7 +1,7 @@
 {
-  "internal/mcp/server.go": "2d62669a52f1b410181b4072ec3a4185486ee72f4707d677d8f33ec9266bf122",
+  "internal/mcp/server.go": "7140030884f0a25ed674850207a9dc11a60fe19a6187619730476c0b65577606",
   "internal/aimodel/config.go": "cab6e5a8f8bfd7ceef9e8e5e5ba8326b4ce8eeda03500269b7f6e205f5fd1e46",
-  "cmd/notif/main.go": "9b90a8b3247901c6003db5e5bf6a09b565e98616fbc60c3f68417dd41ced6296",
+  "cmd/notif/main.go": "64c7df127d97111371661662db0e1a8ecd2c4a283b4a3d7869423aa88cc9a213",
   "cmd/notif/client.go": "e67c282fe65ae206985b9054c2d47a9b62b3a2f922539367c1515effacc18943",
   "cmd/notif/operator.go": "8281c494c79cc198b84575da9fd047f6f86f414f8b93ba37eda9629564af404b"
 }

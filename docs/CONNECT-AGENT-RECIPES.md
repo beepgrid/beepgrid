@@ -1,4 +1,8 @@
-# Connect agent: minimal supported setup
+# Connect Agent: minimal supported setup
+
+For live input during an existing Agent task, choose a harness/framework in the
+workspace and follow [Live input](LIVE-INPUT.md). The sequential worker and
+tool-only paths below remain available under Advanced.
 
 The dashboard creates one worker connection and supplies its credential. Use that worker credential directly; omit `NOTIF_AGENT_ID`. Do not ask the developer to create a Service, launcher or second Agent for this path. Select the URL of the same workspace and store the credential in an owner-only file or the runtime's secret manager.
 

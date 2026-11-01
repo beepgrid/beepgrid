@@ -52,6 +52,11 @@ func Tools() any {
 	}
 }
 func Serve(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer) error {
+	return ServeWithInput(ctx, c, in, out, false)
+}
+
+// ServeWithInput disables competing inbox tools when a live receiver owns intake.
+func ServeWithInput(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer, liveInput bool) error {
 	done := make(chan struct{})
 	defer close(done)
 	if closer, ok := in.(io.ReadCloser); ok {
@@ -96,7 +101,17 @@ func Serve(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer) er
 		case "ping":
 			result = map[string]any{}
 		case "tools/list":
-			result = map[string]any{"tools": Tools(), "resultType": "complete"}
+			tools := Tools().([]tool)
+			if liveInput {
+				filtered := make([]tool, 0, len(tools))
+				for _, item := range tools {
+					if item.Name != "receive" && item.Name != "acknowledge" {
+						filtered = append(filtered, item)
+					}
+				}
+				tools = filtered
+			}
+			result = map[string]any{"tools": tools, "resultType": "complete"}
 		case "tools/call":
 			var p struct {
 				Name      string          `json:"name"`
@@ -104,6 +119,10 @@ func Serve(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer) er
 			}
 			if json.Unmarshal(req.Params, &p) != nil {
 				rpcError = map[string]any{"code": -32602, "message": "Invalid tool parameters"}
+				break
+			}
+			if liveInput && (p.Name == "receive" || p.Name == "acknowledge") {
+				result = map[string]any{"isError": true, "content": []any{map[string]string{"type": "text", "text": "The live receiver owns inbox intake. Use the delivered conversation context."}}}
 				break
 			}
 			value, e := call(ctx, c, p.Name, p.Arguments)
