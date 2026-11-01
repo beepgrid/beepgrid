@@ -15,6 +15,7 @@ WORKDIR /src/workspace
 COPY workspace/package*.json ./
 RUN npm ci --no-fund
 COPY workspace ./
+COPY sdk/typescript/src/runtime/catalog.ts ../sdk/typescript/src/runtime/catalog.ts
 COPY internal/web/web.go ../internal/web/web.go
 RUN npm run build && npm run embed
 
