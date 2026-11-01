@@ -170,7 +170,7 @@ export function RequestCard({
                     </Button>
                   ) : null}
                 </div>
-              ) : conversational && !r.choices?.length ? null : (
+              ) : conversational ? null : (
                 <Form onSubmit={() => void respond("answered")}>
                   {r.choices?.length ? (
                     <fieldset className="reply-choices">

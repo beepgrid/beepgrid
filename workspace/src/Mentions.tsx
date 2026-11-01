@@ -101,6 +101,18 @@ export function MentionEditor({
   onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    if (rows !== 1) return;
+    const size = () => {
+      const el = ref.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    };
+    size();
+    window.addEventListener("resize", size);
+    return () => window.removeEventListener("resize", size);
+  }, [value, rows]);
   const listID = useId();
   const [position, setPosition] = useState<{
     left: number;

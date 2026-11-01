@@ -2699,7 +2699,7 @@ dialog > header h2 {
   margin-left: auto;
 }
 .composer .message-input {
-  min-height: 84px;
+  min-height: 48px;
   resize: none;
 }
 .composer .compose-bottom {
@@ -2852,7 +2852,7 @@ dialog > header h2 {
   font-size: 12px;
 }
 .composer {
-  padding: 16px 20px;
+  padding: 10px 14px;
 }
 .message-view {
   border-radius: 12px;
@@ -3413,8 +3413,33 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 
 .agent-role-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:5px; background:var(--raised); color:var(--ink); font-size:12px; font-weight:500 }
 .agent-role-badge:hover { background:var(--hover) }
-.reply-target { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px; color:var(--sub) }
-.reply-target>select { min-width:0; flex:1; min-height:32px; padding:5px 10px; font-size:12px }
+/* Explicit answers sit above a separate, compact chat composer. */
+.composer .message-compose .message-input { min-height:48px; max-height:160px; padding:12px 14px 6px }
+.composer .compose-bottom { padding:6px 8px 8px }
+.question-dock { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--surface) }
+.question-dock-head { display:flex; align-items:center; gap:8px; padding:8px 10px; min-height:40px }
+.question-dock-head .identity-icon { --avatar-size:24px; flex:none }
+.question-heading { flex:1; min-width:0; padding:0; background:none; border:0; text-align:left; color:var(--ink) }
+.question-heading strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:600 }
+.question-dock nav { display:flex; flex-direction:row; align-items:center; gap:2px; flex:none }
+.question-dock nav span { color:var(--sub); font-size:11px; font-variant-numeric:tabular-nums; margin-right:4px }
+.question-dock .icon-button { width:26px; height:26px; min-height:26px; padding:4px }
+.question-previous svg { transform:rotate(180deg) }
+.question-toggle svg { transform:rotate(-90deg); transition:transform .15s }
+.question-toggle[aria-expanded="false"] svg { transform:rotate(90deg) }
+.question-dock-body { padding:0 12px 10px; max-height:min(240px,35vh); overflow:auto }
+.question-prompt { margin:0 0 10px; max-height:72px; overflow:auto; font-size:14px; font-weight:500; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere }
+.question-dock .form { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:8px }
+.question-dock .form>.error { grid-column:1/-1 }
+.question-dock textarea { resize:none; min-height:38px; max-height:96px; padding:8px 10px; font-size:13px; line-height:1.5; outline:none }
+.question-dock textarea:focus { border-color:var(--faint); box-shadow:none }
+.question-dock .button { min-height:36px; padding:6px 12px; font-size:12px }
+.question-options { min-width:0; display:flex; flex-wrap:wrap; gap:6px; border:0; padding:0; margin:0; max-height:112px; overflow:auto }
+.question-options label { display:flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid var(--line); border-radius:7px; font-size:13px; cursor:pointer; overflow-wrap:anywhere }
+.question-options label:has(:checked) { border-color:var(--ink); background:var(--raised) }
+.question-options input { width:14px; height:14px; min-height:14px; margin:0; accent-color:var(--ink); flex:none }
+@media(prefers-reduced-motion:reduce) { .question-toggle svg { transition:none } }
+
 .request-direction { font-size:12px; color:var(--sub) }
 .request-tools>summary { font-size:12px; color:var(--sub); cursor:pointer }.request-tools .actions { margin-top:8px }
 

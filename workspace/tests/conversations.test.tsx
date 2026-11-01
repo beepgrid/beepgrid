@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import Conversations from "../src/pages/Conversations";
@@ -15,10 +16,9 @@ afterEach(() => {
   history.replaceState(null, "", "/agents");
 });
 
-it("answers an incoming request through one composer with scoped reply authority, without broad Message permission", async () => {
-  history.replaceState(null, "", "/conversations/con_one");
-  let request: any = {
-    id: "req_question",
+function question(id = "req_question", time = "2026-11-01T00:00:00Z") {
+  return {
+    id,
     conversation_id: "con_one",
     requester_id: agent.id,
     kind: "question",
@@ -27,8 +27,14 @@ it("answers an incoming request through one composer with scoped reply authority
     state: "open",
     version: 7,
     choices: [],
-    created_at: "2026-11-01T00:00:00Z",
+    created_at: time,
   };
+}
+function conversationTransport(
+  requests: any[],
+  message = true,
+  respond = true,
+) {
   const writes: { path: string; body: any }[] = [];
   vi.stubGlobal(
     "fetch",
@@ -36,60 +42,91 @@ it("answers an incoming request through one composer with scoped reply authority
       const body = requestBody(init);
       if (path.endsWith("/capabilities"))
         return json({
-          operations: body.request_id
-            ? { respond: true }
-            : { view: true, message: false },
+          operations: body.request_id ? { respond } : { view: true, message },
         });
       if (path.endsWith("/query"))
-        return json({ items: body.collection === "requests" ? [request] : [] });
+        return json({
+          items:
+            body.collection === "requests"
+              ? requests.filter(
+                  (r) => body.filters?.state !== "open" || r.state === "open",
+                )
+              : [],
+        });
       if (path.endsWith("/responses")) {
         writes.push({ path, body });
-        request = {
-          ...request,
+        const request = requests.find((r) => path.includes(r.id));
+        Object.assign(request, {
           state: "resolved",
-          version: 8,
           resolved_by: me.person.id,
           resolved_at: "2026-11-01T00:01:00Z",
           response: { outcome: "answered", answer: body.answer },
-        };
+        });
         return json(request);
+      }
+      if (path.endsWith("/messages")) {
+        writes.push({ path, body });
+        return json({ conversation_id: "con_one" });
       }
       return json({
         id: "con_one",
-        title: "Freeze",
         participants: [agent, me.person],
         messages: [],
       });
     }),
   );
-  const { Wrapper, query } = harness();
+  return writes;
+}
+it("keeps chat corrections separate from explicit question answers", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const requests = [question()];
+  const writes = conversationTransport(requests);
+  const { Wrapper } = harness();
   render(<Conversations />, { wrapper: Wrapper });
-  const editor = await screen.findByRole("textbox", {
-    name: "Message",
+  const answer = await screen.findByRole("textbox", {
+    name: "Answer question",
   });
-  expect(screen.getAllByRole("textbox")).toHaveLength(1);
+  const message = screen.getByRole("textbox", { name: "Message" });
+  fireEvent.change(answer, { target: { value: "At 14:00 UTC." } });
+  fireEvent.change(message, {
+    target: { value: "Actually, use Marcus instead of Johnson." },
+  });
+  fireEvent.keyDown(message, { key: "Enter" });
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0].path).toBe("/api/v1/messages");
+  expect(requests[0].state).toBe("open");
+  expect(answer).toHaveValue("At 14:00 UTC.");
+  fireEvent.click(screen.getByRole("button", { name: "Answer" }));
+  await waitFor(() => expect(writes).toHaveLength(2));
+  expect(writes[1]).toEqual({
+    path: "/api/v1/requests/req_question/responses",
+    body: { version: 7, outcome: "answered", answer: "At 14:00 UTC." },
+  });
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("region", { name: "Pending questions" }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeVisible();
+});
+it("allows a scoped answer without granting ordinary message access", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const writes = conversationTransport([question()], false);
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  const answer = await screen.findByRole("textbox", {
+    name: "Answer question",
+  });
   expect(
-    screen.queryByRole("button", { name: "Attach files" }),
+    screen.queryByRole("textbox", { name: "Message" }),
   ).not.toBeInTheDocument();
-  fireEvent.change(editor, { target: { value: "At 14:00 UTC." } });
-  await act(() => query.invalidateQueries());
-  expect(
-    Object.keys(sessionStorage).some((k) =>
-      sessionStorage.getItem(k)?.includes("At 14:00 UTC."),
-    ),
-  ).toBe(true);
-  expect(screen.queryByText(/^Reply to /)).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await screen.findByText("At 14:00 UTC.");
-  expect(writes).toEqual([
-    {
-      path: "/api/v1/requests/req_question/responses",
-      body: { version: 7, outcome: "answered", answer: "At 14:00 UTC." },
-    },
-  ]);
-  expect(
-    screen.queryByRole("textbox", { name: "Reply" }),
-  ).not.toBeInTheDocument();
+  fireEvent.change(answer, { target: { value: "At noon." } });
+  fireEvent.keyDown(answer, { key: "Enter", shiftKey: true });
+  expect(writes).toHaveLength(0);
+  fireEvent.keyDown(answer, { key: "Enter", isComposing: true });
+  expect(writes).toHaveLength(0);
+  fireEvent.keyDown(answer, { key: "Enter" });
+  await waitFor(() => expect(writes[0]?.body.answer).toBe("At noon."));
 });
 
 it("labels a Coordinator request as outgoing and never offers an administrator a form to answer their own question", async () => {
@@ -145,158 +182,110 @@ it("labels a Coordinator request as outgoing and never offers an administrator a
   expect(location.pathname).toBe("/agents/" + agent.id);
 });
 
-it("uses Send for successive questions and a later message without ending or recreating the conversation", async () => {
+it("shows the latest question first and keeps separate drafts through navigation and collapse", async () => {
   history.replaceState(null, "", "/conversations/con_one");
-  const requests: any[] = [
+  const requests = [
+    question("older"),
     {
-      id: "req_first",
-      conversation_id: "con_one",
-      requester_id: agent.id,
-      kind: "question",
-      title: "Freeze",
-      body: "When should the API freeze?",
-      state: "open",
-      version: 4,
-      choices: [],
-      created_at: "2026-11-01T00:00:00Z",
+      ...question("latest", "2026-11-01T00:01:00Z"),
+      body: "Who should receive the report?",
     },
   ];
-  const messages: any[] = [];
-  const writes: { path: string; body: any }[] = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (path: string, init?: RequestInit) => {
-      const body = requestBody(init);
-      if (path.endsWith("/capabilities"))
-        return json({
-          operations: { view: true, message: true, respond: true },
-        });
-      if (path.endsWith("/query"))
-        return json({ items: body.collection === "requests" ? requests : [] });
-      if (path.endsWith("/responses")) {
-        writes.push({ path, body });
-        const request = requests.find((r) => path.includes(r.id));
-        Object.assign(request, {
-          state: "resolved",
-          response: { outcome: "answered", answer: body.answer },
-          resolved_by: me.person.id,
-          resolved_at: "2026-11-01T00:01:00Z",
-        });
-        if (request.id === "req_first")
-          requests.push({
-            ...request,
-            id: "req_followup",
-            title: "Staging",
-            body: "Should staging stay available?",
-            state: "open",
-            version: 1,
-            response: undefined,
-            resolved_at: undefined,
-            resolved_by: undefined,
-            created_at: "2026-11-01T00:02:00Z",
-          });
-        return json(request);
-      }
-      if (path.endsWith("/messages")) {
-        writes.push({ path, body });
-        messages.push({
-          id: "msg_followup",
-          conversation_id: "con_one",
-          sender_id: me.person.id,
-          body: body.body,
-          created_at: "2026-11-01T00:03:00Z",
-        });
-        return json({ conversation_id: "con_one" });
-      }
-      return json({
-        id: "con_one",
-        participants: [agent, me.person],
-        messages,
-      });
-    }),
-  );
-  const { Wrapper } = harness();
+  conversationTransport(requests);
+  const { Wrapper, query } = harness();
   render(<Conversations />, { wrapper: Wrapper });
-  const first = await screen.findByRole("textbox", { name: "Message" });
-  fireEvent.change(first, { target: { value: "At 14:00 UTC." } });
-  fireEvent.keyDown(first, { key: "Enter" });
-  await screen.findByText("Should staging stay available?");
-  await waitFor(() =>
-    expect(screen.getByRole("textbox", { name: "Message" })).not.toBe(first),
+  let answer = await screen.findByRole("textbox", { name: "Answer question" });
+  const dock = screen.getByRole("region", { name: "Pending questions" });
+  expect(
+    within(dock).getByText("Who should receive the report?"),
+  ).toBeVisible();
+  fireEvent.change(answer, { target: { value: "Marcus" } });
+  fireEvent.click(screen.getByRole("button", { name: "Minimize questions" }));
+  expect(
+    screen.queryByRole("textbox", { name: "Answer question" }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(dock).getByRole("button", {
+      name: "Who should receive the report?",
+    }),
+  ).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Expand questions" }));
+  expect(screen.getByRole("textbox", { name: "Answer question" })).toHaveValue(
+    "Marcus",
   );
-  const next = screen.getByRole("textbox", { name: "Message" });
-  expect(screen.getAllByRole("textbox")).toHaveLength(1);
-  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-  fireEvent.change(next, { target: { value: "Yes, keep staging available." } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await screen.findByText("Yes, keep staging available.");
-  await screen.findByRole("button", { name: "Attach files" });
-  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
-    target: { value: "Please keep me posted." },
+  fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+  answer = screen.getByRole("textbox", { name: "Answer question" });
+  expect(answer).toHaveValue("");
+  fireEvent.change(answer, { target: { value: "14:00" } });
+  requests.push({
+    ...question("arriving", "2026-11-01T00:02:00Z"),
+    body: "A new live question",
   });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await screen.findByText("Please keep me posted.");
-  expect(writes).toEqual([
-    {
-      path: "/api/v1/requests/req_first/responses",
-      body: { version: 4, outcome: "answered", answer: "At 14:00 UTC." },
-    },
-    {
-      path: "/api/v1/requests/req_followup/responses",
-      body: {
-        version: 1,
-        outcome: "answered",
-        answer: "Yes, keep staging available.",
-      },
-    },
-    {
-      path: "/api/v1/messages",
-      body: {
-        attachment_ids: [],
-        target: { kind: "agent", id: agent.id },
-        conversation_id: "con_one",
-        body: "Please keep me posted.",
-        reuse_direct: false,
-        mentions: [],
-      },
-    },
+  await act(() => query.invalidateQueries());
+  expect(screen.getByRole("textbox", { name: "Answer question" })).toHaveValue(
+    "14:00",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Previous question" }));
+  expect(screen.getByRole("textbox", { name: "Answer question" })).toHaveValue(
+    "Marcus",
+  );
+});
+it("requires an explicit choice and leaves all options unselected initially", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const writes = conversationTransport([
+    { ...question(), body: "Which region?", choices: ["Europe", "India"] },
   ]);
-  expect(location.pathname).toBe("/conversations/con_one");
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  const choice = await screen.findByRole("radio", { name: "India" });
+  expect(choice).not.toBeChecked();
+  expect(screen.getByRole("radio", { name: "Europe" })).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Answer" })).toBeDisabled();
+  fireEvent.click(choice);
+  fireEvent.click(screen.getByRole("button", { name: "Answer" }));
+  await waitFor(() => expect(writes[0]?.body.answer).toBe("India"));
 });
-
-it("loads pending questions independently of history and requires a target across reply pages", async () => {
+it("keeps ordinary messaging available when answering is denied", async () => {
   history.replaceState(null, "", "/conversations/con_one");
-  const requests = ["req_first", "req_second"].map((id, i) => ({
-    id,
-    conversation_id: "con_one",
-    requester_id: agent.id,
-    kind: "question",
-    body: `Pending question ${i + 1}`,
-    title: "",
-    state: "open",
-    version: i + 1,
-    choices: [],
-    created_at: "2026-11-01T00:00:00Z",
-  }));
-  const writes: { path: string; body: any }[] = [];
+  const writes = conversationTransport([question()], true, false);
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  await screen.findByText("You can no longer answer this question.");
+  expect(
+    screen.queryByRole("textbox", { name: "Answer question" }),
+  ).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+    target: { value: "An independent follow-up" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(writes[0]?.path).toBe("/api/v1/messages"));
+});
+it("loads older pending questions through next without disabling chat", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
   vi.stubGlobal(
     "fetch",
     vi.fn(async (path: string, init?: RequestInit) => {
-      const body = requestBody(init);
+      const b = requestBody(init);
       if (path.endsWith("/capabilities"))
         return json({
           operations: { view: true, message: true, respond: true },
         });
-      if (path.endsWith("/query")) {
-        if (body.collection !== "requests" || body.filters.state !== "open")
-          return json({ items: [] });
+      if (path.endsWith("/query"))
         return json(
-          body.cursor
-            ? { items: [requests[1]] }
-            : { items: [requests[0]], next_cursor: "more-pending" },
+          b.collection === "requests" && b.filters.state === "open"
+            ? b.cursor
+              ? {
+                  items: [
+                    { ...question("older"), body: "Older pending question" },
+                  ],
+                }
+              : {
+                  items: [question("latest", "2026-11-01T00:01:00Z")],
+                  next_cursor: "more",
+                }
+            : { items: [] },
         );
-      }
-      if (init?.method === "POST") writes.push({ path, body });
       return json({
         id: "con_one",
         participants: [agent, me.person],
@@ -306,83 +295,12 @@ it("loads pending questions independently of history and requires a target acros
   );
   const { Wrapper } = harness();
   render(<Conversations />, { wrapper: Wrapper });
-  const chooser = await screen.findByRole("combobox", {
-    name: "Question to reply to",
-  });
-  await waitFor(() =>
-    expect(screen.getByRole("textbox", { name: "Message" })).toBeDisabled(),
-  );
-  expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
-  fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), {
-    key: "Enter",
-  });
-  expect(writes).toEqual([]);
-  fireEvent.click(screen.getByRole("button", { name: "More questions" }));
-  await screen.findByRole("option", { name: /Pending question 2/ });
-  fireEvent.change(chooser, { target: { value: "req_second" } });
-  const editor = await screen.findByRole("textbox", { name: "Message" });
-  await waitFor(() => expect(editor).toBeEnabled());
-  fireEvent.change(editor, { target: { value: "The second answer." } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await waitFor(() =>
-    expect(writes).toEqual([
-      {
-        path: "/api/v1/requests/req_second/responses",
-        body: { version: 2, outcome: "answered", answer: "The second answer." },
-      },
-    ]),
-  );
-  expect(
-    screen.queryByRole("button", { name: "Reply to request" }),
-  ).not.toBeInTheDocument();
+  await screen.findByRole("textbox", { name: "Answer question" });
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+  await screen.findByText("Older pending question");
 });
 
-it("does not silently send an ordinary message when response permission is unavailable", async () => {
-  history.replaceState(null, "", "/conversations/con_one");
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (path: string, init?: RequestInit) => {
-      if (path.endsWith("/capabilities"))
-        return json({
-          operations: { view: true, message: true, respond: false },
-        });
-      if (path.endsWith("/query"))
-        return json({
-          items:
-            requestBody(init).collection === "requests"
-              ? [
-                  {
-                    id: "req_denied",
-                    conversation_id: "con_one",
-                    requester_id: agent.id,
-                    kind: "question",
-                    title: "When?",
-                    body: "When should the API freeze?",
-                    state: "open",
-                    version: 1,
-                    choices: [],
-                    created_at: "2026-11-01T00:00:00Z",
-                  },
-                ]
-              : [],
-        });
-      return json({
-        id: "con_one",
-        participants: [agent, me.person],
-        messages: [],
-      });
-    }),
-  );
-  const { Wrapper } = harness();
-  render(<Conversations />, { wrapper: Wrapper });
-  await screen.findByText("Replying to this question is no longer available.");
-  expect(
-    screen.queryByRole("textbox", { name: "Message" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Send" }),
-  ).not.toBeInTheDocument();
-});
 it("retains a draft through a temporary read outage but clears it after authoritative contact loss", async () => {
   history.replaceState(null, "", "/conversations/con_one");
   let failure = 0;
@@ -533,4 +451,62 @@ it("keeps the latest reply visible after access loads and the composer changes s
   });
   act(() => resized.forEach((cb) => cb()));
   expect(pane.scrollTop).toBe(120);
+});
+
+it("keeps a failed answer bound to its question and never falls back to chat", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const requests = [question()];
+  const writes: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (path.endsWith("/capabilities"))
+        return json({
+          operations: { view: true, message: true, respond: true },
+        });
+      if (path.endsWith("/query"))
+        return json({ items: body.collection === "requests" ? requests : [] });
+      if (path.endsWith("/responses")) {
+        writes.push(path);
+        return json(
+          {
+            error: {
+              code: "CONFLICT",
+              message: "The request version changed.",
+            },
+          },
+          409,
+        );
+      }
+      if (path.endsWith("/messages")) {
+        writes.push(path);
+        return json({ conversation_id: "con_one" });
+      }
+      return json({
+        id: "con_one",
+        participants: [agent, me.person],
+        messages: [],
+      });
+    }),
+  );
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  const answer = await screen.findByRole("textbox", {
+    name: "Answer question",
+  });
+  fireEvent.change(answer, { target: { value: "At 14:00 UTC." } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+    target: { value: "An unsent correction" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Answer" }));
+  await screen.findByRole("alert");
+  expect(screen.getByRole("textbox", { name: "Answer question" })).toHaveValue(
+    "At 14:00 UTC.",
+  );
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue(
+    "An unsent correction",
+  );
+  expect(requests[0].state).toBe("open");
+  expect(writes).toEqual(["/api/v1/requests/req_question/responses"]);
 });

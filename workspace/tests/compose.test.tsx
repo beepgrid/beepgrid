@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Compose, MessageComposer } from "../src/Compose";
+import { QuestionAnswer } from "../src/PendingQuestions";
 import { clearConversationDrafts } from "../src/data";
 import type { Request } from "../src/contracts";
 import { harness, agent, json, requestBody } from "./fixtures";
@@ -351,25 +352,36 @@ it("keeps a failed upload removable without sending or persisting a file referen
 it("clears a reply draft and uncertain response on contact loss while preserving another conversation", async () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () =>
-      json(
-        { error: { code: "UNAVAILABLE", message: "Response uncertain" } },
-        503,
-      ),
+    vi.fn(async (path: string) =>
+      path.endsWith("/capabilities")
+        ? json({ operations: { respond: true } })
+        : json(
+            { error: { code: "UNAVAILABLE", message: "Response uncertain" } },
+            503,
+          ),
     ),
   );
   const { Wrapper } = harness();
   const view = render(
-    <MessageComposer
-      conversation="con_private"
-      replyTo={{ id: "req_private", version: 3, body: "When?" } as Request}
+    <QuestionAnswer
+      request={
+        {
+          id: "req_private",
+          conversation_id: "con_private",
+          version: 3,
+          body: "When?",
+        } as Request
+      }
     />,
     { wrapper: Wrapper },
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
-    target: { value: "Private response draft" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.change(
+    await screen.findByRole("textbox", { name: "Answer question" }),
+    {
+      target: { value: "Private response draft" },
+    },
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Answer" }));
   await screen.findByRole("alert");
   expect(
     Object.keys(sessionStorage).some(

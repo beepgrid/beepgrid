@@ -1,13 +1,7 @@
 import { useState, useRef, type ReactNode } from "react";
 import { useCollection, useDraft, useOperation, useSession } from "./data";
 import { MentionEditor } from "./Mentions";
-import type {
-  Request,
-  Identity,
-  Mention,
-  Target,
-  Attachment,
-} from "./contracts";
+import type { Identity, Mention, Target, Attachment } from "./contracts";
 import { bytes, upload } from "./client";
 import { fileSize } from "./Attachments";
 import { navigate } from "./navigation";
@@ -23,7 +17,6 @@ export function MessageComposer({
   replyRequired = false,
   delivery = "individual",
   participants = [],
-  replyTo,
   disabled = false,
 }: {
   targets?: Target[];
@@ -34,27 +27,23 @@ export function MessageComposer({
   replyRequired?: boolean;
   delivery?: "individual" | "group";
   participants?: Identity[];
-  replyTo?: Request;
   disabled?: boolean;
 }) {
-  const draftID = replyTo
-    ? "reply:" + conversation + ":" + replyTo.id
-    : "message:" +
+  const draftID =
+    "message:" +
+    (conversation ||
+      targets
+        .map((t) => t.kind + t.id)
+        .sort()
+        .join(","));
+  const [body, setBody] = useDraft(draftID);
+  const [mentionDraft, setMentionDraft] = useDraft(
+    "mentions:" +
       (conversation ||
         targets
           .map((t) => t.kind + t.id)
           .sort()
-          .join(","));
-  const [body, setBody] = useDraft(draftID);
-  const [mentionDraft, setMentionDraft] = useDraft(
-    replyTo
-      ? "reply-mentions:" + conversation + ":" + replyTo.id
-      : "mentions:" +
-          (conversation ||
-            targets
-              .map((t) => t.kind + t.id)
-              .sort()
-              .join(",")),
+          .join(",")),
   );
   let mentions: Mention[] = [];
   try {
@@ -145,19 +134,6 @@ export function MessageComposer({
     setError(null);
     if (bytes(body) > 32768) {
       setError(Error("Your message is too long. Keep it under 32 KB."));
-      return;
-    }
-    if (replyTo) {
-      const result = await op.run(`/requests/${replyTo.id}/responses`, {
-        version: replyTo.version,
-        outcome: "answered",
-        answer: body,
-      });
-      if (result) {
-        setBody("");
-        op.forget();
-        onSent?.(conversation);
-      }
       return;
     }
     if (!conversation && !targets.length) {
@@ -257,7 +233,7 @@ export function MessageComposer({
           onMentions={setMentions}
           participants={participants}
           disabled={disabled}
-          rows={conversation ? 2 : 3}
+          rows={conversation ? 1 : 3}
           onKeyDown={(e) => {
             if (
               e.key === "Enter" &&
@@ -357,7 +333,7 @@ export function MessageComposer({
         ) : null}
         <div className="compose-bottom">
           <div className="actions">
-            {!replyTo ? (
+            {
               <Button
                 icon="attachment"
                 disabled={disabled || op.pending || files.length >= 5}
@@ -365,7 +341,7 @@ export function MessageComposer({
               >
                 Attach files
               </Button>
-            ) : null}
+            }
             <input
               hidden
               type="file"
@@ -376,7 +352,7 @@ export function MessageComposer({
               onChange={(e) => void attach(e.target.files)}
             />
 
-            {!disabled && !replyTo && canAsk && !approval && !choices.length ? (
+            {!disabled && canAsk && !approval && !choices.length ? (
               <>
                 <Button icon="plus" onClick={() => setApproval(true)}>
                   Request approval
