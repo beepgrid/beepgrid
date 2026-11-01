@@ -131,6 +131,27 @@ it("reveals only the chosen live integration and keeps credentials out of its se
     target: { value: "ai-sdk" },
   });
   expect(screen.getByRole("radio", { name: "Steer" })).toBeChecked();
+  expect(
+    screen.getByRole("group", { name: "When the agent is busy, default to" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(/Steering is not supported/),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  const info = screen.getByRole("button", { name: "About Steer and Queue" });
+  fireEvent.focus(info);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    "Steer uses new input during ongoing work",
+  );
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    "Queue handles new messages after current work finishes",
+  );
+  fireEvent.keyDown(info, { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.mouseEnter(info);
+  expect(screen.getByRole("tooltip")).toBeVisible();
+  fireEvent.mouseLeave(info);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("radio", { name: "Queue" }));
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Instructions for your AI" });
@@ -187,6 +208,10 @@ it("reveals only the chosen live integration and keeps credentials out of its se
   expect(
     screen.queryByRole("radio", { name: "Steer" }),
   ).not.toBeInTheDocument();
+  expect(
+    screen.getByText("Steering is not supported with this environment."),
+  ).toBeVisible();
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   expect(
     fn.mock.calls.filter(([path]) => path.endsWith("/sessions")),
   ).toHaveLength(1);

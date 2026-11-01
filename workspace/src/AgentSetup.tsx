@@ -1,4 +1,5 @@
-import { Copy, Field } from "./ui";
+import { useId, useState } from "react";
+import { Copy, Field, Icon } from "./ui";
 import { WorkerSetup } from "./WorkerSetup";
 import { ConnectionToken } from "./ConnectionToken";
 import {
@@ -38,8 +39,53 @@ export function EnvironmentPicker({
           </optgroup>
         ))}
       </select>
-      {selected ? <span className="help">{selected.note}</span> : null}
+      {selected && !selected.steer ? (
+        <span className="help">
+          Steering is not supported with this environment.
+        </span>
+      ) : null}
     </Field>
+  );
+}
+function BusyPolicyInfo() {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      className="setup-policy-info"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label="About Steer and Queue"
+        aria-describedby={open ? id : undefined}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}
+      >
+        <Icon name="info" size={15} />
+      </button>
+      {open ? (
+        <span className="setup-policy-tooltip" id={id} role="tooltip">
+          <span>
+            <strong>Steer</strong> uses new input during ongoing work, at the next
+            supported point.
+          </span>
+          <span>
+            <strong>Queue</strong> handles new messages after current work
+            finishes. Replies and decisions still resume their pending request in
+            either mode.
+          </span>
+        </span>
+      ) : null}
+    </span>
   );
 }
 export function BusyPolicy({
@@ -52,10 +98,14 @@ export function BusyPolicy({
   onChange: (value: "steer" | "queue") => void;
 }) {
   const selected = environments.find((e) => e.id === environment);
+  const labelId = useId();
   if (!selected?.steer) return null;
   return (
-    <fieldset className="setup-policy">
-      <legend>When the Agent is busy</legend>
+    <fieldset className="setup-policy" aria-labelledby={labelId}>
+      <legend>
+        <span id={labelId}>When the agent is busy, default to</span>
+        <BusyPolicyInfo />
+      </legend>
       <div>
         {(["steer", "queue"] as const).map((mode) => (
           <label key={mode}>
@@ -70,11 +120,6 @@ export function BusyPolicy({
           </label>
         ))}
       </div>
-      <p className="help">
-        {value === "steer"
-          ? "Use new input during ongoing work, at a supported input boundary."
-          : "Handle new messages after current work. Answers and decisions still resume their request."}
-      </p>
     </fieldset>
   );
 }
