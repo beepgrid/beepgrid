@@ -134,6 +134,74 @@ function conversationTransport(
   );
   return writes;
 }
+
+it("links each answer and approval to its own original request with a compact preview", async () => {
+  history.replaceState(null, "", "/conversations/con_one");
+  const requests = [
+    {
+      ...question("req_emphasis"),
+      body: "What should the brief emphasize?",
+      response: { outcome: "answered", answer: "reliability" },
+    },
+    {
+      ...question("req_approval"),
+      kind: "approval",
+      body: "May I prepare the synthetic handoff note?",
+      response: { outcome: "approved" },
+    },
+    {
+      ...question("req_recipient"),
+      body: "Who should receive the brief?",
+      response: { outcome: "answered", answer: "me" },
+    },
+    {
+      ...question("req_long"),
+      body: "Please review the release risks. ".repeat(8),
+      response: { outcome: "answered", answer: "Reviewed." },
+    },
+  ].map((request) => ({
+    ...request,
+    state: "resolved",
+    resolved_by: me.person.id,
+    resolved_at: "2026-11-01T00:01:00Z",
+  }));
+  const writes = conversationTransport(requests);
+  const { Wrapper } = harness();
+  render(<Conversations />, { wrapper: Wrapper });
+  expect(
+    await screen.findAllByRole("button", { name: /^Show original/ }),
+  ).toHaveLength(4);
+  for (const request of requests) {
+    const quote = screen.getByRole("button", {
+      name: `Show original ${request.kind} in chat: ${request.body.trim()}`,
+    });
+    const reply = quote.closest("article")!;
+    expect(within(reply).queryByText("Replied")).not.toBeInTheDocument();
+    expect(
+      within(reply).getByText(request.response.answer || "Approved"),
+    ).toBeVisible();
+    const original = document.getElementById(`request-${request.id}`)!;
+    const scroll = vi.fn();
+    original.scrollIntoView = scroll;
+    fireEvent.click(quote);
+    await waitFor(() => expect(original).toHaveFocus());
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(
+      within(original).getByText(
+        request.kind === "approval" ? "Approved" : "Replied",
+      ),
+    ).toBeVisible();
+  }
+  const longQuote = screen.getByRole("button", {
+    name: /^Show original question in chat: Please review/,
+  });
+  expect(Array.from(longQuote.textContent || "").length).toBeLessThanOrEqual(
+    120,
+  );
+  expect(longQuote.textContent).toMatch(/…$/);
+  expect(writes).toHaveLength(0);
+});
+
 it("keeps chat corrections separate from explicit question answers", async () => {
   history.replaceState(null, "", "/conversations/con_one");
   const requests = [question()];

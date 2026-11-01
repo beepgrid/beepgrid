@@ -409,6 +409,11 @@ function Chat({ id }: { id: string }) {
     else if (caps.data && !caps.data.operations.message)
       clearConversationDrafts(id, false);
   }, [q.error, caps.error, caps.data, id]);
+  function jumpToRequest(requestId: string) {
+    pinned.current = false;
+    setError(null);
+    setJumpTo(requestId);
+  }
   if (q.isPending) return <Loading label="Opening conversation" />;
   if (!q.data)
     return <ErrorView error={q.error} retry={() => void q.refetch()} />;
@@ -560,28 +565,28 @@ function Chat({ id }: { id: string }) {
                           (p) => p.id === item.value.resolved_by,
                         )?.name || "Participant"}
                       </strong>
-                      <time>
+                      <time dateTime={item.at} title={timestamp(item.at)}>
                         {new Date(item.at).toLocaleTimeString(undefined, {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
                       </time>
                     </div>
-                    <p
-                      className={
-                        item.value.response?.outcome === "approved"
-                          ? "approved-reply"
-                          : ""
-                      }
-                    >
-                      <RequestStatus request={item.value} />
+                    <ReplyContext
+                      request={item.value}
+                      onJump={() => jumpToRequest(item.value.id)}
+                    />
+                    <div className="decision-response">
+                      {item.value.response?.outcome !== "answered" ? (
+                        <RequestStatus request={item.value} />
+                      ) : null}
                       {typeof item.value.response?.answer === "string" &&
                       item.value.response.answer ? (
-                        <span className="decision-answer">
+                        <p className="decision-answer">
                           {item.value.response.answer}
-                        </span>
+                        </p>
                       ) : null}
-                    </p>
+                    </div>
                   </div>
                 </article>
               ) : (
@@ -674,11 +679,7 @@ function Chat({ id }: { id: string }) {
             if (pending.hasNextPage) void pending.fetchNextPage();
             if (approvals.hasNextPage) void approvals.fetchNextPage();
           }}
-          onJump={(request) => {
-            pinned.current = false;
-            setError(null);
-            setJumpTo(request.id);
-          }}
+          onJump={(request) => jumpToRequest(request.id)}
           onFollowUp={() =>
             document
               .querySelector<HTMLTextAreaElement>(".composer .message-input")
@@ -706,6 +707,37 @@ function Chat({ id }: { id: string }) {
     </section>
   );
 }
+function ReplyContext({
+  request,
+  onJump,
+}: {
+  request: Request;
+  onJump: () => void;
+}) {
+  const text = (
+    request.body.trim() ||
+    request.title.trim() ||
+    "Request"
+  ).replace(/\s+/g, " ");
+  const characters = Array.from(text);
+  const preview =
+    characters.length > 120
+      ? characters.slice(0, 119).join("").trimEnd() + "…"
+      : text;
+  return (
+    <button
+      type="button"
+      className="reply-context"
+      title="Show in chat"
+      aria-label={`Show original ${request.kind} in chat: ${text}`}
+      onClick={onJump}
+    >
+      <Icon name="reply" size={16} />
+      <span>{preview}</span>
+    </button>
+  );
+}
+
 const ChatMessage = memo(function ChatMessage({
   message: m,
   name,

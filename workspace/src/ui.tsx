@@ -37,6 +37,7 @@ const paths: Record<string, string> = {
   sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2m0 16v2M2 12h2m16 0h2 M5 5l1.5 1.5m11 11L19 19 M5 19l1.5-1.5m11-11L19 5",
   moon: "M21 13A9 9 0 0 1 11 3a9 9 0 1 0 10 10",
   arrow: "M4 12h16m-6-6 6 6-6 6",
+  reply: "M5 4v8a3 3 0 0 0 3 3h12m-5-5 5 5-5 5",
   check: "m5 12 4 4L19 6",
   // Tabler Icons checks (MIT), see public/agent-icons/tabler-LICENSE.txt.
   checks: "m7 12 5 5L22 7 M2 12l5 5m5-5 5-5",

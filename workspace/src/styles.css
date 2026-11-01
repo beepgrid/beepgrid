@@ -2322,7 +2322,11 @@ dialog {
 .coordinator-context { padding:12px 18px; margin:0 -18px -16px; border-top:1px solid var(--strong); border-radius:0 0 9px 9px; background:var(--coordinator-surface) }
 .coordinator-context-label { color:var(--coordinator-ink); font-size:12px; font-weight:var(--type-strong) }
 .coordinator-context>p { color:var(--coordinator-ink); font-size:var(--type-small); margin-top:6px }
-.decision-answer { display: block; margin-top: 8px; }
+.reply-context { display:flex; align-items:center; gap:7px; width:fit-content; max-width:min(100%,580px); margin:0 0 6px; padding:5px 8px; border-left:2px solid var(--strong); border-radius:0 5px 5px 0; background:var(--raised); color:var(--sub); font-size:12px; line-height:1.5; text-align:left }
+.reply-context svg { flex:none }
+.reply-context>span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.decision-response { display:grid; justify-items:start; gap:6px }
+.decision-answer { margin:0 }
 .profile-history-hint { margin-bottom: 18px; color: var(--sub); font-size: var(--type-small); max-width: 650px; }
 .decision-actions {
   display: flex;
@@ -2439,11 +2443,6 @@ dialog {
   background: var(--raised);
   border-radius: 9px;
 }
-.approved-reply {
-  color: var(--good);
-  font-weight: var(--type-strong);
-}
-
 .directory-tabs button {
   border-radius: 0;
   padding: 10px 0 14px;
