@@ -1869,13 +1869,9 @@ dialog {
 }
 .coordinator-messages {
   background: var(--surface);
-  padding-inline: 20px;
-  scrollbar-gutter: stable both-edges;
 }
 .coordinator-thread {
   width: 100%;
-  max-width: 780px;
-  margin-inline: auto;
 }
 .coordinator-topic {
   display: flex;
@@ -1973,17 +1969,8 @@ dialog {
   border-color: var(--strong);
 }
 .coordinator-composer {
-  padding: 12px 20px;
   background: var(--surface);
   overflow: hidden;
-  scrollbar-gutter: stable both-edges;
-  scrollbar-width: thin;
-}
-.coordinator-composer > .notice,
-.coordinator-composer > .error,
-.coordinator-composer form {
-  max-width: 780px;
-  margin-inline: auto;
 }
 .coordinator-composer .field > span {
   position: absolute;
@@ -3403,7 +3390,7 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .conversation-row-title time { font-size:11px; color:var(--faint); flex:none }
 .conversation-meta .badge { font-size:10px; padding:1px 5px; text-transform:capitalize }
 .overseer-entry>.coordinator-state { margin-left:auto; align-self:center; min-height:0; line-height:1.4 }
-@media(max-width:600px) { .coordinator-composer { padding:10px 12px }.coordinator-controls { gap:6px }.coordinator-controls select { max-width:140px }.coordinator-review { margin-right:0 }.coordinator-controls>.button { margin-left:auto } }
+@media(max-width:600px) { .coordinator-controls { gap:6px }.coordinator-controls select { max-width:140px }.coordinator-review { margin-right:0 }.coordinator-controls>.button { margin-left:auto } }
 
 .agent-role-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:5px; background:var(--raised); color:var(--ink); font-size:12px; font-weight:500 }
 .agent-role-badge:hover { background:var(--hover) }
