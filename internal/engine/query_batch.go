@@ -85,14 +85,14 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 			put(id, p, s.inspectIdentity(ctx, s.Pool, a, p))
 		}
 	case "groups":
-		rows, err := s.Pool.Query(ctx, `SELECT g.id,g.name,g.version,COALESCE(jsonb_agg(m.principal_id ORDER BY m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]'),g.created_by,g.purpose FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 AND g.id=ANY($2::text[]) GROUP BY g.id`, a.Scope, ids)
+		rows, err := s.Pool.Query(ctx, `SELECT g.id,g.name,g.version,COALESCE(jsonb_agg(m.principal_id ORDER BY m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]'),g.created_by,g.purpose,g.icon FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 AND g.id=ANY($2::text[]) GROUP BY g.id`, a.Scope, ids)
 		if err != nil {
 			return nil, err
 		}
 		groups := []Group{}
 		for rows.Next() {
 			var g Group
-			if err = rows.Scan(&g.ID, &g.Name, &g.Version, &g.Members, &g.CreatedBy, &g.Purpose); err != nil {
+			if err = rows.Scan(&g.ID, &g.Name, &g.Version, &g.Members, &g.CreatedBy, &g.Purpose, &g.Icon); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -190,7 +190,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		if err != nil {
 			return nil, err
 		}
-		rows, err := s.Pool.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,CASE WHEN chat_history_allows(c.scope,c.id,$3,$4,c.preview_sequence) THEN c.last_preview ELSE '' END,c.shared,c.version,c.manager_id,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind,'name',p.name) ORDER BY p.id) FILTER(WHERE p.id IS NOT NULL AND cp.left_at IS NULL),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids, a.ID, a.Admin)
+		rows, err := s.Pool.Query(ctx, `SELECT c.id,c.title,c.created_by,c.created_at,c.last_activity_at,CASE WHEN chat_history_allows(c.scope,c.id,$3,$4,c.preview_sequence) THEN c.last_preview ELSE '' END,c.shared,c.version,c.manager_id,COALESCE(jsonb_agg(jsonb_build_object('id',p.id,'kind',p.kind,'name',p.name,'metadata',jsonb_strip_nulls(jsonb_build_object('appearance_icon',p.metadata->>'appearance_icon'))) ORDER BY p.id) FILTER(WHERE p.id IS NOT NULL AND cp.left_at IS NULL),'[]') FROM conversations c LEFT JOIN participants cp ON cp.scope=c.scope AND cp.conversation_id=c.id LEFT JOIN principals p ON p.scope=cp.scope AND p.id=cp.principal_id WHERE c.scope=$1 AND c.id=ANY($2::text[]) GROUP BY c.id`, a.Scope, ids, a.ID, a.Admin)
 		if err != nil {
 			return nil, err
 		}

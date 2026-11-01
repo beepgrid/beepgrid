@@ -21,15 +21,28 @@ export function RequestCard({
   sender,
   participants = [],
   onFollowUp,
+  onReply,
+  replying = false,
 }: {
   request: Request;
   sender?: Identity;
   participants?: Identity[];
   onFollowUp?: () => void;
+  onReply?: (request: Request) => void;
+  replying?: boolean;
 }) {
   const caps = useCapabilities(undefined, r.id),
     op = useOperation("response:" + r.id),
     me = useSession();
+  const incoming =
+    r.requester_id !== me.person.id &&
+    (!participants.length || participants.some((p) => p.id === me.person.id));
+  const viaCoordinator =
+    r.requester_id === me.person.id && r.title.startsWith("Coordinator: ");
+  const recipients = participants
+    .filter((p) => p.id !== r.requester_id)
+    .map((p) => (p.id === me.person.id ? "you" : p.name))
+    .join(", ");
   const [answer, setAnswer] = useState(""),
     [confirm, setConfirm] = useState(""),
     [sharing, setSharing] = useState(false),
@@ -51,19 +64,30 @@ export function RequestCard({
         kind={sender?.kind || "agent"}
         id={r.requester_id}
         label={sender?.name}
+        icon={String(sender?.metadata?.appearance_icon || "")}
       />
       <div className="message-body">
         <div className="message-meta">
-          <strong>{sender?.name || "Participant"}</strong>
-          <span>
+          <strong>
+            {r.requester_id === me.person.id
+              ? "You"
+              : sender?.name || "Participant"}
+            {viaCoordinator ? " via Coordinator" : ""}
+          </strong>
+          <Badge>
             {r.kind === "approval"
               ? "Approval"
               : r.choices?.length
                 ? "Choose an answer"
-                : "Message"}
-          </span>
+                : r.kind === "task"
+                  ? "Task"
+                  : "Question"}
+          </Badge>
         </div>
         <div className="decision-card">
+          <div className="request-direction">
+            To {recipients || "the recipients"}
+          </div>
           <p>
             <MentionText
               body={r.body || r.title}
@@ -91,7 +115,7 @@ export function RequestCard({
           <ErrorView error={op.error} />
           {r.state !== "open" ? (
             <RequestStatus request={r} />
-          ) : caps.data?.operations.respond ? (
+          ) : caps.data?.operations.respond && incoming ? (
             <>
               {r.kind === "task" ? (
                 <div className="decision-actions">
@@ -138,6 +162,12 @@ export function RequestCard({
                     </Button>
                   ) : null}
                 </div>
+              ) : onReply && !r.choices?.length ? (
+                replying ? (
+                  <Badge tone="warn">Awaiting your reply</Badge>
+                ) : (
+                  <Button onClick={() => onReply(r)}>Reply to request</Button>
+                )
               ) : (
                 <Form onSubmit={() => void respond("answered")}>
                   {r.choices?.length ? (
@@ -177,14 +207,18 @@ export function RequestCard({
             </>
           ) : (
             <small>
-              {caps.isPending ? "Checking access..." : "Waiting for a reply"}
+              {caps.isPending
+                ? "Checking access..."
+                : incoming
+                  ? "Awaiting a reply"
+                  : `Waiting for ${recipients || "the recipients"}`}
             </small>
           )}
           {confirm ? (
             <div className="bound-confirm">
               <p>
                 {confirm === "cancel"
-                  ? "Stop waiting for a response? The message and its history will remain."
+                  ? "Cancel this request? It will stop accepting replies. The conversation stays in history; work already performed is not undone."
                   : "Record this decision for the exact action below?"}
               </p>
               {confirm !== "cancel" ? (
@@ -231,35 +265,52 @@ export function RequestCard({
               </details>
             </div>
           ) : null}
-          <div className="actions request-tools">
-            {caps.data?.operations.replace ? (
-              <Button disabled={op.pending} onClick={() => setReplacing(true)}>
-                Edit and resend
-              </Button>
-            ) : null}
-            {r.kind === "question" &&
+          {caps.data?.operations.replace ||
+          caps.data?.operations.cancel ||
+          (me.can_publish_answers &&
+            r.kind === "question" &&
             r.shared_key &&
-            me.can_publish_answers &&
-            ((r.state === "open" && caps.data?.operations.respond) ||
-              (r.state === "resolved" &&
-                r.response?.outcome === "answered")) ? (
-              <Button onClick={() => setSharing(true)}>
-                {r.state === "open"
-                  ? "Answer and share"
-                  : "Save reusable answer"}
-              </Button>
-            ) : null}
-            {caps.data?.operations.cancel ? (
-              <Button
-                disabled={op.pending}
-                onClick={() => setConfirm("cancel")}
-              >
-                {r.kind === "approval"
-                  ? "Cancel approval"
-                  : "Cancel pending reply"}
-              </Button>
-            ) : null}
-          </div>
+            (r.state === "resolved" ||
+              (incoming && !onReply && caps.data?.operations.respond))) ? (
+            <details className="request-tools">
+              <summary>Request actions</summary>
+              <div className="actions">
+                {caps.data?.operations.replace ? (
+                  <Button
+                    disabled={op.pending}
+                    onClick={() => setReplacing(true)}
+                  >
+                    Edit and resend
+                  </Button>
+                ) : null}
+                {r.kind === "question" &&
+                r.shared_key &&
+                me.can_publish_answers &&
+                ((r.state === "open" &&
+                  caps.data?.operations.respond &&
+                  incoming &&
+                  !onReply) ||
+                  (r.state === "resolved" &&
+                    r.response?.outcome === "answered")) ? (
+                  <Button onClick={() => setSharing(true)}>
+                    {r.state === "open"
+                      ? "Answer and share"
+                      : "Save reusable answer"}
+                  </Button>
+                ) : null}
+                {caps.data?.operations.cancel ? (
+                  <Button
+                    disabled={op.pending}
+                    onClick={() => setConfirm("cancel")}
+                  >
+                    {r.kind === "approval"
+                      ? "Cancel approval"
+                      : "Cancel request"}
+                  </Button>
+                ) : null}
+              </div>
+            </details>
+          ) : null}
         </div>
       </div>
       {sharing ? (

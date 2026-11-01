@@ -1209,7 +1209,6 @@ dialog > header {
 }
 .conversation-meta > span {
   text-transform: capitalize;
-  color: var(--sub);
 }
 .conversation-meta time {
   font-variant-numeric: tabular-nums;
@@ -1302,7 +1301,7 @@ dialog > header {
   font-size: var(--type-secondary);
 }
 .composer .actions {
-  margin-top: 10px;
+  margin-top: 0;
   justify-content: space-between;
 }
 .composer .actions .actions {
@@ -1784,8 +1783,8 @@ dialog {
   text-transform: none;
   font-size: 11px;
   font-weight: var(--type-medium);
-  padding: 2px 7px;
-  border-radius: 20px;
+  padding: 1px 6px;
+  border-radius: 5px;
   flex: none;
   color: var(--sub);
   background: var(--surface);
@@ -1890,13 +1889,12 @@ dialog {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 0 4px;
-  border-top: 1px solid var(--strong);
-  margin-top: 24px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
   flex-wrap: wrap;
 }
 .coordinator-topic-draft strong { display: block; font-size: var(--type-secondary); }
-.coordinator-topic-draft span { display: block; color: var(--sub); margin-top: 4px; font-size: var(--type-small); }
 .coordinator-intro {
   display: flex;
   flex-direction: column;
@@ -1967,6 +1965,7 @@ dialog {
   border-color: var(--strong);
 }
 .coordinator-composer {
+  padding: 12px 20px;
   background: var(--surface);
   overflow: hidden;
   scrollbar-gutter: stable both-edges;
@@ -1985,12 +1984,11 @@ dialog {
   overflow: hidden;
   clip-path: inset(50%);
 }
-.coordinator-composer .details {
-  margin: 0 0 12px;
-}
 .coordinator-composer textarea {
-  border-radius: 9px;
+  border-radius: 9px; min-height: 64px; padding: 10px 12px; resize: vertical;
 }
+.coordinator-composer form { gap:8px; }
+.coordinator-composer .coordinator-controls { flex:initial; margin:0 }
 .coordinator-composer .field {
   margin-bottom: 0;
 }
@@ -2822,7 +2820,7 @@ dialog > header h2 {
   margin-top: 4px;
 }
 .conversation-meta {
-  justify-content: space-between;
+  justify-content:flex-start;
 }
 .message-filters {
   padding: 10px 4px;
@@ -2867,7 +2865,7 @@ dialog > header h2 {
   align-items: center;
 }
 .coordinator-entry-title strong {
-  flex: 0 1 auto;
+  flex: 1;
 }
 .overseer-entry .conversation-copy > p .badge {
   text-transform: none;
@@ -3195,33 +3193,36 @@ a.mention-token:hover { text-decoration:underline }
 .coordinator-instructions { display:grid; gap:10px; margin:14px 0 }
 .coordinator-instructions > div { display:flex; gap:10px; padding:12px; border:1px solid var(--line); border-radius:8px }
 .coordinator-instructions .identity-icon { --avatar-size:28px }
+.coordinator-agent-body { flex:1; min-width:0 }
+.coordinator-agent-body header { display:flex; align-items:center; gap:8px; flex-wrap:wrap }
+.coordinator-agent-body header .button { margin-left:auto; font-size:12px; padding:4px 8px; min-height:28px }
 .coordinator-instructions strong { font-size:var(--type-secondary) }
 .coordinator-instructions p { font-size:var(--type-secondary); margin-top:5px }
-.coordinator-review { display:flex; gap:9px; align-items:center; font-size:var(--type-secondary); font-weight:var(--type-medium); color:var(--ink); margin-right:auto; min-height:40px; cursor:pointer }
-.coordinator-review input { width:17px; height:17px; min-height:17px; accent-color:var(--ink); cursor:pointer }
+.coordinator-review { display:flex; gap:7px; align-items:center; font-size:12px; font-weight:var(--type-medium); color:var(--sub); margin-right:auto; min-height:32px; cursor:pointer }
+.coordinator-review input { width:14px; height:14px; min-height:14px; accent-color:var(--ink); cursor:pointer }
 
 .directory-filters { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
 .directory-filters select { width:auto; min-height:32px; padding:6px 28px 6px 10px; font-size:12px; border-color:var(--line); background:var(--surface) }
-.profile-breadcrumb { display:flex; gap:10px; align-items:center; color:var(--sub); font-size:12px; margin-bottom:26px }
+.profile-breadcrumb { display:flex; gap:10px; align-items:center; color:var(--sub); font-size:12px; margin-bottom:10px }
 .profile-breadcrumb .button { border:0; padding:0; color:var(--sub); background:none }
 .profile-breadcrumb .button svg { transform:rotate(180deg); width:13px }
-.agent-profile-head { display:flex; align-items:center; gap:16px; margin-bottom:20px }
-.agent-profile-head > .identity-icon { --avatar-size:52px; border-radius:14px }
+.agent-profile-head { display:flex; align-items:center; gap:12px; margin-bottom:8px }
+.agent-profile-head > .identity-edit .identity-icon { --avatar-size:52px; border-radius:14px }
 .agent-profile-title { flex:1; min-width:0 }
-.agent-profile-title > div { display:flex; gap:14px; align-items:center; flex-wrap:wrap }
+.agent-profile-title > div:first-child { display:flex; gap:14px; align-items:center; flex-wrap:wrap }
 .agent-profile-title h1 { font-size:26px; font-weight:600; letter-spacing:-.8px; line-height:1.25; margin:0 }
 .agent-profile-title p { color:var(--sub); font-size:13px; margin:7px 0 0 }
-.agent-role-line { display:flex; align-items:center; gap:8px; min-height:28px; color:var(--sub); font-size:12px; margin:0 0 22px; flex-wrap:wrap }
+.agent-role-line { display:flex; align-items:center; gap:6px; color:var(--sub); font-size:12px; margin:8px 0 0; flex-wrap:wrap }
 .text-action { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 12px; min-height:34px; border:1px solid var(--strong); border-radius:8px; background:var(--surface); color:var(--ink); font-size:var(--type-small); font-weight:var(--type-medium) }
 .text-action:hover { background:var(--hover); border-color:var(--faint) }
-.agent-role-line .text-action { margin-left:5px }
-.agent-overview { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr); gap:36px }
+.agent-role-line .button { min-height:26px; padding:3px 7px; font-size:11px }
+.agent-overview { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr); gap:24px }
 .agent-overview > * { min-width:0 }
-.profile-section { padding:8px 0 24px; margin-bottom:20px; border-bottom:1px solid var(--line) }
-.profile-section > header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px }
+.profile-section { padding:8px 0 16px; margin-bottom:12px; border-bottom:1px solid var(--line) }
+.profile-section > header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px }
 .profile-section h2 { font-size:14px; font-weight:600; letter-spacing:-.2px; margin:0 }
 .profile-section > header > .badge { margin-right:auto }
-.profile-inline-empty { display:flex; align-items:center; gap:8px; padding:20px 0; color:var(--sub); font-size:12px }
+.profile-inline-empty { display:flex; align-items:center; gap:8px; padding:6px 0; color:var(--sub); font-size:12px }
 .profile-pending > button,.profile-conversations > button { display:flex; align-items:center; gap:12px; width:100%; padding:14px 8px; text-align:left; border-radius:8px }
 .profile-pending > button:hover,.profile-conversations > button:hover { background:var(--raised) }
 .profile-pending > button + button,.profile-conversations > button + button { border-top:1px solid var(--line) }
@@ -3234,8 +3235,8 @@ a.mention-token:hover { text-decoration:underline }
 .profile-conversations strong { font-size:13px; font-weight:550 }
 .profile-conversations p { color:var(--sub); font-size:12px; margin:5px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .profile-conversations time { color:var(--faint); font-size:11px; white-space:nowrap }
-.profile-runtime { border:1px solid var(--line); border-radius:12px; padding:18px }
-.profile-instance { display:flex; align-items:center; gap:10px; padding:13px 0 }
+.profile-runtime { border:1px solid var(--line); border-radius:12px; padding:14px }
+.profile-instance { display:flex; align-items:center; gap:10px; padding:7px 0 }
 .profile-instance + .profile-instance { border-top:1px solid var(--line) }
 .profile-instance > svg { color:var(--sub); flex:none }
 .profile-instance > div { flex:1; min-width:0 }
@@ -3249,7 +3250,6 @@ a.mention-token:hover { text-decoration:underline }
 .profile-shortcuts button:hover { background:var(--raised) }
 .profile-shortcuts button span { flex:1 }
 .profile-shortcuts button svg { color:var(--sub) }
-.profile-details { margin-top:8px }
 .request-tools { margin-top:12px }
 .answer-provenance { font-size:12px; margin-top:12px; color:var(--sub) }
 .profile-role-list > div { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--line) }
@@ -3361,3 +3361,42 @@ a.mention-token:hover { text-decoration:underline }
 dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x: hidden; }
 .contact-effective-matrix .identity { min-width: 160px; }
 .contact-editor-dialog .form-actions { position: sticky; bottom: 0; z-index: 1; padding: 16px 0; background: var(--surface); }
+
+/* Compact review controls and conversation hierarchy. */
+.coordinator-controls select { width:auto; max-width:180px; min-height:32px; padding:5px 26px 5px 9px; font-size:12px }
+.coordinator-controls>.button { min-height:32px; padding:6px 10px; font-size:12px }
+.coordinator-agent-reply { color:var(--sub); border-left:2px solid var(--line); padding-left:10px }
+.waiting-dots i { font-style:normal; animation:reply-dot 1.2s infinite; opacity:.3 }
+.waiting-dots i:nth-child(2) { animation-delay:.2s }.waiting-dots i:nth-child(3) { animation-delay:.4s }
+@keyframes reply-dot { 50% { opacity:1 } }
+.conversation-row-title { display:flex; gap:8px; align-items:baseline; min-width:0 }
+.conversation-row-title>strong { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.conversation-row-title time { font-size:11px; color:var(--faint); flex:none }
+.conversation-meta .badge { font-size:10px; padding:1px 5px; text-transform:capitalize }
+.overseer-entry>.coordinator-state { margin-left:auto; align-self:center; min-height:0; line-height:1.4 }
+@media(max-width:600px) { .coordinator-composer { padding:10px 12px }.coordinator-controls { gap:6px }.coordinator-controls select { max-width:140px }.coordinator-review { margin-right:0 }.coordinator-controls>.button { margin-left:auto } }
+
+.agent-role-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:5px; background:var(--raised); color:var(--ink); font-size:12px; font-weight:500 }
+.agent-role-badge:hover { background:var(--hover) }
+.reply-context { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--line); color:var(--sub); font-size:12px }
+.reply-context>div { flex:1; min-width:0 }.reply-context strong { color:var(--ink) }.reply-context p { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:3px 0 0 }
+.request-direction { font-size:12px; color:var(--sub); margin-bottom:6px }
+.request-tools>summary { font-size:12px; color:var(--sub); cursor:pointer }.request-tools .actions { margin-top:8px }
+
+.identity-edit { display:inline-flex; padding:0; border-radius:12px; flex:none; background:none }
+.identity-edit:not(:disabled):hover { outline:2px solid var(--strong); outline-offset:3px }
+.identity-edit:disabled { opacity:1; cursor:default }
+.appearance-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px }
+.appearance-grid button { display:grid; place-items:center; padding:8px; border:1px solid var(--line); border-radius:9px }
+.appearance-grid button:hover,.appearance-grid button[aria-pressed="true"] { background:var(--raised); border-color:var(--ink) }
+.agent-role-badge .identity-icon { --avatar-size:19px; border:0; border-radius:4px }
+.agent-role-badge .identity-icon svg { width:13px; height:13px }
+.conversation-meta>.badge:first-child { color:var(--sub) }
+.coordinator-controls select { color:var(--ink); background:var(--surface) }
+.overseer-entry .badge { font-size:10px; padding:1px 5px; line-height:1.5 }
+@media(prefers-reduced-motion:reduce) { .waiting-dots i { animation:none; opacity:1 } }
+
+.reply-compose .message-input { min-height:60px; padding:10px 12px }
+.reply-compose .compose-bottom { padding:6px 10px 10px }
+.request-message .badge,.coordinator-instructions .badge { text-transform:none }
+.overseer-entry .badge.accent { color:color-mix(in srgb,var(--accent) 65%,var(--ink)) }

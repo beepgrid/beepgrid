@@ -83,6 +83,13 @@ export function TargetPicker({
       }),
     );
   }
+  function appearance(item?: Entry) {
+    return item && "metadata" in item
+      ? String(item.metadata?.appearance_icon || "")
+      : item && "icon" in item
+        ? item.icon
+        : "";
+  }
   function name(item: Entry) {
     if ("name" in item) return item.name;
     const role = agents.items.find((a) => a.id === item.agent_id);
@@ -262,6 +269,10 @@ export function TargetPicker({
                 kind={t.kind}
                 id={t.id}
                 label={names[t.kind + t.id]}
+                icon={appearance(
+                  chosenIdentities.current.get(t.id) ||
+                    q.items.find((i) => i.id === t.id),
+                )}
               />
               <span>{names[t.kind + t.id] || "Selected recipient"}</span>
               <Icon name="close" size={13} />
@@ -296,7 +307,12 @@ export function TargetPicker({
                   disabled={expanding}
                   onClick={() => void toggle(item)}
                 >
-                  <IdentityIcon kind={kind} id={item.id} label={name(item)} />
+                  <IdentityIcon
+                    kind={kind}
+                    id={item.id}
+                    label={name(item)}
+                    icon={appearance(item)}
+                  />
                   <span>
                     <strong>{name(item)}</strong>
                     <small>

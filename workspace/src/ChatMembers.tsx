@@ -98,7 +98,7 @@ export function ChatMembers({
           <div className="chat-member-list">
             {chat.participants.map((p) => (
               <div key={p.id} className="chat-member-row">
-                <IdentityIcon kind={p.kind} id={p.id} label={p.name} />
+                <IdentityIcon kind={p.kind} id={p.id} label={p.name} icon={String(p.metadata?.appearance_icon || "")} />
                 <div>
                   <strong>
                     {p.name}

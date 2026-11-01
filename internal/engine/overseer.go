@@ -599,6 +599,18 @@ func (s *Store) SummarizeOverseer(ctx context.Context, a Actor, id string) (Over
 	bounded, cancel := context.WithTimeout(context.WithValue(ctx, assistanceActorKey{}, a.Scope+"/"+a.ID), 30*time.Second)
 	defer cancel()
 	summary, err := s.OverseerSummarizer(bounded, out.Prompt, replies)
+	// Fast Agents can finish before the planner's one-second local gate opens.
+	// Wait once for that gate only. Provider failures do not trigger model retries.
+	if errors.Is(err, errAssistanceRateLimited) {
+		timer := time.NewTimer(time.Second)
+		defer timer.Stop()
+		select {
+		case <-bounded.Done():
+			return OverseerPlan{}, bounded.Err()
+		case <-timer.C:
+			summary, err = s.OverseerSummarizer(bounded, out.Prompt, replies)
+		}
+	}
 	if err != nil {
 		return OverseerPlan{}, &Error{"ASSISTANCE_UNAVAILABLE", "The replies remain available, but the summary could not be prepared.", 503}
 	}

@@ -77,6 +77,8 @@ export function MentionEditor({
   onMentions,
   participants = [],
   rows = 3,
+  label = "Message",
+  placeholder,
   onKeyDown,
 }: {
   value: string;
@@ -85,6 +87,8 @@ export function MentionEditor({
   onMentions: (v: Mention[]) => void;
   participants?: Identity[];
   rows?: number;
+  label?: string;
+  placeholder?: string;
   onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -150,7 +154,7 @@ export function MentionEditor({
       <textarea
         ref={ref}
         className={`message-input ${mentions.length ? "has-mentions" : ""}`}
-        aria-label="Message"
+        aria-label={label}
         aria-autocomplete={participants.length > 2 ? "list" : undefined}
         aria-controls={candidates.length ? "mention-suggestions" : undefined}
         aria-activedescendant={
@@ -158,9 +162,10 @@ export function MentionEditor({
         }
         aria-expanded={candidates.length ? true : undefined}
         placeholder={
-          participants.length > 2
+          placeholder ||
+          (participants.length > 2
             ? "Write a message. Use @ to mention someone..."
-            : "Write a message..."
+            : "Write a message...")
         }
         rows={rows}
         value={value}
@@ -218,7 +223,12 @@ export function MentionEditor({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => choose(p)}
             >
-              <IdentityIcon kind={p.kind} id={p.id} label={p.name} />
+              <IdentityIcon
+                kind={p.kind}
+                id={p.id}
+                label={p.name}
+                icon={String(p.metadata?.appearance_icon || "")}
+              />
               <strong>{p.name}</strong>
               <small>
                 {p.kind} · {p.id.slice(-4)}

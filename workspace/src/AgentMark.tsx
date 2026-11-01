@@ -1,3 +1,6 @@
+import { sprite_sha256 } from "../public/agent-icons/manifest.json";
+const sprite = `/agent-icons/marks.svg?v=${sprite_sha256.slice(0, 12)}`;
+
 // Original vector marks. They identify records visually, not agent capabilities.
 const marks = [
   <g>
@@ -87,8 +90,10 @@ export function identitySeed(key: string) {
   return hash >>> 0;
 }
 
-export function AgentMark({ seed }: { seed: number }) {
-  const index = (seed >>> 8) % marks.length;
+export function AgentMark({ seed, icon }: { seed: number; icon?: string }) {
+  const index = /^mark-([0-9]|1[01])$/.test(icon || "")
+    ? Number(icon!.slice(5))
+    : (seed >>> 8) % marks.length;
   return (
     <svg
       className="agent-mark"
@@ -101,13 +106,13 @@ export function AgentMark({ seed }: { seed: number }) {
         className="mark-outline"
         width="32"
         height="32"
-        href={`/agent-icons/marks.svg#lucide-${index}`}
+        href={`${sprite}#phosphor-outline-${index}`}
       />
       <use
         className="mark-duotone"
         width="32"
         height="32"
-        href={`/agent-icons/marks.svg#phosphor-${index}`}
+        href={`${sprite}#phosphor-${index}`}
       />
       <g className="mark-geometry" fill="currentColor">
         {marks[index]}

@@ -31,9 +31,11 @@ import { MentionText } from "../Mentions";
 import { RequestCard } from "../RequestCard";
 import { Compose, MessageComposer } from "../Compose";
 import {
+  Badge,
   Button,
   ConversationAvatar,
   ConversationPreview,
+  isOutcomePreview,
   conversationPeers,
   conversationLabel,
   Empty,
@@ -148,37 +150,44 @@ export default function Conversations() {
                     currentId={me.person.id}
                   />
                   <div className="conversation-copy">
-                    <strong>
-                      {conversationPeers(c.participants || [], me.person.id)
-                        .length === 1
-                        ? conversationPeers(
-                            c.participants || [],
-                            me.person.id,
-                          )[0].name
-                        : c.title || "Group chat"}
-                    </strong>
-                    <p>
-                      <ConversationPreview
-                        body={
-                          c.last_preview ||
-                          (c.shared
-                            ? "No messages yet"
-                            : c.title === "Conversation"
-                              ? "Start a conversation"
-                              : c.title)
-                        }
-                      />
-                    </p>
-                    <div className="conversation-meta">
-                      <span>
-                        {conversationLabel(c.participants || [], me.person.id)}
-                      </span>
+                    <div className="conversation-row-title">
+                      <strong>
+                        {conversationPeers(c.participants || [], me.person.id)
+                          .length === 1
+                          ? conversationPeers(
+                              c.participants || [],
+                              me.person.id,
+                            )[0].name
+                          : c.title || "Group chat"}
+                      </strong>
                       <time
                         dateTime={c.last_activity_at || c.created_at}
                         title={timestamp(c.last_activity_at || c.created_at)}
                       >
                         {relative(c.last_activity_at || c.created_at)}
                       </time>
+                    </div>
+                    {!isOutcomePreview(c.last_preview || "") ? (
+                      <p>
+                        <ConversationPreview
+                          body={
+                            c.last_preview ||
+                            (c.shared
+                              ? "No messages yet"
+                              : c.title === "Conversation"
+                                ? "Start a conversation"
+                                : c.title)
+                          }
+                        />
+                      </p>
+                    ) : null}
+                    <div className="conversation-meta">
+                      <Badge>
+                        {conversationLabel(c.participants || [], me.person.id)}
+                      </Badge>
+                      {isOutcomePreview(c.last_preview || "") ? (
+                        <ConversationPreview body={c.last_preview!} />
+                      ) : null}
                     </div>
                   </div>
                 </button>
@@ -242,6 +251,25 @@ function Chat({ id }: { id: string }) {
     { conversation_id: id },
     !!q.data && !q.error,
   );
+  const [selectedReply, setSelectedReply] = useState<string | null>(null);
+  const [separateMessage, setSeparateMessage] = useState(false);
+  const incoming = related.items.filter(
+    (r) =>
+      r.state === "open" &&
+      r.kind === "question" &&
+      !r.choices?.length &&
+      r.requester_id !== me.person.id &&
+      q.data?.participants.some((p) => p.id === me.person.id),
+  );
+  const replyTo =
+    incoming.find((r) => r.id === selectedReply) ||
+    (!separateMessage && incoming.length === 1 ? incoming[0] : undefined);
+  const replyCaps = usePostResource<Capability>(
+    "/capabilities",
+    { target: {}, request_id: replyTo?.id, connection_id: undefined },
+    !!replyTo,
+  );
+  const replying = replyCaps.data?.operations.respond ? replyTo : undefined;
   const decisions = related.items.filter((r) => r.response && r.resolved_at);
   useLayoutEffect(() => {
     const el = scroll.current;
@@ -267,12 +295,10 @@ function Chat({ id }: { id: string }) {
     return () => observer.disconnect();
   }, [!!q.data, id]);
   useEffect(() => {
-    if (
-      accessUnavailable(q.error) ||
-      accessUnavailable(caps.error) ||
-      (caps.data && !caps.data.operations.message)
-    )
+    if (accessUnavailable(q.error) || accessUnavailable(caps.error))
       clearConversationDrafts(id);
+    else if (caps.data && !caps.data.operations.message)
+      clearConversationDrafts(id, false);
   }, [q.error, caps.error, caps.data, id]);
   if (q.isPending) return <Loading label="Opening conversation" />;
   if (!q.data)
@@ -395,6 +421,11 @@ function Chat({ id }: { id: string }) {
                       )?.kind || "person"
                     }
                     id={item.value.resolved_by}
+                    icon={String(
+                      knownParticipants.find(
+                        (p) => p.id === item.value.resolved_by,
+                      )?.metadata?.appearance_icon || "",
+                    )}
                     label={
                       knownParticipants.find(
                         (p) => p.id === item.value.resolved_by,
@@ -440,6 +471,14 @@ function Chat({ id }: { id: string }) {
                   sender={knownParticipants.find(
                     (p) => p.id === item.value.requester_id,
                   )}
+                  replying={replying?.id === item.value.id}
+                  onReply={(r) => {
+                    setSelectedReply(r.id);
+                    setSeparateMessage(false);
+                    document
+                      .querySelector<HTMLTextAreaElement>(".composer textarea")
+                      ?.focus();
+                  }}
                   onFollowUp={() =>
                     document
                       .querySelector<HTMLTextAreaElement>(".composer textarea")
@@ -495,14 +534,24 @@ function Chat({ id }: { id: string }) {
       ) : null}
       <div className="composer">
         <ErrorView error={error} />
-        {caps.isPending ? (
+        {caps.isPending || (replyTo && replyCaps.isPending) ? (
           <Loading label="Checking conversation access" />
-        ) : caps.data?.operations.message && destination ? (
+        ) : replying || (caps.data?.operations.message && destination) ? (
           <MessageComposer
+            key={replying?.id || "message"}
+            replyTo={replying}
+            replyAuthor={
+              knownParticipants.find((p) => p.id === replying?.requester_id)
+                ?.name
+            }
+            onClearReply={() => {
+              setSelectedReply(null);
+              setSeparateMessage(true);
+            }}
             conversation={id}
             participants={c.participants}
-            targets={[destination]}
-            canAsk={!!caps.data.operations.ask}
+            targets={destination ? [destination] : []}
+            canAsk={!!caps.data?.operations.ask}
             onSent={() => {
               pinned.current = true;
             }}
@@ -527,7 +576,15 @@ const ChatMessage = memo(function ChatMessage({
 }) {
   return (
     <article className="message">
-      <IdentityIcon id={m.sender_id} kind={kind} label={name} />
+      <IdentityIcon
+        id={m.sender_id}
+        kind={kind}
+        label={name}
+        icon={String(
+          participants.find((p) => p.id === m.sender_id)?.metadata
+            ?.appearance_icon || "",
+        )}
+      />
       <div className="message-body">
         <div className="message-meta">
           <strong>{name}</strong>

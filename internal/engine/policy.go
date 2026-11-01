@@ -287,7 +287,7 @@ func (s *Store) Bindings(ctx context.Context, a Actor) ([]Binding, error) {
 }
 func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	ctx = withPolicySnapshot(ctx)
-	rows, e := s.Pool.Query(ctx, `SELECT g.id,g.name,COALESCE(jsonb_agg(m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]'),g.version,g.created_by,g.purpose FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 GROUP BY g.id ORDER BY g.name`, a.Scope)
+	rows, e := s.Pool.Query(ctx, `SELECT g.id,g.name,COALESCE(jsonb_agg(m.principal_id) FILTER(WHERE m.principal_id IS NOT NULL),'[]'),g.version,g.created_by,g.purpose,g.icon FROM groups g LEFT JOIN memberships m ON m.scope=g.scope AND m.group_id=g.id WHERE g.scope=$1 GROUP BY g.id ORDER BY g.name`, a.Scope)
 	if e != nil {
 		return nil, e
 	}
@@ -296,7 +296,7 @@ func (s *Store) Groups(ctx context.Context, a Actor) ([]Group, error) {
 	for rows.Next() {
 		var g Group
 		var raw []byte
-		if e = rows.Scan(&g.ID, &g.Name, &raw, &g.Version, &g.CreatedBy, &g.Purpose); e != nil {
+		if e = rows.Scan(&g.ID, &g.Name, &raw, &g.Version, &g.CreatedBy, &g.Purpose, &g.Icon); e != nil {
 			return nil, e
 		}
 		_ = json.Unmarshal(raw, &g.Members)
@@ -395,7 +395,7 @@ func (s *Store) SaveGroup(ctx context.Context, a Actor, g Group) (Group, error) 
 		if _, e = tx.Exec(ctx, `INSERT INTO memberships(scope,group_id,principal_id) SELECT $1,$2,id FROM unnest($3::text[]) member(id) ON CONFLICT DO NOTHING`, a.Scope, g.ID, g.Members); e != nil {
 			return e
 		}
-		if e = tx.QueryRow(ctx, `SELECT version,created_by,purpose FROM groups WHERE scope=$1 AND id=$2`, a.Scope, g.ID).Scan(&g.Version, &g.CreatedBy, &g.Purpose); e != nil {
+		if e = tx.QueryRow(ctx, `SELECT version,created_by,purpose,icon FROM groups WHERE scope=$1 AND id=$2`, a.Scope, g.ID).Scan(&g.Version, &g.CreatedBy, &g.Purpose, &g.Icon); e != nil {
 			return e
 		}
 		g.Member = contains(g.Members, a.ID)

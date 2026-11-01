@@ -193,14 +193,17 @@ export function clearDrafts() {
       if (k.startsWith(draftPrefix)) sessionStorage.removeItem(k);
   } catch {}
 }
-export function clearConversationDrafts(id: string) {
+export function clearConversationDrafts(id: string, includeReplies = true) {
   try {
     for (const key of Object.keys(sessionStorage))
       if (
         key.startsWith(draftPrefix) &&
         (key.endsWith(":message:" + id) ||
           key.endsWith(":mentions:" + id) ||
-          key.endsWith(":operation:message:" + id))
+          key.endsWith(":operation:message:" + id) ||
+          (includeReplies &&
+            (key.includes(":reply:" + id + ":") ||
+              key.includes(":reply-mentions:" + id + ":"))))
       )
         sessionStorage.removeItem(key);
   } catch {}

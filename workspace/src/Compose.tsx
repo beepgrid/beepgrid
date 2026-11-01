@@ -1,7 +1,13 @@
 import { useState, useRef, type ReactNode } from "react";
 import { useCollection, useDraft, useOperation, useSession } from "./data";
 import { MentionEditor } from "./Mentions";
-import type { Identity, Mention, Target, Attachment } from "./contracts";
+import type {
+  Request,
+  Identity,
+  Mention,
+  Target,
+  Attachment,
+} from "./contracts";
 import { bytes, upload } from "./client";
 import { fileSize } from "./Attachments";
 import { navigate } from "./navigation";
@@ -17,6 +23,9 @@ export function MessageComposer({
   replyRequired = false,
   delivery = "individual",
   participants = [],
+  replyTo,
+  replyAuthor,
+  onClearReply,
 }: {
   targets?: Target[];
   conversation?: string;
@@ -26,22 +35,28 @@ export function MessageComposer({
   replyRequired?: boolean;
   delivery?: "individual" | "group";
   participants?: Identity[];
+  replyTo?: Request;
+  replyAuthor?: string;
+  onClearReply?: () => void;
 }) {
-  const [body, setBody] = useDraft(
-    "message:" +
+  const draftID = replyTo
+    ? "reply:" + conversation + ":" + replyTo.id
+    : "message:" +
       (conversation ||
         targets
           .map((t) => t.kind + t.id)
           .sort()
-          .join(",")),
-  );
+          .join(","));
+  const [body, setBody] = useDraft(draftID);
   const [mentionDraft, setMentionDraft] = useDraft(
-    "mentions:" +
-      (conversation ||
-        targets
-          .map((t) => t.kind + t.id)
-          .sort()
-          .join(",")),
+    replyTo
+      ? "reply-mentions:" + conversation + ":" + replyTo.id
+      : "mentions:" +
+          (conversation ||
+            targets
+              .map((t) => t.kind + t.id)
+              .sort()
+              .join(",")),
   );
   let mentions: Mention[] = [];
   try {
@@ -120,19 +135,26 @@ export function MessageComposer({
   const [approval, setApproval] = useState(false),
     [choices, setChoices] = useState<string[]>([]),
     [error, setError] = useState<Error | null>(null);
-  const op = useOperation(
-    "message:" +
-      (conversation ||
-        targets
-          .map((t) => t.kind + t.id)
-          .sort()
-          .join(",")),
-  );
+  const op = useOperation(draftID);
   async function send() {
     if ((!body.trim() && !files.length) || waitingFiles || op.pending) return;
     setError(null);
     if (bytes(body) > 32768) {
       setError(Error("Your message is too long. Keep it under 32 KB."));
+      return;
+    }
+    if (replyTo) {
+      const result = await op.run(`/requests/${replyTo.id}/responses`, {
+        version: replyTo.version,
+        outcome: "answered",
+        answer: body,
+      });
+      if (result) {
+        setBody("");
+        op.forget();
+        onClearReply?.();
+        onSent?.(conversation);
+      }
       return;
     }
     if (!conversation && !targets.length) {
@@ -222,16 +244,36 @@ export function MessageComposer({
     }
   }
   return (
-    <div className="message-compose">
+    <div className={`message-compose ${replyTo ? "reply-compose" : ""}`}>
       <Form onSubmit={() => void send()}>
         <ErrorView error={error || op.error} />
+        {replyTo ? (
+          <div className="reply-context">
+            <div>
+              <strong>Reply to {replyAuthor || "request"}</strong>
+              <p>{replyTo.body || replyTo.title}</p>
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Write a separate message instead"
+              onClick={onClearReply}
+            >
+              <Icon name="close" size={15} />
+            </button>
+          </div>
+        ) : null}
         <MentionEditor
           value={body}
           onChange={setBody}
           mentions={mentions}
           onMentions={setMentions}
           participants={participants}
-          rows={conversation ? 2 : 3}
+          label={replyTo ? "Reply" : "Message"}
+          placeholder={
+            replyTo ? `Answer ${replyAuthor || "this request"}...` : undefined
+          }
+          rows={replyTo ? 1 : conversation ? 2 : 3}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
@@ -324,13 +366,15 @@ export function MessageComposer({
         ) : null}
         <div className="compose-bottom">
           <div className="actions">
-            <Button
-              icon="attachment"
-              disabled={op.pending || files.length >= 5}
-              onClick={() => fileInput.current?.click()}
-            >
-              Attach files
-            </Button>
+            {!replyTo ? (
+              <Button
+                icon="attachment"
+                disabled={op.pending || files.length >= 5}
+                onClick={() => fileInput.current?.click()}
+              >
+                Attach files
+              </Button>
+            ) : null}
             <input
               hidden
               type="file"
@@ -341,7 +385,7 @@ export function MessageComposer({
               onChange={(e) => void attach(e.target.files)}
             />
 
-            {canAsk && !approval && !choices.length ? (
+            {!replyTo && canAsk && !approval && !choices.length ? (
               <>
                 <Button icon="plus" onClick={() => setApproval(true)}>
                   Request approval
@@ -367,7 +411,7 @@ export function MessageComposer({
               (!conversation && !targets.length)
             }
           >
-            {op.pending ? "Sending..." : "Send"}
+            {op.pending ? "Sending..." : replyTo ? "Send reply" : "Send"}
           </Button>
         </div>
       </Form>

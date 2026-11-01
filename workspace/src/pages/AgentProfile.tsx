@@ -22,7 +22,6 @@ import {
   Button,
   ConversationAvatar,
   ConversationPreview,
-  Details,
   ErrorView,
   Icon,
   IdentityIcon,
@@ -33,6 +32,7 @@ import {
   Tabs,
 } from "../ui";
 import { GroupForm } from "./Groups";
+import AppearancePicker from "../AppearancePicker";
 
 const Permissions = lazy(() => import("./Permissions"));
 const AgentContacts = lazy(() => import("./AgentContacts"));
@@ -94,6 +94,7 @@ function Profile({
 }) {
   const [compose, setCompose] = useState<Target[] | null>(null),
     [editRoles, setEditRoles] = useState(false),
+    [appearance, setAppearance] = useState(false),
     [confirm, setConfirm] = useState(false);
   const caps = useCapabilities({ kind: "agent", id: p.id });
   const op = useOperation();
@@ -136,13 +137,45 @@ function Profile({
   return (
     <div className="agent-profile">
       <header className="agent-profile-head">
-        <IdentityIcon kind="agent" id={p.id} label={p.name} />
+        <button
+          className="identity-edit"
+          disabled={!caps.data?.operations.manage}
+          aria-label={`Change ${p.name} icon`}
+          onClick={() => setAppearance(true)}
+        >
+          <IdentityIcon
+            kind="agent"
+            id={p.id}
+            label={p.name}
+            icon={String(p.metadata?.appearance_icon || "")}
+          />
+        </button>
         <div className="agent-profile-title">
           <div>
             <h1>{p.name}</h1>
             <Status value={state} />
           </div>
           {description ? <p>{description}</p> : null}
+          <div className="agent-role-line">
+            {roles.items.map((g) => (
+              <button
+                key={g.id}
+                className="agent-role-badge"
+                onClick={() => navigate("/agents?role=" + g.id)}
+              >
+                <IdentityIcon kind="group" id={g.id} icon={g.icon} />
+                {g.name}
+              </button>
+            ))}
+            {global.data?.operations.create_group ? (
+              <Button
+                onClick={() => setEditRoles(true)}
+                aria-label="Manage Agent roles"
+              >
+                Manage roles
+              </Button>
+            ) : null}
+          </div>
         </div>
         <div className="actions">
           {caps.data?.operations.enroll_agent ||
@@ -161,21 +194,6 @@ function Profile({
           ) : null}
         </div>
       </header>
-      <div className="agent-role-line">
-        <Icon name="groups" size={15} />
-        <span>Agent roles</span>
-        {roles.items.map((g) => (
-          <Badge key={g.id}>{g.name}</Badge>
-        ))}
-        {!roles.isPending && !roles.items.length ? (
-          <span className="muted">No visible roles</span>
-        ) : null}
-        {global.data?.operations.create_group ? (
-          <button className="text-action" onClick={() => setEditRoles(true)}>
-            Manage
-          </button>
-        ) : null}
-      </div>
       <ErrorView error={caps.error || roles.error || op.error} />
       <Tabs
         value={tab}
@@ -351,20 +369,13 @@ function Profile({
       {tab === "access" ? (
         <Suspense fallback={<Loading />}>
           <Permissions profile={p} embedded />
+          {caps.data?.operations.manage ? (
+            <Button danger={!p.disabled} onClick={() => setConfirm(true)}>
+              {p.disabled ? "Enable Agent" : "Disable Agent"}
+            </Button>
+          ) : null}
         </Suspense>
       ) : null}
-      <details className="advanced-access profile-details">
-        <summary>Agent details</summary>
-        <Details
-          label="Identifiers"
-          value={{ id: p.id, external_id: p.external_id, metadata: p.metadata }}
-        />
-        {caps.data?.operations.manage ? (
-          <Button danger={!p.disabled} onClick={() => setConfirm(true)}>
-            {p.disabled ? "Enable Agent" : "Disable Agent"}
-          </Button>
-        ) : null}
-      </details>
       {confirm ? (
         <Modal
           title={p.disabled ? "Enable Agent" : "Disable Agent"}
@@ -394,6 +405,15 @@ function Profile({
       ) : null}
       {compose ? (
         <Compose initial={compose} onClose={() => setCompose(null)} />
+      ) : null}
+      {appearance ? (
+        <AppearancePicker
+          kind="agent"
+          id={p.id}
+          name={p.name}
+          icon={String(p.metadata?.appearance_icon || "")}
+          onClose={() => setAppearance(false)}
+        />
       ) : null}
       {editRoles ? (
         <AgentRoles agent={p} onClose={() => setEditRoles(false)} />
@@ -495,7 +515,7 @@ function RoleMembership({
   const caps = useCapabilities({ kind: "group", id: g.id });
   return (
     <div>
-      <IdentityIcon kind="group" id={g.id} />
+      <IdentityIcon kind="group" id={g.id} icon={g.icon} />
       <strong>{g.name}</strong>
       {g.members.includes(agent.id) ? <Badge tone="good">Member</Badge> : null}
       {caps.data?.operations.manage ? (

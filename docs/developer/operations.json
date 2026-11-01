@@ -726,5 +726,12 @@
     "returns": "The current direct policy, effective action cells and sources for up to 100 contacts, warnings and save eligibility.",
     "errors": "Reload on version conflict. Visibility and assignment authority remain separate. A preview is never a grant.",
     "family": "Permissions"
+  },
+  "POST /api/v1/appearance": {
+    "description": "Change an Agent or group icon from the bundled pack, or reset its default.",
+    "returns": "Target, selected icon and current group version. Appearance changes do not alter membership or permissions.",
+    "family": "identities",
+    "audience": "A current manager of the target Agent or group.",
+    "errors": "Invalid icons are rejected. A stale group revision conflicts. Other workspaces and unmanaged identities remain inaccessible."
   }
 }

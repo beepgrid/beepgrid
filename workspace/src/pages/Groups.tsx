@@ -1,6 +1,7 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { useCapabilities, useCollection, useOperation } from "../data";
 import type { Group, Identity, Target } from "../contracts";
+import AppearancePicker from "../AppearancePicker";
 import { TargetPicker } from "../TargetPicker";
 import { navigate } from "../navigation";
 import {
@@ -18,10 +19,12 @@ import {
 export default function Groups({
   purpose = "team",
   embedded = false,
+  initialID,
 }: {
   purpose?: "team" | "agent_role" | "contacts";
   embedded?: boolean;
   section?: string;
+  initialID?: string;
 }) {
   const [search, setSearch] = useState(""),
     [selected, setSelected] = useState<Group | null>(null),
@@ -30,6 +33,16 @@ export default function Groups({
       purpose,
     }),
     caps = useCapabilities();
+  const openedID = useRef("");
+  useEffect(() => {
+    if (initialID && openedID.current !== initialID) {
+      const group = q.items.find((g) => g.id === initialID);
+      if (group) {
+        openedID.current = initialID;
+        setSelected(group);
+      }
+    }
+  }, [initialID, q.data]);
   const label =
     purpose === "agent_role"
       ? "Agent roles"
@@ -64,7 +77,12 @@ export default function Groups({
               key={g.id}
               onClick={() => setSelected(g)}
             >
-              <IdentityIcon kind="group" id={g.id} label={g.name} />
+              <IdentityIcon
+                kind="group"
+                id={g.id}
+                label={g.name}
+                icon={g.icon}
+              />
               <div className="contact-name">
                 <strong>{g.name}</strong>
                 <small>
@@ -85,7 +103,13 @@ export default function Groups({
         </div>
       </QueryState>
       {selected ? (
-        <GroupDetail group={selected} onClose={() => setSelected(null)} />
+        <GroupDetail
+          group={q.items.find((g) => g.id === selected.id) || selected}
+          onClose={() => {
+            setSelected(null);
+            if (initialID) navigate("/agents");
+          }}
+        />
       ) : null}
       {create ? (
         <GroupForm purpose={purpose} onClose={() => setCreate(false)} />
@@ -100,7 +124,8 @@ function GroupDetail({
   group: Group;
   onClose: () => void;
 }) {
-  const [edit, setEdit] = useState(false);
+  const [edit, setEdit] = useState(false),
+    [appearance, setAppearance] = useState(false);
   const caps = useCapabilities({ kind: "group", id: g.id }),
     people = useCollection<Identity>(
       g.purpose === "agent_role" ? "agents" : "people",
@@ -122,6 +147,14 @@ function GroupDetail({
   return (
     <Modal title={g.name} onClose={onClose}>
       <div className="actions">
+        <button
+          className="identity-edit"
+          disabled={!caps.data?.operations.manage}
+          aria-label={`Change ${g.name} icon`}
+          onClick={() => setAppearance(true)}
+        >
+          <IdentityIcon kind="group" id={g.id} label={g.name} icon={g.icon} />
+        </button>
         {caps.data?.operations.manage ? (
           <Button onClick={() => setEdit(true)}>
             Edit{" "}
@@ -148,7 +181,12 @@ function GroupDetail({
             <QueryState key={i} query={q} empty="">
               {q.items.map((p) => (
                 <div className="team-member" key={p.id}>
-                  <IdentityIcon kind={p.kind} id={p.id} label={p.name} />
+                  <IdentityIcon
+                    kind={p.kind}
+                    id={p.id}
+                    label={p.name}
+                    icon={String(p.metadata?.appearance_icon || "")}
+                  />
                   <strong>{p.name}</strong>
                 </div>
               ))}
@@ -159,6 +197,16 @@ function GroupDetail({
           <p className="help">Only members you can see are shown.</p>
         ) : null}
       </section>
+      {appearance ? (
+        <AppearancePicker
+          kind="group"
+          id={g.id}
+          name={g.name}
+          icon={g.icon}
+          version={g.version}
+          onClose={() => setAppearance(false)}
+        />
+      ) : null}
       {edit ? (
         <GroupForm
           group={g}

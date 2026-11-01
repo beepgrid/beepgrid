@@ -7,7 +7,55 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
+
+func TestFastCoordinatorRepliesRespectTheLocalModelGate(t *testing.T) {
+	for _, cancelled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "automatic_summary", true: "cancelled_wait"}[cancelled], func(t *testing.T) {
+			s, owner := testStore(t)
+			ctx := context.Background()
+			worker := testWorker(t, s, owner, "Fast reviewer")
+			var calls atomic.Int32
+			s.configureOverseer(boundedAssistance(func(_ context.Context, _ string, payload, out any) error {
+				calls.Add(1)
+				var result any = map[string]string{"summary": "The fallback is ready."}
+				if payload.(map[string]any)["task"] == "overseer_plan" {
+					result = OverseerDecision{Operation: "question", Summary: "Ask the reviewer", Instructions: []OverseerInstruction{{worker.ID, "question", "Check the fallback"}}}
+				}
+				return json.Unmarshal(JSON(result), out)
+			}))
+			enableAssistance(t, s, owner, true)
+			plan, err := s.Coordinate(ctx, owner, OverseerInput{Prompt: "Review readiness"}, "fast-review")
+			if err != nil {
+				t.Fatal(err)
+			}
+			request, err := s.Request(ctx, worker, plan.Dispatches[0].RequestID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = s.Respond(ctx, worker, request.ID, Response{Version: request.Version, Outcome: "answered", Answer: "Ready"}); err != nil {
+				t.Fatal(err)
+			}
+			if cancelled {
+				limited, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+				defer cancel()
+				_, err = s.SummarizeOverseer(limited, owner, plan.ID)
+				if !errors.Is(err, context.DeadlineExceeded) || calls.Load() != 1 {
+					t.Fatal("cancelled wait reached the provider", err, calls.Load())
+				}
+				return
+			}
+			if n, err := s.ProcessCoordinatorSummary(ctx); err != nil || n != 1 {
+				t.Fatal(n, err)
+			}
+			result, err := s.OverseerPlan(ctx, owner, plan.ID)
+			if err != nil || result.SummaryError != "" || result.ReplySummary != "The fallback is ready." || calls.Load() != 2 {
+				t.Fatal(result, err, calls.Load())
+			}
+		})
+	}
+}
 
 func TestExplicitBlockingCyclesAndResolution(t *testing.T) {
 	s, owner := testStore(t)

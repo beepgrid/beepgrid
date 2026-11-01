@@ -25,6 +25,8 @@ const paths: Record<string, string> = {
   permissions: "m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6z M8 12l3 3 5-6",
   integrations: "M9 3v5m6-5v5 M6 8h12v3a6 6 0 0 1-6 6v5 M8 5h8",
   fleet: "M3 4h6v6H3z M15 4h6v6h-6z M9 16h6v6H9z M6 10v3h12v-3 M12 13v3",
+  warning:
+    "M10.3 3.8a2 2 0 0 1 3.4 0l8.1 14A2 2 0 0 1 20.1 21H3.9a2 2 0 0 1-1.7-3.2Z M12 9v4 M12 17h.01",
   activity: "M3 12h4l3-8 4 16 3-8h4",
   settings:
     "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z",
@@ -107,10 +109,12 @@ export function IdentityIcon({
   kind = "agent",
   label,
   id,
+  icon,
 }: {
   kind?: string;
   label?: string;
   id?: string;
+  icon?: string;
 }) {
   const seed = identitySeed(`${kind}:${id || label || "unassigned"}`);
   const glyph =
@@ -119,7 +123,11 @@ export function IdentityIcon({
       : kind === "service"
         ? "service"
         : kind === "group"
-          ? "groups"
+          ? roleGlyphs[
+              /^role-([0-9]|1[01])$/.test(icon || "")
+                ? Number(icon!.slice(5))
+                : (seed >>> 8) % roleGlyphs.length
+            ]
           : kind === "instance"
             ? "code"
             : "conversations";
@@ -132,7 +140,7 @@ export function IdentityIcon({
       aria-hidden="true"
     >
       {kind === "agent" ? (
-        <AgentMark seed={seed} />
+        <AgentMark seed={seed} icon={icon} />
       ) : kind === "person" && label ? (
         initials(label)
       ) : (
@@ -150,7 +158,22 @@ function initials(name: string) {
     .join("")
     .toLocaleUpperCase();
 }
-type Participant = Pick<Identity, "id" | "kind" | "name">;
+const roleGlyphs = [
+  "fleet",
+  "code",
+  "permissions",
+  "task",
+  "globe",
+  "bolt",
+  "service",
+  "link",
+  "spark",
+  "people",
+  "integrations",
+  "agents",
+];
+type Participant = Pick<Identity, "id" | "kind" | "name"> &
+  Partial<Pick<Identity, "metadata">>;
 export function conversationPeers(
   participants: readonly Participant[],
   currentId: string,
@@ -186,6 +209,7 @@ export function ConversationAvatar({
         id={peers[0]?.id}
         kind={peers[0]?.kind || "conversation"}
         label={peers[0]?.name}
+        icon={String(peers[0]?.metadata?.appearance_icon || "")}
       />
     );
   return (
@@ -200,6 +224,7 @@ export function ConversationAvatar({
           id={person.id}
           kind={person.kind}
           label={person.name}
+          icon={String(person.metadata?.appearance_icon || "")}
         />
       ))}
       {peers.length > 4 ? (
@@ -293,17 +318,18 @@ export function RequestStatus({
 }
 // The conversation API uses exact outcome labels as its latest preview.
 // Only style complete labels; never infer a state from message substrings.
-export function ConversationPreview({ body }: { body: string }) {
-  const status = [
+export function isOutcomePreview(body: string) {
+  return [
     "answered",
     "approved",
     "denied",
     "completed",
     "failed",
     "rejected",
-  ].includes(body)
-    ? requestStates[body]
-    : undefined;
+  ].includes(body);
+}
+export function ConversationPreview({ body }: { body: string }) {
+  const status = isOutcomePreview(body) ? requestStates[body] : undefined;
   return status ? (
     <Badge tone={status.tone}>{status.label}</Badge>
   ) : (

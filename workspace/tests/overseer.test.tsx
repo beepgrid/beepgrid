@@ -93,16 +93,15 @@ it("keeps a 25-agent result compact and reveals canonical per-agent details on d
   vi.stubGlobal("fetch", fetcher);
   const { Wrapper } = harness();
   render(<Overseer />, { wrapper: Wrapper });
-  const summary = await screen.findByText(
-    "25 Agents · 3 of 25 replies received · Details",
-  );
-  expect(screen.queryByText("Result 0")).not.toBeInTheDocument();
-  fireEvent.click(summary);
   await screen.findByText("Result 0");
   expect(
     screen.getAllByRole("button", { name: "Open conversation" }),
+  ).toHaveLength(5);
+  fireEvent.click(screen.getByRole("button", { name: "Show 20 more Agents" }));
+  expect(
+    screen.getAllByRole("button", { name: "Open conversation" }),
   ).toHaveLength(25);
-  expect(screen.getAllByText("Awaiting an authorized reply")).toHaveLength(22);
+  expect(screen.getAllByText("Awaiting reply")).toHaveLength(22);
 });
 
 it("opens the explicit assistant without enrolling it or querying a fake identity", async () => {
@@ -236,9 +235,9 @@ it("reloads private chronological turns, sends bounded follow-up identity and cl
   const next = harness();
   render(<Overseer />, { wrapper: next.Wrapper });
   await screen.findByText("Explain that");
-  expect(
-    screen.getAllByRole("separator", { name: "Topic" }),
-  ).toHaveLength(2);
+  expect(screen.getAllByRole("separator", { name: "New topic" })).toHaveLength(
+    2,
+  );
   expect(
     posts
       .filter((p) => p.path.endsWith("/query"))
@@ -289,11 +288,6 @@ it("keeps a proposed exact instruction separate from direct chat and requires ex
   expect(mutations).toEqual([
     { path: "/api/v1/fleet/command", body: { plan_id: "ovr_first" } },
   ]);
-  const details = screen
-    .getByText("1 Agent · messages accepted · Details")
-    .closest("details")!;
-  details.open = true;
-  fireEvent(details, new Event("toggle"));
   fireEvent.click(
     await screen.findByRole("button", { name: "Open conversation" }),
   );
@@ -376,6 +370,66 @@ it("refreshes saved assistant turns on reply and assistant events and clears the
   expect(query.getQueryState(key)?.isInvalidated).toBe(true);
   applyLiveEvent(query, "scope", "overseer", { kind: "assistance.updated" });
   expect(query.getQueryData(key)).toBeUndefined();
+});
+
+it("replaces waiting with canonical replies and a combined summary on live events without remounting", async () => {
+  let turn: Plan = {
+    ...plan(),
+    operation: "question",
+    body: "Check readiness",
+    automatic: true,
+    instructions: [
+      { agent_id: agent.id, operation: "question", body: "Check the fallback" },
+    ],
+    dispatches: [
+      {
+        agent_id: agent.id,
+        conversation_id: "con_live",
+        request_id: "req_live",
+      },
+    ],
+    replies: [{ id: "req_live", state: "open" } as any],
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) =>
+      path.endsWith("/assistance/settings")
+        ? json(settings)
+        : json({
+            items:
+              requestBody(init).collection === "overseer_plans" ? [turn] : [],
+          }),
+    ),
+  );
+  const { Wrapper, query } = harness();
+  render(<Overseer />, { wrapper: Wrapper });
+  await screen.findByText("Waiting for replies");
+  expect(screen.queryByText(/Sources and freshness/)).not.toBeInTheDocument();
+  turn = {
+    ...turn,
+    replies: [
+      {
+        id: "req_live",
+        state: "resolved",
+        response: { outcome: "answered", answer: "The fallback is ready." },
+      } as any,
+    ],
+    reply_summary: "The team is ready.",
+  };
+  await act(async () =>
+    applyLiveEvent(
+      query,
+      `${me.company}/${me.environment}/${me.person.id}`,
+      "overseer",
+      { kind: "request.resolved" },
+    ),
+  );
+  await screen.findByText("The fallback is ready.");
+  await screen.findByText("The team is ready.");
+  expect(screen.queryByText("Waiting for replies")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Open conversation" }),
+  ).toBeVisible();
 });
 
 it("retries a lost planning response with its original context and key after refreshed history", async () => {

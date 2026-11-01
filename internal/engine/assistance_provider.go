@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,6 +19,8 @@ import (
 // assistanceCaller is provider-neutral. Only the bounded authorized payload crosses
 // this interface. The provider gets no engine credential, executable tool or database access.
 type assistanceCall func(context.Context, string, any, any) error
+
+var errAssistanceRateLimited = errors.New("assistance rate limited")
 
 // AIConfig is startup-only model configuration for applications embedding the engine.
 type AIConfig = aimodel.Config
@@ -114,7 +117,7 @@ func boundedAssistance(call assistanceCall) assistanceCall {
 		}
 		if now.Sub(last[person]) < time.Second {
 			mu.Unlock()
-			return fmt.Errorf("assistance rate limited")
+			return errAssistanceRateLimited
 		}
 		count++
 		last[person] = now

@@ -104,7 +104,7 @@ export default function Fleet() {
           {deadlocks.length ? (
             <section className="fleet-deadlock" id="blocking-dependencies">
               <header>
-                <Icon name="activity" size={18} />
+                <Icon name="warning" size={18} />
                 <h2>Agents are waiting on each other</h2>
                 <Badge tone="warn">{cycles.size} Agents blocked</Badge>
               </header>
@@ -121,7 +121,11 @@ export default function Fleet() {
                         navigate("/conversations/" + d.conversation_id)
                       }
                     >
-                      <IdentityIcon kind="agent" id={d.from.id} />
+                      <IdentityIcon
+                        kind="agent"
+                        id={d.from.id}
+                        icon={String(d.from.metadata?.appearance_icon || "")}
+                      />
                       <strong>{d.from.name}</strong>
                       <Icon name="arrow" size={14} />
                       <span>{d.to.name}</span>
@@ -167,7 +171,13 @@ export default function Fleet() {
                           <tr key={a.agent.id}>
                             <td>
                               <div className="fleet-identity">
-                                <IdentityIcon kind="agent" id={a.agent.id} />
+                                <IdentityIcon
+                                  kind="agent"
+                                  id={a.agent.id}
+                                  icon={String(
+                                    a.agent.metadata?.appearance_icon || "",
+                                  )}
+                                />
                                 <div>
                                   <strong>{a.agent.name}</strong>
                                   <small>

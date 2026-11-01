@@ -90,7 +90,7 @@ export default function AgentContacts({ agent }: { agent: Identity }) {
                   <IdentityIcon
                     kind={p.target.kind}
                     id={p.target.id}
-                    label={p.name}
+                    label={p.name} icon={String(directory.items.find((i) => i.id === p.target.id)?.metadata?.appearance_icon || "")}
                   />
                   <div>
                     <strong>{p.name}</strong>

@@ -40,8 +40,8 @@ for (const name of assets) {
 const budgets = {
   entry_js_gzip_kib: 96,
   all_js_gzip_kib: 145,
-  // Shared request badges, topic separation and readable Fleet controls.
-  css_gzip_kib: 14,
+  // Shared reply context, compact Coordinator controls and persisted icon chooser.
+  css_gzip_kib: 15,
   all_fonts_kib: 320,
   largest_font_kib: 96,
 };
@@ -58,6 +58,11 @@ const icons = JSON.parse(
 const sprite = await fs.readFile(path.join(dist, "agent-icons/marks.svg"));
 if (createHash("sha256").update(sprite).digest("hex") !== icons.sprite_sha256)
   throw Error("Agent icon sprite integrity mismatch");
+for (let i = 0; i < 12; i++) {
+  const symbol = sprite.toString().match(new RegExp(`<symbol id="phosphor-outline-${i}"[^>]*>([\\s\\S]*?)</symbol>`));
+  if (!symbol || !symbol[1].includes("<path") || symbol[1].includes('opacity="0.2"'))
+    throw Error("Missing outline icon geometry: " + i);
+}
 if (gzipSync(sprite).length > 5 * 1024)
   throw Error("Agent icon sprite exceeds 5 KiB gzip");
 for (const key of Object.keys(budgets))

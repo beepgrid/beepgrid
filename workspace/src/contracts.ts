@@ -109,6 +109,7 @@ export type Conversation = {
   messages?: Message[];
 };
 export type Group = {
+  icon?: string;
   purpose?: "team" | "agent_role" | "contacts";
   id: string;
   name: string;

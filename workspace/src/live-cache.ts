@@ -83,6 +83,10 @@ export function applyLiveEvent(
   // affected families; the 15-second authoritative read recovers missed events.
   const families = new Set<string>();
   if (/message|conversation/.test(kind)) families.add("conversations");
+  if (kind === "agent.updated") {
+    families.add("conversations");
+    families.add("overseer_plans");
+  }
   if (/request|response|answer/.test(kind)) {
     families.add("requests");
     families.add("conversations");
@@ -110,7 +114,7 @@ export function applyLiveEvent(
           path === "/activity" ||
           (families.has("requests") && path.startsWith("/requests/")) ||
           (families.has("agents") && /fleet|agents|instances/.test(path)) ||
-          (!event.data &&
+          ((!event.data || kind === "agent.updated") &&
             families.has("conversations") &&
             path === "/conversations/" + selected)
         );

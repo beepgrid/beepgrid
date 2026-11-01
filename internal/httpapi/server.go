@@ -231,6 +231,14 @@ func (s *Server) routes() {
 		x, e := s.Store.UpdatePerson(r.Context(), actor(r), r.PathValue("id"), in)
 		return ok(w, x, e)
 	}))
+	m.HandleFunc("POST /api/v1/appearance", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.AppearanceInput
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.SaveAppearance(r.Context(), actor(r), in)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("POST /api/v1/people/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/agents/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/services/{id}/status", s.protect(s.setStatus))

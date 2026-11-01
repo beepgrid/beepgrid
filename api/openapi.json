@@ -2887,6 +2887,118 @@
         ]
       }
     },
+    "/api/v1/appearance": {
+      "post": {
+        "operationId": "post_api_v1_appearance",
+        "description": "Change an Agent or group icon from the bundled pack, or reset its default.\n\nA current manager of the target Agent or group.\n\nReturns: Target, selected icon and current group version. Appearance changes do not alter membership or permissions.\n\nRecovery: Invalid icons are rejected. A stale group revision conflicts. Other workspaces and unmanaged identities remain inaccessible.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "$ref": "#/components/schemas/Target",
+                    "description": "Target kind and stable ID. Choose a new target or an existing conversation, not both."
+                  },
+                  "icon": {
+                    "type": "string",
+                    "description": "mark-0 through mark-11 for an Agent; role-0 through role-11 for a group. Empty resets to its default."
+                  },
+                  "version": {
+                    "type": "integer",
+                    "description": "Current group revision. Required for an existing group."
+                  }
+                },
+                "required": [
+                  "target",
+                  "icon"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Change an Agent or group icon from the bundled pack, or reset its default",
+        "tags": [
+          "identities"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "get_api_v1_me",
@@ -12464,6 +12576,11 @@
       "Group": {
         "type": "object",
         "properties": {
+          "icon": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Presentation-only role icon. Change with POST /appearance."
+          },
           "purpose": {
             "enum": [
               "contacts",

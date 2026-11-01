@@ -501,7 +501,7 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 	case "groups":
 		var x Group
 		var raw []byte
-		e := db.QueryRow(ctx, `SELECT g.id,g.name,g.version,COALESCE((SELECT jsonb_agg(m.principal_id ORDER BY m.principal_id) FROM memberships m WHERE m.scope=g.scope AND m.group_id=g.id),'[]'),g.created_by,g.purpose FROM groups g WHERE g.scope=$1 AND g.id=$2`, a.Scope, id).Scan(&x.ID, &x.Name, &x.Version, &raw, &x.CreatedBy, &x.Purpose)
+		e := db.QueryRow(ctx, `SELECT g.id,g.name,g.version,COALESCE((SELECT jsonb_agg(m.principal_id ORDER BY m.principal_id) FROM memberships m WHERE m.scope=g.scope AND m.group_id=g.id),'[]'),g.created_by,g.purpose,g.icon FROM groups g WHERE g.scope=$1 AND g.id=$2`, a.Scope, id).Scan(&x.ID, &x.Name, &x.Version, &raw, &x.CreatedBy, &x.Purpose, &x.Icon)
 		if e != nil {
 			return nil, normalize(e)
 		}

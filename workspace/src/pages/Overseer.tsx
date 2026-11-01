@@ -14,7 +14,6 @@ import {
   Badge,
   Button,
   DateValue,
-  Details,
   ErrorView,
   Field,
   Form,
@@ -25,67 +24,71 @@ import {
   unavailable,
 } from "../ui";
 
-function CoordinatorResults({ turn }: { turn: Plan }) {
-  const [open, setOpen] = useState(false);
-  const count = turn.dispatches?.length || 0;
-  const settled =
-    turn.replies?.filter(
-      (r) => r.state !== "open" && r.state !== "clarification",
-    ).length || 0;
-  if (!count && !turn.replies?.length) return null;
-  const results = () => (
-    <>
-      {turn.dispatches?.map((d) => (
-        <div className="actions" key={d.agent_id}>
-          <strong>
-            {turn.sources.find((s) => s.agent.id === d.agent_id)?.agent.name ||
-              d.agent_id}
-          </strong>
-          <Button
-            onClick={() => navigate("/conversations/" + d.conversation_id)}
-          >
-            Open conversation
-          </Button>
-        </div>
-      ))}
-      {turn.replies?.map((r) => (
-        <section className="section" key={r.id}>
-          <RequestStatus request={r} />{" "}
-          <strong>
-            {turn.sources.find(
-              (s) =>
-                turn.dispatches.find((d) => d.request_id === r.id)?.agent_id ===
-                s.agent.id,
-            )?.agent.name || r.title}
-          </strong>
-          <p>
-            {r.response
-              ? readable(r.response.answer ?? r.response.outcome)
-              : "Awaiting an authorized reply"}
-          </p>
-          {r.resolved_at ? (
-            <small>
-              Resolved <DateValue value={r.resolved_at} />
-            </small>
-          ) : null}
-        </section>
-      ))}
-    </>
-  );
+function CoordinatorAgents({ turn }: { turn: Plan }) {
+  const ids = [
+    ...new Set([
+      ...(turn.instructions || []).map((i) => i.agent_id),
+      ...(turn.dispatches || []).map((d) => d.agent_id),
+    ]),
+  ];
+  const [expanded, setExpanded] = useState(false);
+  if (!ids.length) return null;
   return (
-    <details
-      className="details"
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-    >
-      <summary>
-        {count} Agent{count === 1 ? "" : "s"} ·{" "}
-        {turn.replies?.length
-          ? `${settled} of ${turn.replies.length} replies received`
-          : "messages accepted"}{" "}
-        · Details
-      </summary>
-      {open ? results() : null}
-    </details>
+    <div className="coordinator-instructions">
+      {(expanded ? ids : ids.slice(0, 5)).map((id) => {
+        const dispatch = turn.dispatches?.find((d) => d.agent_id === id);
+        const reply = turn.replies?.find((r) => r.id === dispatch?.request_id);
+        const agent = turn.sources.find((s) => s.agent.id === id)?.agent;
+        return (
+          <div key={id}>
+            <IdentityIcon
+              kind="agent"
+              id={id}
+              label={agent?.name}
+              icon={String(agent?.metadata?.appearance_icon || "")}
+            />
+            <div className="coordinator-agent-body">
+              <header>
+                <strong>{agent?.name || "Agent"}</strong>
+                {reply ? (
+                  <RequestStatus request={reply} />
+                ) : dispatch ? (
+                  <Badge>Sent</Badge>
+                ) : (
+                  <Badge>Proposed</Badge>
+                )}
+                {dispatch ? (
+                  <Button
+                    icon="arrow"
+                    onClick={() =>
+                      navigate("/conversations/" + dispatch.conversation_id)
+                    }
+                  >
+                    Open conversation
+                  </Button>
+                ) : null}
+              </header>
+              <p>
+                {turn.instructions?.find((i) => i.agent_id === id)?.body ||
+                  turn.body}
+              </p>
+              {reply?.response ? (
+                <p className="coordinator-agent-reply">
+                  {readable(reply.response.answer ?? reply.response.outcome)}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+      {ids.length > 5 ? (
+        <Button onClick={() => setExpanded(!expanded)}>
+          {expanded
+            ? "Show fewer Agents"
+            : `Show ${ids.length - 5} more Agents`}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -107,7 +110,6 @@ export default function Overseer() {
   const op = useOperation();
   const busy = planning.pending || op.pending;
   const scroll = useRef<HTMLDivElement>(null);
-  const scopeControl = useRef<HTMLDetailsElement>(null);
   const promptControl = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
   const pinned = useRef(true);
@@ -347,11 +349,11 @@ export default function Overseer() {
                       className="coordinator-topic"
                       role="separator"
                       aria-label={
-                        !turn.previous_plan_id ? "Topic" : "Earlier topic"
+                        !turn.previous_plan_id ? "New topic" : "Earlier topic"
                       }
                     >
                       <span>
-                        {!turn.previous_plan_id ? "Topic" : "Earlier topic"}
+                        {!turn.previous_plan_id ? "New topic" : "Earlier topic"}
                       </span>
                       <DateValue value={turn.created_at} />
                     </div>
@@ -386,31 +388,10 @@ export default function Overseer() {
                         </Badge>
                       </div>
                       <p>{turn.summary}</p>
-                      {turn.instructions?.length ? (
-                        <div className="coordinator-instructions">
-                          {turn.instructions.map((i) => (
-                            <div key={i.agent_id}>
-                              <IdentityIcon kind="agent" id={i.agent_id} />
-                              <div>
-                                <strong>
-                                  {turn.sources.find(
-                                    (s) => s.agent.id === i.agent_id,
-                                  )?.agent.name || "Specialist"}
-                                </strong>
-                                <p>{i.body}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                      <CoordinatorAgents turn={turn} />
                       {turn.summary_error ? (
                         <small>{turn.summary_error}</small>
                       ) : null}
-                      <Details
-                        defer
-                        label={`Sources and freshness (${turn.sources.length})`}
-                        value={turn.sources}
-                      />
                       {turn.operation !== "status" &&
                       (!turn.dispatches?.length ||
                         !turn.instructions?.length) ? (
@@ -465,7 +446,6 @@ export default function Overseer() {
                           ) : null}
                         </section>
                       ) : null}
-                      <CoordinatorResults turn={turn} />
                       {turn.replies?.length &&
                       (!turn.automatic || turn.summary_error) ? (
                         <Button
@@ -497,13 +477,21 @@ export default function Overseer() {
                       turn.replies?.length &&
                       !turn.reply_summary &&
                       !turn.summary_error ? (
-                        <small className="muted">
+                        <small
+                          className="muted coordinator-waiting"
+                          role="status"
+                        >
                           {turn.replies.some(
                             (r) =>
                               r.state === "open" || r.state === "clarification",
                           )
                             ? "Waiting for replies"
-                            : "Bringing the replies together..."}
+                            : "Bringing replies together"}
+                          <span className="waiting-dots" aria-hidden="true">
+                            <i>.</i>
+                            <i>.</i>
+                            <i>.</i>
+                          </span>
                         </small>
                       ) : null}
                       {turn.reply_summary ? (
@@ -520,7 +508,6 @@ export default function Overseer() {
                 <div className="coordinator-topic-draft" role="status">
                   <div>
                     <strong>New topic</strong>
-                    <span>Start a separate conversation with Coordinator.</span>
                   </div>
                   {latest && (latest.target?.id || "") === group ? (
                     <Button
@@ -553,49 +540,6 @@ export default function Overseer() {
             </p>
           ) : (
             <Form onSubmit={() => void ask()}>
-              <details className="details" ref={scopeControl}>
-                <summary>
-                  Agents:{" "}
-                  {group
-                    ? groups.items.find((g) => g.id === group)?.name ||
-                      "Selected group"
-                    : "All permitted (up to 100)"}
-                </summary>
-                <Field label="Agent scope">
-                  <select
-                    value={group}
-                    disabled={busy}
-                    onChange={(e) => {
-                      planning.forget();
-                      setGroup(e.target.value);
-                      if (scopeControl.current)
-                        scopeControl.current.open = false;
-                      setFreshTopic(true);
-                    }}
-                  >
-                    <option value="">All permitted Agents (up to 100)</option>
-                    {group && !groups.items.some((g) => g.id === group) ? (
-                      <option disabled value={group}>
-                        Saved group (not loaded)
-                      </option>
-                    ) : null}
-                    {groups.items.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {groups.hasNextPage ? (
-                  <Button
-                    disabled={groups.isFetchingNextPage}
-                    onClick={() => void groups.fetchNextPage()}
-                  >
-                    Load more groups
-                  </Button>
-                ) : null}
-                <ErrorView error={groups.error} />
-              </details>
               <Field
                 label={
                   freshTopic
@@ -614,7 +558,37 @@ export default function Overseer() {
                   placeholder="Message Coordinator…"
                 />
               </Field>
-              <div className="actions">
+              <div className="actions coordinator-controls">
+                <select
+                  aria-label="Agents"
+                  value={group}
+                  disabled={busy}
+                  onChange={(e) => {
+                    planning.forget();
+                    setGroup(e.target.value);
+                    setFreshTopic(true);
+                  }}
+                >
+                  <option value="">All Agents</option>
+                  {group && !groups.items.some((g) => g.id === group) ? (
+                    <option disabled value={group}>
+                      Selected Agent role
+                    </option>
+                  ) : null}
+                  {groups.items.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+                {groups.hasNextPage ? (
+                  <Button
+                    disabled={groups.isFetchingNextPage}
+                    onClick={() => void groups.fetchNextPage()}
+                  >
+                    More roles
+                  </Button>
+                ) : null}
                 <label className="coordinator-review">
                   <input
                     type="checkbox"
@@ -634,6 +608,7 @@ export default function Overseer() {
                     : "Send to " + assistantName}
                 </Button>
               </div>
+              <ErrorView error={groups.error} />
               {planning.pending ? (
                 <Loading label="Reviewing permitted reports and recent context" />
               ) : null}

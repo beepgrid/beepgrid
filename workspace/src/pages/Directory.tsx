@@ -85,9 +85,13 @@ export default function Directory({
     agents: FleetSource[];
     deadlocks: AgentDeadlock[];
   }>("/fleet/status", {}, agents);
-  const deadlocks = fleet.data?.deadlocks || [];
+  const deadlocks = agents ? fleet.data?.deadlocks || [] : [];
   useEffect(() => {
     const id = new URLSearchParams(location.search).get("agent");
+    const groupID = new URLSearchParams(location.search).get("role");
+    if (agents && groupID) {
+      setTab("groups");
+    }
     if (agents && id) navigate("/agents/" + encodeURIComponent(id));
   }, [agents, route.id]);
   useEffect(() => {
@@ -129,7 +133,7 @@ export default function Directory({
           className="dependency-notice"
           onClick={() => navigate("/fleet")}
         >
-          <Icon name="activity" size={16} />
+          <Icon name="warning" size={16} />
           <strong>Agents are blocked in a dependency cycle</strong>
           <span>Review</span>
           <Icon name="arrow" size={15} />
@@ -187,7 +191,13 @@ export default function Directory({
         ) : null}
       </div>
       {tab === "groups" ? (
-        <Groups purpose={agents ? "agent_role" : "team"} embedded />
+        <Groups
+          purpose={agents ? "agent_role" : "team"}
+          initialID={
+            new URLSearchParams(location.search).get("role") || undefined
+          }
+          embedded
+        />
       ) : (
         <>
           {agents && !search ? <OverseerEntry /> : null}
@@ -214,6 +224,7 @@ export default function Directory({
                     id={item.id}
                     kind={item.kind}
                     label={item.name}
+                    icon={String(item.metadata?.appearance_icon || "")}
                   />
                   <div className="contact-name">
                     <strong>{item.name}</strong>
@@ -298,7 +309,12 @@ export function IdentityDetail({
   return (
     <Modal title={p.name} onClose={onClose}>
       <div className="contact-profile">
-        <IdentityIcon kind={p.kind} id={p.id} label={p.name} />
+        <IdentityIcon
+          kind={p.kind}
+          id={p.id}
+          label={p.name}
+          icon={String(p.metadata?.appearance_icon || "")}
+        />
         <div>
           <h2>{p.name}</h2>
           <p>

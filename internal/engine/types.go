@@ -159,6 +159,7 @@ type Binding struct {
 	SubjectID   string `json:"subject_id"`
 }
 type Group struct {
+	Icon            string   `json:"icon,omitempty"`
 	Purpose         string   `json:"purpose"`
 	CreatedBy       string   `json:"created_by"`
 	Version         int64    `json:"version"`

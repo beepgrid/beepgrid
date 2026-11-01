@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { Compose } from "../src/Compose";
+import { Compose, MessageComposer } from "../src/Compose";
+import { clearConversationDrafts } from "../src/data";
+import type { Request } from "../src/contracts";
 import { harness, agent, json, requestBody } from "./fixtures";
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -315,4 +317,51 @@ it("keeps a failed upload removable without sending or persisting a file referen
   fireEvent.click(screen.getByRole("button", { name: "Remove brief.txt" }));
   expect(screen.queryByText("brief.txt")).not.toBeInTheDocument();
   expect(fn.mock.calls.some(([p]) => p.endsWith("/messages"))).toBe(false);
+});
+
+it("clears a reply draft and uncertain response on contact loss while preserving another conversation", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      json(
+        { error: { code: "UNAVAILABLE", message: "Response uncertain" } },
+        503,
+      ),
+    ),
+  );
+  const { Wrapper } = harness();
+  const view = render(
+    <MessageComposer
+      conversation="con_private"
+      replyTo={{ id: "req_private", version: 3, body: "When?" } as Request}
+      replyAuthor="Builder"
+    />,
+    { wrapper: Wrapper },
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Reply" }), {
+    target: { value: "Private response draft" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  await screen.findByRole("alert");
+  expect(
+    Object.keys(sessionStorage).some(
+      (k) =>
+        k.includes(":operation:") &&
+        sessionStorage.getItem(k)?.includes("Private response draft"),
+    ),
+  ).toBe(true);
+  view.unmount();
+  sessionStorage.setItem(
+    "beepgrid:workspace:draft:scope:message:con_other",
+    "Keep this other draft",
+  );
+  clearConversationDrafts("con_private");
+  expect(
+    Object.keys(sessionStorage).some((k) =>
+      sessionStorage.getItem(k)?.includes("Private response draft"),
+    ),
+  ).toBe(false);
+  expect(
+    sessionStorage.getItem("beepgrid:workspace:draft:scope:message:con_other"),
+  ).toBe("Keep this other draft");
 });

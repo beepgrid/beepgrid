@@ -173,6 +173,6 @@
       "sha256": "8fb8e2b85f5005e340a3ee99d9142a3d04943f601a227f13c3da6c6382b763dd"
     }
   ],
-  "sprite_sha256": "83c97b93fc37beb7bd48ca74f3e3ecd9988a14c23f1ef56375da190ddabc97b2",
-  "normalization": "Lucide stroke width normalized to 1.65 for the Open Tabs reference; original view boxes retained."
+  "sprite_sha256": "1edaadb6968b3d32cc251aae59d340821469caa39b768e48e5718afcc7514135",
+  "normalization": "Lucide strokes use 1.65. Phosphor Outline removes the translucent fill and expands the original silhouette by 3/256 for a neutral, heavier outline. Original view boxes and license notices are retained."
 }

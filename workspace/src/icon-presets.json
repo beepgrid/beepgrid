@@ -1,13 +1,13 @@
 [
   {
     "id": "open-tabs",
-    "name": "Open Tabs \u00b7 Outline",
-    "description": "Closest to your shortlist: familiar outline symbols on flat neutral tiles."
+    "name": "Phosphor \u00b7 Outline",
+    "description": "Phosphor shapes with a slightly heavier outline on flat neutral tiles."
   },
   {
     "id": "lucide-tint",
-    "name": "Lucide \u00b7 Tinted",
-    "description": "Crisp outline symbols with a restrained color wash. No shine or gradient."
+    "name": "Phosphor \u00b7 Tinted",
+    "description": "The same outline symbols with a restrained color wash."
   },
   {
     "id": "phosphor-duotone",
