@@ -3454,9 +3454,7 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .overseer-entry .badge.accent { color:color-mix(in srgb,var(--accent) 65%,var(--ink)) }
 
 button.question-prompt { display:block; width:100%; text-align:left; padding:0; border:0; background:none; color:var(--ink) }
-button.question-prompt:hover { text-decoration:underline; text-underline-offset:3px }
 .request-message:focus { outline:none }
-.request-message:focus .decision-card { outline:2px solid var(--faint); outline-offset:2px }
 .question-dock .bound-confirm { margin:0 }
 .question-dock .bound-confirm p { margin-bottom:8px }
 
