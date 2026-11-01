@@ -340,22 +340,22 @@ export function Status({ value }: { value: string }) {
   const good = [
     "connected",
     "online",
+    "enabled",
     "received",
     "succeeded",
     "completed",
     "approved",
   ];
   const warn = ["stale", "unknown", "waiting"];
-  return (
-    <span className="status">
-      <i
-        className={
-          good.includes(value) ? "good" : warn.includes(value) ? "warn" : ""
-        }
-      />
-      {value.replaceAll("_", " ")}
-    </span>
-  );
+  const danger = ["failed", "rejected", "denied"];
+  const tone = good.includes(value)
+    ? "good"
+    : warn.includes(value)
+      ? "warn"
+      : danger.includes(value)
+        ? "danger"
+        : "neutral";
+  return <span className={`status ${tone}`}>{value.replaceAll("_", " ")}</span>;
 }
 export function Field({
   label,

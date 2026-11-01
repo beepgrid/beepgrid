@@ -76,7 +76,7 @@ it("steps through all five distinct packs and resets to the reference style", ()
     expect(document.documentElement.dataset.agentIcons).toBe(id);
   }
   expect(screen.getByRole("button", { name: "Next →" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Reset to Open Tabs" }));
+  fireEvent.click(screen.getByRole("button", { name: "Reset to Outline" }));
   expect(document.documentElement.dataset.agentIcons).toBe("open-tabs");
 });
 it("falls back from obsolete preferences and handles denied storage without breaking preview", () => {

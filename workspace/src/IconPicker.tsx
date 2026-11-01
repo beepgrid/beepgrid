@@ -143,7 +143,7 @@ export function IconPicker({
           </div>
           <div className="type-compare">
             <button type="button" onClick={() => choose(presets[0].id)}>
-              Reset to Open Tabs
+              Reset to Outline
             </button>
           </div>
           <footer>

@@ -410,21 +410,18 @@ nav a[aria-current="page"]::before {
   font-size: var(--type-caption);
   flex-shrink: 0;
   white-space: nowrap;
+  font-weight: var(--type-strong);
 }
-.live-indicator i,
-.status i {
-  height: 5px;
-  width: 5px;
-  border-radius: 50%;
-  background: var(--faint);
-  display: inline-block;
+.live-indicator.good,
+.status.good {
+  color: var(--good);
 }
-.live-indicator .good,
-.status .good {
-  background: var(--good);
+.live-indicator.warn,
+.status.warn {
+  color: var(--warn);
 }
-.status .warn {
-  background: var(--warn);
+.status.danger {
+  color: var(--danger);
 }
 .environment {
   border: 1px solid var(--line);
@@ -636,13 +633,11 @@ main#main {
   border-color: color-mix(in srgb, var(--identity-color) 22%, var(--line));
 }
 :root[data-agent-icons="phosphor-duotone"] .mark-outline,
-:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"])
-  .mark-outline {
+:root[data-agent-icons="dimensional"] .mark-outline {
   display: none;
 }
 :root[data-agent-icons="phosphor-duotone"] .mark-duotone,
-:root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"])
-  .mark-geometry {
+:root[data-agent-icons="dimensional"] .mark-geometry {
   display: initial;
 }
 :root:is([data-agent-icons="geometric-flat"], [data-agent-icons="dimensional"])
@@ -650,6 +645,9 @@ main#main {
   color: #fff;
   background: var(--agent-face);
   border-color: var(--agent-face);
+}
+:root[data-agent-icons="geometric-flat"] .agent-mark {
+  --agent-glyph-weight: 8;
 }
 :root[data-agent-icons="dimensional"] .identity-agent {
   color: #fff;
@@ -779,6 +777,8 @@ main#main {
   align-items: center;
   text-transform: capitalize;
   font-size: var(--type-caption);
+  font-weight: var(--type-strong);
+  color: var(--sub);
   white-space: nowrap;
 }
 .badge {

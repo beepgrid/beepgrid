@@ -173,6 +173,6 @@
       "sha256": "8fb8e2b85f5005e340a3ee99d9142a3d04943f601a227f13c3da6c6382b763dd"
     }
   ],
-  "sprite_sha256": "1edaadb6968b3d32cc251aae59d340821469caa39b768e48e5718afcc7514135",
-  "normalization": "Lucide strokes use 1.65. Phosphor Outline removes the translucent fill and expands the original silhouette by 3/256 for a neutral, heavier outline. Original view boxes and license notices are retained."
+  "sprite_sha256": "aaa6227f56fe3ec613d4e8ec970871ccc883fd92a84914785c023420d15f45e1",
+  "normalization": "Lucide strokes use 1.65. Phosphor Outline removes translucent fill and expands the original silhouette by 3/256; the flat preset uses 8/256 for a bolder small-size glyph. Original view boxes and license notices are retained."
 }

@@ -490,8 +490,9 @@ function WorkspaceApp({
           <span>
             {links.find((x) => x[0] === activeSection)?.[1] || "Settings"}
           </span>
-          <span className="live-indicator">
-            <i className={live === "Live" ? "good" : ""} />
+          <span
+            className={`live-indicator ${live === "Live" ? "good" : "warn"}`}
+          >
             {live}
           </span>
           <span className="environment">{me.environment}</span>
