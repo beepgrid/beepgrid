@@ -148,8 +148,8 @@
   font-variant-numeric: tabular-nums;
 }
 .type-compare button[aria-pressed="true"] {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--ink);
+  background: var(--raised);
 }
 .type-panel footer {
   margin-top: 18px;

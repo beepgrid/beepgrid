@@ -61,6 +61,7 @@
 }
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 ::selection {
   background: color-mix(in srgb, var(--ink) 18%, var(--surface));
@@ -77,13 +78,6 @@ textarea,
 select {
   font: inherit;
   color: inherit;
-}
-button,
-a,
-input,
-textarea,
-select {
-  -webkit-tap-highlight-color: transparent;
 }
 button,
 a {
@@ -104,23 +98,7 @@ button {
   border: 0;
   background: none;
 }
-button,
-a,
-input,
-select,
-textarea {
-  outline-offset: 3px;
-}
-button:focus-visible,
-a:focus-visible,
-input[type="checkbox"]:focus-visible,
-input[type="radio"]:focus-visible,
-select:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--sub);
-}
-input:not([type="checkbox"]):not([type="radio"]):focus,
-textarea:focus {
+:focus {
   outline: none;
 }
 input,
@@ -624,6 +602,11 @@ main#main {
   height: calc(var(--avatar-size) * 0.47);
 }
 .identity-icon.identity-agent {
+  color: #fff;
+  background: var(--agent-face);
+  border-color: var(--agent-face);
+}
+:root[data-agent-icons="open-tabs"] .identity-agent {
   color: var(--ink);
   background: var(--raised);
   border-color: var(--strong);
@@ -655,6 +638,7 @@ main#main {
   background: var(--agent-face);
   border-color: var(--agent-face);
 }
+:root:not([data-agent-icons]) .agent-mark,
 :root[data-agent-icons="geometric-flat"] .agent-mark {
   --agent-glyph-weight: 8;
 }
@@ -1151,7 +1135,6 @@ dialog > header {
   text-align: left;
 }
 .choice[aria-pressed="true"] {
-  border-color: var(--sub);
   background: var(--raised);
 }
 .message-view {
@@ -3416,7 +3399,7 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .question-dock .button { min-height:36px; padding:6px 12px; font-size:12px }
 .question-options { min-width:0; display:flex; flex-wrap:wrap; gap:6px; border:0; padding:0; margin:0; max-height:112px; overflow:auto }
 .question-options label { display:flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid var(--line); border-radius:7px; font-size:13px; cursor:pointer; overflow-wrap:anywhere }
-.question-options label:has(:checked) { border-color:var(--ink); background:var(--raised) }
+.question-options label:has(:checked) { background:var(--raised) }
 .question-options input { width:14px; height:14px; min-height:14px; margin:0; flex:none }
 @media(prefers-reduced-motion:reduce) { .question-toggle svg { transition:none } }
 
@@ -3424,11 +3407,10 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .request-tools>summary { font-size:12px; color:var(--sub); cursor:pointer }.request-tools .actions { margin-top:8px }
 
 .identity-edit { display:inline-flex; padding:0; border-radius:12px; flex:none; background:none }
-.identity-edit:not(:disabled):hover { outline:2px solid var(--strong); outline-offset:3px }
 .identity-edit:disabled { opacity:1; cursor:default }
 .appearance-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px }
 .appearance-grid button { display:grid; place-items:center; padding:8px; border:1px solid var(--line); border-radius:9px }
-.appearance-grid button:hover,.appearance-grid button[aria-pressed="true"] { background:var(--raised); border-color:var(--ink) }
+.appearance-grid button:hover,.appearance-grid button[aria-pressed="true"] { background:var(--raised) }
 .agent-role-badge .identity-icon { --avatar-size:19px; border:0; border-radius:4px }
 .agent-role-badge .identity-icon svg { width:13px; height:13px }
 .conversation-meta>.badge:first-child { color:var(--sub); background:var(--surface); border:1px solid var(--line) }
@@ -3460,7 +3442,7 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 .setup-policy-tooltip strong { font-weight:650 }
 .setup-policy > div { display:flex;gap:8px }
 .setup-policy label { display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;cursor:pointer }
-.setup-policy label:has(input:checked) { background:var(--raised);border-color:var(--sub) }
+.setup-policy label:has(input:checked) { background:var(--raised) }
 .setup-policy input { width:14px;height:14px;margin:0 }
 .setup-instruction { display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:9px;padding:12px }
 .setup-instruction > div { display:flex;gap:8px;align-items:baseline;font-size:13px }
