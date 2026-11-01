@@ -116,7 +116,6 @@ summary:focus-visible {
 }
 textarea:focus-visible {
   outline: none;
-  border-color: var(--faint);
 }
 input,
 select,
@@ -2658,10 +2657,6 @@ dialog > header h2 {
   border-radius: 12px;
   box-shadow: 0 2px 4px #00000004;
 }
-.message-compose:focus-within {
-  border-color: var(--faint);
-  box-shadow: none;
-}
 .message-compose > .form {
   gap: 0;
 }
@@ -3432,7 +3427,6 @@ dialog.contact-editor-dialog { width: min(920px, calc(100vw - 30px)); overflow-x
 .question-dock .form { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:8px }
 .question-dock .form>.error { grid-column:1/-1 }
 .question-dock textarea { resize:none; min-height:38px; max-height:96px; padding:8px 10px; font-size:13px; line-height:1.5; outline:none }
-.question-dock textarea:focus { border-color:var(--faint); box-shadow:none }
 .question-dock .button { min-height:36px; padding:6px 12px; font-size:12px }
 .question-options { min-width:0; display:flex; flex-wrap:wrap; gap:6px; border:0; padding:0; margin:0; max-height:112px; overflow:auto }
 .question-options label { display:flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid var(--line); border-radius:7px; font-size:13px; cursor:pointer; overflow-wrap:anywhere }
