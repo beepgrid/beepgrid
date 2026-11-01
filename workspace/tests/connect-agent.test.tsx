@@ -133,13 +133,11 @@ it("reveals only the chosen live integration and keeps credentials out of its se
   expect(screen.getByRole("radio", { name: "Steer" })).toBeChecked();
   fireEvent.click(screen.getByRole("radio", { name: "Queue" }));
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
-  await screen.findByRole("heading", { name: "Connect AI SDK" });
+  await screen.findByRole("heading", { name: "Instructions for your AI" });
   expect(
     screen.queryByRole("heading", { name: "Run your worker" }),
   ).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("radio", { name: "Queue" }),
-  ).not.toBeVisible();
+  expect(screen.getByRole("radio", { name: "Queue" })).toBeVisible();
   fireEvent.click(
     screen.getByRole("button", { name: "Copy setup instruction" }),
   );
@@ -148,11 +146,28 @@ it("reveals only the chosen live integration and keeps credentials out of its se
   expect(writeText.mock.calls[0][0]).toContain("ins_live");
   expect(writeText.mock.calls[0][0]).not.toContain("secret-not-for-a-prompt");
   expect(writeText.mock.calls[0][0]).toContain("aiSDKBinding");
-  fireEvent.click(screen.getByText("Change"));
+  const token = screen.getByLabelText("Connection token");
+  expect(token).toHaveAttribute("type", "password");
+  expect(token).toHaveValue("secret-not-for-a-prompt");
+  fireEvent.click(screen.getByRole("button", { name: "Show" }));
+  expect(token).toHaveAttribute("type", "text");
+  fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+  fireEvent.click(screen.getByRole("button", { name: "Copy token" }));
+  await waitFor(() =>
+    expect(writeText).toHaveBeenLastCalledWith("secret-not-for-a-prompt"),
+  );
+  expect(writeText.mock.calls[0][0]).toContain(
+    "https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#ai-sdk",
+  );
+  expect(writeText.mock.calls[0][0]).toContain("Ask me for the absolute path");
+  expect(screen.queryByText("Change")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Generate the instruction locally"),
+  ).not.toBeInTheDocument();
   fireEvent.change(screen.getByRole("combobox", { name: "Your environment" }), {
     target: { value: "opencode" },
   });
-  await screen.findByRole("heading", { name: "Connect OpenCode" });
+  await screen.findByRole("heading", { name: "Instructions for your AI" });
   expect(
     screen.queryByRole("radio", { name: "Steer" }),
   ).not.toBeInTheDocument();

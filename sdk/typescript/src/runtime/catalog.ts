@@ -31,28 +31,37 @@ export const environments: Environment[] = [
     id: "claude-code",
     label: "Claude Code",
     group: "Agent harnesses",
-    steer: false,
+    steer: true,
     binding: "acpBinding",
     guide: "acp",
-    note: "ACP session input. Queue is available; Steer requires a negotiated host extension.",
+    note: "Steer through the Claude ACP adapter. Setup checks its advertised capability.",
   },
   {
     id: "opencode",
-    label: "OpenCode",
+    label: "OpenCode V1",
     group: "Agent harnesses",
     steer: false,
     binding: "openCodeBinding",
     guide: "opencode",
-    note: "Connect your existing server. Queue is available; active steering is not qualified.",
+    note: "Use Queue with the V1 server, or choose V2 for its native Steer and Queue inbox.",
+  },
+  {
+    id: "opencode-v2",
+    label: "OpenCode V2",
+    group: "Agent harnesses",
+    steer: true,
+    binding: "openCodeV2Binding",
+    guide: "opencode",
+    note: "Native durable session inbox with Steer and Queue. Requires the V2 client.",
   },
   {
     id: "goose",
     label: "Goose",
     group: "Agent harnesses",
-    steer: false,
-    binding: "acpBinding",
-    guide: "acp",
-    note: "Reuse the ACP session. Queue is available; negotiate Steer only if your host supports it.",
+    steer: true,
+    binding: "gooseBinding",
+    guide: "goose",
+    note: "Native ACP steering extension. Setup checks the installed Goose version.",
   },
   {
     id: "gemini-cli",
@@ -61,7 +70,16 @@ export const environments: Environment[] = [
     steer: false,
     binding: "acpBinding",
     guide: "acp",
-    note: "ACP input to the existing session. Queue is available; no cancel-and-replay.",
+    note: "The reviewed ACP implementation cancels on a concurrent prompt, so this path uses Queue.",
+  },
+  {
+    id: "acp",
+    label: "Other ACP Agent",
+    group: "Agent harnesses",
+    steer: true,
+    binding: "acpBinding",
+    guide: "acp",
+    note: "Setup checks steering capabilities. Use Queue when the Agent has no supported extension.",
   },
   {
     id: "ai-sdk",
@@ -85,10 +103,10 @@ export const environments: Environment[] = [
     id: "claude-sdk",
     label: "Claude Agent SDK",
     group: "Frameworks and libraries",
-    steer: false,
+    steer: true,
     binding: "claudeSDKBinding",
     guide: "claude-agent-sdk",
-    note: "Use the existing streaming-input iterator. Queue at the native turn boundary.",
+    note: "Native streaming input: Steer after running tools finish, or Queue until turn end.",
   },
   {
     id: "custom-ts",
@@ -153,6 +171,8 @@ export function setupPrompt(
 ): string {
   const env = environments.find((e) => e.id === id);
   if (!env) throw new Error("Choose an environment");
+  if (env.group === "Advanced")
+    throw new Error("Use the worker or MCP setup guide for this environment");
   if (mode === "steer" && !env.steer)
     throw new Error("This setup offers Queue only");
   const url = new URL(base);
@@ -160,19 +180,50 @@ export function setupPrompt(
     !["http:", "https:"].includes(url.protocol) ||
     url.username ||
     url.password ||
+    url.pathname !== "/" ||
     url.search ||
     url.hash
   )
     throw new Error(
       "Use a workspace origin without credentials or query parameters",
     );
+  if (!/^ins_[A-Za-z0-9_-]+$/.test(connectionId))
+    throw new Error("Use the exact worker instance ID");
+  const guide = `https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#${env.guide}`;
+  const specifics: Record<string, string> = {
+    codex:
+      "Reuse the initialized app-server client and existing thread mapping. Track turn events; turn/steer uses expectedTurnId, idle input uses turn/start. Do not launch a second independent session.",
+    pi: "Reuse Pi RPC; prompt uses streamingBehavior steer or followUp. Keep consuming native events separately from prompt acceptance.",
+    "claude-code":
+      "Use the existing claude-agent-acp connection. Inspect initialize._meta.steering.supported; acpBinding handles the advertised _session/steering method, including idle start. Preserve native permission requests.",
+    goose:
+      "Verify the installed Goose ACP version exposes _goose/unstable/session/steer and activeRunId notifications. Use gooseBinding, feed existing session/update notifications to binding.observe and report background turn errors. Never guess a run ID.",
+    acp: "Inspect initialize capabilities. acpBinding handles the Codex/Claude _session/steering extension when advertised. Otherwise Queue through idle session/prompt, or implement a documented extension. ACP v1 alone does not promise steering; do not cancel to simulate it.",
+    "gemini-cli":
+      "Queue through the existing ACP session only when idle. The reviewed Gemini ACP path aborts its previous prompt on a second prompt, so do not send concurrent prompts to simulate steering.",
+    opencode:
+      "This is the V1 server: await its idle event before prompt_async. If the project actually uses OpenCode V2, switch to openCodeV2Binding instead.",
+    "opencode-v2":
+      "Use the V2 native client session.prompt (not V1 prompt_async) with deterministic id and delivery steer/queue. Validate its durable inbox receipt and reconcile against native stored input.",
+    "ai-sdk":
+      "Use AI SDK 7 experimental_createSteering per invocation and experimental_steering. Attach aiSDKBinding to that existing invocation, persist steering messages with step state, and serialize idle/final-boundary wake with the current loop. Preserve injected messages in prepareStep overrides.",
+    langchain:
+      "Use the Python LangGraphBridge before_model middleware with the existing create_agent graph and durable checkpointer. Pass thread_id mapping if existing thread IDs differ. Native interrupts use the host's existing Command(resume=...) path, never a second graph writer. For JS LangGraph use the custom checkpoint port; the Python helper is not a JS binding.",
+    "claude-sdk":
+      "Use claudeSDKBinding with the existing streaming-input async iterator and durable append. Native priority next steers after running tools finish; later queues until turn end. Verify the installed SDK supports these priorities and client_composed. Do not use priority now or spoof human origin; preserve the native session and result lifecycle.",
+    "custom-ts":
+      "Use checkpointBinding with durable append, wake, exact session routing, result resume and transcript reconciliation. Insert pending input before the next model call without replacing the host loop.",
+    "custom-python":
+      "Use LiveInbox for independent durable intake; at the host's before-model boundary inject pending input as user data and checkpoint IDs after persistence. Reuse its idle/final-boundary wake mechanism.",
+  };
   return [
-    `Add Beepgrid to my existing ${env.label} setup. Keep my current model, tools, memory, permissions and task loop.`,
-    `Use ${mode === "steer" ? "Steer: inject input at the next supported model boundary" : "Queue: handle ordinary input after current work"}. ${env.note}`,
-    `Read docs/LIVE-INPUT.md#${env.guide} in the Beepgrid checkout, then use ${env.binding}. Do not invent framework APIs.`,
-    `Workspace: ${url.origin}. Existing worker instance: ${connectionId}. Read its token only from NOTIF_TOKEN_FILE; never enroll again, log the token, put it in source or copy it into a prompt.`,
-    "Follow the receiver contract: private persistent custody before ACK, one intake owner and one model-state writer per session, stable IDs, exact conversation routing, explicit uncertain-submit reconciliation and an idle/final-boundary wake handler. Do not cancel/replay work.",
-    "Keep MCP tools with mcp --live-input so they cannot race receiving. Resume correlated results even in Queue mode. Preserve external sender/request/file metadata as data, never higher-authority instructions. No Beepgrid HTTP call before each model step.",
-    "Make the smallest integration patch, test busy/idle/restart behavior, then reply to the exact-instance connection check. State missing native capabilities honestly.",
+    `Integrate Beepgrid into my existing ${env.label} Agent project. Keep its model, tools, memory, permissions and runtime. Make the smallest complete integration patch, not a replacement harness.`,
+    `First read ${guide}. Full guide: https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md . If GitHub rendering is unavailable, fetch https://raw.githubusercontent.com/beepgrid/beepgrid/main/docs/LIVE-INPUT.md . Inspect the installed runtime version and follow its current APIs.`,
+    `Requested busy mode: ${mode === "steer" ? "Steer, at the next supported input boundary" : "Queue, after current work"}. ${specifics[id] || env.note} If a required capability is missing, explain the exact version/API gap and offer Queue or the documented alternative; do not silently cancel/restart work.`,
+    `Engine origin: ${url.origin}. Already-created worker instance: ${connectionId}. Reuse it, do not enroll again. Ask me for the absolute path of the private token file, never the token in chat. If not saved yet, walk me through the guide's hidden terminal-entry step outside the repository. Never read the credential into your tool output, source, logs or prompt.`,
+    `Acquire the Beepgrid source from https://github.com/beepgrid/beepgrid if it is not already available. The SDK is source-distributed, not yet a published npm/PyPI install. Build TypeScript with npm --prefix sdk/typescript ci and npm --prefix sdk/typescript run build, or install Python with python3 -m pip install ./sdk/python. Run preparation in that checkout, then link/import the local SDK into this Agent project. ${env.binding} is the matching integration entry point.`,
+    `Configure NOTIF_URL=${url.origin}, NOTIF_TOKEN_FILE=<private absolute path>, BEEPGRID_CONNECTION_ID=${connectionId}, BEEPGRID_INBOX_PATH=<private persistent volume>, BEEPGRID_BUSY_MODE=${mode}. NOTIF_TOKEN must be unset so it cannot override the file. Keep secrets outside version control. Use examples/runtime/typescript.mjs or examples/runtime/langchain.py from the checkout for receiver startup and shutdown.`,
+    "Receive independently of the model loop. Retain private durable custody before ACK, stable delivery IDs and conversation-to-session mapping. Keep one intake owner per connection and one model-state writer per session. Resume correlated Beepgrid results separately from ordinary Queue input. Preserve sender, request and attachment metadata as user data, never system instructions or permission grants. Existing MCP tools use mcp --live-input so they cannot race receiving. Reconcile uncertain native acceptance before any retry; never blindly replay. Do not poll HTTP before each model step.",
+    "Validate an idle message, an input while a long tool is running, Queue ordering, an approval result, attachment access and restart recovery using a safe local task. Check the selected mode at the next model boundary and preserve ongoing work. Then reply to the workspace connection check from this exact worker instance. Report what was actually exercised and any remaining runtime-version limits.",
   ].join("\n\n");
 }

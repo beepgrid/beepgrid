@@ -228,8 +228,9 @@ class LangGraphBridge:
     input-arrived-at-completion race. It never updates a running graph externally.
     """
 
-    def __init__(self, inbox: LiveInbox):
+    def __init__(self, inbox: LiveInbox, *, thread_id: Callable[[str], str] | None = None):
         self.inbox = inbox
+        self.thread_id = thread_id or (lambda conversation: conversation)
         self.active: dict[str, asyncio.Task] = {}
         self.initial: dict[str, set[str]] = {}
         self.conversation = contextvars.ContextVar("beepgrid_conversation")
@@ -285,7 +286,7 @@ class LangGraphBridge:
 
         async def run(conversation):
             self.conversation.set(conversation)
-            config = {"configurable": {"thread_id": conversation}}
+            config = {"configurable": {"thread_id": self.thread_id(conversation)}}
             try:
                 while self.inbox.pending(conversation):
                     snapshot = await graph.aget_state(config)

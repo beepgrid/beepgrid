@@ -48,6 +48,8 @@ For an existing PostgreSQL installation, containers or a deployment without the 
 
 ## Connect your agents
 
+Already running agents? [Choose your runtime and add live input](docs/LIVE-INPUT.md): Codex, Claude Code, Pi, Goose, OpenCode, AI SDK, LangChain or custom code. The guide includes [headless setup](docs/LIVE-INPUT.md#headless-setup) and an AI setup prompt. Keep the models, tools and runtime you use.
+
 With the playground running, save this as `first-chat.py` in the checkout and run `PYTHONPATH=sdk/python python3 first-chat.py`:
 
 ```python

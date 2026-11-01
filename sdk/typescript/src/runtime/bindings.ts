@@ -13,6 +13,7 @@ export type RPC = (
   signal?: AbortSignal,
 ) => Promise<unknown>;
 type Reconcile = InputBinding["reconcile"];
+export { gooseBinding } from "./goose.js";
 
 /** Connect correlated Beepgrid results to the host's existing request waiter.
  * Keep this separate from ordinary turn input so Queue cannot block a result. */
@@ -91,21 +92,48 @@ export function piBinding(options: {
     },
   };
 }
-/** ACP has no universal steering method. Only enable Steer after negotiating a
- * host extension. Queue uses ordinary session/prompt when the session is idle. */
+/** ACP v1 has no universal steering method. Codex and Claude ACP advertise the
+ * same _session/steering extension in initialize._meta.steering.supported. */
 export function acpBinding(options: {
   rpc: RPC;
   route: SessionRoute;
   idle: (session: string) => Promise<void>;
   steer?: (session: string, text: string, id: string) => Promise<void>;
+  initialization?: unknown;
   reconcile: Reconcile;
 }): InputBinding {
+  const initialized = options.initialization as
+    | {
+        _meta?: { steering?: { supported?: boolean } | null } | null;
+      }
+    | null
+    | undefined;
+  const nativeSteer = initialized?._meta?.steering?.supported === true;
   return {
     name: "ACP",
-    supportsSteer: !!options.steer,
+    supportsSteer: nativeSteer || !!options.steer,
     reconcile: options.reconcile,
     async submit(input, mode, signal) {
       const sessionId = await options.route(input.conversationId);
+      if (nativeSteer) {
+        if (mode === "queue") await options.idle(sessionId);
+        const result = (await options.rpc(
+          "_session/steering",
+          {
+            sessionId,
+            prompt: [{ type: "text", text: inputText(input) }],
+          },
+          signal,
+        )) as { outcome?: string } | null;
+        // Without idleBehavior:promptRequired, both qualified adapters start an
+        // idle turn and return acceptance separately from turn completion.
+        if (
+          result?.outcome !== "injected" &&
+          result?.outcome !== "startedNewTurn"
+        )
+          throw new Error("ACP steering did not confirm input acceptance");
+        return;
+      }
       if (mode === "steer") {
         if (!options.steer)
           throw new Error("ACP host did not negotiate steering");
@@ -118,6 +146,50 @@ export function acpBinding(options: {
           signal,
         );
       }
+    },
+  };
+}
+
+/** OpenCode V2's durable session inbox. V1 prompt_async has different semantics.
+ * Use the installed native client's session.prompt, which returns admission,
+ * not task completion. Keep the deterministic message ID for reconciliation. */
+export function openCodeV2Binding(options: {
+  prompt: (input: {
+    sessionID: string;
+    id: string;
+    text: string;
+    delivery: BusyMode;
+    metadata: Record<string, unknown>;
+  }) => Promise<{
+    id: string;
+    sessionID: string;
+    type: string;
+    delivery: string;
+  }>;
+  route: SessionRoute;
+  reconcile: Reconcile;
+}): InputBinding {
+  return {
+    name: "OpenCode V2",
+    supportsSteer: true,
+    reconcile: options.reconcile,
+    async submit(input, mode) {
+      const sessionID = await options.route(input.conversationId);
+      const messageID = "msg_beepgrid_" + input.id;
+      const receipt = await options.prompt({
+        sessionID,
+        id: messageID,
+        text: inputText(input),
+        delivery: mode,
+        metadata: { beepgridDeliveryId: input.id },
+      });
+      if (
+        receipt.id !== messageID ||
+        receipt.sessionID !== sessionID ||
+        receipt.type !== "user" ||
+        receipt.delivery !== mode
+      )
+        throw new Error("OpenCode V2 returned a different input admission");
     },
   };
 }
@@ -208,9 +280,9 @@ export function openCodeBinding(options: {
     },
   };
 }
-/** Claude Agent SDK's streaming input iterator. Yield user messages into the
- * existing query. Queue input is gated by the host's turn-complete event.
- * This is turn input, not interruption of an executing tool. */
+/** Claude Agent SDK's streaming input iterator. Native next priority steers
+ * after running tools finish; later waits for the turn to end. Never use now,
+ * which may interrupt a tool, or mislabel Agent input as human origin. */
 export function claudeSDKBinding(options: {
   route: SessionRoute;
   append: (
@@ -220,6 +292,8 @@ export function claudeSDKBinding(options: {
       message: { role: "user"; content: string };
       parent_tool_use_id: null;
       session_id: string;
+      priority: "next" | "later";
+      client_composed: true;
     },
     id: string,
     mode: BusyMode,
@@ -228,7 +302,7 @@ export function claudeSDKBinding(options: {
 }): InputBinding {
   return {
     name: "Claude Agent SDK",
-    supportsSteer: false,
+    supportsSteer: true,
     reconcile: options.reconcile,
     async submit(input, mode) {
       const session = await options.route(input.conversationId);
@@ -239,6 +313,8 @@ export function claudeSDKBinding(options: {
           message: { role: "user", content: inputText(input) },
           parent_tool_use_id: null,
           session_id: session,
+          priority: mode === "steer" ? "next" : "later",
+          client_composed: true,
         },
         input.id,
         mode,

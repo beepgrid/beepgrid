@@ -7,6 +7,9 @@ import { LiveConnection, liveInput } from "../dist/runtime/index.js";
 import { SQLiteInbox } from "../dist/runtime/node.js";
 import {
   codexBinding,
+  gooseBinding,
+  claudeSDKBinding,
+  openCodeV2Binding,
   piBinding,
   aiSDKBinding,
   acpBinding,
@@ -470,4 +473,202 @@ test("accepted custody retains its dedup ID without retaining message content", 
   assert.equal(store.get("one").delivery.payload.message, undefined);
   store.put(liveInput(job("one", "con_a", "message", 2)));
   assert.equal(store.pending().length, 0);
+});
+
+test("ACP negotiated steering accepts idle start without waiting for turn completion", async () => {
+  const calls = [];
+  let idle = 0;
+  let outcome = "startedNewTurn";
+  const binding = acpBinding({
+    initialization: { _meta: { steering: { supported: true } } },
+    route: async () => "same-session",
+    idle: async () => {
+      idle++;
+    },
+    rpc: async (method, params) => {
+      calls.push([method, params]);
+      return { outcome };
+    },
+  });
+  assert.equal(binding.supportsSteer, true);
+  await binding.submit(liveInput(job("idle")), "steer");
+  outcome = "injected";
+  await binding.submit(liveInput(job("busy")), "steer");
+  await binding.submit(liveInput(job("queued")), "queue");
+  assert.equal(idle, 1);
+  assert.ok(calls.every(([method]) => method === "_session/steering"));
+  assert.ok(calls.every(([, params]) => params.sessionId === "same-session"));
+  assert.match(calls[1][1].prompt[0].text, /delivery_id.*busy/);
+  outcome = "promptRequired";
+  await assert.rejects(
+    binding.submit(liveInput(job("unaccepted")), "steer"),
+    /confirm/,
+  );
+  assert.equal(calls.length, 4, "No blind prompt fallback or cancellation");
+});
+test("Goose intake can steer a still-running first prompt after correlated native echo", async () => {
+  let finish, fail;
+  const turn = new Promise((resolve, reject) => {
+    finish = resolve;
+    fail = reject;
+  });
+  const calls = [],
+    errors = [];
+  const binding = gooseBinding({
+    route: async () => "s1",
+    idle: async () => {},
+    onError: (e) => errors.push(e),
+    rpc: async (method, params) => {
+      calls.push([method, params]);
+      if (method === "session/prompt") return turn;
+      return { runId: params.expectedRunId, messageId: "steer_1" };
+    },
+  });
+  let accepted = false;
+  const first = binding.submit(liveInput(job("first")), "steer").then(() => {
+    accepted = true;
+  });
+  await until(() => calls.length === 1);
+  binding.observe({
+    sessionId: "other",
+    update: {
+      sessionUpdate: "user_message_chunk",
+      content: { type: "text", text: calls[0][1].prompt[0].text },
+    },
+  });
+  binding.observe({
+    sessionId: "s1",
+    update: {
+      sessionUpdate: "session_info_update",
+      _meta: { goose: { activeRunId: "run_1" } },
+    },
+  });
+  await sleep(10);
+  assert.equal(
+    accepted,
+    false,
+    "Run-start alone does not prove prompt custody",
+  );
+  const text = calls[0][1].prompt[0].text;
+  for (const chunk of [text.slice(0, 12), text.slice(12)])
+    binding.observe({
+      sessionId: "s1",
+      update: {
+        sessionUpdate: "user_message_chunk",
+        content: { type: "text", text: chunk },
+      },
+    });
+  await first;
+  await binding.submit(liveInput(job("correction")), "steer");
+  assert.equal(calls[1][0], "_goose/unstable/session/steer");
+  assert.equal(calls[1][1].expectedRunId, "run_1");
+  fail(Error("Later native turn failed"));
+  await until(() => errors.length === 1);
+  assert.match(errors[0].message, /Later native/);
+});
+test("Goose never accepts a mismatched fenced receipt or drops an unconfirmed prompt", async () => {
+  const binding = gooseBinding({
+    route: async () => "s",
+    idle: async () => {},
+    onError: () => {},
+    rpc: async () => ({ runId: "wrong", messageId: "steer_1" }),
+  });
+  binding.observe({
+    sessionId: "s",
+    update: {
+      sessionUpdate: "session_info_update",
+      _meta: { goose: { activeRunId: "run_1" } },
+    },
+  });
+  await assert.rejects(
+    binding.submit(liveInput(job("one")), "steer"),
+    /fenced/,
+  );
+});
+test("OpenCode V2 uses native durable IDs and explicit delivery, validates its receipt", async () => {
+  const seen = [];
+  let wrong = false;
+  const binding = openCodeV2Binding({
+    route: async () => "ses_existing",
+    prompt: async (input) => {
+      seen.push(input);
+      return {
+        id: input.id,
+        sessionID: wrong ? "ses_other" : input.sessionID,
+        type: "user",
+        delivery: input.delivery,
+      };
+    },
+  });
+  const input = liveInput(job("one"));
+  await binding.submit(input, "steer");
+  await binding.submit(input, "queue");
+  assert.equal(seen[0].id, "msg_beepgrid_one");
+  assert.equal(seen[0].id, seen[1].id);
+  assert.equal(seen[0].delivery, "steer");
+  assert.equal(seen[1].delivery, "queue");
+  wrong = true;
+  await assert.rejects(
+    binding.submit(input, "steer"),
+    /different input admission/,
+  );
+});
+
+test("Claude SDK maps safe Steer and Queue to native priorities without now or human spoofing", async () => {
+  const calls = [];
+  const binding = claudeSDKBinding({
+    route: async () => "session-existing",
+    append: async (...args) => calls.push(args),
+  });
+  assert.equal(binding.supportsSteer, true);
+  await binding.submit(liveInput(job("steered")), "steer");
+  await binding.submit(liveInput(job("queued")), "queue");
+  assert.equal(calls[0][1].priority, "next");
+  assert.equal(calls[1][1].priority, "later");
+  assert.equal(calls[0][1].client_composed, true);
+  assert.equal(calls[0][1].origin, undefined);
+  assert.equal(calls[0][1].session_id, "session-existing");
+  assert.equal(calls[0][2], "steered");
+  assert.match(calls[0][1].message.content, /agent_peer/);
+});
+
+test("Goose new-run output releases admission even when the initial user message is not echoed", async () => {
+  let settle, submitted;
+  const binding = gooseBinding({
+    route: async () => "s",
+    idle: async () => {},
+    onError: () => {},
+    rpc: async (_method, params) => {
+      submitted = params;
+      return new Promise((r) => {
+        settle = r;
+      });
+    },
+  });
+  let accepted = false;
+  const pending = binding.submit(liveInput(job("first")), "steer").then(() => {
+    accepted = true;
+  });
+  await until(() => submitted);
+  binding.observe({
+    sessionId: "s",
+    update: { sessionUpdate: "agent_message_chunk" },
+  });
+  await sleep(5);
+  assert.equal(
+    accepted,
+    false,
+    "Output without a new run fence is not admission",
+  );
+  binding.observe({
+    sessionId: "s",
+    update: {
+      sessionUpdate: "session_info_update",
+      _meta: { goose: { activeRunId: "run_new" } },
+    },
+  });
+  assert.equal(accepted, false);
+  binding.observe({ sessionId: "s", update: { sessionUpdate: "tool_call" } });
+  await pending;
+  settle({ stopReason: "end_turn" });
 });

@@ -1,5 +1,6 @@
 import { Copy, Field } from "./ui";
 import { WorkerSetup } from "./WorkerSetup";
+import { ConnectionToken } from "./ConnectionToken";
 import {
   environments,
   setupPrompt,
@@ -71,21 +72,10 @@ export function BusyPolicy({
       </div>
       <p className="help">
         {value === "steer"
-          ? "Handle new input at the next model step. Running tools finish normally."
+          ? "Use new input during ongoing work, at a supported input boundary."
           : "Handle new messages after current work. Answers and decisions still resume their request."}
       </p>
     </fieldset>
-  );
-}
-function Code({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="setup-code">
-      <div>
-        <span>{label}</span>
-        <Copy value={value} />
-      </div>
-      <pre className="code-example">{value}</pre>
-    </div>
   );
 }
 export function AgentSetup({
@@ -112,23 +102,14 @@ export function AgentSetup({
   const prompt = advanced ? "" : setupPrompt(method, base, mode, instanceId);
   return (
     <div className="agent-setup-guide">
-      <details className="setup-environment">
-        <summary>
-          <strong>{environment.label}</strong>
-          <span>
-            {advanced ? "Tools / worker" : mode === "steer" ? "Steer" : "Queue"}
-          </span>
-          <span>Change</span>
-        </summary>
-        <div>
-          <EnvironmentPicker value={method} onChange={onMethodChange} />
-          <BusyPolicy
-            environment={method}
-            value={mode}
-            onChange={onBusyModeChange}
-          />
-        </div>
-      </details>
+      <div className="setup-environment">
+        <EnvironmentPicker value={method} onChange={onMethodChange} />
+        <BusyPolicy
+          environment={method}
+          value={mode}
+          onChange={onBusyModeChange}
+        />
+      </div>
       {advanced ? (
         <WorkerSetup method={method} base={base} token={token} />
       ) : (
@@ -139,31 +120,20 @@ export function AgentSetup({
               <h3>Save your connection token</h3>
             </header>
             <p>
-              Save it in a private file or your secret manager. This token
-              expires after 24 hours.
+              Shown once. Save it outside your source code or in your secret
+              manager. This token expires after 24 hours.
             </p>
-            <div className="setup-token">
-              <span>
-                <code>worker-token</code>
-                <small>
-                  Shown once. Keep it out of source code and prompts.
-                </small>
-              </span>
-              <Copy value={token} label="Copy token" />
-            </div>
-            <div className="setup-command">
-              <code>chmod 600 /absolute/path/worker-token</code>
-              <Copy value="chmod 600 /absolute/path/worker-token" />
-            </div>
+            <ConnectionToken token={token} />
           </section>
           <section className="setup-step">
             <header>
               <span>2</span>
-              <h3>Connect {environment.label}</h3>
+              <h3>Instructions for your AI</h3>
             </header>
             <p>
-              Copy the setup instruction into your coding assistant in the
-              Beepgrid checkout. It uses your existing model, tools and runtime.
+              Paste this into your coding assistant in your Agent’s project. It
+              includes the guide and asks for your token file’s path, not the
+              token.
             </p>
             <div className="setup-instruction">
               <div>
@@ -173,29 +143,16 @@ export function AgentSetup({
               <Copy value={prompt} label="Copy setup instruction" />
             </div>
             <details className="setup-reference">
-              <summary>Set up by hand</summary>
-              <p>
-                Use <code>{environment.binding}</code> from the source SDK. The
-                guide covers session routing, checkpoints and the wake handler.
-              </p>
+              <summary className="button">Set up by hand</summary>
               <a
                 className="button"
-                href={`https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#${environment.guide}`}
+                href={`https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#manual-setup`}
                 target="_blank"
                 rel="noreferrer"
               >
                 Open integration guide
               </a>
-              <Code
-                label="Generate the instruction locally"
-                value={`node sdk/typescript/bin/setup.mjs ${method} \\\n  --url '${base.replaceAll("'", "'\\''")}' --instance '${instanceId}' --mode ${mode}`}
-              />
             </details>
-            <p className="help">
-              The check below verifies replies from this connection. Your
-              runtime's supported input boundary determines when a busy Agent
-              can respond.
-            </p>
           </section>
         </>
       )}

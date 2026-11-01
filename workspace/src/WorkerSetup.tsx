@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Copy, Tabs } from "./ui";
+import { ConnectionToken } from "./ConnectionToken";
 
 function quote(value: string) {
   return "'" + value.replaceAll("'", "'\\''") + "'";
@@ -91,13 +92,7 @@ export function WorkerSetup({
           Copy it into a file outside your source code. This token expires after
           24 hours.
         </p>
-        <div className="setup-token">
-          <span>
-            <code>worker-token</code>
-            <small>Shown once. Keep this file private.</small>
-          </span>
-          <Copy value={token} label="Copy token" />
-        </div>
+        <ConnectionToken token={token} />
         <Code
           label="Protect the token file"
           value="chmod 600 /absolute/path/worker-token"

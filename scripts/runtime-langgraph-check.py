@@ -75,7 +75,7 @@ async def case(mode):
         inbox = LiveInbox(
             Client(), folder + "/inbox.db", "workspace/exact-instance", mode=mode
         )
-        bridge = LangGraphBridge(inbox)
+        bridge = LangGraphBridge(inbox, thread_id=lambda c: "existing/" + c)
         model = Model()
         graph = create_agent(
             model,
@@ -113,6 +113,8 @@ async def case(mode):
                 await serve
             await asyncio.sleep(0.03)
         assert not inbox.pending(), inbox.pending()
+        snapshot = await graph.aget_state({"configurable": {"thread_id": "existing/con_a"}})
+        assert snapshot.values.get("messages"), "Existing thread mapping was not preserved"
         second = repr([m.content for m in model._calls[1]])
         assert ("Keep V1" in second) == (mode == "steer"), (mode, second)
         assert len(model._calls) == (2 if mode == "steer" else 3)
