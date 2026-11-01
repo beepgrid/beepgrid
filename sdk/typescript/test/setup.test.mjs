@@ -12,6 +12,9 @@ test("each live setup prompt routes an AI to a complete credential-free environm
       "ins_existing",
     );
     assert.ok(text.includes("docs/LIVE-INPUT.md#" + env.guide), env.id);
+    assert.ok(text.includes("docs/LIVE-INPUT.md in the Beepgrid checkout"));
+    assert.ok(text.includes("including Manual setup"));
+    assert.ok(text.includes("https://github.com/beepgrid/beepgrid#readme"));
     assert.ok(
       text.includes(
         "https://raw.githubusercontent.com/beepgrid/beepgrid/main/docs/LIVE-INPUT.md",

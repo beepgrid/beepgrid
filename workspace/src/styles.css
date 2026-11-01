@@ -3318,6 +3318,7 @@ a.mention-token:hover { text-decoration:underline }
 .setup-token { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid var(--line); border-radius:9px }
 .setup-token input { min-width:0;flex:1;font-family:var(--mono);font-size:12px;border:0;background:transparent;padding:0 }
 .setup-reference { margin-top:14px; color:var(--sub); font-size:12px }
+.setup-reference > h4 { margin:0 0 8px; color:var(--ink); font-size:13px; font-weight:600 }
 .setup-reference dl { display:grid; gap:8px; margin-top:12px; overflow-wrap:anywhere }
 .setup-reference dd { margin:0; color:var(--ink) }
 .setup-verification { padding-top:8px }
@@ -3464,9 +3465,6 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 
 /* Environment-first setup: reveal one integration rather than all language tabs. */
 .setup-environment { display:grid;gap:14px }
-.setup-reference > summary.button { display:inline-flex;cursor:pointer;color:var(--ink) }
-.setup-reference[open] > summary.button { margin-bottom:12px }
-.setup-reference > a.button { margin-left:8px }
 .setup-policy { border:0;padding:0;margin:0;min-width:0 }
 .setup-policy legend { font-size:13px;font-weight:550;margin-bottom:8px }
 .setup-policy > div { display:flex;gap:8px }

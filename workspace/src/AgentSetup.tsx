@@ -142,8 +142,8 @@ export function AgentSetup({
               </div>
               <Copy value={prompt} label="Copy setup instruction" />
             </div>
-            <details className="setup-reference">
-              <summary className="button">Set up by hand</summary>
+            <div className="setup-reference">
+              <h4>Set up by hand</h4>
               <a
                 className="button"
                 href={`https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#manual-setup`}
@@ -152,7 +152,7 @@ export function AgentSetup({
               >
                 Open integration guide
               </a>
-            </details>
+            </div>
           </section>
         </>
       )}

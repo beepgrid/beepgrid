@@ -134,6 +134,19 @@ it("reveals only the chosen live integration and keeps credentials out of its se
   fireEvent.click(screen.getByRole("radio", { name: "Queue" }));
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Instructions for your AI" });
+  expect(screen.getByRole("heading", { name: "Set up by hand" })).toBeVisible();
+  expect(
+    screen.getByRole("link", { name: "Open integration guide" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("link", { name: "Open integration guide" }),
+  ).toHaveAttribute(
+    "href",
+    "https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#manual-setup",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Set up by hand" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("heading", { name: "Run your worker" }),
   ).not.toBeInTheDocument();
@@ -146,6 +159,9 @@ it("reveals only the chosen live integration and keeps credentials out of its se
   expect(writeText.mock.calls[0][0]).toContain("ins_live");
   expect(writeText.mock.calls[0][0]).not.toContain("secret-not-for-a-prompt");
   expect(writeText.mock.calls[0][0]).toContain("aiSDKBinding");
+  expect(writeText.mock.calls[0][0]).toContain(
+    "https://github.com/beepgrid/beepgrid#readme",
+  );
   const token = screen.getByLabelText("Connection token");
   expect(token).toHaveAttribute("type", "password");
   expect(token).toHaveValue("secret-not-for-a-prompt");
