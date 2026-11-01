@@ -105,7 +105,7 @@ export function RequestCard({
                 className="coordinator-context"
                 aria-label="Coordinator context"
               >
-                <Badge tone="accent">Coordinator</Badge>
+                <span className="coordinator-context-label">Coordinator</span>
                 <p>{r.title.slice("Coordinator: ".length)}</p>
               </aside>
             ) : (

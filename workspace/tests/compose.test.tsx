@@ -158,7 +158,10 @@ it("addresses a selected participant in the first shared message without invitin
   expect(screen.getByRole("option", { name: /DevOps 2/ })).toBeInTheDocument();
   fireEvent.keyDown(input, { key: "Enter" });
   expect(input).toHaveValue("@DevOps 2 ");
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  expect(fn.mock.calls.some(([path]) => path.endsWith("/conversations"))).toBe(
+    false,
+  );
+  fireEvent.keyDown(input, { key: "Enter" });
   await waitFor(() =>
     expect(
       fn.mock.calls.some(([path]) => path.endsWith("/conversations")),
@@ -172,6 +175,32 @@ it("addresses a selected participant in the first shared message without invitin
     { kind: "agent", id: agent.id },
     { kind: "agent", id: devops.id },
   ]);
+});
+it("sends on Enter while keeping Shift+Enter and IME composition available for writing", async () => {
+  const fn = transport(),
+    { Wrapper } = harness();
+  render(<MessageComposer conversation="con_keyboard" />, { wrapper: Wrapper });
+  const input = screen.getByRole("textbox", { name: "Message" });
+  fireEvent.change(input, { target: { value: "First line" } });
+  fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true, keyCode: 229 });
+  fireEvent.keyDown(input, { key: "Enter", repeat: true });
+  expect(fn.mock.calls.some(([path]) => path.endsWith("/messages"))).toBe(
+    false,
+  );
+  fireEvent.change(input, { target: { value: "First line\nSecond line" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() =>
+    expect(fn.mock.calls.some(([path]) => path.endsWith("/messages"))).toBe(
+      true,
+    ),
+  );
+  expect(
+    requestBody(fn.mock.calls.find(([path]) => path.endsWith("/messages"))![1]),
+  ).toMatchObject({
+    conversation_id: "con_keyboard",
+    body: "First line\nSecond line",
+  });
 });
 it("keeps follow-ups in the same conversation", async () => {
   const fn = transport(),

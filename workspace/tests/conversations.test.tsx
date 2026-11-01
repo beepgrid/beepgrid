@@ -140,6 +140,8 @@ it("labels a Coordinator request as outgoing and never offers an administrator a
     screen.queryByRole("button", { name: "Send reply" }),
   ).not.toBeInTheDocument();
   expect(screen.getByRole("textbox", { name: "Message" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "View Agent" }));
+  expect(location.pathname).toBe("/agents/" + agent.id);
 });
 it("retains a draft through a temporary read outage but clears it after authoritative contact loss", async () => {
   history.replaceState(null, "", "/conversations/con_one");

@@ -320,6 +320,18 @@ function Chat({ id }: { id: string }) {
           </strong>
           <p>{c.participants.map((p) => p.name).join(", ")}</p>
         </div>
+        {!c.shared &&
+        participants.length === 1 &&
+        participants[0].kind === "agent" ? (
+          <Button
+            primary
+            onClick={() =>
+              navigate("/agents/" + encodeURIComponent(participants[0].id))
+            }
+          >
+            View Agent
+          </Button>
+        ) : null}
         {c.shared ? (
           <Button
             icon="people"

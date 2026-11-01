@@ -28,6 +28,9 @@
   --teal: #24756a;
   --amber: #91621c;
   --slate: #5d6b83;
+  --coordinator-ink: #294468;
+  --coordinator-surface: #eff3f8;
+  --coordinator-line: #ced9e7;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -52,6 +55,9 @@
   --teal: #8ac7ba;
   --amber: #d4b47d;
   --slate: #a8b6d0;
+  --coordinator-ink: #bacce8;
+  --coordinator-surface: #1b2534;
+  --coordinator-line: #35485f;
   color-scheme: dark;
 }
 * {
@@ -109,6 +115,10 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--accent);
+}
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--faint);
 }
 input,
 select,
@@ -796,8 +806,9 @@ main#main {
 }
 .badge.good {
   color: var(--good);
-  background: color-mix(in srgb, var(--good) 8%, var(--surface));
-  border-color: color-mix(in srgb, var(--good) 18%, var(--line));
+  background: color-mix(in srgb, var(--good) 14%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good) 35%, transparent);
+  font-weight: var(--type-medium);
 }
 .badge.warn {
   color: var(--warn);
@@ -2290,9 +2301,9 @@ dialog {
   display: grid;
   gap: 12px;
   padding: 16px 18px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--strong);
   border-radius: 10px;
-  background: var(--raised);
+  background: var(--surface);
   max-width: 580px;
 }
 .decision-card p {
@@ -2300,14 +2311,16 @@ dialog {
   white-space: pre-wrap;
 }
 .coordinator-context {
-  padding: 14px 16px;
-  margin: 2px -18px;
-  border-block: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line));
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  padding: 12px 18px;
+  margin: 0 -18px;
+  border-block: 1px solid var(--coordinator-line);
+  background: var(--coordinator-surface);
+  box-shadow: inset 3px 0 var(--coordinator-ink);
 }
+.coordinator-context-label { color:var(--coordinator-ink); font-size:12px; font-weight:var(--type-strong) }
 .coordinator-context > p {
-  margin-top: 8px;
-  color: var(--sub);
+  margin-top: 6px;
+  color: var(--coordinator-ink);
   font-size: var(--type-small);
   line-height: 1.65;
 }
@@ -2647,11 +2660,10 @@ dialog > header h2 {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 2px 4px #00000004;
-  overflow: hidden;
 }
 .message-compose:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--strong));
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: var(--faint);
+  box-shadow: none;
 }
 .message-compose > .form {
   gap: 0;
@@ -3173,12 +3185,12 @@ dialog > header h2 {
 .mention-mirror { position:absolute; inset:0; padding:16px 16px 12px; font-size:14px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; overflow:hidden; pointer-events:none }
 .mention-token { color:var(--accent); background:var(--accent-soft); border-radius:3px }
 a.mention-token:hover { text-decoration:underline }
-.mention-suggestions { position:absolute; bottom:calc(100% - 8px); left:12px; min-width:260px; max-width:calc(100% - 24px); z-index:10; padding:5px; border:1px solid var(--line); background:var(--surface); border-radius:10px; box-shadow:0 8px 28px #00000015 }
-.mention-suggestions button { width:100%; text-align:left; display:flex; align-items:center; gap:8px; padding:8px; border-radius:6px }
+.mention-suggestions { position:fixed; z-index:100; padding:5px; border:1px solid var(--strong); background:var(--surface); color:var(--ink); border-radius:10px; box-shadow:0 8px 28px #00000020; overflow-y:auto; overscroll-behavior:contain }
+.mention-suggestions button { width:100%; height:44px; text-align:left; display:flex; align-items:center; gap:8px; padding:8px; border-radius:6px }
 .mention-suggestions button[aria-selected="true"] { background:var(--raised) }
 .mention-suggestions .identity-icon { --avatar-size:26px }
-.mention-suggestions strong { font-size:12px; font-weight:550 }
-.mention-suggestions small { margin-left:auto; font-size:10px }
+.mention-suggestions strong { font-size:13px; font-weight:550; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.mention-suggestions small { margin-left:auto; font-size:10px; white-space:nowrap; color:var(--sub); text-transform:capitalize }
 
 .fleet-deadlock { border:1px solid color-mix(in srgb,var(--warn) 30%,var(--line)); border-radius:12px; padding:18px; margin-bottom:24px }
 .fleet-deadlock > header { display:flex; align-items:center; gap:9px; color:var(--warn); flex-wrap:wrap }

@@ -496,7 +496,7 @@ export default function Overseer() {
                       ) : null}
                       {turn.reply_summary ? (
                         <section className="section">
-                          <h3>Combined reply</h3>
+                          <h3>Coordinator Summary</h3>
                           <p>{turn.reply_summary}</p>
                         </section>
                       ) : null}
@@ -555,6 +555,19 @@ export default function Overseer() {
                   disabled={busy}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !e.shiftKey &&
+                      !e.altKey &&
+                      !e.nativeEvent.isComposing &&
+                      e.nativeEvent.keyCode !== 229 &&
+                      !e.repeat
+                    ) {
+                      e.preventDefault();
+                      if (!busy) void ask();
+                    }
+                  }}
                   placeholder="Message Coordinator…"
                 />
               </Field>

@@ -193,7 +193,15 @@ it("reloads private chronological turns, sends bounded follow-up identity and cl
       target: { value: "Explain that" },
     },
   );
-  fireEvent.click(screen.getByRole("button", { name: "Send to Coordinator" }));
+  const composer = screen.getByRole("textbox", { name: "Message Coordinator" });
+  fireEvent.keyDown(composer, { key: "Enter", shiftKey: true });
+  fireEvent.keyDown(composer, {
+    key: "Enter",
+    isComposing: true,
+    keyCode: 229,
+  });
+  expect(posts.some((p) => p.path.endsWith("/fleet/coordinate"))).toBe(false);
+  fireEvent.keyDown(composer, { key: "Enter" });
   await waitFor(() =>
     expect(
       posts.find((p) => p.path.endsWith("/fleet/coordinate"))?.body,

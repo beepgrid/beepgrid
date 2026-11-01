@@ -1,4 +1,11 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import type { Identity, Mention } from "./contracts";
 import { IdentityIcon } from "./ui";
 import { workspaceURL } from "./navigation";
@@ -92,6 +99,13 @@ export function MentionEditor({
   onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const listID = useId();
+  const [position, setPosition] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const [anchor, setAnchor] = useState<{
       start: number;
       end: number;
@@ -104,6 +118,35 @@ export function MentionEditor({
         .filter((p) => p.name.toLowerCase().includes(anchor.term.toLowerCase()))
         .slice(0, 6)
     : [];
+  useLayoutEffect(() => {
+    if (!candidates.length) {
+      setPosition(null);
+      return;
+    }
+    const place = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const desired = candidates.length * 44 + 12;
+      const above = rect.top - 14,
+        below = innerHeight - rect.bottom - 14;
+      const upward = above >= desired || above >= below;
+      const maxHeight = Math.max(44, Math.min(desired, upward ? above : below));
+      const width = Math.min(340, Math.max(260, rect.width), innerWidth - 16);
+      setPosition({
+        left: Math.max(8, Math.min(rect.left, innerWidth - width - 8)),
+        top: upward ? Math.max(8, rect.top - maxHeight - 6) : rect.bottom + 6,
+        width,
+        maxHeight,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [candidates.length, anchor?.start, anchor?.term]);
   function locate(text: string, cursor: number) {
     const prefix = text.slice(0, cursor);
     const match = prefix.match(/(?:^|\s)@([^@\n]{0,60})$/);
@@ -156,9 +199,9 @@ export function MentionEditor({
         className={`message-input ${mentions.length ? "has-mentions" : ""}`}
         aria-label={label}
         aria-autocomplete={participants.length > 2 ? "list" : undefined}
-        aria-controls={candidates.length ? "mention-suggestions" : undefined}
+        aria-controls={candidates.length ? listID : undefined}
         aria-activedescendant={
-          candidates.length ? `mention-option-${active}` : undefined
+          candidates.length ? `${listID}-option-${active}` : undefined
         }
         aria-expanded={candidates.length ? true : undefined}
         placeholder={
@@ -180,7 +223,10 @@ export function MentionEditor({
             locate(value, e.currentTarget.selectionStart);
         }}
         onScroll={(e) => setScroll(e.currentTarget.scrollTop)}
+        onBlur={() => setAnchor(null)}
         onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)
+            return;
           if (candidates.length) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault();
@@ -191,7 +237,14 @@ export function MentionEditor({
               );
               return;
             }
-            if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+            if (
+              e.key === "Enter" &&
+              !e.shiftKey &&
+              !e.altKey &&
+              !e.metaKey &&
+              !e.ctrlKey &&
+              !e.repeat
+            ) {
               e.preventDefault();
               choose(candidates[active]);
               return;
@@ -206,37 +259,42 @@ export function MentionEditor({
           onKeyDown(e);
         }}
       />
-      {candidates.length ? (
-        <div
-          className="mention-suggestions"
-          id="mention-suggestions"
-          role="listbox"
-          aria-label="Mention a participant"
-        >
-          {candidates.map((p, i) => (
-            <button
-              type="button"
-              id={`mention-option-${i}`}
-              role="option"
-              aria-selected={active === i}
-              key={p.id}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => choose(p)}
+      {candidates.length && position
+        ? createPortal(
+            <div
+              className="mention-suggestions"
+              id={listID}
+              role="listbox"
+              aria-label="Mention a participant"
+              style={position}
             >
-              <IdentityIcon
-                kind={p.kind}
-                id={p.id}
-                label={p.name}
-                icon={String(p.metadata?.appearance_icon || "")}
-              />
-              <strong>{p.name}</strong>
-              <small>
-                {p.kind} · {p.id.slice(-4)}
-              </small>
-            </button>
-          ))}
-        </div>
-      ) : null}
+              {candidates.map((p, i) => (
+                <button
+                  type="button"
+                  id={`${listID}-option-${i}`}
+                  role="option"
+                  aria-selected={active === i}
+                  key={p.id}
+                  onPointerDown={(e) => e.preventDefault()}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => choose(p)}
+                >
+                  <IdentityIcon
+                    kind={p.kind}
+                    id={p.id}
+                    label={p.name}
+                    icon={String(p.metadata?.appearance_icon || "")}
+                  />
+                  <strong>{p.name}</strong>
+                  <small>
+                    {p.kind} · {p.id.slice(-4)}
+                  </small>
+                </button>
+              ))}
+            </div>,
+            ref.current?.closest("dialog") || document.body,
+          )
+        : null}
     </div>
   );
 }

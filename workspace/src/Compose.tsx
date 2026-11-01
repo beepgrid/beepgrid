@@ -275,7 +275,14 @@ export function MessageComposer({
           }
           rows={replyTo ? 1 : conversation ? 2 : 3}
           onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            if (
+              e.key === "Enter" &&
+              !e.shiftKey &&
+              !e.altKey &&
+              !e.nativeEvent.isComposing &&
+              e.nativeEvent.keyCode !== 229 &&
+              !e.repeat
+            ) {
               e.preventDefault();
               void send();
             }
