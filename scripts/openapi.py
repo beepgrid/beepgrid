@@ -58,6 +58,12 @@ schemas['Conversation']['properties'].update({'shared':{'type':'boolean'},'versi
 schemas['ChannelPolicy']=obj({'mode':{'enum':['preferred','all']},'destinations':{'type':'array','items':S,'maxItems':16,'uniqueItems':True},'followup_seconds':{'type':'integer','minimum':0,'maximum':604800,'description':'0 disables unanswered-request follow-ups. Otherwise 60 to 604800 seconds. Only questions and approvals; all mode requires 0.'}},['mode','destinations','followup_seconds'])
 schemas['ChannelOverride']=obj({'source':obj({'kind':{'enum':['agent','group']},'id':S},['kind','id']),'policy':ref('ChannelPolicy')},['source','policy'])
 schemas['DeliveryPreferences']=obj({'person_id':S,'version':{'type':'integer','minimum':0},'default':{'anyOf':[ref('ChannelPolicy'),{'type':'null'}]},'overrides':{'type':'array','items':ref('ChannelOverride'),'maxItems':64}},['version','default','overrides'])
+# Programmatic token lifecycle. Raw secrets appear only in issue/rotate responses.
+nullableDate={'type':['string','null'],'format':'date-time'}
+schemas['Credential']=obj({'id':S,'principal_id':S,'owner_name':S,'name':S,'kind':S,'prefix':S,'token_hint':S,'created_at':S,'last_used_at':nullableDate,'expires_at':nullableDate,'renewable_until':nullableDate,'previous_until':nullableDate,'permissions':{'type':['array','null'],'items':{'enum':['read','message','request','respond','execute','manage']}},'version':{'type':'integer'},'revoked':{'type':'boolean'},'parent_credential_id':S})
+schemas['IssuedCredential']=obj({'id':S,'kind':S,'token':S,'expires_at':S})
+schemas['CredentialReplacement']=obj({'token':S,'credential':ref('Credential')})
+schemas['Enrollment']['properties'].update({'connection_name':S,'renewable':{'type':'boolean','default':False},'expires_at':{'type':'string','format':'date-time','description':'Hard deadline. Renewable workers use a 24-hour active lease up to this date.'}})
 paths={}
 def add(method,path,body=None,result=None,description=''):
  op={'operationId':method.lower()+'_'+re.sub('[^A-Za-z0-9]+','_',path).strip('_'),'description':description or path,'responses':{'200':response(result or {'type':'object'}),'400':response(ref('Error')),'401':response(ref('Error')),'403':response(ref('Error')),'404':response(ref('Error')),'409':response(ref('Error')),'429':response(ref('Error'))},'parameters':[]}
@@ -100,9 +106,12 @@ add('POST','/api/v1/destinations/{id}/remove',obj({}))
 add('GET','/api/v1/people/{id}/delivery-preferences',result=ref('DeliveryPreferences'),description='Read recipient-owned channel preferences. Person self, administrator or identity manager only. Agent override wins over ordered Agent role overrides, then default. Null default retains legacy destinations. Does not grant contact permission.')
 add('POST','/api/v1/people/{id}/delivery-preferences',ref('DeliveryPreferences'),ref('DeliveryPreferences'),description='Atomically save versioned recipient defaults and ordered Agent/Agent-role overrides. Destinations must belong to this Person; group selectors must be Agent roles. Preferred tries the first permitted enabled channel, fails over after definite failure, and optionally follows up on unresolved questions/approvals after provider acceptance. All sends selected channels immediately. Empty destinations means workspace only. Saving cancels pending external sends from the old policy; in-flight effects cannot be recalled. Native history stays available. Stale versions conflict.')
 
-add('GET','/api/v1/credentials',result=array({'type':'object','description':'Credential metadata only; no digest or plaintext.'}))
-add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','enrollment']},'prefix':S},['principal_id','kind']))
-add('POST','/api/v1/credentials/{id}/revoke',obj({}))
+add('GET','/api/v1/credentials',result=array(ref('Credential')))
+add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','enrollment']},'prefix':S,'name':S,'expires_at':{'type':'string','format':'date-time'},'permissions':array({'enum':['read','message','request','respond','execute','manage']})},['principal_id','kind']),ref('IssuedCredential'))
+add('POST','/api/v1/credentials/{id}/revoke',obj({'revoke_workers':{'type':'boolean','default':False}}))
+add('POST','/api/v1/credentials/{id}/edit',obj({'version':{'type':'integer'},'name':S,'expires_at':{'type':'string','format':'date-time'},'permissions':array(S),'clear_permissions':{'type':'boolean'}},['version']),ref('Credential'))
+add('POST','/api/v1/credentials/{id}/rotate',obj({'version':{'type':'integer'},'overlap_seconds':{'type':'integer','minimum':0,'maximum':86400,'default':3600}},['version']),ref('CredentialReplacement'))
+add('POST','/api/v1/credentials/self/renew',obj({}),ref('Credential'))
 add('POST','/api/v1/permissions/explain',obj({'subject_id':S,'action':S,'target':obj({'kind':S,'id':S},['kind','id']),'connection_id':S,'action_name':S,'descriptor':ref('Action')},['action','target']))
 add('POST','/api/v1/route-preview',obj({'target':ref('Target'),'action':S},['target','action']))
 add('POST','/api/v1/conversations',obj({'targets':array(ref('Target')),'body':S,'title':S,'approval':{'type':'boolean'},'choices':array(S),'mentions':{'type':'array','items':ref('Mention'),'maxItems':20}},['targets','body']),ref('SendResult'),description='Start an explicit shared chat with a durable first message. Individual recipients only; all members must have current mutual view permission. Every later send checks current contact access. Idempotent; private broadcast contracts are unchanged.')

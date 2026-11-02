@@ -59,7 +59,7 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 	sender := Actor{Principal: Principal{ID: policy.SenderID}, Scope: scope}
 	var valid bool
 	err := db.QueryRow(ctx, `SELECT p.kind,CASE WHEN $4<>'' THEN 'provider' ELSE COALESCE(c.kind,'') END,
- CASE WHEN $4<>'' THEN false ELSE COALESCE(c.kind='admin' OR (c.kind='browser' AND EXISTS(
+ c.permissions,CASE WHEN $4<>'' THEN false ELSE COALESCE(c.kind='admin' OR (c.kind='browser' AND EXISTS(
  SELECT 1 FROM credentials ac WHERE ac.scope=$1 AND ac.principal_id=p.id AND ac.kind='admin' AND NOT ac.revoked AND (ac.expires_at IS NULL OR ac.expires_at>now()))),false) END,
  COALESCE(NOT p.disabled AND NOT rp.disabled AND
  (CASE WHEN $4<>'' THEN pc.enabled ELSE NOT c.revoked AND (c.expires_at IS NULL OR c.expires_at>now()) END) AND
@@ -69,7 +69,7 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
  FROM principals p JOIN principals rp ON rp.scope=p.scope AND rp.id=$5
  LEFT JOIN credentials c ON c.scope=p.scope AND c.id=$3 AND c.principal_id=p.id
  LEFT JOIN connections pc ON pc.scope=p.scope AND pc.id=$4
- WHERE p.scope=$1 AND p.id=$2`, scope, policy.SenderID, policy.CredentialID, policy.ProviderConnection, d.RecipientID, policy.Target.Kind, policy.Target.ID, checkRequest, requestID, conv, d.OperationID).Scan(&sender.Kind, &sender.CredentialKind, &sender.Admin, &valid)
+ WHERE p.scope=$1 AND p.id=$2`, scope, policy.SenderID, policy.CredentialID, policy.ProviderConnection, d.RecipientID, policy.Target.Kind, policy.Target.ID, checkRequest, requestID, conv, d.OperationID).Scan(&sender.Kind, &sender.CredentialKind, &sender.TokenPermissions, &sender.Admin, &valid)
 	if err != nil || !valid {
 		return false
 	}

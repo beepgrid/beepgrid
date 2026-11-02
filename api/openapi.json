@@ -4646,8 +4646,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "description": "Credential metadata only; no digest or plaintext."
+                    "$ref": "#/components/schemas/Credential"
                   }
                 }
               }
@@ -4722,7 +4721,7 @@
       },
       "post": {
         "operationId": "post_api_v1_credentials",
-        "description": "Issue a credential for an authorized identity or enrollment purpose.\n\nAuthenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.\n\nReturns: `id`, one-time plaintext `token` and `kind`. Save the token securely immediately; list/read operations do not disclose it again.\n\nRecovery: Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used.",
+        "description": "Issue a named API or namespace-restricted enrollment token with an optional expiry and API permission ceiling. Defaults to 30 days.\n\nAuthenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.\n\nReturns: Token secret once with id, kind and expires_at. Metadata listing never recovers plaintext.\n\nRecovery: Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used.",
         "responses": {
           "200": {
             "description": "Success",
@@ -4831,6 +4830,28 @@
                   "prefix": {
                     "type": "string",
                     "description": "Permitted enrollment namespace prefix for a bounded launcher."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Human-readable name. It is not necessarily unique."
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "read",
+                        "message",
+                        "request",
+                        "respond",
+                        "execute",
+                        "manage"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -4842,7 +4863,7 @@
             }
           }
         },
-        "summary": "Issue a credential for an authorized identity or enrollment purpose",
+        "summary": "Issue a named API or namespace-restricted enrollment token with an optional expiry and API permission ceiling",
         "tags": [
           "identities"
         ]
@@ -4851,7 +4872,7 @@
     "/api/v1/credentials/{id}/revoke": {
       "post": {
         "operationId": "post_api_v1_credentials_id_revoke",
-        "description": "Revoke the specified credential.\n\nAuthenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.\n\nReturns: `{revoked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.\n\nRecovery: Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used.",
+        "description": "Revoke this exact credential, including its rotation overlap. An enrollment token may explicitly revoke_workers to stop connections it issued after lineage tracking was introduced.\n\nAuthenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.\n\nReturns: `{revoked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.\n\nRecovery: Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used.",
         "responses": {
           "200": {
             "description": "Success",
@@ -4946,6 +4967,355 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "properties": {
+                  "revoke_workers": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Revoke this exact credential, including its rotation overlap",
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/credentials/{id}/edit": {
+      "post": {
+        "operationId": "post_api_v1_credentials_id_edit",
+        "description": "Rename a token, change expiry or update its permission ceiling using the observed version.\n\nAuthorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.\n\nReturns: Current metadata with the next version. Never returns the secret.\n\nRecovery: Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "description": "Current optimistic-concurrency version. Read the object before a guarded change; a stale version conflicts."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Human-readable name. It is not necessarily unique."
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "clear_permissions": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Rename a token, change expiry or update its permission ceiling using the observed version",
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/credentials/{id}/rotate": {
+      "post": {
+        "operationId": "post_api_v1_credentials_id_rotate",
+        "description": "Replace a token secret while preserving its identity, instance and permissions. Choose a zero to 86400 second overlap.\n\nAuthorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.\n\nReturns: New token secret once, plus metadata including previous_until. No automatic retry after an uncertain outcome.\n\nRecovery: Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialReplacement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "description": "Current optimistic-concurrency version. Read the object before a guarded change; a stale version conflicts."
+                  },
+                  "overlap_seconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "default": 3600
+                  }
+                },
+                "required": [
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Replace a token secret while preserving its identity, instance and permissions",
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/credentials/self/renew": {
+      "post": {
+        "operationId": "post_api_v1_credentials_self_renew",
+        "description": "Renew the current renewable worker lease, capped by its hard deadline. Active traffic renews near expiry automatically.\n\nAuthorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.\n\nReturns: Current credential metadata. No new instance or secret is created.\n\nRecovery: Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
                 "properties": {},
                 "required": [],
                 "additionalProperties": false
@@ -4953,7 +5323,7 @@
             }
           }
         },
-        "summary": "Revoke the specified credential",
+        "summary": "Renew the current renewable worker lease, capped by its hard deadline",
         "tags": [
           "identities"
         ]
@@ -12137,6 +12507,18 @@
           "metadata": {
             "type": "object",
             "description": "Application-supplied JSON metadata. Do not put credentials here."
+          },
+          "connection_name": {
+            "type": "string"
+          },
+          "renewable": {
+            "type": "boolean",
+            "default": false
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hard deadline. Renewable workers use a 24-hour active lease up to this date."
           }
         },
         "required": [
@@ -13583,6 +13965,135 @@
           "default",
           "overrides"
         ],
+        "additionalProperties": false
+      },
+      "Credential": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable identifier returned by the engine. Treat it as opaque."
+          },
+          "principal_id": {
+            "type": "string",
+            "description": "Person, agent or service identity ID. This is an API term, not a separate product entity."
+          },
+          "owner_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name. It is not necessarily unique."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource or operation kind. Use one of the listed values, not a display label."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Permitted enrollment namespace prefix for a bounded launcher."
+          },
+          "token_hint": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation timestamp in RFC 3339 UTC."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+          },
+          "renewable_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "previous_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "permissions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "enum": [
+                "read",
+                "message",
+                "request",
+                "respond",
+                "execute",
+                "manage"
+              ]
+            }
+          },
+          "version": {
+            "type": "integer",
+            "description": "Current optimistic-concurrency version. Read the object before a guarded change; a stale version conflicts."
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "parent_credential_id": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "IssuedCredential": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable identifier returned by the engine. Treat it as opaque."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource or operation kind. Use one of the listed values, not a display label."
+          },
+          "token": {
+            "type": "string",
+            "description": "Bearer credential. Save in protected server-side storage and never expose it in browser code or logs."
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CredentialReplacement": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Bearer credential. Save in protected server-side storage and never expose it in browser code or logs."
+          },
+          "credential": {
+            "$ref": "#/components/schemas/Credential"
+          }
+        },
+        "required": [],
         "additionalProperties": false
       },
       "ProviderField": {

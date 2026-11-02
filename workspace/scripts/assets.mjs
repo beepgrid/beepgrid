@@ -39,10 +39,10 @@ for (const name of assets) {
 }
 const budgets = {
   entry_js_gzip_kib: 96,
-  // Environment setup and the recipient channel-policy editor, loaded with Integrations.
-  all_js_gzip_kib: 152,
-  // Shared request context, question panel, icon chooser and channel stack.
-  css_gzip_kib: 15.75,
+  // Includes the lazy-loaded token lifecycle editor; initial entry remains capped separately.
+  all_js_gzip_kib: 156,
+  // Shared request surfaces, channel stack and compact token lifecycle table.
+  css_gzip_kib: 16,
   all_fonts_kib: 320,
   largest_font_kib: 96,
 };

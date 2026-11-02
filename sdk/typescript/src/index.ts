@@ -122,6 +122,11 @@ export type Delivery = {
     request?: RequestItem;
   };
 };
+export type Credential = {id:string;principal_id:string;owner_name:string;name:string;kind:string;prefix:string;token_hint:string;created_at:string;last_used_at:string|null;expires_at:string|null;renewable_until:string|null;previous_until:string|null;permissions:string[]|null;version:number;revoked:boolean;parent_credential_id?:string};
+export type CredentialInput = {principal_id:string;kind:"api"|"enrollment";name?:string;prefix?:string;expires_at?:string;permissions?:Array<"read"|"message"|"request"|"respond"|"execute"|"manage">};
+export type CredentialEdit = {version:number;name?:string;expires_at?:string;permissions?:string[];clear_permissions?:boolean};
+export type IssuedCredential = {id:string;token:string;kind:string;expires_at:string};
+export type CredentialReplacement = {token:string;credential:Credential};
 export type Session = {
   token: string;
   agent: Agent;
@@ -204,6 +209,13 @@ export class Client {
       throw new Error("Invalid Beep Grid server URL");
     this.baseURL = baseURL.replace(/\/$/, "");
   }
+  credentials(){return this.call<Credential[]>("GET","/api/v1/credentials");}
+  createCredential(input:CredentialInput){return this.call<IssuedCredential>("POST","/api/v1/credentials",input);}
+  editCredential(id:string,input:CredentialEdit){return this.call<Credential>("POST",`/api/v1/credentials/${encodeURIComponent(id)}/edit`,input);}
+  /** Returned once. No automatic retry after an uncertain response. */
+  rotateCredential(id:string,version:number,overlapSeconds=3600){return this.call<CredentialReplacement>("POST",`/api/v1/credentials/${encodeURIComponent(id)}/rotate`,{version,overlap_seconds:overlapSeconds});}
+  revokeCredential(id:string,revokeWorkers=false){return this.call<{revoked:true}>("POST",`/api/v1/credentials/${encodeURIComponent(id)}/revoke`,{revoke_workers:revokeWorkers});}
+  renewCredential(){return this.call<Credential>("POST","/api/v1/credentials/self/renew",{});}
   deliveryPreferences(personId: string): Promise<DeliveryPreferences> {
     return this.call("GET", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`);
   }
@@ -312,8 +324,10 @@ export class Client {
     name: string,
     capabilities: string[] = [],
     metadata: Record<string, unknown> = {},
+    options: {connection_name?:string;renewable?:boolean;expires_at?:string} = {},
   ): Promise<{ client: Client; session: Session }> {
     const session = await this.call<Session>("POST", "/api/v1/sessions", {
+      ...options,
       agent,
       name,
       capabilities,

@@ -533,7 +533,9 @@ export function Connect({
     [contact, setContact] = useState(true),
     [runtime, setRuntime] = useState(""),
     [busyMode, setBusyMode] = useState<"steer" | "queue">("steer"),
-    [testConversation, setTestConversation] = useState("");
+    [testConversation, setTestConversation] = useState(""),
+ [renewable,setRenewable]=useState(true),
+ [connectionDays,setConnectionDays]=useState("90");
   const base = location.origin;
   function chooseRuntime(value: string) {
     setRuntime(value);
@@ -561,6 +563,9 @@ export function Connect({
     }>("/sessions", {
       agent: external,
       name,
+ connection_name: name+" connection",
+ renewable,
+ expires_at: new Date(Date.now()+Number(connectionDays)*86400000).toISOString(),
       capabilities: ["message", "status"],
     });
     if (!result) return;
@@ -681,7 +686,7 @@ export function Connect({
             </label>
           ) : null}
           <ErrorView error={op.error} />
-          <div className="form-actions">
+          <details className="connection-security"><summary>Connection security</summary><div className="form"><Field label="Connection valid for"><select value={connectionDays} onChange={e=>setConnectionDays(e.target.value)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></Field><label className="check"><input type="checkbox" checked={renewable} onChange={e=>setRenewable(e.target.checked)}/>Renew automatically while connected</label><p className="help">Renewable connections use a 24-hour lease, up to this deadline. Manage or revoke them in Settings → Access tokens.</p></div></details><div className="form-actions">
             <Button onClick={onClose}>Cancel</Button>
             <Button primary type="submit" disabled={op.pending || !name.trim() || !runtime}>
               Create connection

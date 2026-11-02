@@ -92,6 +92,6 @@ For measured performance and its limits, see the [benchmark methodology](https:/
 
 ## Documentation and contributing
 
-Start with the [user guides and SDK reference](https://beepgrid.com/docs/). Coding agents can fetch the [Markdown documentation index](https://beepgrid.com/llms.txt). Contributor notes, API contracts and test instructions are indexed in [docs](docs/README.md).
+Start with the [user guides and SDK reference](https://beepgrid.com/docs/). Coding agents can fetch the [Markdown documentation index](https://beepgrid.com/llms.txt). Manage named, expiring credentials and renewable Agent connections through the UI or [headless token API](docs/ACCESS-TOKENS.md). Contributor notes, API contracts and test instructions are indexed in [docs](docs/README.md).
 
 Small fixes, new runtime examples and clear bug reports are welcome. See [contributing](CONTRIBUTING.md), report vulnerabilities [privately](SECURITY.md), and use Beepgrid under [Apache-2.0](LICENSE).

@@ -166,7 +166,7 @@ export function AgentSetup({
             </header>
             <p>
               Shown once. Save it outside your source code or in your secret
-              manager. This token expires after 24 hours.
+              manager. Manage its expiry in Settings → Access tokens.
             </p>
             <ConnectionToken token={token} />
           </section>

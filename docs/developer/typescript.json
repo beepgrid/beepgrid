@@ -826,6 +826,249 @@
   },
   {
     "file": "sdk/typescript/src/index.ts",
+    "name": "Credential",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Credential = {id:string;principal_id:string;owner_name:string;name:string;kind:string;prefix:string;token_hint:string;created_at:string;last_used_at:string|null;expires_at:string|null;renewable_until:string|null;previous_until:string|null;permissions:string[]|null;version:number;revoked:boolean;parent_credential_id?:string};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "principal_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "owner_name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "prefix",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "token_hint",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "last_used_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "renewable_until",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "previous_until",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "permissions",
+        "type": "string[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "revoked",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "parent_credential_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "CredentialInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type CredentialInput = {principal_id:string;kind:\"api\"|\"enrollment\";name?:string;prefix?:string;expires_at?:string;permissions?:Array<\"read\"|\"message\"|\"request\"|\"respond\"|\"execute\"|\"manage\">};",
+    "fields": [
+      {
+        "name": "principal_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "\"api\" | \"enrollment\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "prefix",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "permissions",
+        "type": "(\"read\" | \"message\" | \"request\" | \"respond\" | \"execute\" | \"manage\")[]",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "CredentialEdit",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type CredentialEdit = {version:number;name?:string;expires_at?:string;permissions?:string[];clear_permissions?:boolean};",
+    "fields": [
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "permissions",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "clear_permissions",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "IssuedCredential",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type IssuedCredential = {id:string;token:string;kind:string;expires_at:string};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "token",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "CredentialReplacement",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type CredentialReplacement = {token:string;credential:Credential};",
+    "fields": [
+      {
+        "name": "token",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "credential",
+        "type": "Credential",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
     "name": "Session",
     "doc": "",
     "kind": "TypeAliasDeclaration",
@@ -1419,8 +1662,102 @@
     "name": "Client",
     "doc": "",
     "kind": "ClassDeclaration",
-    "definition": "export class Client {\n  readonly baseURL: string;\n  constructor(\n    baseURL: string,\n    private readonly token: string,\n    private readonly transport: typeof fetch = fetch,\n  ) {\n    const u = new URL(baseURL);\n    if (![\"http:\", \"https:\"].includes(u.protocol) || u.username || u.password)\n      throw new Error(\"Invalid Beep Grid server URL\");\n    this.baseURL = baseURL.replace(/\\/$/, \"\");\n  }\n  deliveryPreferences(personId: string): Promise<DeliveryPreferences> {\n    return this.call(\"GET\", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`);\n  }\n  saveDeliveryPreferences(personId: string, preferences: DeliveryPreferences): Promise<DeliveryPreferences> {\n    return this.call(\"POST\", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`, preferences);\n  }\n  async call<T>(\n    method: string,\n    path: string,\n    body?: unknown,\n    options: { key?: string; signal?: AbortSignal; minimal?: boolean } = {},\n  ): Promise<T> {\n    if (!path.startsWith(\"/api/v1/\")) throw new Error(\"Invalid API path\");\n    const headers: Record<string, string> = {\n      \"Content-Type\": \"application/json\",\n      Authorization: `Bearer ${this.token}`,\n    };\n    if (options.key) headers[\"Idempotency-Key\"] = options.key;\n    if (options.minimal) headers[\"Prefer\"] = \"return=minimal\";\n    const raw = body === undefined ? undefined : JSON.stringify(body);\n    for (let attempt = 0; attempt < 3; attempt++) {\n      let response: globalThis.Response;\n      try {\n        response = await this.transport(this.baseURL + path, {\n          method,\n          redirect: \"error\",\n          headers,\n          body: raw,\n          signal: options.signal ?? AbortSignal.timeout(20000),\n        });\n      } catch (error) {\n        if (\n          attempt === 2 ||\n          options.signal?.aborted ||\n          (method !== \"GET\" && !options.key)\n        )\n          throw error;\n        await delay(200 * (attempt + 1), options.signal);\n        continue;\n      }\n      let value: any;\n      try {\n        value = await response.json();\n      } catch (error) {\n        if (\n          attempt === 2 ||\n          options.signal?.aborted ||\n          (method !== \"GET\" && !options.key)\n        )\n          throw error;\n        await delay(200 * (attempt + 1), options.signal);\n        continue;\n      }\n      if (!response.ok)\n        throw new NotifError(\n          value.error?.code ?? \"HTTP_ERROR\",\n          value.error?.message ?? `HTTP ${response.status}`,\n          response.status,\n        );\n      return value as T;\n    }\n    throw new Error(\"Request attempts exhausted\");\n  }\n  query<T=unknown>(input:QueryInput) {return this.call<QueryPage<T>>(\"POST\",\"/api/v1/query\",input);}\n  capabilities(input:{target?:{kind:string;id:string};request_id?:string;connection_id?:string;descriptor?:Action}={}) {return this.call<CapabilityResult>(\"POST\",\"/api/v1/capabilities\",input);}\n  previewContactPermissions(input: ContactPreviewInput) {return this.call<unknown>(\"POST\",\"/api/v1/contact-permissions/preview\",input);}\n  saveContactPermissions(input: ContactPermissionsInput) {return this.call<unknown>(\"POST\",\"/api/v1/contact-permissions\",input);}\n  access(subject=\"\") {return this.call<unknown>(\"GET\",\"/api/v1/access?subject_id=\"+encodeURIComponent(subject));}\n  dispatchPreview(input:DispatchPreviewInput) {return this.call<DispatchPreview>(\"POST\",\"/api/v1/dispatch-preview\",input);}\n  sendBatch(input:{targets:Target[];body:string;title?:string;preview_token?:string;attachment_ids?:string[]},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;result:{conversation_id:string;messages:Message[]}}>>(\"POST\",\"/api/v1/message-batches\",input,{key});}\n  askBatch(input:{targets:Target[];request:Omit<AskInput,\"target\"|\"conversation_id\"|\"preview_token\">;preview_token?:string},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;request:RequestItem}>>(\"POST\",\"/api/v1/request-batches\",input,{key});}\n  requestTrace(id:string,cursor=\"\"){return this.call<unknown>(\"GET\",\"/api/v1/requests/\"+encodeURIComponent(id)+\"/trace?delivery_cursor=\"+encodeURIComponent(cursor));}\n  workspace(){return this.call<unknown>(\"GET\",\"/api/v1/workspace\");}\n  account(){return this.call<unknown>(\"GET\",\"/api/v1/workspace/account\");}\n  startChat(input:StartChatInput,key:string=crypto.randomUUID()) { return this.call<{conversation_id:string;messages:Message[]}>(\"POST\",\"/api/v1/conversations\",input,{key}); }\n  changeChatMembership(conversationId:string,input:ChatMembershipInput,key:string=crypto.randomUUID()){return this.call<ChatMembershipResult>(\"POST\",`/api/v1/conversations/${encodeURIComponent(conversationId)}/membership`,input,{key});}\n  attachments(conversationId:string) { return this.call<Attachment[]>(\"GET\",`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`); }\n  async uploadAttachment(conversationId:string, file:Blob, name:string, signal?:AbortSignal):Promise<Attachment> {\n    return this.uploadFile(`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`,file,name,signal);\n  }\n  /** Private draft for attachment_ids. No automatic retry; unused drafts expire after 24 hours. */\n  async stageAttachment(file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {\n    return this.uploadFile(\"/api/v1/attachments\",file,name,signal);\n  }\n  private async uploadFile(path:string,file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {\n    if (!file.size || file.size>5*1024*1024) throw new Error(\"Attachments must be between 1 byte and 5 MiB\");\n    const form=new FormData(); form.append(\"file\",file,name);\n    const response=await this.transport(`${this.baseURL}${path}`,{method:\"POST\",headers:{Authorization:`Bearer ${this.token}`},body:form,signal:signal??AbortSignal.timeout(20000),redirect:\"error\"});\n    const value=await response.json(); if(!response.ok) throw new NotifError(value.error?.code??\"HTTP_ERROR\",value.error?.message??\"Attachment upload rejected\",response.status);\n    return value as Attachment;\n  }\n  async downloadAttachment(id:string,signal?:AbortSignal):Promise<Blob> {\n    const response=await this.transport(`${this.baseURL}/api/v1/attachments/${encodeURIComponent(id)}`,{headers:{Authorization:`Bearer ${this.token}`},signal:signal??AbortSignal.timeout(20000),redirect:\"error\"});\n    if(!response.ok) { let value:any;try{value=await response.json();}catch{} throw new NotifError(value?.error?.code??\"HTTP_ERROR\",value?.error?.message??\"Attachment download rejected\",response.status); }\n    if (Number(response.headers.get(\"Content-Length\"))>5*1024*1024) { await response.body?.cancel();throw new Error(\"Attachment exceeds 5 MiB\"); }\n    const reader=response.body?.getReader();const chunks:Uint8Array<ArrayBuffer>[]=[];let size=0;\n    if(reader) try {for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>5*1024*1024)throw new Error(\"Attachment exceeds 5 MiB\");chunks.push(new Uint8Array(value));}}finally{await reader.cancel();reader.releaseLock();}\n    return new Blob(chunks,{type:response.headers.get(\"Content-Type\")??\"application/octet-stream\"});\n  }\n  directory(kind:\"agent\"|\"person\"|\"service\",search=\"\") { return this.query<Agent|Person>({collection:kind===\"person\"?\"people\":kind+\"s\",search}); }\n  conversation(id:string) { return this.call<Conversation>(\"GET\",`/api/v1/conversations/${encodeURIComponent(id)}`); }\n  providerCatalog() { return this.call<unknown[]>(\"GET\",\"/api/v1/integrations/catalog\"); }\n  connectionSetup(id:string) { return this.call<unknown>(\"GET\",`/api/v1/connections/${encodeURIComponent(id)}/setup`); }\n  async connect(\n    agent: string,\n    name: string,\n    capabilities: string[] = [],\n    metadata: Record<string, unknown> = {},\n  ): Promise<{ client: Client; session: Session }> {\n    const session = await this.call<Session>(\"POST\", \"/api/v1/sessions\", {\n      agent,\n      name,\n      capabilities,\n      metadata,\n    });\n    return {\n      client: new Client(this.baseURL, session.token, this.transport),\n      session,\n    };\n  }\n  send(input: SendInput, key: string = crypto.randomUUID()) {\n    return this.call<{ conversation_id: string; messages: Message[] }>(\n      \"POST\",\n      \"/api/v1/messages\",\n      input,\n      { key },\n    );\n  }\n  // Confirms durable acceptance only, never provider delivery or execution.\n  // send(input, sameKey) can recover the complete canonical receipt later.\n  notify(input: SendInput, key: string = crypto.randomUUID()) {\n    return this.call<{ conversation_id: string; message_count: number }>(\n      \"POST\",\n      \"/api/v1/messages\",\n      input,\n      { key, minimal: true },\n    );\n  }\n  ask(input: AskInput, key: string = crypto.randomUUID()) {\n    return this.call<RequestItem>(\"POST\", \"/api/v1/requests\", input, { key });\n  }\n  getRequest(id: string, signal?: AbortSignal) {\n    return this.call<RequestItem>(\n      \"GET\",\n      \"/api/v1/requests/\" + encodeURIComponent(id),\n      undefined,\n      { signal },\n    );\n  }\n  respond(id: string, response: Response) {\n    return this.call<RequestItem>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/responses`,\n      response,\n    );\n  }\n  redeem(id: string, action: Action) {\n    return this.call<Execution>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/redeem`,\n      action,\n      { key: crypto.randomUUID() },\n    );\n  }\n  reportExecution(\n    id: string,\n    state: \"running\" | \"succeeded\" | \"failed\" | \"unknown\",\n    result: unknown = null,\n  ) {\n    return this.call<Execution>(\n      \"POST\",\n      `/api/v1/executions/${encodeURIComponent(id)}`,\n      { state, result },\n      { key: crypto.randomUUID() },\n    );\n  }\n  assistance(signal?: AbortSignal) {\n    return this.call<AssistanceSettings>(\n      \"GET\",\n      \"/api/v1/assistance/settings\",\n      undefined,\n      { signal },\n    );\n  }\n  updateAssistance(\n    settings: Partial<\n      Pick<AssistanceSettings, \"overseer\" | \"version\">\n    >,\n  ) {\n    return this.call<AssistanceSettings>(\n      \"POST\",\n      \"/api/v1/assistance/settings\",\n      settings,\n    );\n  }\n  setRequestBlocking(id:string, blocking:boolean) {\n    return this.call<RequestItem>(\"POST\", `/api/v1/requests/${encodeURIComponent(id)}/blocking`, {blocking});\n  }\n  coordinate(input:OverseerInput, signal?:AbortSignal, key?:string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/coordinate\", input, {key,signal});\n  }\n  planOverseer(input: OverseerInput, signal?: AbortSignal, key?: string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/plan\", input, {\n      key, signal,\n    });\n  }\n  overseerPlans(signal?: AbortSignal) {\n    return this.call<OverseerPlan[]>(\"GET\", \"/api/v1/fleet/plans\", undefined, {\n      signal,\n    });\n  }\n  overseerPlan(id: string, signal?: AbortSignal) {\n    return this.call<OverseerPlan>(\n      \"GET\",\n      \"/api/v1/fleet/plans/\" + encodeURIComponent(id),\n      undefined,\n      { signal },\n    );\n  }\n  confirmOverseer(id: string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/command\", {\n      plan_id: id,\n    });\n  }\n  summarizeOverseer(id: string, signal?: AbortSignal) {\n    return this.call<OverseerPlan>(\n      \"POST\",\n      \"/api/v1/fleet/plans/\" + encodeURIComponent(id) + \"/summary\",\n      {},\n      { signal },\n    );\n  }\n  // Full, durable events contain canonical message data. Consumers can append\n  // message.created directly instead of downloading a growing history again.\n  events(options: EventOptions = {}) {\n    return readEvents(this.baseURL, this.token, this.transport, options);\n  }\n  async wait(id: string, signal?: AbortSignal): Promise<RequestItem> {\n    for (;;) {\n      const request = await this.getRequest(id, signal);\n      if (request.state !== \"open\") return request;\n      await delay(1000, signal);\n    }\n  }\n  replaceRequest(id: string, input: { version: number; body: string; mentions?: Mention[] }, key: string = crypto.randomUUID()) {\n    return this.call<{ previous: RequestItem; replacement: RequestItem }>(\"POST\", `/api/v1/requests/${encodeURIComponent(id)}/replace`, input, {key});\n  }\n  cancel(id: string, version: number) {\n    return this.call<RequestItem>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/cancel`,\n      { version },\n    );\n  }\n  inbox(signal?: AbortSignal, waitMs = 0) {\n    return this.call<Delivery[]>(\"GET\", `/api/v1/worker/inbox?wait_ms=${Math.max(0, Math.min(15000, Math.floor(waitMs)))}`, undefined, {\n      signal,\n    });\n  }\n  ack(delivery: Delivery) {\n    return this.call(\n      \"POST\",\n      `/api/v1/worker/inbox/${encodeURIComponent(delivery.id)}/ack`,\n      { generation: delivery.generation },\n    );\n  }\n  heartbeat(progress: Record<string, unknown> = {}) {\n    return this.call(\"POST\", \"/api/v1/worker/heartbeat\", progress);\n  }\n  async run(\n    handler: (delivery: Delivery) => Promise<void>,\n    signal?: AbortSignal,\n  ) {\n    while (!signal?.aborted) {\n      let jobs: Delivery[];\n      try {\n        jobs = await this.call<Delivery[]>(\n          \"GET\",\n          \"/api/v1/worker/inbox?wait_ms=15000\",\n          undefined,\n          { signal },\n        );\n      } catch (e) {\n        if (signal?.aborted) throw e;\n        if (e instanceof NotifError && e.status < 500 && e.status !== 429)\n          throw e;\n        await delay(2000, signal);\n        continue;\n      }\n      for (const job of jobs) {\n        await handler(job);\n        await this.ack(job);\n      }\n      if (!jobs.length) await delay(100, signal);\n    }\n  }\n}",
+    "definition": "export class Client {\n  readonly baseURL: string;\n  constructor(\n    baseURL: string,\n    private readonly token: string,\n    private readonly transport: typeof fetch = fetch,\n  ) {\n    const u = new URL(baseURL);\n    if (![\"http:\", \"https:\"].includes(u.protocol) || u.username || u.password)\n      throw new Error(\"Invalid Beep Grid server URL\");\n    this.baseURL = baseURL.replace(/\\/$/, \"\");\n  }\n  credentials(){return this.call<Credential[]>(\"GET\",\"/api/v1/credentials\");}\n  createCredential(input:CredentialInput){return this.call<IssuedCredential>(\"POST\",\"/api/v1/credentials\",input);}\n  editCredential(id:string,input:CredentialEdit){return this.call<Credential>(\"POST\",`/api/v1/credentials/${encodeURIComponent(id)}/edit`,input);}\n  /** Returned once. No automatic retry after an uncertain response. */\n  rotateCredential(id:string,version:number,overlapSeconds=3600){return this.call<CredentialReplacement>(\"POST\",`/api/v1/credentials/${encodeURIComponent(id)}/rotate`,{version,overlap_seconds:overlapSeconds});}\n  revokeCredential(id:string,revokeWorkers=false){return this.call<{revoked:true}>(\"POST\",`/api/v1/credentials/${encodeURIComponent(id)}/revoke`,{revoke_workers:revokeWorkers});}\n  renewCredential(){return this.call<Credential>(\"POST\",\"/api/v1/credentials/self/renew\",{});}\n  deliveryPreferences(personId: string): Promise<DeliveryPreferences> {\n    return this.call(\"GET\", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`);\n  }\n  saveDeliveryPreferences(personId: string, preferences: DeliveryPreferences): Promise<DeliveryPreferences> {\n    return this.call(\"POST\", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`, preferences);\n  }\n  async call<T>(\n    method: string,\n    path: string,\n    body?: unknown,\n    options: { key?: string; signal?: AbortSignal; minimal?: boolean } = {},\n  ): Promise<T> {\n    if (!path.startsWith(\"/api/v1/\")) throw new Error(\"Invalid API path\");\n    const headers: Record<string, string> = {\n      \"Content-Type\": \"application/json\",\n      Authorization: `Bearer ${this.token}`,\n    };\n    if (options.key) headers[\"Idempotency-Key\"] = options.key;\n    if (options.minimal) headers[\"Prefer\"] = \"return=minimal\";\n    const raw = body === undefined ? undefined : JSON.stringify(body);\n    for (let attempt = 0; attempt < 3; attempt++) {\n      let response: globalThis.Response;\n      try {\n        response = await this.transport(this.baseURL + path, {\n          method,\n          redirect: \"error\",\n          headers,\n          body: raw,\n          signal: options.signal ?? AbortSignal.timeout(20000),\n        });\n      } catch (error) {\n        if (\n          attempt === 2 ||\n          options.signal?.aborted ||\n          (method !== \"GET\" && !options.key)\n        )\n          throw error;\n        await delay(200 * (attempt + 1), options.signal);\n        continue;\n      }\n      let value: any;\n      try {\n        value = await response.json();\n      } catch (error) {\n        if (\n          attempt === 2 ||\n          options.signal?.aborted ||\n          (method !== \"GET\" && !options.key)\n        )\n          throw error;\n        await delay(200 * (attempt + 1), options.signal);\n        continue;\n      }\n      if (!response.ok)\n        throw new NotifError(\n          value.error?.code ?? \"HTTP_ERROR\",\n          value.error?.message ?? `HTTP ${response.status}`,\n          response.status,\n        );\n      return value as T;\n    }\n    throw new Error(\"Request attempts exhausted\");\n  }\n  query<T=unknown>(input:QueryInput) {return this.call<QueryPage<T>>(\"POST\",\"/api/v1/query\",input);}\n  capabilities(input:{target?:{kind:string;id:string};request_id?:string;connection_id?:string;descriptor?:Action}={}) {return this.call<CapabilityResult>(\"POST\",\"/api/v1/capabilities\",input);}\n  previewContactPermissions(input: ContactPreviewInput) {return this.call<unknown>(\"POST\",\"/api/v1/contact-permissions/preview\",input);}\n  saveContactPermissions(input: ContactPermissionsInput) {return this.call<unknown>(\"POST\",\"/api/v1/contact-permissions\",input);}\n  access(subject=\"\") {return this.call<unknown>(\"GET\",\"/api/v1/access?subject_id=\"+encodeURIComponent(subject));}\n  dispatchPreview(input:DispatchPreviewInput) {return this.call<DispatchPreview>(\"POST\",\"/api/v1/dispatch-preview\",input);}\n  sendBatch(input:{targets:Target[];body:string;title?:string;preview_token?:string;attachment_ids?:string[]},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;result:{conversation_id:string;messages:Message[]}}>>(\"POST\",\"/api/v1/message-batches\",input,{key});}\n  askBatch(input:{targets:Target[];request:Omit<AskInput,\"target\"|\"conversation_id\"|\"preview_token\">;preview_token?:string},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;request:RequestItem}>>(\"POST\",\"/api/v1/request-batches\",input,{key});}\n  requestTrace(id:string,cursor=\"\"){return this.call<unknown>(\"GET\",\"/api/v1/requests/\"+encodeURIComponent(id)+\"/trace?delivery_cursor=\"+encodeURIComponent(cursor));}\n  workspace(){return this.call<unknown>(\"GET\",\"/api/v1/workspace\");}\n  account(){return this.call<unknown>(\"GET\",\"/api/v1/workspace/account\");}\n  startChat(input:StartChatInput,key:string=crypto.randomUUID()) { return this.call<{conversation_id:string;messages:Message[]}>(\"POST\",\"/api/v1/conversations\",input,{key}); }\n  changeChatMembership(conversationId:string,input:ChatMembershipInput,key:string=crypto.randomUUID()){return this.call<ChatMembershipResult>(\"POST\",`/api/v1/conversations/${encodeURIComponent(conversationId)}/membership`,input,{key});}\n  attachments(conversationId:string) { return this.call<Attachment[]>(\"GET\",`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`); }\n  async uploadAttachment(conversationId:string, file:Blob, name:string, signal?:AbortSignal):Promise<Attachment> {\n    return this.uploadFile(`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`,file,name,signal);\n  }\n  /** Private draft for attachment_ids. No automatic retry; unused drafts expire after 24 hours. */\n  async stageAttachment(file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {\n    return this.uploadFile(\"/api/v1/attachments\",file,name,signal);\n  }\n  private async uploadFile(path:string,file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {\n    if (!file.size || file.size>5*1024*1024) throw new Error(\"Attachments must be between 1 byte and 5 MiB\");\n    const form=new FormData(); form.append(\"file\",file,name);\n    const response=await this.transport(`${this.baseURL}${path}`,{method:\"POST\",headers:{Authorization:`Bearer ${this.token}`},body:form,signal:signal??AbortSignal.timeout(20000),redirect:\"error\"});\n    const value=await response.json(); if(!response.ok) throw new NotifError(value.error?.code??\"HTTP_ERROR\",value.error?.message??\"Attachment upload rejected\",response.status);\n    return value as Attachment;\n  }\n  async downloadAttachment(id:string,signal?:AbortSignal):Promise<Blob> {\n    const response=await this.transport(`${this.baseURL}/api/v1/attachments/${encodeURIComponent(id)}`,{headers:{Authorization:`Bearer ${this.token}`},signal:signal??AbortSignal.timeout(20000),redirect:\"error\"});\n    if(!response.ok) { let value:any;try{value=await response.json();}catch{} throw new NotifError(value?.error?.code??\"HTTP_ERROR\",value?.error?.message??\"Attachment download rejected\",response.status); }\n    if (Number(response.headers.get(\"Content-Length\"))>5*1024*1024) { await response.body?.cancel();throw new Error(\"Attachment exceeds 5 MiB\"); }\n    const reader=response.body?.getReader();const chunks:Uint8Array<ArrayBuffer>[]=[];let size=0;\n    if(reader) try {for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>5*1024*1024)throw new Error(\"Attachment exceeds 5 MiB\");chunks.push(new Uint8Array(value));}}finally{await reader.cancel();reader.releaseLock();}\n    return new Blob(chunks,{type:response.headers.get(\"Content-Type\")??\"application/octet-stream\"});\n  }\n  directory(kind:\"agent\"|\"person\"|\"service\",search=\"\") { return this.query<Agent|Person>({collection:kind===\"person\"?\"people\":kind+\"s\",search}); }\n  conversation(id:string) { return this.call<Conversation>(\"GET\",`/api/v1/conversations/${encodeURIComponent(id)}`); }\n  providerCatalog() { return this.call<unknown[]>(\"GET\",\"/api/v1/integrations/catalog\"); }\n  connectionSetup(id:string) { return this.call<unknown>(\"GET\",`/api/v1/connections/${encodeURIComponent(id)}/setup`); }\n  async connect(\n    agent: string,\n    name: string,\n    capabilities: string[] = [],\n    metadata: Record<string, unknown> = {},\n    options: {connection_name?:string;renewable?:boolean;expires_at?:string} = {},\n  ): Promise<{ client: Client; session: Session }> {\n    const session = await this.call<Session>(\"POST\", \"/api/v1/sessions\", {\n      ...options,\n      agent,\n      name,\n      capabilities,\n      metadata,\n    });\n    return {\n      client: new Client(this.baseURL, session.token, this.transport),\n      session,\n    };\n  }\n  send(input: SendInput, key: string = crypto.randomUUID()) {\n    return this.call<{ conversation_id: string; messages: Message[] }>(\n      \"POST\",\n      \"/api/v1/messages\",\n      input,\n      { key },\n    );\n  }\n  // Confirms durable acceptance only, never provider delivery or execution.\n  // send(input, sameKey) can recover the complete canonical receipt later.\n  notify(input: SendInput, key: string = crypto.randomUUID()) {\n    return this.call<{ conversation_id: string; message_count: number }>(\n      \"POST\",\n      \"/api/v1/messages\",\n      input,\n      { key, minimal: true },\n    );\n  }\n  ask(input: AskInput, key: string = crypto.randomUUID()) {\n    return this.call<RequestItem>(\"POST\", \"/api/v1/requests\", input, { key });\n  }\n  getRequest(id: string, signal?: AbortSignal) {\n    return this.call<RequestItem>(\n      \"GET\",\n      \"/api/v1/requests/\" + encodeURIComponent(id),\n      undefined,\n      { signal },\n    );\n  }\n  respond(id: string, response: Response) {\n    return this.call<RequestItem>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/responses`,\n      response,\n    );\n  }\n  redeem(id: string, action: Action) {\n    return this.call<Execution>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/redeem`,\n      action,\n      { key: crypto.randomUUID() },\n    );\n  }\n  reportExecution(\n    id: string,\n    state: \"running\" | \"succeeded\" | \"failed\" | \"unknown\",\n    result: unknown = null,\n  ) {\n    return this.call<Execution>(\n      \"POST\",\n      `/api/v1/executions/${encodeURIComponent(id)}`,\n      { state, result },\n      { key: crypto.randomUUID() },\n    );\n  }\n  assistance(signal?: AbortSignal) {\n    return this.call<AssistanceSettings>(\n      \"GET\",\n      \"/api/v1/assistance/settings\",\n      undefined,\n      { signal },\n    );\n  }\n  updateAssistance(\n    settings: Partial<\n      Pick<AssistanceSettings, \"overseer\" | \"version\">\n    >,\n  ) {\n    return this.call<AssistanceSettings>(\n      \"POST\",\n      \"/api/v1/assistance/settings\",\n      settings,\n    );\n  }\n  setRequestBlocking(id:string, blocking:boolean) {\n    return this.call<RequestItem>(\"POST\", `/api/v1/requests/${encodeURIComponent(id)}/blocking`, {blocking});\n  }\n  coordinate(input:OverseerInput, signal?:AbortSignal, key?:string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/coordinate\", input, {key,signal});\n  }\n  planOverseer(input: OverseerInput, signal?: AbortSignal, key?: string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/plan\", input, {\n      key, signal,\n    });\n  }\n  overseerPlans(signal?: AbortSignal) {\n    return this.call<OverseerPlan[]>(\"GET\", \"/api/v1/fleet/plans\", undefined, {\n      signal,\n    });\n  }\n  overseerPlan(id: string, signal?: AbortSignal) {\n    return this.call<OverseerPlan>(\n      \"GET\",\n      \"/api/v1/fleet/plans/\" + encodeURIComponent(id),\n      undefined,\n      { signal },\n    );\n  }\n  confirmOverseer(id: string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/command\", {\n      plan_id: id,\n    });\n  }\n  summarizeOverseer(id: string, signal?: AbortSignal) {\n    return this.call<OverseerPlan>(\n      \"POST\",\n      \"/api/v1/fleet/plans/\" + encodeURIComponent(id) + \"/summary\",\n      {},\n      { signal },\n    );\n  }\n  // Full, durable events contain canonical message data. Consumers can append\n  // message.created directly instead of downloading a growing history again.\n  events(options: EventOptions = {}) {\n    return readEvents(this.baseURL, this.token, this.transport, options);\n  }\n  async wait(id: string, signal?: AbortSignal): Promise<RequestItem> {\n    for (;;) {\n      const request = await this.getRequest(id, signal);\n      if (request.state !== \"open\") return request;\n      await delay(1000, signal);\n    }\n  }\n  replaceRequest(id: string, input: { version: number; body: string; mentions?: Mention[] }, key: string = crypto.randomUUID()) {\n    return this.call<{ previous: RequestItem; replacement: RequestItem }>(\"POST\", `/api/v1/requests/${encodeURIComponent(id)}/replace`, input, {key});\n  }\n  cancel(id: string, version: number) {\n    return this.call<RequestItem>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/cancel`,\n      { version },\n    );\n  }\n  inbox(signal?: AbortSignal, waitMs = 0) {\n    return this.call<Delivery[]>(\"GET\", `/api/v1/worker/inbox?wait_ms=${Math.max(0, Math.min(15000, Math.floor(waitMs)))}`, undefined, {\n      signal,\n    });\n  }\n  ack(delivery: Delivery) {\n    return this.call(\n      \"POST\",\n      `/api/v1/worker/inbox/${encodeURIComponent(delivery.id)}/ack`,\n      { generation: delivery.generation },\n    );\n  }\n  heartbeat(progress: Record<string, unknown> = {}) {\n    return this.call(\"POST\", \"/api/v1/worker/heartbeat\", progress);\n  }\n  async run(\n    handler: (delivery: Delivery) => Promise<void>,\n    signal?: AbortSignal,\n  ) {\n    while (!signal?.aborted) {\n      let jobs: Delivery[];\n      try {\n        jobs = await this.call<Delivery[]>(\n          \"GET\",\n          \"/api/v1/worker/inbox?wait_ms=15000\",\n          undefined,\n          { signal },\n        );\n      } catch (e) {\n        if (signal?.aborted) throw e;\n        if (e instanceof NotifError && e.status < 500 && e.status !== 429)\n          throw e;\n        await delay(2000, signal);\n        continue;\n      }\n      for (const job of jobs) {\n        await handler(job);\n        await this.ack(job);\n      }\n      if (!jobs.length) await delay(100, signal);\n    }\n  }\n}",
     "methods": [
+      {
+        "name": "credentials",
+        "signature": "(): Promise<Credential[]>",
+        "parameters": [],
+        "returns": "Promise<Credential[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "createCredential",
+        "signature": "(input: CredentialInput): Promise<IssuedCredential>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "CredentialInput",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<IssuedCredential>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "editCredential",
+        "signature": "(id: string, input: CredentialEdit): Promise<Credential>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "input",
+            "type": "CredentialEdit",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<Credential>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "rotateCredential",
+        "signature": "(id: string, version: number, overlapSeconds?: number): Promise<CredentialReplacement>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "version",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "overlapSeconds",
+            "type": "number",
+            "optional": true,
+            "default": "3600"
+          }
+        ],
+        "returns": "Promise<CredentialReplacement>",
+        "doc": "Returned once. No automatic retry after an uncertain response.",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "revokeCredential",
+        "signature": "(id: string, revokeWorkers?: boolean): Promise<{ revoked: true; }>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "revokeWorkers",
+            "type": "boolean",
+            "optional": true,
+            "default": "false"
+          }
+        ],
+        "returns": "Promise<{ revoked: true; }>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "renewCredential",
+        "signature": "(): Promise<Credential>",
+        "parameters": [],
+        "returns": "Promise<Credential>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
       {
         "name": "deliveryPreferences",
         "signature": "(personId: string): Promise<DeliveryPreferences>",
@@ -1835,7 +2172,7 @@
       },
       {
         "name": "connect",
-        "signature": "(agent: string, name: string, capabilities?: string[], metadata?: Record<string, unknown>): Promise<{ client: Client; session: Session; }>",
+        "signature": "(agent: string, name: string, capabilities?: string[], metadata?: Record<string, unknown>, options?: { connection_name?: string; renewable?: boolean; expires_at?: string; }): Promise<{ client: Client; session: Session; }>",
         "parameters": [
           {
             "name": "agent",
@@ -1856,6 +2193,12 @@
           {
             "name": "metadata",
             "type": "Record<string, unknown>",
+            "optional": true,
+            "default": "{}"
+          },
+          {
+            "name": "options",
+            "type": "{connection_name?:string;renewable?:boolean;expires_at?:string}",
             "optional": true,
             "default": "{}"
           }
@@ -2022,7 +2365,7 @@
       },
       {
         "name": "updateAssistance",
-        "signature": "(settings: Partial<Pick<AssistanceSettings, \"overseer\" | \"version\">>): Promise<AssistanceSettings>",
+        "signature": "(settings: Partial<Pick<AssistanceSettings, \"version\" | \"overseer\">>): Promise<AssistanceSettings>",
         "parameters": [
           {
             "name": "settings",
@@ -2709,7 +3052,7 @@
         "doc": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
       },
       {
-        "name": "__@iterator@557",
+        "name": "__@iterator@624",
         "type": "() => StringIterator<string>",
         "optional": false,
         "doc": "Iterator"

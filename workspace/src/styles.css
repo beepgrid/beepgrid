@@ -3471,3 +3471,19 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 .delivery-destinations { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 12px; }
 
 .routing-number { color: var(--sub); font-size: 13px; }
+
+/* Token management keeps identity, state and lifecycle separate and scannable. */
+.token-toolbar{display:flex;gap:10px;margin:0 0 16px;align-items:center}
+.token-toolbar input{max-width:340px}.token-toolbar select{width:auto;min-width:175px}
+.token-table th,.token-table td{padding:12px 14px;vertical-align:middle}
+.token-table td:first-child{min-width:210px}.token-table td strong{font-weight:600}
+.token-table small{display:flex;gap:8px;align-items:center;color:var(--sub);font-size:12px;margin-top:4px}
+.token-table code{font-size:12px}.token-actions{display:flex;gap:6px;justify-content:flex-end}
+.token-actions button{padding:6px 10px;min-height:32px;font-size:13px}
+.token-empty{padding:24px;text-align:center;color:var(--sub)}
+.token-permissions{border:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.token-permissions legend{margin-bottom:10px;font-weight:600}.token-permissions label{display:flex;align-items:center;gap:9px}
+.token-secret{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:10px}
+.token-secret code{word-break:break-all;flex:1}.connection-security{font-size:14px}
+.connection-security summary{cursor:pointer;font-weight:500}.connection-security>.form{padding-top:12px}
+@media(max-width:700px){.token-toolbar{align-items:stretch;flex-direction:column}.token-toolbar input{max-width:none}.token-permissions{grid-template-columns:1fr}.token-table td:first-child{min-width:170px}}

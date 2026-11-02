@@ -51,6 +51,8 @@ assert.equal(typeof new Client('http://localhost','fixture').uploadAttachment,'f
 assert.equal(typeof new Client('http://localhost','fixture').stageAttachment,'function');
 assert.equal(typeof new Client('http://localhost','fixture').changeChatMembership,'function');
 assert.equal(typeof new Client('http://localhost','fixture').replaceRequest,'function');
+assert.equal(typeof new Client('http://localhost','fixture').rotateCredential,'function');
+assert.equal(typeof new Client('http://localhost','fixture').renewCredential,'function');
 assert.equal(typeof browserClient('http://localhost').events,'function');
 assert.match(import.meta.resolve('@notif/react/styles.css'),/styles.css$/);
 assert.equal(typeof NotifConversation,'function');
@@ -68,7 +70,10 @@ const membership: ChatMembershipInput = {operation:'add',version:1,members:['pee
 const changed: Promise<ChatMembershipResult> = client.changeChatMembership('c',membership,'members-1');
 const replaced: Promise<{previous: import('@notif/client').RequestItem; replacement: import('@notif/client').RequestItem}> = client.replaceRequest('r',{version:1,body:'Revised'},'key');
 const followup: Promise<import('@notif/client').RequestItem> = client.ask({conversation_id:'c',body:'Which version?'});
-void [upload, draft, changed, replaced, followup, events, shared, NotifRequest];
+const keys: Promise<import('@notif/client').Credential[]> = client.credentials();
+const replacement: Promise<import('@notif/client').CredentialReplacement> = client.rotateCredential('key',1,300);
+const renewal: Promise<import('@notif/client').Credential> = client.renewCredential();
+void [upload, draft, changed, replaced, followup, keys, replacement, renewal, events, shared, NotifRequest];
 ''')
     run([root/"sdk/typescript/node_modules/.bin/tsc", "--noEmit", "--strict", "--module", "nodenext", "--target", "es2022", "consumer.ts"], cwd=node)
     wheel_stage = scratch / "python-source"
@@ -88,13 +93,13 @@ void [upload, draft, changed, replaced, followup, events, shared, NotifRequest];
     run([python, "-m", "venv", venv])
     vpython = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     run([vpython, "-m", "pip", "install", "--no-deps", "--no-index", wheel])
-    run([vpython, "-c", "from notif import Client; from notif.events import read_frames; assert callable(Client.start_chat); assert callable(Client.events); assert callable(Client.upload_attachment); assert callable(Client.download_attachment); assert callable(Client.stage_attachment); assert callable(Client.change_chat_membership)"], cwd=scratch)
+    run([vpython, "-c", "from notif import Client; from notif.events import read_frames; assert callable(Client.start_chat); assert callable(Client.events); assert callable(Client.upload_attachment); assert callable(Client.download_attachment); assert callable(Client.stage_attachment); assert callable(Client.change_chat_membership); assert callable(Client.rotate_credential); assert callable(Client.renew_credential)"], cwd=scratch)
     go = scratch / "go"
     go.mkdir()
     (go / "go.mod").write_text('module example.com/beepgrid-consumer\n\ngo 1.26.0\n\nrequire github.com/beepgrid/beepgrid v0.0.0\nreplace github.com/beepgrid/beepgrid => ' + json.dumps(str(root)) + '\n')
     (go / "main.go").write_text('''package main
 import "github.com/beepgrid/beepgrid/sdk/go/notif"
-func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ = c.StageAttachment;_ = c.ChangeChatMembership;_ = notif.ChatMembershipInput{Operation:"add",Version:1,Members:[]string{"peer"}};_ = c.StreamEvents;_ = c.Directory;_ = c.Cancel;_ = c.StartChat;_ = notif.StartChatInput{AttachmentIDs:[]string{"draft"},Mentions:[]notif.Mention{{PrincipalID:"a",Start:2,End:13}}}}
+func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ = c.StageAttachment;_ = c.ChangeChatMembership;_ = c.RotateCredential;_ = c.RenewCredential;_ = notif.CredentialEdit{Version:1,ClearPermissions:true};_ = notif.ChatMembershipInput{Operation:"add",Version:1,Members:[]string{"peer"}};_ = c.StreamEvents;_ = c.Directory;_ = c.Cancel;_ = c.StartChat;_ = notif.StartChatInput{AttachmentIDs:[]string{"draft"},Mentions:[]notif.Mention{{PrincipalID:"a",Start:2,End:13}}}}
 ''')
     run(["go", "run", "-buildvcs=false", "."], cwd=go)
 

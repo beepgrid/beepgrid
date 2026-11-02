@@ -654,9 +654,27 @@
     "name": "Session"
   },
   {
-    "definition": "struct {\n\tParentID     string         `json:\"parent_id,omitempty\"`\n\tAgent        string         `json:\"agent\"`\n\tName         string         `json:\"name\"`\n\tCapabilities []string       `json:\"capabilities\"`\n\tMetadata     map[string]any `json:\"metadata,omitempty\"`\n}",
+    "definition": "struct {\n\tConnectionName string         `json:\"connection_name,omitempty\"`\n\tRenewable      bool           `json:\"renewable,omitempty\"`\n\tExpiresAt      *time.Time     `json:\"expires_at,omitempty\"`\n\tParentID       string         `json:\"parent_id,omitempty\"`\n\tAgent          string         `json:\"agent\"`\n\tName           string         `json:\"name\"`\n\tCapabilities   []string       `json:\"capabilities\"`\n\tMetadata       map[string]any `json:\"metadata,omitempty\"`\n}",
     "doc": "",
     "fields": [
+      {
+        "doc": "",
+        "name": "ConnectionName",
+        "tag": "`json:\"connection_name,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Renewable",
+        "tag": "`json:\"renewable,omitempty\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at,omitempty\"`",
+        "type": "*time.Time"
+      },
       {
         "doc": "",
         "name": "ParentID",
@@ -1716,6 +1734,359 @@
       }
     ],
     "signature": "func(ctx context.Context, in ContactPermissionsInput) (map[string]any, error)"
+  },
+  {
+    "definition": "struct {\n\tID                 string     `json:\"id\"`\n\tPrincipalID        string     `json:\"principal_id\"`\n\tName               string     `json:\"name\"`\n\tOwnerName          string     `json:\"owner_name\"`\n\tKind               string     `json:\"kind\"`\n\tPrefix             string     `json:\"prefix\"`\n\tTokenHint          string     `json:\"token_hint\"`\n\tCreatedAt          time.Time  `json:\"created_at\"`\n\tLastUsedAt         *time.Time `json:\"last_used_at\"`\n\tExpiresAt          *time.Time `json:\"expires_at\"`\n\tRenewableUntil     *time.Time `json:\"renewable_until\"`\n\tPreviousUntil      *time.Time `json:\"previous_until\"`\n\tPermissions        []string   `json:\"permissions\"`\n\tVersion            int64      `json:\"version\"`\n\tRevoked            bool       `json:\"revoked\"`\n\tParentCredentialID string     `json:\"parent_credential_id,omitempty\"`\n}",
+    "doc": "Credential is metadata only. Permissions restrict, never grant, identity access.\n",
+    "fields": [
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "PrincipalID",
+        "tag": "`json:\"principal_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Name",
+        "tag": "`json:\"name\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "OwnerName",
+        "tag": "`json:\"owner_name\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Kind",
+        "tag": "`json:\"kind\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Prefix",
+        "tag": "`json:\"prefix\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "TokenHint",
+        "tag": "`json:\"token_hint\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "CreatedAt",
+        "tag": "`json:\"created_at\"`",
+        "type": "time.Time"
+      },
+      {
+        "doc": "",
+        "name": "LastUsedAt",
+        "tag": "`json:\"last_used_at\"`",
+        "type": "*time.Time"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at\"`",
+        "type": "*time.Time"
+      },
+      {
+        "doc": "",
+        "name": "RenewableUntil",
+        "tag": "`json:\"renewable_until\"`",
+        "type": "*time.Time"
+      },
+      {
+        "doc": "",
+        "name": "PreviousUntil",
+        "tag": "`json:\"previous_until\"`",
+        "type": "*time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Permissions",
+        "tag": "`json:\"permissions\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "Revoked",
+        "tag": "`json:\"revoked\"`",
+        "type": "bool"
+      },
+      {
+        "doc": "",
+        "name": "ParentCredentialID",
+        "tag": "`json:\"parent_credential_id,omitempty\"`",
+        "type": "string"
+      }
+    ],
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "type",
+    "name": "Credential"
+  },
+  {
+    "definition": "struct {\n\tPrincipalID string     `json:\"principal_id\"`\n\tKind        string     `json:\"kind\"`\n\tName        string     `json:\"name,omitempty\"`\n\tPrefix      string     `json:\"prefix,omitempty\"`\n\tExpiresAt   *time.Time `json:\"expires_at,omitempty\"`\n\tPermissions []string   `json:\"permissions,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "PrincipalID",
+        "tag": "`json:\"principal_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Kind",
+        "tag": "`json:\"kind\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Name",
+        "tag": "`json:\"name,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Prefix",
+        "tag": "`json:\"prefix,omitempty\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at,omitempty\"`",
+        "type": "*time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Permissions",
+        "tag": "`json:\"permissions,omitempty\"`",
+        "type": "[]string"
+      }
+    ],
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "type",
+    "name": "CredentialInput"
+  },
+  {
+    "definition": "struct {\n\tVersion          int64      `json:\"version\"`\n\tName             *string    `json:\"name,omitempty\"`\n\tExpiresAt        *time.Time `json:\"expires_at,omitempty\"`\n\tPermissions      *[]string  `json:\"permissions,omitempty\"`\n\tClearPermissions bool       `json:\"clear_permissions,omitempty\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "Name",
+        "tag": "`json:\"name,omitempty\"`",
+        "type": "*string"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at,omitempty\"`",
+        "type": "*time.Time"
+      },
+      {
+        "doc": "",
+        "name": "Permissions",
+        "tag": "`json:\"permissions,omitempty\"`",
+        "type": "*[]string"
+      },
+      {
+        "doc": "",
+        "name": "ClearPermissions",
+        "tag": "`json:\"clear_permissions,omitempty\"`",
+        "type": "bool"
+      }
+    ],
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "type",
+    "name": "CredentialEdit"
+  },
+  {
+    "definition": "struct {\n\tToken     string    `json:\"token\"`\n\tID        string    `json:\"id\"`\n\tKind      string    `json:\"kind\"`\n\tExpiresAt time.Time `json:\"expires_at\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Token",
+        "tag": "`json:\"token\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ID",
+        "tag": "`json:\"id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Kind",
+        "tag": "`json:\"kind\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "ExpiresAt",
+        "tag": "`json:\"expires_at\"`",
+        "type": "time.Time"
+      }
+    ],
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "type",
+    "name": "IssuedCredential"
+  },
+  {
+    "definition": "struct {\n\tToken      string     `json:\"token\"`\n\tCredential Credential `json:\"credential\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Token",
+        "tag": "`json:\"token\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Credential",
+        "tag": "`json:\"credential\"`",
+        "type": "Credential"
+      }
+    ],
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "type",
+    "name": "CredentialReplacement"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "method",
+    "name": "Credentials",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) (out []Credential, err error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "method",
+    "name": "CreateCredential",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "in",
+        "type": "CredentialInput"
+      }
+    ],
+    "signature": "func(ctx context.Context, in CredentialInput) (out IssuedCredential, err error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "method",
+    "name": "EditCredential",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "in",
+        "type": "CredentialEdit"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, in CredentialEdit) (out Credential, err error)"
+  },
+  {
+    "doc": "RotateCredential returns a secret once. It is deliberately not automatically retried.\n",
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "method",
+    "name": "RotateCredential",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "version",
+        "type": "int64"
+      },
+      {
+        "name": "overlapSeconds",
+        "type": "int"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, version int64, overlapSeconds int) (out CredentialReplacement, err error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "method",
+    "name": "RevokeCredential",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "revokeWorkers",
+        "type": "bool"
+      }
+    ],
+    "signature": "func(ctx context.Context, id string, revokeWorkers bool) error"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/credentials.go",
+    "kind": "method",
+    "name": "RenewCredential",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      }
+    ],
+    "signature": "func(ctx context.Context) (out Credential, err error)"
   },
   {
     "definition": "struct {\n\tMode            string   `json:\"mode\"`\n\tDestinations    []string `json:\"destinations\"`\n\tFollowupSeconds int      `json:\"followup_seconds\"`\n}",

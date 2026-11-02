@@ -202,7 +202,7 @@ it("makes answer management reachable for a delegated publisher without exposing
   ).toBeVisible();
   expect(
     screen.queryByRole("button", { name: "Access tokens" }),
-  ).not.toBeInTheDocument();
+  ).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Activity log" }),
   ).not.toBeInTheDocument();

@@ -45,7 +45,7 @@ func querySearchText(table string) string {
 	switch table {
 	case "principals":
 		fields += ",t.name,t.external_id,t.metadata->>'department',t.metadata->>'email'"
-	case "groups", "roles", "connections":
+	case "groups", "roles", "connections", "credentials":
 		fields += ",t.name"
 	case "requests":
 		fields += ",t.title,t.body"
@@ -553,7 +553,7 @@ func (s *Store) queryRecord(ctx context.Context, a Actor, collection, id string)
 		return x, nil
 	case "credentials":
 		var x Credential
-		e := db.QueryRow(ctx, `SELECT id,principal_id,kind,prefix,expires_at,revoked FROM credentials WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&x.ID, &x.PrincipalID, &x.Kind, &x.Prefix, &x.ExpiresAt, &x.Revoked)
+		e := db.QueryRow(ctx, `SELECT `+credentialFields+` FROM credentials WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&x.ID, &x.PrincipalID, &x.Kind, &x.Prefix, &x.ExpiresAt, &x.Revoked, &x.Name, &x.TokenHint, &x.CreatedAt, &x.LastUsedAt, &x.Permissions, &x.Version, &x.RenewableUntil, &x.PreviousUntil, &x.ParentCredentialID, &x.OwnerName)
 		if e != nil {
 			return nil, normalize(e)
 		}

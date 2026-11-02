@@ -85,7 +85,10 @@ type Agent struct {
 	Instances []Instance `json:"instances"`
 }
 type Actor struct {
-	ProviderConnection string `json:"-"`
+	ProviderConnection string   `json:"-"`
+	TokenPermissions   []string `json:"-"`
+	CredentialPrevious bool     `json:"-"`
+	TokenDigest        string   `json:"-"`
 
 	Principal
 	Scope          string `json:"scope"`
@@ -103,11 +106,14 @@ type CreatePerson struct {
 	Email      string `json:"email"`
 }
 type EnrollInput struct {
-	ParentID     string         `json:"parent_id,omitempty"`
-	Agent        string         `json:"agent"`
-	Name         string         `json:"name"`
-	Capabilities []string       `json:"capabilities"`
-	Metadata     map[string]any `json:"metadata"`
+	ConnectionName string         `json:"connection_name,omitempty"`
+	ExpiresAt      *time.Time     `json:"expires_at,omitempty"`
+	Renewable      bool           `json:"renewable,omitempty"`
+	ParentID       string         `json:"parent_id,omitempty"`
+	Agent          string         `json:"agent"`
+	Name           string         `json:"name"`
+	Capabilities   []string       `json:"capabilities"`
+	Metadata       map[string]any `json:"metadata"`
 }
 type Instance struct {
 	ID           string         `json:"id"`
@@ -124,12 +130,22 @@ type Session struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 type Credential struct {
-	ID          string     `json:"id"`
-	PrincipalID string     `json:"principal_id"`
-	Kind        string     `json:"kind"`
-	Prefix      string     `json:"prefix"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	Revoked     bool       `json:"revoked"`
+	Name               string     `json:"name"`
+	OwnerName          string     `json:"owner_name"`
+	TokenHint          string     `json:"token_hint"`
+	CreatedAt          time.Time  `json:"created_at"`
+	LastUsedAt         *time.Time `json:"last_used_at"`
+	Permissions        []string   `json:"permissions"`
+	Version            int64      `json:"version"`
+	RenewableUntil     *time.Time `json:"renewable_until"`
+	PreviousUntil      *time.Time `json:"previous_until"`
+	ParentCredentialID string     `json:"parent_credential_id,omitempty"`
+	ID                 string     `json:"id"`
+	PrincipalID        string     `json:"principal_id"`
+	Kind               string     `json:"kind"`
+	Prefix             string     `json:"prefix"`
+	ExpiresAt          *time.Time `json:"expires_at"`
+	Revoked            bool       `json:"revoked"`
 }
 type RuleConditions struct {
 	Resource        string     `json:"resource,omitempty"`

@@ -210,3 +210,24 @@ test("real recipient preferences preserve inheritance and reject stale edits", {
   const restored = await c.saveDeliveryPreferences(person.id, {...before, version:saved.version});
   assert.deepEqual(restored.default, before.default);
 });
+
+test("real token lifecycle keeps names, limits and rotation metadata", {skip: !process.env.NOTIF_SDK_TEST_URL}, async () => {
+  const owner = new Client(process.env.NOTIF_SDK_TEST_URL, process.env.NOTIF_SDK_TEST_TOKEN);
+  const me = await owner.call("GET", "/api/v1/me");
+  const issued = await owner.createCredential({principal_id:me.person.id,kind:"api",name:"TypeScript reports",permissions:["read"]});
+  const meta = (await owner.credentials()).find(c=>c.id===issued.id);
+  assert.equal(meta.name,"TypeScript reports");assert.deepEqual(meta.permissions,["read"]);
+  const edited = await owner.editCredential(meta.id,{version:meta.version,name:"TypeScript renamed"});
+  const replacement = await owner.rotateCredential(meta.id,edited.version,300);
+  assert.equal(replacement.credential.id,meta.id);
+  await new Client(owner.baseURL,replacement.token).call("GET","/api/v1/me");
+  await owner.revokeCredential(meta.id);
+  await assert.rejects(new Client(owner.baseURL,replacement.token).call("GET","/api/v1/me"),e=>e.status===401);
+  const {client,session}=await owner.connect("sdk/renew-ts-"+crypto.randomUUID(),"Renewable",[],{},{renewable:true,connection_name:"TS live"});
+  const renewed=await client.renewCredential();assert.equal(renewed.kind,"worker");assert.ok(renewed.renewable_until);
+  assert.equal((await client.call("GET","/api/v1/me")).instance_id,session.instance_id);
+});
+test("rotation never blindly retries an uncertain secret response",async()=>{
+  let calls=0;const client=new Client("http://localhost","fixture",async()=>{calls++;throw new TypeError("response lost")});
+  await assert.rejects(client.rotateCredential("key_fixture",1));assert.equal(calls,1);
+});

@@ -30,3 +30,5 @@ For installation, primitives, SDK methods and integration walkthroughs, use the 
 - [Live channel checks](LIVE-CHANNEL-QUALIFICATION.md), [channel recovery](CHANNEL-RECOVERY-QUALIFICATION.md) and [Coordinator recovery](COORDINATOR-RECOVERY-QUALIFICATION.md)
 
 Reports preserve their measured source identities and limitations. The normal test suite is the current functional check; an old benchmark is not evidence that every later version has the same performance.
+
+- [Access tokens](ACCESS-TOKENS.md): expiry, permission limits, renewable connections, rotation and revocation.

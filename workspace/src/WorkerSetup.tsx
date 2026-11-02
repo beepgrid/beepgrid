@@ -89,8 +89,7 @@ export function WorkerSetup({
           <h3>Save your connection token</h3>
         </header>
         <p>
-          Copy it into a file outside your source code. This token expires after
-          24 hours.
+          Copy it into a file outside your source code. Manage its expiry in Settings → Access tokens.
         </p>
         <ConnectionToken token={token} />
         <Code

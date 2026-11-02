@@ -10,6 +10,10 @@ import (
 )
 
 func (s *Store) allowed(ctx context.Context, db DB, a Actor, action string, target Target, connection, actionName string, descriptor ...*Action) bool {
+	permission := map[string]string{"view": "read", "message": "message", "ask": "request", "decide": "respond", "manage": "manage"}[action]
+	if permission != "" && !a.CredentialPermits(permission) {
+		return false
+	}
 	if a.CredentialKind == "enrollment" {
 		return false
 	}

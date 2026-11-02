@@ -55,7 +55,7 @@ Recovery assumes a trusted database operator. It cannot undo an external action 
 
 ## Credentials and accounts
 
-Use different credentials for owner administration, application API access, trusted namespace-restricted launchers and each worker instance. Tokens are stored as digests; provider secrets are encrypted. Worker credentials last 24 hours, ordinary issued API/enrollment credentials 30 days and browser sessions 12 hours. Revocation/disabled accounts are checked on new requests and continuing streams.
+Use different credentials for owner administration, application API access, trusted namespace-restricted launchers and each worker instance. Tokens are stored as digests; provider secrets are encrypted. Non-renewable worker credentials default to 24 hours, ordinary issued API/enrollment credentials to 30 days and browser sessions to 12 hours. Issuance and versioned edits support custom expiries. Opt-in renewable worker leases extend during authenticated activity up to their hard deadline. See [access token management](ACCESS-TOKENS.md) for names, usage metadata, permission ceilings, bounded rotation overlap and optional enrollment-worker revocation. Revocation/disabled accounts are checked on new requests and continuing streams.
 
 Basic OIDC uses `NOTIF_OIDC_ISSUER`, `NOTIF_OIDC_CLIENT_ID` and `NOTIF_OIDC_CLIENT_SECRET`, with callback `/auth/oidc/callback`. The issuer must use HTTPS outside local development. Login verifies signatures, issuer/audience, expiry, nonce and PKCE. New verified subjects create a Person with no role grants. Configure IdP access appropriately; OIDC login does not import a directory or prove an organizational role. Explicit account links use immutable issuer+subject, not email matching.
 

@@ -136,6 +136,12 @@ func (s *Server) protect(fn func(http.ResponseWriter, *http.Request) error) http
 			writeError(w, engine.Denied())
 			return
 		}
+		permission := credentialRequestPermission(r)
+		if !a.CredentialPermits(permission) {
+			writeError(w, engine.Denied())
+			return
+		}
+		r = r.WithContext(engine.WithCredentialPermission(r.Context(), permission))
 		if !s.limits.allow("credential/"+a.CredentialID, 600) {
 			w.Header().Set("Retry-After", "60")
 			writeError(w, &engine.Error{Code: "RATE_LIMITED", Message: "Credential request rate exceeded.", Status: 429})
@@ -242,16 +248,18 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/v1/people/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/agents/{id}/status", s.protect(s.setStatus))
 	m.HandleFunc("POST /api/v1/services/{id}/status", s.protect(s.setStatus))
+	s.credentialRoutes(m)
 	m.HandleFunc("POST /api/v1/credentials", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in struct {
 			PrincipalID string `json:"principal_id"`
 			Kind        string `json:"kind"`
 			Prefix      string `json:"prefix"`
+			engine.CredentialOptions
 		}
 		if e := decode(r, &in); e != nil {
 			return e
 		}
-		x, e := s.Store.NewCredential(r.Context(), actor(r), in.PrincipalID, in.Kind, in.Prefix)
+		x, e := s.Store.NewCredential(r.Context(), actor(r), in.PrincipalID, in.Kind, in.Prefix, in.CredentialOptions)
 		return ok(w, x, e)
 	}))
 	m.HandleFunc("GET /api/v1/credentials", s.protect(func(w http.ResponseWriter, r *http.Request) error {
@@ -259,7 +267,13 @@ func (s *Server) routes() {
 		return ok(w, x, e)
 	}))
 	m.HandleFunc("POST /api/v1/credentials/{id}/revoke", s.protect(func(w http.ResponseWriter, r *http.Request) error {
-		return ok(w, map[string]bool{"revoked": true}, s.Store.Revoke(r.Context(), actor(r), r.PathValue("id")))
+		var in struct {
+			RevokeWorkers bool `json:"revoke_workers"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		return ok(w, map[string]bool{"revoked": true}, s.Store.Revoke(r.Context(), actor(r), r.PathValue("id"), in.RevokeWorkers))
 	}))
 	m.HandleFunc("POST /api/v1/sessions", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		var in engine.EnrollInput

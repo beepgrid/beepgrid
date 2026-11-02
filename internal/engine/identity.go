@@ -100,7 +100,25 @@ func (s *Store) SetDisabled(ctx context.Context, a Actor, id string, disabled bo
 		return event(ctx, tx, a, "principal.updated", "", id, map[string]any{"id": id, "disabled": disabled})
 	})
 }
-func (s *Store) NewCredential(ctx context.Context, a Actor, pid, kind, prefix string) (map[string]any, error) {
+func (s *Store) NewCredential(ctx context.Context, a Actor, pid, kind, prefix string, options ...CredentialOptions) (map[string]any, error) {
+	var opt CredentialOptions
+	if len(options) > 0 {
+		opt = options[0]
+	}
+	if len(strings.TrimSpace(opt.Name)) > 120 {
+		return nil, Bad("Token name must be at most 120 characters.")
+	}
+	expires, e := credentialExpiry(opt.ExpiresAt, 30*24*time.Hour)
+	if e != nil {
+		return nil, e
+	}
+	permissions, e := credentialPermissions(opt.Permissions)
+	if e != nil {
+		return nil, e
+	}
+	if kind != "api" && permissions != nil {
+		return nil, Bad("Permission limits are available for API tokens.")
+	}
 	var token, id string
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
 		p, e := principal(ctx, tx, a.Scope, pid)
@@ -119,25 +137,28 @@ func (s *Store) NewCredential(ctx context.Context, a Actor, pid, kind, prefix st
 		if kind == "enrollment" && !ValidText(prefix, 120) {
 			return Bad("An enrollment namespace prefix is required.")
 		}
-		token, id, e = issue(ctx, tx, a, pid, kind, prefix, 30*24*time.Hour)
+		token, id, e = issue(ctx, tx, a, pid, kind, prefix, time.Until(expires))
 		if e != nil {
+			return e
+		}
+		if _, e = tx.Exec(ctx, `UPDATE credentials SET name=$3,permissions=$4 WHERE scope=$1 AND id=$2`, a.Scope, id, strings.TrimSpace(opt.Name), permissions); e != nil {
 			return e
 		}
 		return event(ctx, tx, a, "credential.created", "", pid, map[string]any{"id": id, "kind": kind})
 	})
-	return map[string]any{"id": id, "token": token, "kind": kind}, err
+	return map[string]any{"id": id, "token": token, "kind": kind, "expires_at": expires}, err
 }
 func (s *Store) Credentials(ctx context.Context, a Actor) ([]Credential, error) {
 
-	rows, e := s.Pool.Query(ctx, `SELECT id,principal_id,kind,prefix,expires_at,revoked FROM credentials WHERE scope=$1 ORDER BY created_at DESC`, a.Scope)
+	rows, e := s.Pool.Query(ctx, `SELECT `+credentialFields+` FROM credentials WHERE scope=$1 ORDER BY created_at DESC LIMIT 1000`, a.Scope)
 	if e != nil {
 		return nil, e
 	}
 	defer rows.Close()
 	out := []Credential{}
 	for rows.Next() {
-		var c Credential
-		if e = rows.Scan(&c.ID, &c.PrincipalID, &c.Kind, &c.Prefix, &c.ExpiresAt, &c.Revoked); e != nil {
+		c, err := scanCredential(rows)
+		if e = err; e != nil {
 			return nil, e
 		}
 		out = append(out, c)
@@ -155,7 +176,7 @@ func (s *Store) Credentials(ctx context.Context, a Actor) ([]Credential, error) 
 	}
 	return visible, nil
 }
-func (s *Store) Revoke(ctx context.Context, a Actor, id string) error {
+func (s *Store) Revoke(ctx context.Context, a Actor, id string, revokeWorkers ...bool) error {
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
 		var pid, kind string
 		if e := tx.QueryRow(ctx, `SELECT principal_id,kind FROM credentials WHERE scope=$1 AND id=$2`, a.Scope, id).Scan(&pid, &kind); e != nil {
@@ -168,18 +189,26 @@ func (s *Store) Revoke(ctx context.Context, a Actor, id string) error {
 		if !a.Admin && (kind == "admin" || (pid != a.ID && !s.mayIssueCredential(ctx, tx, a, p))) {
 			return Denied()
 		}
-		tag, e := tx.Exec(ctx, `UPDATE credentials SET revoked=true WHERE scope=$1 AND id=$2`, a.Scope, id)
+		tag, e := tx.Exec(ctx, `UPDATE credentials SET revoked=true,version=version+1 WHERE scope=$1 AND id=$2`, a.Scope, id)
 		if e != nil {
 			return e
 		}
 		if tag.RowsAffected() == 0 {
 			return Missing()
 		}
-		return event(ctx, tx, a, "credential.revoked", "", a.ID, map[string]any{"id": id})
+		if len(revokeWorkers) > 0 && revokeWorkers[0] {
+			if kind != "enrollment" {
+				return Bad("Only enrollment tokens have issued worker connections.")
+			}
+			if _, e = tx.Exec(ctx, `UPDATE credentials SET revoked=true,version=version+1 WHERE scope=$1 AND parent_credential_id=$2 AND kind='worker'`, a.Scope, id); e != nil {
+				return e
+			}
+		}
+		return event(ctx, tx, a, "credential.revoked", "", a.ID, map[string]any{"id": id, "workers_revoked": len(revokeWorkers) > 0 && revokeWorkers[0]})
 	})
 }
 func (s *Store) BrowserSession(ctx context.Context, a Actor) (string, error) {
-	if a.Kind != "person" || a.CredentialKind == "enrollment" {
+	if a.Kind != "person" || a.CredentialKind == "enrollment" || a.TokenPermissions != nil {
 		return "", Denied()
 	}
 	var token string
@@ -200,6 +229,20 @@ func (s *Store) Logout(ctx context.Context, a Actor) error {
 
 func (s *Store) Enroll(ctx context.Context, a Actor, in EnrollInput) (Session, error) {
 	var out Session
+	if !a.CredentialPermits("manage") {
+		return out, Denied()
+	}
+	fallback := 24 * time.Hour
+	if in.Renewable {
+		fallback = 30 * 24 * time.Hour
+	}
+	deadline, e := credentialExpiry(in.ExpiresAt, fallback)
+	if e != nil {
+		return out, e
+	}
+	if len(strings.TrimSpace(in.ConnectionName)) > 120 {
+		return out, Bad("Connection name must be at most 120 characters.")
+	}
 	if !ValidText(in.Agent, 200) || !ValidText(in.Name, 120) || len(in.Capabilities) > 32 {
 		return out, Bad("agent and name are required; at most 32 capabilities.")
 	}
@@ -249,15 +292,30 @@ func (s *Store) Enroll(ctx context.Context, a Actor, in EnrollInput) (Session, e
 		} else if p.Disabled || (!a.Admin && p.Metadata["enrolled_by"] != a.ID) {
 			return Denied()
 		}
-		token, cid, e := issue(ctx, tx, a, p.ID, "worker", "", 24*time.Hour)
+		lease := deadline
+		if in.Renewable && lease.After(time.Now().Add(24*time.Hour)) {
+			lease = time.Now().Add(24 * time.Hour)
+		}
+		token, cid, e := issue(ctx, tx, a, p.ID, "worker", "", time.Until(lease))
 		if e != nil {
+			return e
+		}
+		var renewable *time.Time
+		var parent *string
+		if in.Renewable {
+			renewable = &deadline
+		}
+		if a.CredentialKind == "enrollment" {
+			parent = &a.CredentialID
+		}
+		if _, e = tx.Exec(ctx, `UPDATE credentials SET name=$3,renewable_until=$4,parent_credential_id=$5,expires_at=$6 WHERE scope=$1 AND id=$2`, a.Scope, cid, strings.TrimSpace(in.ConnectionName), renewable, parent, lease); e != nil {
 			return e
 		}
 		instance := ID("ins")
 		if _, e = tx.Exec(ctx, `INSERT INTO instances(id,scope,agent_id,credential_id,capabilities) VALUES($1,$2,$3,$4,$5)`, instance, a.Scope, p.ID, cid, JSON(in.Capabilities)); e != nil {
 			return e
 		}
-		out = Session{token, p, instance, time.Now().Add(24 * time.Hour)}
+		out = Session{token, p, instance, lease}
 		return event(ctx, tx, a, "agent.connected", "", p.ID, map[string]any{"agent_id": p.ID, "instance_id": instance})
 	})
 	return out, err

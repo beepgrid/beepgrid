@@ -203,14 +203,14 @@
     "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
   },
   "POST /api/v1/credentials": {
-    "description": "Issue a credential for an authorized identity or enrollment purpose.",
-    "returns": "`id`, one-time plaintext `token` and `kind`. Save the token securely immediately; list/read operations do not disclose it again.",
+    "description": "Issue a named API or namespace-restricted enrollment token with an optional expiry and API permission ceiling. Defaults to 30 days.",
+    "returns": "Token secret once with id, kind and expires_at. Metadata listing never recovers plaintext.",
     "family": "identities",
     "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
     "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
   },
   "POST /api/v1/credentials/{id}/revoke": {
-    "description": "Revoke the specified credential.",
+    "description": "Revoke this exact credential, including its rotation overlap. An enrollment token may explicitly revoke_workers to stop connections it issued after lineage tracking was introduced.",
     "returns": "`{revoked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
     "family": "identities",
     "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
@@ -747,5 +747,26 @@
     "errors": "Forbidden for another Person without management authority; stale versions conflict. Invalid selectors, foreign destinations and invalid timer bounds fail validation.",
     "description": "Save versioned recipient channel preferences. Individual Agent overrides win, then the first matching Agent role, then default. Preferred channels fail over on definite failure and optionally on an unresolved question/approval timer after provider acceptance. All sends selected channels immediately. Empty destinations means workspace only. Saving cancels pending external sends from the previous configuration; in-flight effects cannot be recalled.",
     "returns": "Saved DeliveryPreferences with the incremented version."
+  },
+  "POST /api/v1/credentials/{id}/edit": {
+    "description": "Rename a token, change expiry or update its permission ceiling using the observed version.",
+    "returns": "Current metadata with the next version. Never returns the secret.",
+    "family": "identities",
+    "audience": "Authorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.",
+    "errors": "Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials."
+  },
+  "POST /api/v1/credentials/{id}/rotate": {
+    "description": "Replace a token secret while preserving its identity, instance and permissions. Choose a zero to 86400 second overlap.",
+    "returns": "New token secret once, plus metadata including previous_until. No automatic retry after an uncertain outcome.",
+    "family": "identities",
+    "audience": "Authorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.",
+    "errors": "Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials."
+  },
+  "POST /api/v1/credentials/self/renew": {
+    "description": "Renew the current renewable worker lease, capped by its hard deadline. Active traffic renews near expiry automatically.",
+    "returns": "Current credential metadata. No new instance or secret is created.",
+    "family": "identities",
+    "audience": "Authorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.",
+    "errors": "Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials."
   }
 }

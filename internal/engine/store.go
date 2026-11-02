@@ -101,9 +101,13 @@ func (s *Store) mutation(ctx context.Context, a Actor, independent bool, fn func
 	}
 	if a.CredentialID != "" {
 		var valid bool
-		err = tx.QueryRow(ctx, `SELECT NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now()) FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope WHERE c.id=$1 AND c.scope=$2`, a.CredentialID, a.Scope).Scan(&valid)
+		var permissions []string
+		err = tx.QueryRow(ctx, `SELECT NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now()),c.permissions FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope WHERE c.id=$1 AND c.scope=$2 AND ($3='' OR c.digest=$3 OR (c.previous_digest=$3 AND c.previous_until>now()))`, a.CredentialID, a.Scope, a.TokenDigest).Scan(&valid, &permissions)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return authorizationUnavailable()
+		}
+		if permission, ok := ctx.Value(credentialPermissionKey{}).(string); ok && !(Actor{TokenPermissions: permissions}).CredentialPermits(permission) {
+			return Denied()
 		}
 		if err != nil || !valid {
 			return Denied()
@@ -264,13 +268,18 @@ func (s *Store) AuthenticateLogout(ctx context.Context, token string) (Actor, er
 }
 func (s *Store) authenticate(ctx context.Context, token string, accountOnly bool) (Actor, error) {
 	var a Actor
+	a.TokenDigest = Digest(token)
 	var meta []byte
-	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,'') FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE c.digest=$1 AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND ($2 OR (NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())))) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token), accountOnly).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID)
+	var lastUsed, expires, until *time.Time
+	err := s.Pool.QueryRow(ctx, `SELECT p.id,p.kind,p.external_id,p.name,p.metadata,p.disabled,p.created_at,c.scope,c.id,c.kind,c.prefix,COALESCE(i.id,''),c.permissions,c.last_used_at,c.expires_at,c.renewable_until,c.digest<>$1 FROM credentials c JOIN principals p ON p.id=c.principal_id AND p.scope=c.scope LEFT JOIN instances i ON i.credential_id=c.id AND i.scope=c.scope WHERE (c.digest=$1 OR (c.previous_digest=$1 AND c.previous_until>now())) AND EXISTS(SELECT 1 FROM scopes s WHERE s.id=c.scope AND ($2 OR (NOT s.suspended AND (s.access_until IS NULL OR s.access_until>now())))) AND NOT c.revoked AND NOT p.disabled AND (c.expires_at IS NULL OR c.expires_at>now())`, Digest(token), accountOnly).Scan(&a.ID, &a.Kind, &a.ExternalID, &a.Name, &meta, &a.Disabled, &a.CreatedAt, &a.Scope, &a.CredentialID, &a.CredentialKind, &a.Prefix, &a.InstanceID, &a.TokenPermissions, &lastUsed, &expires, &until, &a.CredentialPrevious)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return a, authorizationUnavailable()
 	}
 	if err != nil {
 		return a, &Error{"UNAUTHENTICATED", "A valid credential is required.", 401}
+	}
+	if err = s.recordCredentialUse(ctx, a, lastUsed, expires, until, a.CredentialPrevious); err != nil {
+		return a, authorizationUnavailable()
 	}
 	_ = json.Unmarshal(meta, &a.Metadata)
 	a.Admin = a.CredentialKind == "admin"
@@ -288,6 +297,6 @@ func issue(ctx context.Context, db DB, a Actor, pid, kind, prefix string, ttl ti
 		t := time.Now().Add(ttl)
 		expires = &t
 	}
-	_, err := db.Exec(ctx, `INSERT INTO credentials(id,scope,principal_id,digest,kind,prefix,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, a.Scope, pid, Digest(token), kind, prefix, expires)
+	_, err := db.Exec(ctx, `INSERT INTO credentials(id,scope,principal_id,digest,kind,prefix,expires_at,token_hint) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, id, a.Scope, pid, Digest(token), kind, prefix, expires, tokenHint(token))
 	return token, id, err
 }

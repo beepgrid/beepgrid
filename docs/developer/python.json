@@ -5,6 +5,36 @@
     "doc": ""
   },
   {
+    "name": "credentials",
+    "signature": "credentials(self)",
+    "doc": "List permitted metadata without retrieving secrets."
+  },
+  {
+    "name": "create_credential",
+    "signature": "create_credential(self, principal_id: str, *, kind: str='api', name: str='', **options)",
+    "doc": ""
+  },
+  {
+    "name": "edit_credential",
+    "signature": "edit_credential(self, credential_id: str, *, version: int, **changes)",
+    "doc": ""
+  },
+  {
+    "name": "rotate_credential",
+    "signature": "rotate_credential(self, credential_id: str, *, version: int, overlap_seconds: int=3600)",
+    "doc": "Returns a secret once; does not automatically retry an uncertain write."
+  },
+  {
+    "name": "revoke_credential",
+    "signature": "revoke_credential(self, credential_id: str, *, revoke_workers: bool=False)",
+    "doc": ""
+  },
+  {
+    "name": "renew_credential",
+    "signature": "renew_credential(self)",
+    "doc": ""
+  },
+  {
     "name": "delivery_preferences",
     "signature": "delivery_preferences(self, person_id: str)",
     "doc": "Read your channel defaults and ordered Agent/Agent-role overrides."
@@ -141,7 +171,7 @@
   },
   {
     "name": "connect",
-    "signature": "connect(self, agent: str, name: str, capabilities: list[str] | None=None, metadata: dict[str, Any] | None=None)",
+    "signature": "connect(self, agent: str, name: str, capabilities: list[str] | None=None, metadata: dict[str, Any] | None=None, *, renewable: bool=False, expires_at: str | None=None, connection_name: str='')",
     "doc": ""
   },
   {

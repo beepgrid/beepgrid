@@ -8,7 +8,6 @@ import {
 } from "../data";
 import type {
   AssistanceSettings,
-  Credential,
   Identity,
   PublishedAnswer,
   Target,
@@ -37,6 +36,7 @@ import {
   QueryState,
 } from "../ui";
 
+const AccessTokens = lazy(() => import("./AccessTokens"));
 const Activity = lazy(() => import("./Activity"));
 const Permissions = lazy(() => import("./Permissions"));
 const Groups = lazy(() => import("./Groups"));
@@ -62,7 +62,7 @@ export default function Settings() {
             .filter(
               ([key]) =>
                 me.admin ||
-                ["account", "workspace"].includes(key) ||
+                ["account", "workspace", "credentials"].includes(key) ||
                 (key === "answers" && !!me.can_publish_answers),
             )
             .map(([key, label]) => (
@@ -161,7 +161,7 @@ export default function Settings() {
             </section>
           ) : null}
           {tab === "services" ? <Services /> : null}
-          {tab === "credentials" ? <Credentials /> : null}
+          {tab === "credentials" ? <Suspense fallback={<Loading />}><AccessTokens /></Suspense> : null}
           {tab === "assistance" ? <Assistance /> : null}
           {tab === "answers" ? <Answers /> : null}
           {tab === "contacts" ? (
@@ -286,219 +286,7 @@ function Services() {
     </>
   );
 }
-function Credentials() {
-  const q = useCollection<Credential>("credentials"),
-    [create, setCreate] = useState(false),
-    [target, setTarget] = useState<Target[]>([]),
-    [kind, setKind] = useState("api"),
-    [prefix, setPrefix] = useState(""),
-    [secret, setSecret] = useState(""),
-    [metadata, setMetadata] = useState<unknown>(null),
-    cap = useCapabilities(target[0]),
-    op = useOperation();
-  return (
-    <>
-      <div className="page-header">
-        <div>
-          <h2>Access tokens</h2>
-          <p>Scoped credentials, separate from people and role grants.</p>
-        </div>
-        <Button icon="plus" onClick={() => setCreate(true)}>
-          Issue token
-        </Button>
-      </div>
-      <p className="help">
-        To rotate a token, issue a replacement, update its runtime securely,
-        verify the replacement, then revoke the old credential. This is not an
-        atomic rotation operation.
-      </p>
-      <QueryState query={q} empty="No permitted credential metadata">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Credential</th>
-                <th>Owner</th>
-                <th>Expiry</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {q.items.map((c) => (
-                <CredentialRow credential={c} key={c.id} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </QueryState>
-      {create ? (
-        <Modal title="Issue access token" wide onClose={() => setCreate(false)}>
-          <Form
-            onSubmit={() =>
-              void op
-                .run<{ token: string; id: string; kind: string }>(
-                  "/credentials",
-                  {
-                    principal_id: target[0]?.id,
-                    kind,
-                    prefix: kind === "enrollment" ? prefix : "",
-                  },
-                )
-                .then((r) => {
-                  if (r) {
-                    setSecret(r.token);
-                    setMetadata({ id: r.id, kind: r.kind });
-                    setCreate(false);
-                  }
-                })
-            }
-          >
-            <TargetPicker
-              value={target}
-              onChange={setTarget}
-              allowGroups={false}
-              allowInstances={false}
-            />
-            <Field label="Credential kind">
-              <select value={kind} onChange={(e) => setKind(e.target.value)}>
-                <option value="api">API access (30 days)</option>
-                <option value="enrollment">Bounded enrollment (30 days)</option>
-              </select>
-            </Field>
-            {kind === "enrollment" ? (
-              <Field
-                label="Allowed external-key prefix"
-                hint="Required. Enrollment is limited to this explicit namespace."
-              >
-                <input
-                  required
-                  value={prefix}
-                  onChange={(e) => setPrefix(e.target.value)}
-                  placeholder="research/"
-                />
-              </Field>
-            ) : null}
-            <p className="help">
-              No administrator credential is created here. Enrollment creates
-              24-hour worker credentials for individual instances.
-            </p>
-            <ErrorView error={op.error || cap.error} />
-            <Button
-              primary
-              disabled={
-                op.pending ||
-                !target.length ||
-                !cap.data?.operations.issue_credential
-              }
-              type="submit"
-            >
-              Issue token
-            </Button>
-          </Form>
-        </Modal>
-      ) : null}
-      {secret ? (
-        <Modal
-          title="Save your new token"
-          onClose={() => {
-            setSecret("");
-            setMetadata(null);
-          }}
-        >
-          <div className="secret">
-            <p>
-              Copy this secret now. It will not be shown again. Keep it in a
-              secure runtime secret store.
-            </p>
-            <code>{secret}</code>
-            <Copy value={secret} />
-            <Details value={metadata} label="Issued credential metadata" />
-            <Button
-              primary
-              onClick={() => {
-                setSecret("");
-                setMetadata(null);
-              }}
-            >
-              I have saved it securely
-            </Button>
-          </div>
-        </Modal>
-      ) : null}
-    </>
-  );
-}
-function CredentialRow({ credential: c }: { credential: Credential }) {
-  const [confirm, setConfirm] = useState(false),
-    op = useOperation();
-  return (
-    <tr>
-      <td>
-        <code>{c.id}</code>
-        <p>
-          <small>
-            {c.kind}
-            {c.prefix ? " · " + c.prefix : ""}
-          </small>
-        </p>
-      </td>
-      <td>
-        <code>{c.principal_id}</code>
-      </td>
-      <td>
-        {c.revoked ? (
-          <Badge>Revoked</Badge>
-        ) : (
-          <DateValue value={c.expires_at} />
-        )}
-      </td>
-      <td>
-        {!c.revoked && c.kind !== "admin" ? (
-          <>
-            <Button danger onClick={() => setConfirm(true)}>
-              Revoke
-            </Button>
-            {confirm ? (
-              <Modal
-                title="Revoke this credential?"
-                onClose={() => setConfirm(false)}
-              >
-                <div className="form">
-                  <p>
-                    This stops future authenticated calls and streams for this
-                    exact credential. It does not delete history or revoke every
-                    credential for its owner.
-                  </p>
-                  <code>{c.id}</code>
-                  <ErrorView error={op.error} />
-                  <div className="form-actions">
-                    <Button onClick={() => setConfirm(false)}>
-                      Keep credential
-                    </Button>
-                    <Button
-                      danger
-                      primary
-                      disabled={op.pending}
-                      onClick={() =>
-                        void op
-                          .run("/credentials/" + c.id + "/revoke", {})
-                          .then((r) => {
-                            if (r) setConfirm(false);
-                          })
-                      }
-                    >
-                      Revoke credential
-                    </Button>
-                  </div>
-                </div>
-              </Modal>
-            ) : null}
-          </>
-        ) : null}
-      </td>
-    </tr>
-  );
-}
+
 function Assistance() {
   const q = useResource<AssistanceSettings>("/assistance/settings"),
     cap = useCapabilities(),

@@ -33,6 +33,26 @@ class Client:
             raise ValueError("Invalid Beep Grid server URL")
         self.base_url, self._token, self.timeout = base_url.rstrip("/"), token, timeout
 
+    def credentials(self) -> list[dict[str, Any]]:
+        """List permitted metadata without retrieving secrets."""
+        return self.call("GET", "/api/v1/credentials")
+
+    def create_credential(self, principal_id: str, *, kind: str = "api", name: str = "", **options) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/credentials", dict(principal_id=principal_id, kind=kind, name=name, **options))
+
+    def edit_credential(self, credential_id: str, *, version: int, **changes) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/credentials/" + urllib.parse.quote(credential_id, safe="") + "/edit", dict(version=version, **changes))
+
+    def rotate_credential(self, credential_id: str, *, version: int, overlap_seconds: int = 3600) -> dict[str, Any]:
+        """Returns a secret once; does not automatically retry an uncertain write."""
+        return self.call("POST", "/api/v1/credentials/" + urllib.parse.quote(credential_id, safe="") + "/rotate", dict(version=version, overlap_seconds=overlap_seconds))
+
+    def revoke_credential(self, credential_id: str, *, revoke_workers: bool = False) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/credentials/" + urllib.parse.quote(credential_id, safe="") + "/revoke", dict(revoke_workers=revoke_workers))
+
+    def renew_credential(self) -> dict[str, Any]:
+        return self.call("POST", "/api/v1/credentials/self/renew", {})
+
     def delivery_preferences(self, person_id: str) -> dict[str, Any]:
         """Read your channel defaults and ordered Agent/Agent-role overrides."""
         return self.call("GET", "/api/v1/people/" + urllib.parse.quote(person_id, safe="") + "/delivery-preferences")
@@ -197,9 +217,12 @@ class Client:
         return self.call("GET", "/api/v1/workspace/account")
 
     def connect(self, agent: str, name: str, capabilities: list[str] | None = None,
-                metadata: dict[str, Any] | None = None) -> tuple[Client, dict[str, Any]]:
-        session = self.call("POST", "/api/v1/sessions", {"agent": agent, "name": name,
-                            "capabilities": capabilities or [], "metadata": metadata or {}})
+                metadata: dict[str, Any] | None = None, *, renewable: bool = False,
+                expires_at: str | None = None, connection_name: str = "") -> tuple[Client, dict[str, Any]]:
+        data = {"agent": agent, "name": name, "capabilities": capabilities or [], "metadata": metadata or {}, "renewable": renewable, "connection_name": connection_name}
+        if expires_at is not None:
+            data["expires_at"] = expires_at
+        session = self.call("POST", "/api/v1/sessions", data)
         return Client(self.base_url, session["token"], self.timeout), session
 
     def send(self, *, body: str, target: dict[str, str] | None = None, conversation_id: str = "",

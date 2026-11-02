@@ -21,6 +21,30 @@ class ClientTests(unittest.TestCase):
         restored = c.save_delivery_preferences(person, {**before, "version": saved["version"]})
         self.assertEqual(restored["default"], before["default"])
 
+    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    def test_token_lifecycle_and_renewable_connection(self):
+        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        person = owner.call("GET", "/api/v1/me")["person"]["id"]
+        issued = owner.create_credential(person, name="Python reports", permissions=["read"])
+        meta = next(c for c in owner.credentials() if c["id"] == issued["id"])
+        self.assertEqual(meta["permissions"], ["read"])
+        edited = owner.edit_credential(meta["id"], version=meta["version"], name="Python renamed")
+        replacement = owner.rotate_credential(meta["id"], version=edited["version"], overlap_seconds=300)
+        Client(owner.base_url, replacement["token"]).call("GET", "/api/v1/me")
+        owner.revoke_credential(meta["id"])
+        with self.assertRaises(NotifError):
+            Client(owner.base_url, replacement["token"]).call("GET", "/api/v1/me")
+        worker, session = owner.connect("sdk/renew-py-"+str(uuid.uuid4()), "Renewable", renewable=True, connection_name="Python live")
+        renewed = worker.renew_credential()
+        self.assertIsNotNone(renewed["renewable_until"])
+        self.assertEqual(worker.call("GET", "/api/v1/me")["instance_id"], session["instance_id"])
+
+    def test_rotation_is_not_retried_after_lost_response(self):
+        with patch("notif._open", side_effect=OSError("response lost")) as transport:
+            with self.assertRaises(OSError):
+                Client("http://localhost", "fixture").rotate_credential("key_fixture", version=1)
+            self.assertEqual(transport.call_count, 1)
+
     def test_identified_client_works_behind_a_gateway_rejecting_generic_urllib(self):
         import http.server
         import threading

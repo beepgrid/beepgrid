@@ -303,6 +303,9 @@ func (s *Store) membershipChangeAllowed(ctx context.Context, db DB, a Actor, gro
 	return true
 }
 func (s *Store) mayIssueCredential(ctx context.Context, db DB, a Actor, p Principal) bool {
+	if a.TokenPermissions != nil {
+		return false
+	}
 	if a.Admin {
 		return true
 	}

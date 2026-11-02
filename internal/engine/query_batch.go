@@ -47,7 +47,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 	case "deliveries":
 		return s.queryDeliveryRecords(ctx, a, ids)
 	case "credentials":
-		rows, err := s.Pool.Query(ctx, `SELECT id,principal_id,kind,prefix,expires_at,revoked FROM credentials WHERE scope=$1 AND id=ANY($2::text[])`, a.Scope, ids)
+		rows, err := s.Pool.Query(ctx, `SELECT `+credentialFields+` FROM credentials WHERE scope=$1 AND id=ANY($2::text[])`, a.Scope, ids)
 		if err != nil {
 			return nil, err
 		}
@@ -55,7 +55,7 @@ func (s *Store) queryRecords(ctx context.Context, a Actor, collection string, id
 		principals := []string{}
 		for rows.Next() {
 			var x Credential
-			if err = rows.Scan(&x.ID, &x.PrincipalID, &x.Kind, &x.Prefix, &x.ExpiresAt, &x.Revoked); err != nil {
+			if err = rows.Scan(&x.ID, &x.PrincipalID, &x.Kind, &x.Prefix, &x.ExpiresAt, &x.Revoked, &x.Name, &x.TokenHint, &x.CreatedAt, &x.LastUsedAt, &x.Permissions, &x.Version, &x.RenewableUntil, &x.PreviousUntil, &x.ParentCredentialID, &x.OwnerName); err != nil {
 				rows.Close()
 				return nil, err
 			}

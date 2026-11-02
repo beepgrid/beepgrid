@@ -58,11 +58,14 @@ type Session struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 type EnrollInput struct {
-	ParentID     string         `json:"parent_id,omitempty"`
-	Agent        string         `json:"agent"`
-	Name         string         `json:"name"`
-	Capabilities []string       `json:"capabilities"`
-	Metadata     map[string]any `json:"metadata,omitempty"`
+	ConnectionName string         `json:"connection_name,omitempty"`
+	Renewable      bool           `json:"renewable,omitempty"`
+	ExpiresAt      *time.Time     `json:"expires_at,omitempty"`
+	ParentID       string         `json:"parent_id,omitempty"`
+	Agent          string         `json:"agent"`
+	Name           string         `json:"name"`
+	Capabilities   []string       `json:"capabilities"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 type Action struct {
 	Name            string         `json:"name"`

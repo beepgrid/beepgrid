@@ -166,6 +166,16 @@ export type Destination = {
   version: number;
 };
 export type Credential = {
+  name: string;
+  owner_name: string;
+  token_hint: string;
+  created_at: string;
+  last_used_at?: string;
+  permissions?: string[] | null;
+  version: number;
+  renewable_until?: string;
+  previous_until?: string;
+  parent_credential_id?: string;
   id: string;
   principal_id: string;
   kind: string;

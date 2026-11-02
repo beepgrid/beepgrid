@@ -439,5 +439,59 @@
     "purpose": "Save a Person's channel policy using its observed version.",
     "returns": "DeliveryPreferences with the incremented version; pending external sends from the previous configuration stop.",
     "recovery": "Person self, administrator or authorized identity manager only. Reload after a stale-version conflict; preferences grant no contact authority."
+  },
+  {
+    "python": "credentials",
+    "go": "Credentials",
+    "typescript": "credentials",
+    "family": "setup",
+    "purpose": "List authorized token metadata.",
+    "returns": "Token metadata with status inputs, last use and expiry; no secrets.",
+    "recovery": "Never print secrets. Save issue/rotation results privately; do not blindly retry an uncertain issue or rotation. Edit and rotation require the current metadata version."
+  },
+  {
+    "python": "create_credential",
+    "go": "CreateCredential",
+    "typescript": "createCredential",
+    "family": "setup",
+    "purpose": "Issue a named, optionally restricted API or enrollment token.",
+    "returns": "The new token secret once, id, kind and expires_at.",
+    "recovery": "Never print secrets. Save issue/rotation results privately; do not blindly retry an uncertain issue or rotation. Edit and rotation require the current metadata version."
+  },
+  {
+    "python": "edit_credential",
+    "go": "EditCredential",
+    "typescript": "editCredential",
+    "family": "setup",
+    "purpose": "Edit name, expiry or API permission ceiling using the observed version.",
+    "returns": "Current token metadata with its next version.",
+    "recovery": "Never print secrets. Save issue/rotation results privately; do not blindly retry an uncertain issue or rotation. Edit and rotation require the current metadata version."
+  },
+  {
+    "python": "rotate_credential",
+    "go": "RotateCredential",
+    "typescript": "rotateCredential",
+    "family": "setup",
+    "purpose": "Replace a secret with a bounded overlap while retaining its instance.",
+    "returns": "New token once and current metadata including previous_until.",
+    "recovery": "Never print secrets. Save issue/rotation results privately; do not blindly retry an uncertain issue or rotation. Edit and rotation require the current metadata version."
+  },
+  {
+    "python": "revoke_credential",
+    "go": "RevokeCredential",
+    "typescript": "revokeCredential",
+    "family": "setup",
+    "purpose": "Revoke a token; optionally revoke issued workers for an enrollment token.",
+    "returns": "Revocation acknowledgment; Go returns an error only.",
+    "recovery": "Never print secrets. Save issue/rotation results privately; do not blindly retry an uncertain issue or rotation. Edit and rotation require the current metadata version."
+  },
+  {
+    "python": "renew_credential",
+    "go": "RenewCredential",
+    "typescript": "renewCredential",
+    "family": "setup",
+    "purpose": "Renew a live worker lease within its hard deadline.",
+    "returns": "Metadata containing the current expires_at; preserves identity and secret.",
+    "recovery": "Never print secrets. Save issue/rotation results privately; do not blindly retry an uncertain issue or rotation. Edit and rotation require the current metadata version."
   }
 ]
