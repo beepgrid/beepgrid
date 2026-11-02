@@ -81,9 +81,13 @@ project that **already runs your Agent**, not to a second replacement Agent.
    ```
 
    The secret is neither a command argument nor shell history. Keep the terminal
-   private. Use a different filename for each connection. A workspace token
-   expires after 24 hours; rotate deliberately and update the existing host's
-   secret rather than enrolling on every message or process restart.
+   private. Use a different filename for each connection. The workspace form
+   defaults to a renewable connection with a 90-day hard deadline. Normal
+   authenticated activity renews its 24-hour lease without a model tool call.
+   Headless enrollment can opt in too; existing fixed tokens keep their expiry.
+   See [access token management](ACCESS-TOKENS.md) for exact renewal and rotation
+   behavior. Update the existing host's secret when rotating rather than
+   enrolling on every message or process restart. Rotation does not extend expiry.
 3. Prepare the SDK in the **Beepgrid checkout**:
 
    ```sh
