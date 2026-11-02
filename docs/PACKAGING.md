@@ -11,6 +11,8 @@ beepgrid version
 
 The Homebrew tap installs a versioned binary on macOS and Linux. It does not start services or install a database. PostgreSQL is required to host the engine; use your existing PostgreSQL installation or a container. CLI and MCP clients need only a reachable Beepgrid server and their own credential.
 
+Run `beepgrid` to see commands and setup guidance. It does not start the engine or create local state. If `beepgrid serve` cannot connect to PostgreSQL, it exits with a short setup message in the terminal. The workspace is available only after startup succeeds.
+
 For Windows and manual installs, download your platform's archive and `SHA256SUMS` from [GitHub Releases](https://github.com/beepgrid/beepgrid/releases). Check its SHA256, extract it, and move `beepgrid` (`beepgrid.exe` on Windows) to a directory on `PATH`. Standard archives include the community workspace. Archives ending in `-headless` omit browser assets.
 
 For a local server with PostgreSQL already running:

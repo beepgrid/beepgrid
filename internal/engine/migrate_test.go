@@ -2,11 +2,21 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"github.com/jackc/pgx/v5"
 	"os"
 	"sync"
 	"testing"
 )
+
+func TestOpenExistingPreservesConnectionFailure(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	store, err := OpenExisting(ctx, "postgres://unused@127.0.0.1/beepgrid?sslmode=disable", "startup_test", nil)
+	if store != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("connection failure was hidden by a migration error: store=%v err=%v", store, err)
+	}
+}
 
 func TestUpgradeConcurrentMigrationsAndRestartRecovery(t *testing.T) {
 	s, a := testStore(t)

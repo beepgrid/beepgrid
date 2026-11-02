@@ -2,7 +2,7 @@
 
 The same `beepgrid` executable is a server, an HTTP client and an MCP stdio adapter. Both workspace and headless builds include these commands. They require a running engine and PostgreSQL; the CLI never implements a second permission or persistence layer.
 
-Run `beepgrid help` for command syntax. Client flags precede positional arguments. JSON results go to stdout; command errors are JSON on stderr. Exit codes are 0 success, 1 other failure, 2 invalid usage/input, 3 authentication/authorization failure and 4 interrupted/deadline-exceeded. Server worker logs remain ordinary operational logs. API conflict and validation details retain the server's error code and HTTP status.
+Run `beepgrid` or `beepgrid help` for command syntax and local setup guidance. Client flags precede positional arguments. Client JSON results go to stdout; client command errors are JSON on stderr. Server database connection/configuration failures print a short setup message on stderr and exit before the workspace starts. Exit codes are 0 success, 1 other failure, 2 invalid usage/input, 3 authentication/authorization failure and 4 interrupted/deadline-exceeded. Server worker logs remain ordinary operational logs. API conflict and validation details retain the server's error code and HTTP status.
 
 ## Authenticate without a browser
 

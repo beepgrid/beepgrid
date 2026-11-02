@@ -20,6 +20,11 @@ import (
 
 const clientHelp = `Beep Grid
 
+Local engine: PostgreSQL is required. Set BEEPGRID_DATABASE_URL, then run:
+  beepgrid serve --dev
+Setup: https://github.com/beepgrid/beepgrid/blob/main/docs/PACKAGING.md
+CLI and MCP clients can use an existing server without local PostgreSQL.
+
 Server: serve [--dev] [--no-ui], migrate, reconcile, seed, diagnose
 Clients (flags before positional arguments):
   send [--input file|-] [--key KEY] agent|person|group ID MESSAGE
@@ -132,7 +137,8 @@ func reserveClientOutput(file string) (*os.File, error) {
 
 func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) (bool, error) {
 	if len(args) == 0 {
-		return false, nil
+		_, err := io.WriteString(stdout, clientHelp)
+		return true, err
 	}
 	command := args[0]
 	if command == "help" || command == "--help" || command == "-h" {

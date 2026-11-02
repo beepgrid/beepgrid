@@ -26,6 +26,11 @@ server = None
 
 with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
     directory = Path(directory)
+    for binary in (headless, workspace):
+        result = subprocess.run([str(binary)], cwd=directory, text=True, capture_output=True,
+                                env={key: value for key, value in os.environ.items() if not key.startswith('BEEPGRID_')}, timeout=10)
+        assert result.returncode == 0 and 'beepgrid serve --dev' in result.stdout, (result.returncode, result.stderr)
+        assert not result.stderr and not (directory / '.local').exists(), 'Bare command started setup or wrote local state'
     token = secrets.token_hex(32)
     owner = directory / 'owner-token'
     owner.touch(mode=0o600)

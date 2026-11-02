@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -36,13 +35,7 @@ func env(k, fallback string) string {
 }
 func Main() {
 	if e := run(); e != nil {
-		var api *beepgrid.APIError
-		code := "command_failed"
-		status := 0
-		if errors.As(e, &api) {
-			code, status = api.Code, api.Status
-		}
-		_ = json.NewEncoder(os.Stderr).Encode(map[string]any{"error": code, "message": e.Error(), "status": status, "exit_code": clientExitCode(e)})
+		writeCommandError(os.Stderr, e)
 		os.Exit(clientExitCode(e))
 	}
 }
@@ -69,7 +62,7 @@ func run() error {
 		}
 		s, e := engine.OpenExisting(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid"), nil)
 		if e != nil {
-			return e
+			return databaseStartupError(e)
 		}
 		defer s.Close()
 		scope := env("BEEPGRID_WORKSPACE", "local") + "/" + env("BEEPGRID_ENVIRONMENT", "development")
@@ -99,7 +92,7 @@ func run() error {
 		fmt.Println("Recovery hold set. New owner credential file:", path)
 		return nil
 	case "migrate":
-		return engine.Migrate(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid"))
+		return databaseStartupError(engine.Migrate(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid")))
 	case "seed":
 		return seed(ctx, os.Args[2:])
 	case "trace":
@@ -213,7 +206,7 @@ func serve(ctx context.Context, args []string) error {
 	}
 	store, e := openStore(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid"), decoded)
 	if e != nil {
-		return e
+		return databaseStartupError(e)
 	}
 	defer store.Close()
 	stopDiagnostics, e := startDiagnostics(ctx, store, os.Getenv("BEEPGRID_PROFILE_ADDR"))

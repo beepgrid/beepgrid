@@ -118,7 +118,11 @@ func OpenConfigured(ctx context.Context, url, name string, key []byte, maxConns 
 	}
 	var version int
 	e = p.QueryRow(ctx, `SELECT COALESCE(max(version),0) FROM schema_migrations`).Scan(&version)
-	if e != nil || version != SchemaVersion {
+	if e != nil {
+		p.Close()
+		return nil, fmt.Errorf("read database schema version (run beepgrid migrate if the schema is not initialized): %w", e)
+	}
+	if version != SchemaVersion {
 		p.Close()
 		return nil, fmt.Errorf("schema must be migrated to version %s before serving", strconv.Itoa(SchemaVersion))
 	}
