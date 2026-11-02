@@ -1,6 +1,6 @@
 # Beepgrid for Go
 
-[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/go/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/go)
+[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/go/) · [Go package](https://pkg.go.dev/github.com/beepgrid/beepgrid/sdk/go) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/go)
 
 ```sh
 go get github.com/beepgrid/beepgrid/sdk/go@v0.2.0
@@ -11,6 +11,7 @@ import "github.com/beepgrid/beepgrid/sdk/go"
 ```
 
 The SDK is a standalone Go module with no third-party dependencies. The engine and CLI are installed separately.
+[Connect a worker in your own Go module](https://github.com/beepgrid/beepgrid/blob/main/docs/CONNECT-AGENT-RECIPES.md#go).
 
 Use a dashboard-issued worker credential directly. Use `Enroll` only when intentionally creating a worker with a namespace-restricted launcher credential. `Ask` immediately returns a durable request. `Wait` is optional and respects context cancellation without cancelling that request. Use stable operation keys across application restarts. `Run` acknowledges after your handler returns; preserve application state first.
 

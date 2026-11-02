@@ -41,6 +41,8 @@ for target in targets:
             (stage / 'README.txt').write_text(f'''Beepgrid {version}{suffix}
 https://beepgrid.com
 Documentation: https://beepgrid.com/docs/
+Setup: https://github.com/beepgrid/beepgrid/blob/main/docs/PACKAGING.md
+CLI reference: https://github.com/beepgrid/beepgrid/blob/main/docs/CLI.md
 Source: https://github.com/beepgrid/beepgrid
 
 Move beepgrid to a directory on PATH, then run: beepgrid version
@@ -48,7 +50,7 @@ PostgreSQL is required to run the engine. No PostgreSQL is needed for CLI/MCP cl
 For local setup, set BEEPGRID_DATABASE_URL and run: beepgrid serve --dev
 For production credentials and migrations, see:
 https://github.com/beepgrid/beepgrid/blob/main/docs/OPERATIONS.md
-This is the public Apache-2.0 engine. Managed billing and website analytics are excluded.
+Licensed under Apache-2.0.
 ''')
             archive = output / (stem + ('.zip' if system == 'windows' else '.tar.gz'))
             if system == 'windows':

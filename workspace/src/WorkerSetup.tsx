@@ -12,7 +12,10 @@ export function connectionGuide(method: string, base: string, host = "codex") {
   ];
   if (method === "mcp") {
     return {
-      prepare: "go build -buildvcs=false -o .local/beepgrid ./cmd/beepgrid",
+      prepare:
+        "brew install beepgrid/tap/beepgrid\n# Or, with Go installed:\ngo install github.com/beepgrid/beepgrid/cmd/beepgrid@latest",
+      guide:
+        "https://github.com/beepgrid/beepgrid/blob/main/docs/CONNECT-AGENT-RECIPES.md#local-mcp-host",
       run:
         host === "codex"
           ? [
@@ -45,15 +48,18 @@ export function connectionGuide(method: string, base: string, host = "codex") {
   return {
     prepare:
       method === "typescript"
-        ? "npm --prefix sdk/typescript ci\nnpm --prefix sdk/typescript run build"
-        : "",
+        ? "npm install @beepgrid/sdk"
+        : method === "go"
+          ? "go get github.com/beepgrid/beepgrid/sdk/go@latest"
+          : "python3 -m pip install beepgrid\n# Or, in a uv project:\nuv add beepgrid",
+    guide: `https://github.com/beepgrid/beepgrid/blob/main/docs/CONNECT-AGENT-RECIPES.md#${method}`,
     run: [
       ...env,
       method === "python"
-        ? "PYTHONPATH=sdk/python python3 examples/python-worker/main.py"
+        ? "python3 worker.py"
         : method === "go"
-          ? "go run -buildvcs=false ./examples/go-worker"
-          : "node examples/typescript-worker/main.mjs",
+          ? "go run ."
+          : "node worker.mjs",
     ].join("\n"),
   };
 }
@@ -89,7 +95,8 @@ export function WorkerSetup({
           <h3>Save your connection token</h3>
         </header>
         <p>
-          Copy it into a file outside your source code. Manage its expiry in Settings → Access tokens.
+          Copy it into a file outside your source code. Manage its expiry in
+          Settings → Access tokens.
         </p>
         <ConnectionToken token={token} />
         <Code
@@ -105,15 +112,14 @@ export function WorkerSetup({
           </h3>
         </header>
         <p>
-          From your Beepgrid source checkout. Use your token file’s absolute
-          path below.
+          {method === "mcp"
+            ? "Install the Beepgrid executable, then use its absolute path and your token file’s path below."
+            : "Install the SDK in your Agent project. Save the starter from the guide there, then use your token file’s absolute path below."}
         </p>
         {guide.prepare ? (
           <Code
             label={
-              method === "mcp"
-                ? "Build the local MCP server"
-                : "Prepare the SDK"
+              method === "mcp" ? "Install the MCP server" : "Install the SDK"
             }
             value={guide.prepare}
           />
@@ -137,7 +143,7 @@ export function WorkerSetup({
               value={guide.run}
             />
             <p className="help">
-              Replace the server path with the binary you built. Restart your
+              Replace the server path with your installed binary. Restart your
               host, then ask it to receive and reply using Beepgrid. Tools do
               not wake an idle model.
             </p>
@@ -151,6 +157,14 @@ export function WorkerSetup({
             </p>
           </>
         )}
+        <a
+          className="button"
+          href={guide.guide}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open integration guide
+        </a>
         <details className="setup-reference">
           <summary>Connection details</summary>
           <dl>

@@ -1,12 +1,12 @@
 # Beepgrid for Python
 
 For an Agent that is already running in a framework or custom loop, see
-[live input](https://beepgrid.com/docs/live-input/). `beepgrid.runtime.LiveInbox` receives
+[live input](https://beepgrid.com/docs/guides/live-input/). `beepgrid.runtime.LiveInbox` receives
 independently of ongoing work, and `LangGraphBridge` adds Steer/Queue behavior
 to an existing LangChain Agent with its own durable checkpointer. Framework
 packages remain optional. Keep the existing model, tools and runtime authority.
 
-[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/python/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/python)
+[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/python/) · [PyPI](https://pypi.org/project/beepgrid/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/python)
 
 ```sh
 pip install beepgrid
@@ -19,9 +19,13 @@ Python 3.10 or later. No runtime dependencies.
 import os
 from beepgrid import Client
 client = Client(os.environ["BEEPGRID_URL"], os.environ["BEEPGRID_TOKEN"])
+client.send(target={"kind": "agent", "id": "agt_recipient"},
+            body="The report is ready.", key="report-ready-1")
 ```
 
 Use an individually issued credential from your secret manager or a protected file.
+Replace `agt_recipient` with an Agent your credential can message. Reuse the same
+operation key only when retrying the same message. [Connect a worker without a source checkout](https://github.com/beepgrid/beepgrid/blob/main/docs/CONNECT-AGENT-RECIPES.md#python).
 
 Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout:
 

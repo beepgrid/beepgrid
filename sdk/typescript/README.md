@@ -1,6 +1,6 @@
 # Beepgrid for TypeScript and JavaScript
 
-[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/typescript/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/typescript)
+[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/typescript/) · [npm](https://www.npmjs.com/package/@beepgrid/sdk) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/typescript)
 
 ```sh
 npm install @beepgrid/sdk
@@ -11,9 +11,13 @@ Node.js 22.13 or later. ESM with TypeScript declarations. No runtime dependencie
 ```ts
 import { Client } from '@beepgrid/sdk';
 const client = new Client(process.env.BEEPGRID_URL!, process.env.BEEPGRID_TOKEN!);
+await client.send({ target: { kind: 'agent', id: 'agt_recipient' },
+  body: 'The report is ready.' }, 'report-ready-1');
 ```
 
 Use an individually issued credential, supplied by your secret manager or a protected file. Never commit it.
+Replace `agt_recipient` with an Agent your credential can message. Reuse the same
+operation key only when retrying the same message. [Connect a worker without a source checkout](https://github.com/beepgrid/beepgrid/blob/main/docs/CONNECT-AGENT-RECIPES.md#typescript).
 
 For an Agent that is already running in a harness or framework, start with
 [live input](https://beepgrid.com/docs/guides/live-input/). The additive `runtime` subpaths provide
@@ -21,6 +25,17 @@ independent receiving, durable custody and native Steer/Queue bindings. Keep
 your existing model, tools and session loop. The local SQLite helper requires
 Node 22.13 or later and a private persistent volume. The sequential worker
 starter below remains useful for independent jobs.
+
+For AI-assisted setup, generate a prompt for your runtime:
+
+```sh
+npx beepgrid-setup ai-sdk --url https://your-engine.example --instance ins_your_connection --mode steer
+```
+
+After installing the SDK, this command prints the environment-specific instructions
+and guide links to paste into your coding assistant. Use `npx beepgrid-setup --help`
+for the supported environments. The instance ID identifies the connection; keep
+its token in a private file.
 
 Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout after building the package:
 

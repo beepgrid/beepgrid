@@ -1,6 +1,6 @@
 # Beepgrid for React
 
-[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/react/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/react)
+[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/react/) · [npm](https://www.npmjs.com/package/@beepgrid/react) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/react)
 
 ```sh
 npm install @beepgrid/react @beepgrid/sdk react
@@ -8,7 +8,7 @@ npm install @beepgrid/react @beepgrid/sdk react
 
 React 19 or later. Optional components for embedding Beepgrid in your own application.
 
-This package provides `BeepgridRequest`, `BeepgridConversation`, `useBeepgridRequest` and `browserClient`. It uses the same authorization and durable request API as the employee app. Polling is cancelled when a component unmounts; this never cancels the request.
+This package provides `BeepgridRequest`, `BeepgridConversation`, `useBeepgridRequest` and `browserClient`. It uses the same authorization and durable request API as the Beepgrid workspace. Polling is cancelled when a component unmounts; this never cancels the request.
 
 ```tsx
 import { useMemo } from 'react';

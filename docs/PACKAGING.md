@@ -1,6 +1,6 @@
 # Install the engine and optional workspace
 
-Beep Grid keeps the public engine, CLI, MCP server, SDKs and community workspace in one repository. The workspace is an authenticated API client. Authorization, requests, conversation history and delivery workers live in the Go engine. No private enterprise source is needed by either public distribution.
+Beep Grid keeps the engine, CLI, MCP server, SDKs and community workspace in one repository. The workspace is an authenticated API client. Authorization, requests, conversation history and delivery workers live in the Go engine.
 
 ## Prebuilt releases
 
@@ -79,7 +79,7 @@ Run local development from a directory where your account can read and write `.l
 
 Without Make, run `go build -buildvcs=false -trimpath -o beepgrid ./cmd/beepgrid` for the workspace or add `-tags headless` for the asset-free binary. `docker build .` still builds the workspace image. The explicit image targets are `workspace` and `headless`.
 
-Both binaries include the same CLI, HTTP API, MCP tools, health checks, migrations, policy engine and delivery workers. They use the same database schema. Switching binaries neither migrates identities nor copies history. PostgreSQL remains required. The binary releases contain the public engine only. Managed billing, private account provisioning and marketing analytics are excluded. Container build targets remain available from source.
+Both binaries include the same CLI, HTTP API, MCP tools, health checks, migrations, policy engine and delivery workers. They use the same database schema. Switching binaries neither migrates identities nor copies history. PostgreSQL remains required. Container build targets remain available from source.
 
 ## Run
 

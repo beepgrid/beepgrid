@@ -53,6 +53,8 @@ go get github.com/beepgrid/beepgrid/sdk/go@v0.2.0
 
 Optional React embeds: `npm install @beepgrid/react @beepgrid/sdk react`. [Installation and hosting →](docs/PACKAGING.md)
 
+Package pages: [TypeScript](https://www.npmjs.com/package/@beepgrid/sdk) · [Python](https://pypi.org/project/beepgrid/) · [Go SDK](https://pkg.go.dev/github.com/beepgrid/beepgrid/sdk/go) · [React](https://www.npmjs.com/package/@beepgrid/react) · [Go command](https://pkg.go.dev/github.com/beepgrid/beepgrid/cmd/beepgrid)
+
 ## Try it locally
 
 You need **Docker Compose, Python 3.10+ and Go 1.26.10**. Go can download the toolchain specified in `go.mod`. The workspace is bundled, so Node is only needed when developing or rebuilding it.

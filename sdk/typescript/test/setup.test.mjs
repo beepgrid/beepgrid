@@ -1,6 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { environments, setupPrompt } from "../dist/runtime/catalog.js";
+
+test("setup command errors lead to usage and the manual integration guide", () => {
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("../bin/setup.mjs", import.meta.url)), "ai-sdk"],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /Workspace URL and exact instance are required/);
+  assert.match(result.stderr, /beepgrid-setup --help/);
+  assert.match(result.stderr, /docs\/LIVE-INPUT\.md#manual-setup/);
+  assert.equal(result.stderr.trim().split("\n").length, 3);
+});
 
 test("each live setup prompt routes an AI to a complete credential-free environment guide", () => {
   for (const env of environments.filter((e) => e.group !== "Advanced")) {

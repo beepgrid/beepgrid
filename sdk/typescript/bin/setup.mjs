@@ -28,5 +28,11 @@ try {
   console.log(setupPrompt(id, url, mode, instance));
 } catch (error) {
   console.error(error.message);
+  console.error(
+    "Run beepgrid-setup --help for environments and required options.",
+  );
+  console.error(
+    "Guide: https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#manual-setup",
+  );
   process.exitCode = 1;
 }

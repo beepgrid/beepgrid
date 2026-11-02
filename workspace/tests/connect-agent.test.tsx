@@ -40,6 +40,16 @@ it("uses the existing worker credential and verifies its exact instance reply", 
   });
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Run your worker" });
+  expect(screen.getByText(/python3 -m pip install beepgrid/)).toBeVisible();
+  expect(screen.getByText(/BEEPGRID_TOKEN_FILE=/)).toHaveTextContent(
+    "python3 worker.py",
+  );
+  expect(
+    screen.getByRole("link", { name: "Open integration guide" }),
+  ).toHaveAttribute(
+    "href",
+    "https://github.com/beepgrid/beepgrid/blob/main/docs/CONNECT-AGENT-RECIPES.md#python",
+  );
   expect(screen.getByText(/BEEPGRID_TOKEN_FILE=/)).not.toHaveTextContent(
     "test-only-session",
   );
@@ -85,6 +95,15 @@ it("guides the chosen MCP method without exposing a token in configuration or re
   });
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Connect your tool host" });
+  expect(
+    screen.getByText(/brew install beepgrid\/tap\/beepgrid/),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("link", { name: "Open integration guide" }),
+  ).toHaveAttribute(
+    "href",
+    "https://github.com/beepgrid/beepgrid/blob/main/docs/CONNECT-AGENT-RECIPES.md#local-mcp-host",
+  );
   expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).toHaveTextContent(
     'BEEPGRID_TOKEN_FILE = "/absolute/path/worker-token"',
   );
