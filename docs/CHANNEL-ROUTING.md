@@ -9,7 +9,7 @@ Open **Integrations → Delivery preferences**. Drag channels into order, or foc
 - **Preferred:** start with the first enabled, permitted destination. A definite delivery failure tries the next one immediately, after any safe provider retries.
 - **All selected:** send to every selected destination immediately. This is opt-in.
 - **Only in Beepgrid:** remove every destination from the list. Authorized conversation history stays in the workspace.
-- **Unanswered requests:** optionally choose a delay before trying the next destination. This applies only to open questions and approvals, not ordinary messages or task completion. The delay starts when the provider accepts the previous notification. Each subsequent channel gets the same delay.
+- **Unanswered requests:** optionally choose a delay before trying the next destination. The workspace offers 5 seconds, 15 seconds, 30 seconds, 1 minute, 3 minutes, 5 minutes, 10 minutes and 15 minutes. This applies only to open questions and approvals, not ordinary messages or task completion. The delay starts when the provider accepts the previous notification. Each subsequent channel gets the same delay.
 
 Provider acceptance does not prove that a Person read a notification. Unknown or ambiguous provider outcomes pause that delivery chain for reconciliation; they do not trigger automatic duplicate sends, including timed follow-ups.
 
@@ -65,16 +65,16 @@ Content-Type: application/json
       "policy": {
         "mode": "preferred",
         "destinations": ["dst_telegram", "dst_email"],
-        "followup_seconds": 1800
+        "followup_seconds": 300
       }
     }
   ]
 }
 ```
 
-Use the returned version for the next write. A stale version returns `409`; reload instead of overwriting another edit. `default: null` preserves legacy defaults. An empty `destinations` list means workspace-only delivery. Omit an override to restore inheritance. The first matching group entry wins, regardless of where individual Agent entries appear.
+Use the returned version for the next write. A stale version returns `409`; reload instead of overwriting another edit. `default: null` preserves legacy defaults. An empty `destinations` list means workspace-only delivery. Omit an override to restore inheritance. The first matching role’s preferences are used, regardless of where individual Agent entries appear.
 
-Limits: 16 destinations per policy and 64 overrides per Person. Follow-up delay is `0` (off), or 60 to 604800 seconds. All-channel policies require `0`. Missing or disabled channels are skipped. Native history remains when native contact is permitted.
+Limits: 16 destinations per policy and 64 overrides per Person. Follow-up delay is `0` (off), or 5 to 900 seconds. A previously saved longer delay can be kept unchanged, but new delays are capped at 15 minutes. All-channel policies require `0`. Missing or disabled channels are skipped. Native history remains when native contact is permitted.
 
 TypeScript:
 

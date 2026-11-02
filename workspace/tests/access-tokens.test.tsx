@@ -68,15 +68,28 @@ it("keeps expired tokens out of the active list and exposes meaningful identity 
   });
   expect(screen.queryByText("Production worker")).not.toBeInTheDocument();
 });
-it("edits the observed version without changing expiry unless requested", async () => {
+it("shows the saved expiry directly and preserves it when only the name changes", async () => {
   const fetcher = setup(
-    [{ ...credential, kind: "api", permissions: ["read"] }],
+    [
+      {
+        ...credential,
+        kind: "api",
+        permissions: ["read"],
+        renewable_until: undefined,
+      },
+    ],
     () => json({ ...credential, version: 5 }),
   );
   await screen.findByText("Production worker");
   fireEvent.click(screen.getByRole("button", { name: "Edit" }));
   expect(screen.getByLabelText("Token access")).toHaveValue("read");
-  expect(screen.queryByLabelText("Expires")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Expires")).toHaveValue("current");
+  expect(
+    within(screen.getByLabelText("Expires")).getByRole("option", {
+      selected: true,
+    }),
+  ).toHaveTextContent(new Date(credential.expires_at!).toLocaleString());
+  expect(screen.queryByLabelText("Change expiry")).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Token name"), {
     target: { value: "Reporting job" },
   });
@@ -97,7 +110,6 @@ it("makes never-expiring access a direct expiry choice without sending a fake da
   );
   await screen.findByText("Production worker");
   fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-  fireEvent.click(screen.getByLabelText("Change expiry"));
   fireEvent.change(screen.getByLabelText("Expires"), {
     target: { value: "never" },
   });
@@ -112,6 +124,54 @@ it("makes never-expiring access a direct expiry choice without sending a fake da
     never_expires: true,
     clear_permissions: true,
   });
+});
+it("shows a renewable connection's hard deadline and can replace it with a dated expiry", async () => {
+  const fetcher = setup([credential], () =>
+    json({ ...credential, version: 5 }),
+  );
+  await screen.findByText("Production worker");
+  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+  expect(
+    within(screen.getByLabelText("Expires")).getByRole("option", {
+      selected: true,
+    }),
+  ).toHaveTextContent(new Date(credential.renewable_until!).toLocaleString());
+  fireEvent.change(screen.getByLabelText("Expires"), {
+    target: { value: "custom" },
+  });
+  fireEvent.change(screen.getByLabelText("Expiry date"), {
+    target: { value: "2099-03-04T12:30" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() =>
+    expect(fetcher.mock.calls.some(([p]) => p.endsWith("/edit"))).toBe(true),
+  );
+  expect(
+    requestBody(fetcher.mock.calls.find(([p]) => p.endsWith("/edit"))![1]),
+  ).toEqual({
+    version: 4,
+    name: credential.name,
+    expires_at: new Date("2099-03-04T12:30").toISOString(),
+  });
+});
+it("preselects Never expires and preserves it for an unrelated edit", async () => {
+  const fetcher = setup(
+    [{ ...credential, expires_at: null, renewable_until: undefined }],
+    () => json({ ...credential, version: 5 }),
+  );
+  await screen.findByText("Production worker");
+  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+  expect(screen.getByLabelText("Expires")).toHaveValue("never");
+  fireEvent.change(screen.getByLabelText("Token name"), {
+    target: { value: "Renamed worker" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() =>
+    expect(fetcher.mock.calls.some(([p]) => p.endsWith("/edit"))).toBe(true),
+  );
+  expect(
+    requestBody(fetcher.mock.calls.find(([p]) => p.endsWith("/edit"))![1]),
+  ).toEqual({ version: 4, name: "Renamed worker" });
 });
 it("rotates with a bounded overlap and shows the replacement secret only after success", async () => {
   const fetcher = setup([credential], () =>

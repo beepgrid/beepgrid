@@ -13,6 +13,16 @@ import { Button, ErrorView, Field, Icon, Loading } from "../ui";
 import { ChannelMark } from "../ChannelMark";
 
 const sourceKey = (t: Target) => t.kind + ":" + t.id;
+const followupOptions = [
+  [5, "5 seconds"],
+  [15, "15 seconds"],
+  [30, "30 seconds"],
+  [60, "1 minute"],
+  [180, "3 minutes"],
+  [300, "5 minutes"],
+  [600, "10 minutes"],
+  [900, "15 minutes"],
+] as const;
 export function DeliveryPreferences({
   renderDestinations,
 }: {
@@ -36,7 +46,7 @@ export function DeliveryPreferences({
             Where to reach {person === me.person.id ? "you" : "this Person"}
           </h2>
           <p className="help">
-            Messages always stay in Beepgrid. Choose where else they arrive.
+            Messages always show in Beepgrid. Choose where else they arrive.
           </p>
         </div>
         {me.admin ? (
@@ -141,7 +151,8 @@ export function PreferenceEditor({
       .sort(
         (a, b) =>
           Number(b.mode === "primary") - Number(a.mode === "primary") ||
-          a.priority - b.priority || a.id.localeCompare(b.id),
+          a.priority - b.priority ||
+          a.id.localeCompare(b.id),
       )
       .map((d) => d.id),
     followup_seconds: 0,
@@ -273,7 +284,7 @@ export function PreferenceEditor({
         ) : null}
         <span
           className="routing-info"
-          title="An Agent override takes precedence over Agent roles, then your default. If several Agent roles match, the first role below wins."
+          title="An Agent override takes precedence over Agent roles, then your default. If several Agent roles match, the first matching role’s preferences are used."
           aria-label="How overrides work"
         >
           <Icon name="info" size={16} />
@@ -329,22 +340,33 @@ export function PreferenceEditor({
               If I haven’t responded, try the next channel after
             </label>
             {policy.followup_seconds > 0 ? (
-              <label className="routing-delay">
-                <input
-                  aria-label="Follow-up delay in minutes"
-                  type="number"
-                  min={1}
-                  max={10080}
-                  value={policy.followup_seconds / 60}
-                  onChange={(e) =>
-                    change({
-                      ...policy,
-                      followup_seconds: Number(e.target.value) * 60,
-                    })
-                  }
-                />{" "}
-                minutes
-              </label>
+              <select
+                className="routing-delay"
+                aria-label="Follow-up delay"
+                value={policy.followup_seconds}
+                onChange={(e) =>
+                  change({
+                    ...policy,
+                    followup_seconds: Number(e.target.value),
+                  })
+                }
+              >
+                {!followupOptions.some(
+                  ([seconds]) => seconds === policy.followup_seconds,
+                ) ? (
+                  <option value={policy.followup_seconds} disabled>
+                    {policy.followup_seconds % 60 === 0
+                      ? `${policy.followup_seconds / 60} minutes`
+                      : `${policy.followup_seconds} seconds`}{" "}
+                    (current)
+                  </option>
+                ) : null}
+                {followupOptions.map(([seconds, label]) => (
+                  <option key={seconds} value={seconds}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             ) : null}
             <span
               className="routing-info"
@@ -371,8 +393,8 @@ export function PreferenceEditor({
         <div className="routing-role-order">
           <h3>Agent role priority</h3>
           <p className="help">
-            The first matching role wins. Individual Agent preferences come
-            first.
+            The first matching role’s preferences are used. Individual Agent
+            preferences come first.
           </p>
           <ReorderStack
             items={roleOverrides.map((o) => ({

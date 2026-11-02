@@ -13903,7 +13903,7 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 604800,
-            "description": "0 disables unanswered-request follow-ups. Otherwise 60 to 604800 seconds. Only questions and approvals; all mode requires 0."
+            "description": "0 disables unanswered-request follow-ups. Otherwise 5 to 900 seconds. Previously saved longer delays may be retained unchanged. Only questions and approvals; all mode requires 0."
           }
         },
         "required": [

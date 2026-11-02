@@ -16,7 +16,7 @@ required. People, Agents and software services keep separate identities.
   directly with any SDK, CLI or MCP connection. Do not enroll again on each call.
 
 New API and enrollment tokens default to 30 days. Choose an expiry from one
-minute to one year ahead, or select **Never expires**. Existing tokens keep their current lifetime. Tokens
+minute to one year ahead, or select **Never expires**. The edit form always shows the saved expiry in the **Expires** dropdown. For renewable connections this is their hard deadline, not the shorter access lease. Saving other fields keeps that expiry unchanged. Existing tokens keep their current lifetime. Tokens
 have names, a non-secret hint, creation time and last-use information. Last use
 is recorded at most once per five minutes, so it is approximate.
 

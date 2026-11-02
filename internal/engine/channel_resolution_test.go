@@ -155,13 +155,68 @@ func TestChannelResolutionAgentAndRoleOverrideOrder(t *testing.T) {
 	p = saveRouting(t, s, owner, p)
 	send(0, "default", conv)
 }
+func TestDeliveryPreferenceDelayBoundsAndLegacyEdits(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	f := testRoutes(t, s, owner, owner.ID, 202, 202)
+	p := DeliveryPreferences{PersonID: owner.ID, Default: policy(f, 0, 1)}
+	for _, seconds := range []int{5, 15, 30, 60, 180, 300, 600, 900} {
+		p.Default.FollowupSeconds = seconds
+		p = saveRouting(t, s, owner, p)
+	}
+	for _, seconds := range []int{-1, 1, 4, 901, 3600, 604800, 604801} {
+		p.Default.FollowupSeconds = seconds
+		if _, err := s.SaveDeliveryPreferences(ctx, owner, owner.ID, p); ErrorStatus(err) != 400 {
+			t.Fatalf("invalid timer %d accepted: %v", seconds, err)
+		}
+	}
+	// Previously saved policies stay editable without silently changing their timer.
+	if _, err := s.Pool.Exec(ctx, `UPDATE delivery_preferences SET default_policy=jsonb_set(default_policy,'{followup_seconds}','3600') WHERE scope=$1 AND person_id=$2`, owner.Scope, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+	var err error
+	p, err = s.DeliveryPreferences(ctx, owner, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Default.Destinations[0], p.Default.Destinations[1] = p.Default.Destinations[1], p.Default.Destinations[0]
+	p = saveRouting(t, s, owner, p)
+	p.Default.FollowupSeconds = 1800
+	if _, err = s.SaveDeliveryPreferences(ctx, owner, owner.ID, p); ErrorStatus(err) != 400 {
+		t.Fatal("legacy timer could change outside the new bounds", err)
+	}
+	p.Default.FollowupSeconds = 30
+	p = saveRouting(t, s, owner, p)
+	p.Default.FollowupSeconds = 3600
+	if _, err = s.SaveDeliveryPreferences(ctx, owner, owner.ID, p); ErrorStatus(err) != 400 {
+		t.Fatal("removed legacy timer could be reintroduced", err)
+	}
+	p.Default.FollowupSeconds = 30
+	worker := testWorker(t, s, owner, "legacy-delay")
+	p.Overrides = []ChannelOverride{{Source: Target{"agent", worker.ID}, Policy: *policy(f, 0, 1)}}
+	p = saveRouting(t, s, owner, p)
+	if _, err = s.Pool.Exec(ctx, `UPDATE delivery_preferences SET overrides=jsonb_set(overrides,'{0,policy,followup_seconds}','3600') WHERE scope=$1 AND person_id=$2`, owner.Scope, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+	p, err = s.DeliveryPreferences(ctx, owner, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p = saveRouting(t, s, owner, p)
+	p.Overrides[0].Policy.FollowupSeconds = 1800
+	if _, err = s.SaveDeliveryPreferences(ctx, owner, owner.ID, p); ErrorStatus(err) != 400 {
+		t.Fatal("override timer could change outside the new bounds", err)
+	}
+	p.Overrides[0].Policy.FollowupSeconds = 5
+	saveRouting(t, s, owner, p)
+}
 func TestRequestFollowupDurabilityAndResolution(t *testing.T) {
 	s, owner := testStore(t)
 	ctx := context.Background()
 	worker := testWorker(t, s, owner, "routing-asker")
 	f := testRoutes(t, s, owner, owner.ID, 202, 202, 202)
 	p := DeliveryPreferences{PersonID: owner.ID, Default: policy(f, 0, 1, 2)}
-	p.Default.FollowupSeconds = 60
+	p.Default.FollowupSeconds = 5
 	saveRouting(t, s, owner, p)
 	q, err := s.Ask(ctx, worker, AskInput{Target: Target{"person", owner.ID}, Title: "Which release?"}, "timed-question")
 	if err != nil {
@@ -171,7 +226,7 @@ func TestRequestFollowupDurabilityAndResolution(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wait float64
-	if err = s.Pool.QueryRow(ctx, `SELECT extract(epoch FROM next_at-now()) FROM deliveries WHERE operation_id=$1 AND connection_id=$2`, q.ID, f.destinations[1].ConnectionID).Scan(&wait); err != nil || wait < 58 {
+	if err = s.Pool.QueryRow(ctx, `SELECT extract(epoch FROM next_at-now()) FROM deliveries WHERE operation_id=$1 AND connection_id=$2`, q.ID, f.destinations[1].ConnectionID).Scan(&wait); err != nil || wait < 3 || wait > 5 {
 		t.Fatal("missing durable timer", wait, err)
 	}
 	schema := strings.Split(s.Pool.Config().ConnConfig.RuntimeParams["search_path"], ",")[0]

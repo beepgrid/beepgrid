@@ -149,9 +149,11 @@ function PermissionFields({
 function ExpiryField({
   value,
   onChange,
+  current,
 }: {
   value: string;
   onChange: (v: string) => void;
+  current?: string | null;
 }) {
   const custom = value.startsWith("date:");
   return (
@@ -162,6 +164,9 @@ function ExpiryField({
           onChange(e.target.value === "custom" ? "date:" : e.target.value)
         }
       >
+        {current ? (
+          <option value="current">{new Date(current).toLocaleString()}</option>
+        ) : null}
         <option value="never">Never expires</option>
         <option value="7">In 7 days</option>
         <option value="30">In 30 days</option>
@@ -452,12 +457,13 @@ function TokenForm({
   onClose: () => void;
   onCreated: (s: Secret) => void;
 }) {
+  const currentExpiry = c?.renewable_until || c?.expires_at;
+  const initialExpiry = c ? (currentExpiry ? "current" : "never") : "30";
   const [name, setName] = useState(c?.name || ""),
     [target, setTarget] = useState<Target[]>([]),
     [kind, setKind] = useState(c?.kind || "api"),
     [prefix, setPrefix] = useState(c?.prefix || ""),
-    [expiry, setExpiry] = useState(c && !c.expires_at ? "never" : "30"),
-    [changeExpiry, setChangeExpiry] = useState(!c),
+    [expiry, setExpiry] = useState(initialExpiry),
     [permissions, setPermissions] = useState<string[] | null>(
       c?.permissions || null,
     ),
@@ -479,7 +485,7 @@ function TokenForm({
                 ? {
                     version: c.version,
                     name,
-                    ...(changeExpiry ? expiryInput(expiry) : {}),
+                    ...(expiry !== initialExpiry ? expiryInput(expiry) : {}),
                     ...(kind === "api"
                       ? permissions === null
                         ? { clear_permissions: true }
@@ -549,19 +555,11 @@ function TokenForm({
         {kind === "api" ? (
           <PermissionFields value={permissions} onChange={setPermissions} />
         ) : null}
-        {c ? (
-          <label className="inline-check">
-            <input
-              type="checkbox"
-              checked={changeExpiry}
-              onChange={(e) => setChangeExpiry(e.target.checked)}
-            />
-            Change expiry
-          </label>
-        ) : null}
-        {changeExpiry ? (
-          <ExpiryField value={expiry} onChange={setExpiry} />
-        ) : null}
+        <ExpiryField
+          value={expiry}
+          onChange={setExpiry}
+          current={currentExpiry}
+        />
         <ErrorView error={op.error || (!c ? cap.error : null)} />
         <div className="form-actions">
           <Button onClick={onClose}>Cancel</Button>

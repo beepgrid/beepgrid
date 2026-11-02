@@ -119,7 +119,9 @@ it("offers timers only for preferred routing and clears them for all-channel del
   fireEvent.click(
     screen.getByRole("checkbox", { name: /If I haven’t responded/ }),
   );
-  expect(screen.getByLabelText("Follow-up delay in minutes")).toHaveValue(15);
+  expect(screen.getByRole("combobox", { name: "Follow-up delay" })).toHaveValue(
+    "900",
+  );
   fireEvent.change(screen.getByLabelText("Delivery"), {
     target: { value: "all" },
   });
@@ -132,6 +134,49 @@ it("offers timers only for preferred routing and clears them for all-channel del
   expect(
     screen.getByRole("checkbox", { name: /If I haven’t responded/ }),
   ).not.toBeChecked();
+});
+it("saves a seconds-based preset rather than a minute conversion", async () => {
+  const fn = vi.fn(async (_path: string, _init?: RequestInit) =>
+    json({ ...value, version: 3 }),
+  );
+  vi.stubGlobal("fetch", fn);
+  mount();
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: /If I haven’t responded/ }),
+  );
+  const delay = screen.getByRole("combobox", { name: "Follow-up delay" });
+  expect(Array.from(delay.querySelectorAll("option"), (o) => o.value)).toEqual([
+    "5",
+    "15",
+    "30",
+    "60",
+    "180",
+    "300",
+    "600",
+    "900",
+  ]);
+  fireEvent.change(delay, { target: { value: "5" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  await waitFor(() => expect(fn).toHaveBeenCalled());
+  expect(requestBody(fn.mock.calls[0][1]).default.followup_seconds).toBe(5);
+});
+it("preserves a previously saved longer delay until the user chooses a preset", async () => {
+  const fn = vi.fn(async (_path: string, _init?: RequestInit) =>
+    json({ ...value, version: 3 }),
+  );
+  vi.stubGlobal("fetch", fn);
+  mount({ ...value, default: { ...value.default!, followup_seconds: 3600 } });
+  const delay = screen.getByRole("combobox", { name: "Follow-up delay" });
+  expect(delay).toHaveValue("3600");
+  expect(
+    screen.getByRole("option", { name: "60 minutes (current)" }),
+  ).toBeDisabled();
+  fireEvent.keyDown(screen.getByRole("button", { name: "Move channel 1" }), {
+    key: "ArrowDown",
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  await waitFor(() => expect(fn).toHaveBeenCalled());
+  expect(requestBody(fn.mock.calls[0][1]).default.followup_seconds).toBe(3600);
 });
 it("keeps all-channel opt-outs explicit and can use workspace history only", async () => {
   const fn = vi.fn(async (_path: string, _init?: RequestInit) =>

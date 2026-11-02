@@ -3465,7 +3465,7 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 .routing-grip { cursor: grab; color: var(--sub); background: transparent; border: 0; padding: 6px; font-size: 24px; line-height: 1; }
 .routing-grip:focus-visible { color: var(--ink); background: var(--raised); border-radius: 4px; }
 .routing-followup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; font-size: 14px; }
-.routing-delay input { width: 76px; padding: 7px 9px; }
+.routing-delay { width: auto; min-width: 130px; }
 .routing-save { margin-top: 20px; }
 .routing-role-order { margin-top: 24px; }
 .delivery-destinations { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 12px; }

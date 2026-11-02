@@ -180,7 +180,7 @@ export type Credential = {
   principal_id: string;
   kind: string;
   prefix: string;
-  expires_at?: string;
+  expires_at?: string | null;
   revoked: boolean;
 };
 export type Attachment = {

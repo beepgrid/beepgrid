@@ -22,7 +22,7 @@ type DeliveryPreferences struct {
 	PersonID  string            `json:"person_id"`
 	Version   int64             `json:"version"`
 	Default   *ChannelPolicy    `json:"default"`
-	Overrides []ChannelOverride `json:"overrides"` // First matching Agent role wins.
+	Overrides []ChannelOverride `json:"overrides"` // The first matching Agent role's preferences are used.
 }
 
 func (s *Store) mayEditDeliveryPreferences(ctx context.Context, db DB, a Actor, id string) bool {
@@ -75,15 +75,16 @@ func (s *Store) SaveDeliveryPreferences(ctx context.Context, a Actor, id string,
 		if in.Version != previous.Version {
 			return Conflict("Delivery preferences changed. Reload before saving.")
 		}
-		validate := func(p ChannelPolicy) error {
+		validate := func(p ChannelPolicy, previousDelay int) error {
 			if p.Mode != "preferred" && p.Mode != "all" {
 				return Bad("Choose preferred channels or all selected channels.")
 			}
 			if len(p.Destinations) > 16 {
 				return Bad("Choose at most 16 destinations.")
 			}
-			if p.FollowupSeconds != 0 && (p.FollowupSeconds < 60 || p.FollowupSeconds > 604800) {
-				return Bad("Follow-up delay must be between one minute and seven days.")
+			legacyDelay := p.FollowupSeconds > 900 && p.FollowupSeconds <= 604800 && p.FollowupSeconds == previousDelay
+			if p.FollowupSeconds != 0 && (p.FollowupSeconds < 5 || p.FollowupSeconds > 900) && !legacyDelay {
+				return Bad("Follow-up delay must be between 5 seconds and 15 minutes.")
 			}
 			if p.Mode == "all" && p.FollowupSeconds != 0 {
 				return Bad("All selected channels do not need timed follow-ups.")
@@ -105,11 +106,19 @@ func (s *Store) SaveDeliveryPreferences(ctx context.Context, a Actor, id string,
 			return nil
 		}
 		if in.Default != nil {
-			if err = validate(*in.Default); err != nil {
+			previousDelay := 0
+			if previous.Default != nil {
+				previousDelay = previous.Default.FollowupSeconds
+			}
+			if err = validate(*in.Default, previousDelay); err != nil {
 				return err
 			}
 		}
 		seen := map[Target]bool{}
+		previousDelays := map[Target]int{}
+		for _, o := range previous.Overrides {
+			previousDelays[o.Source] = o.Policy.FollowupSeconds
+		}
 		for _, o := range in.Overrides {
 			if seen[o.Source] {
 				return Bad("Choose one override per Agent or Agent role.")
@@ -140,7 +149,7 @@ func (s *Store) SaveDeliveryPreferences(ctx context.Context, a Actor, id string,
 			if !valid || !visible {
 				return Denied()
 			}
-			if err = validate(o.Policy); err != nil {
+			if err = validate(o.Policy, previousDelays[o.Source]); err != nil {
 				return err
 			}
 		}
