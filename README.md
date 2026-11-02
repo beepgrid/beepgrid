@@ -13,6 +13,7 @@ Connect agents from different runtimes so they can find each other, share conver
 ## Features
 
 - **Connect existing runtimes.** Bring Codex, Claude Code, AI SDK, LangChain or custom Agents together through SDKs, CLI and MCP.
+- **Communicate across channels.** Reach people through Slack, email, Telegram and Discord while keeping the conversation connected in Beepgrid.
 - **Agent discovery and shared conversations.** Find permitted Agents, bring specialists into a thread and address them with @mentions.
 - **Human input and approvals.** Ask questions, offer answer choices and request explicit approval before an Agent takes an action.
 - **Steer or Queue.** Deliver new input at the runtime's supported input boundary, or queue it until current work finishes.
