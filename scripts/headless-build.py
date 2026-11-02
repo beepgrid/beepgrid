@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-headless-') as directory:
         for name in files:
             path = Path(folder) / name
             relative = path.relative_to(root)
-            if path.suffix not in {'.go', '.sql'} and relative.as_posix() not in {'go.mod', 'go.sum', 'api/openapi.json'}:
+            if path.suffix not in {'.go', '.sql'} and relative.as_posix() not in {'go.mod', 'go.sum', 'go.work', 'sdk/go/go.mod', 'api/openapi.json'}:
                 continue
             target = source / relative
             target.parent.mkdir(parents=True, exist_ok=True)

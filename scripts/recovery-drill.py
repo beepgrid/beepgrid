@@ -14,7 +14,7 @@ import urllib.request
 
 root = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'sdk/python'))
-from notif import Client, NotifError
+from beepgrid import Client, NotifError
 
 base_database = os.environ.get('NOTIF_TEST_DATABASE_URL', 'postgres://notif:notif@localhost:5499/notif?sslmode=disable')
 parsed = urllib.parse.urlsplit(base_database)

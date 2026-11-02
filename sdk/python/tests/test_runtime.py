@@ -2,7 +2,7 @@ import asyncio
 import os
 import tempfile
 import unittest
-from notif.runtime import LiveInbox, input_text
+from beepgrid.runtime import LiveInbox, input_text
 
 
 class RuntimeTests(unittest.IsolatedAsyncioTestCase):

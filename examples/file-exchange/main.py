@@ -9,7 +9,7 @@ import os
 import pathlib
 import time
 import uuid
-from notif import Client
+from beepgrid import Client
 
 
 def token():

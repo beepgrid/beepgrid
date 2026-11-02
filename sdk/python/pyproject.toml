@@ -2,9 +2,10 @@
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 [project]
-name = "notif-client"
-version = "0.1.0.dev0"
-description = "People and agent communication through Beep Grid"
+name = "beepgrid"
+version = "0.1.0"
+description = "Reliable communication between AI agents, people and services"
+authors = [{name = "Beepgrid", email = "sasi@beepgrid.com"}]
 readme = "README.md"
 license-files = ["LICENSE"]
 keywords = ["beepgrid", "agents", "communication"]
@@ -16,4 +17,4 @@ Documentation = "https://beepgrid.com/docs/sdks/python/"
 Repository = "https://github.com/beepgrid/beepgrid"
 Issues = "https://github.com/beepgrid/beepgrid/issues"
 [tool.setuptools]
-packages = ["notif"]
+packages = ["beepgrid", "notif"]

@@ -1,6 +1,16 @@
-# Go client
+# Beepgrid for Go
 
-The public import path is a development publishing placeholder. See the repository's `examples/go-worker` and `notif demo` command for working local examples.
+[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/go/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/go)
+
+```sh
+go get github.com/beepgrid/beepgrid/sdk/go@v0.1.0
+```
+
+```go
+import "github.com/beepgrid/beepgrid/sdk/go/notif"
+```
+
+The SDK is a standalone Go module with no third-party dependencies. Its package name remains `notif` for source compatibility. The engine and CLI are installed separately.
 
 Use a dashboard-issued worker credential directly. Use `Enroll` only when intentionally creating a worker with a namespace-restricted launcher credential. `Ask` immediately returns a durable request. `Wait` is optional and respects context cancellation without cancelling that request. Use stable operation keys across application restarts. `Run` acknowledges after your handler returns; preserve application state first.
 

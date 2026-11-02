@@ -5,7 +5,7 @@ Uses the local/provider-configured Coordinator setup from the main tour first.
 """
 import runpy
 import uuid
-from notif import NotifError
+from beepgrid import NotifError
 state = runpy.run_path('examples/developer-tour/main.py')
 owner, builder, billing = (state[name] for name in ['owner', 'builder', 'billing'])
 builder_id, billing_id, person_id = (state[name] for name in ['builder_id', 'billing_id', 'person_id'])

@@ -1,6 +1,8 @@
-# Unreleased
+# 0.1.0
 
-Development namespace and versions remain pending a public release decision. No registry publication is implied.
+First public release of the Beepgrid SDK, compatible with the API v1 engine.
+
+Canonical packages: `@beepgrid/sdk`, `@beepgrid/react` and Python `beepgrid`. Python retains the `notif` import as a compatibility alias.
 
 30 October 2026: message-first examples, clean packed-consumer checks and explicit runtime/qualification limits. TypeScript, Go and Python support current-access workspace files and canonical event consumption. React embeds continue to use same-origin authenticated Person sessions and typed durable decisions. MCP file tools are limited to 64 KiB; SDK files to 5 MiB. Shared membership and initial-message attachment contracts follow the separately owned engine work.
 

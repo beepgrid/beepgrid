@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import time
 import uuid
-from notif import Client, NotifError
+from beepgrid import Client, NotifError
 
 root = pathlib.Path(__file__).resolve().parents[1]
 url = os.environ["NOTIF_SDK_TEST_URL"]

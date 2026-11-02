@@ -102,7 +102,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-doc-tour-') as scratch:
                 'tours': [item for item in evidence if item['language'] not in recipe_names],
                 'recipes': [item for item in evidence if item['language'] in recipe_names],
                 'recipe_source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in (root/'examples/a2a-workflows').glob('*.py')},
-                'source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['sdk/go/notif','sdk/typescript/src','sdk/python/notif','sdk/react/src'] for p in (root/folder).glob('*') if p.suffix in ['.go','.ts','.tsx','.py'] and not p.name.endswith('_test.go')}}, indent=2) + '\n')
+                'source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['sdk/go/notif','sdk/typescript/src','sdk/python/beepgrid','sdk/react/src'] for p in (root/folder).glob('*') if p.suffix in ['.go','.ts','.tsx','.py'] and not p.name.endswith('_test.go')}}, indent=2) + '\n')
             print('PASS: documentation tours; evidence: .local/documentation-qualification.json')
         finally:
             server.terminate()

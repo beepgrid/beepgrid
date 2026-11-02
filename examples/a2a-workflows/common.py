@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import uuid
 
-from notif import Client
+from beepgrid import Client
 
 
 class Fixture:

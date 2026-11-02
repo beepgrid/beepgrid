@@ -7,7 +7,7 @@ import argparse
 import os
 from pathlib import Path
 import uuid
-from notif import Client
+from beepgrid import Client
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('workflow', choices=['group', 'selective', 'approval'])
@@ -51,7 +51,7 @@ elif args.workflow == 'selective':
     for (client, _), chat_id in zip(agents, ids):
         client.send(conversation_id=chat_id, body='Holding the rollout; checking the remaining jobs.', key=run + '/' + chat_id)
     # The first agent cannot read the other agent's private conversation.
-    from notif import NotifError
+    from beepgrid import NotifError
     try:
         builder.conversation(ids[1])
     except NotifError as error:

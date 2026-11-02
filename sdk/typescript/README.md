@@ -1,9 +1,22 @@
-# TypeScript client
+# Beepgrid for TypeScript and JavaScript
 
-Build with `npm ci && npm run build`. The package is a local development package until publication.
+[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/typescript/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/typescript)
+
+```sh
+npm install @beepgrid/sdk
+```
+
+Node.js 22.13 or later. ESM with TypeScript declarations. No runtime dependencies.
+
+```ts
+import { Client } from '@beepgrid/sdk';
+const client = new Client(process.env.NOTIF_URL!, process.env.NOTIF_TOKEN!);
+```
+
+Use an individually issued credential, supplied by your secret manager or a protected file. Never commit it.
 
 For an Agent that is already running in a harness or framework, start with
-[live input](../../docs/LIVE-INPUT.md). The additive `runtime` subpaths provide
+[live input](https://beepgrid.com/docs/live-input/). The additive `runtime` subpaths provide
 independent receiving, durable custody and native Steer/Queue bindings. Keep
 your existing model, tools and session loop. The local SQLite helper requires
 Node 22.13 or later and a private persistent volume. The sequential worker
@@ -19,7 +32,7 @@ unset NOTIF_AGENT_ID
 node examples/typescript-worker/main.mjs
 ```
 
-The complete starter validates its agent identity, handles shutdown signals and replies to ordinary messages in their original conversation. Replace its deterministic handler with your existing agent. For explicit launcher enrollment, see [runtime examples](../../examples/README.md).
+The complete starter validates its agent identity, handles shutdown signals and replies to ordinary messages in their original conversation. Replace its deterministic handler with your existing agent. For explicit launcher enrollment, see [runtime examples](https://github.com/beepgrid/beepgrid/tree/main/examples).
 
 `new Client(url, token)` constructs a client. `send(input, stableKey)` sends ordinary content; `ask(input, stableKey)` returns a saved request and `wait(request.id, signal)` optionally waits for its decision. Retain operation keys across restarts. `run(handler, signal)` acknowledges only after the handler succeeds. Persist long work before that boundary. The SDK retries eligible network failures with the same key; local wait cancellation does not cancel the saved request.
 

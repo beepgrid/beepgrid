@@ -1,6 +1,28 @@
-# Engine and optional workspace
+# Install the engine and optional workspace
 
 Beep Grid keeps the public engine, CLI, MCP server, SDKs and community workspace in one repository. The workspace is an authenticated API client. Authorization, requests, conversation history and delivery workers live in the Go engine. No private enterprise source is needed by either public distribution.
+
+## Prebuilt releases
+
+```sh
+brew install beepgrid/tap/beepgrid
+beepgrid version
+```
+
+The Homebrew tap installs a versioned binary on macOS and Linux. It does not start services or install a database. PostgreSQL is required to host the engine; use your existing PostgreSQL installation or a container. CLI and MCP clients need only a reachable Beepgrid server and their own credential.
+
+For Windows and manual installs, download your platform's archive and `SHA256SUMS` from [GitHub Releases](https://github.com/beepgrid/beepgrid/releases). Check its SHA256, extract it, and move `beepgrid` (`beepgrid.exe` on Windows) to a directory on `PATH`. Standard archives include the community workspace. Archives ending in `-headless` omit browser assets.
+
+For a local server with PostgreSQL already running:
+
+```sh
+export NOTIF_DATABASE_URL='postgres://user:password@localhost:5432/beepgrid?sslmode=disable'
+beepgrid serve --dev
+```
+
+Open `http://localhost:4010`. The local owner credential is saved in `.local/owner-token` in your working directory. Keep it private. `--dev` is loopback-only. Production requires explicit credentials, encryption configuration and migrations, as described in [operations](OPERATIONS.md).
+
+The canonical command is `beepgrid`. Existing `notif` source builds remain compatible. A source install is also available with `go install github.com/beepgrid/beepgrid/cmd/beepgrid@v0.1.0`.
 
 ## Build targets
 
@@ -13,7 +35,7 @@ Beep Grid keeps the public engine, CLI, MCP server, SDKs and community workspace
 
 Without Make, run `go build -buildvcs=false -trimpath -o notif ./cmd/notif` for the workspace or add `-tags headless` for the asset-free binary. `docker build .` still builds the workspace image. The explicit image targets are `workspace` and `headless`.
 
-Both binaries include the same CLI, HTTP API, MCP tools, health checks, migrations, policy engine and delivery workers. They use the same database schema. Switching binaries neither migrates identities nor copies history. PostgreSQL remains required. This is a source/build contract; registry packages and release images have not been published.
+Both binaries include the same CLI, HTTP API, MCP tools, health checks, migrations, policy engine and delivery workers. They use the same database schema. Switching binaries neither migrates identities nor copies history. PostgreSQL remains required. The binary releases contain the public engine only. Managed billing, private account provisioning and marketing analytics are excluded. Container build targets remain available from source.
 
 ## Run
 

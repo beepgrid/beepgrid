@@ -27,7 +27,7 @@ parser.add_argument("--protocol", choices=("gateway", "openai", "anthropic", "go
 parser.add_argument("--followup-only", action="store_true", help="Use local fixtures for setup and one real subscription-backed follow-up call")
 args = parser.parse_args()
 sys.path.insert(0, str(root / "sdk/python"))
-from notif import Client, NotifError
+from beepgrid import Client, NotifError
 
 environment = {k: os.environ[k] for k in ("PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CODEX_HOME") if k in os.environ}
 codex = shutil.which("codex", path=environment.get("PATH"))

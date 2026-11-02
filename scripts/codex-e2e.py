@@ -19,7 +19,7 @@ from codex_capacity import safe_capacity_retry
 
 root=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root/'sdk/python'))
-from notif import Client,NotifError
+from beepgrid import Client,NotifError
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--url',default='http://localhost:4010')

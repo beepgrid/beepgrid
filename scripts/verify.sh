@@ -21,6 +21,8 @@ npm --prefix workspace test
 npm --prefix workspace run build
 npm --prefix workspace run embed
 go vet ./...
+go -C sdk/go vet ./...
+go -C sdk/go test -race ./... -count=1
 go test -race ./... -count=1
 go test -race -tags headless ./... -count=1
 python3 scripts/sdk-integration.py

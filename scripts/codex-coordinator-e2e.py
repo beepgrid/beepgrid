@@ -33,7 +33,7 @@ parser.add_argument("--ui", action="store_true", help="Wait for real UI group se
 parser.add_argument("--model", default="gpt-6-luna", help="Saved-subscription model; no API fallback")
 args = parser.parse_args()
 sys.path.insert(0, str(root / "sdk/python"))
-from notif import Client, NotifError
+from beepgrid import Client, NotifError
 
 os.umask(0o077)
 environment = {k: os.environ[k] for k in ("PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CODEX_HOME") if k in os.environ}

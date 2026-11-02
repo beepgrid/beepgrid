@@ -9,7 +9,7 @@ import subprocess
 root = Path(__file__).resolve().parents[1]
 metadata = root / 'docs/developer'
 methods = json.loads((metadata / 'methods.json').read_text())
-module = ast.parse((root / 'sdk/python/notif/__init__.py').read_text())
+module = ast.parse((root / 'sdk/python/beepgrid/__init__.py').read_text())
 client = next(x for x in module.body if isinstance(x, ast.ClassDef) and x.name == 'Client')
 python = [{'name': m.name, 'signature': m.name + '(' + ast.unparse(m.args) + ')', 'doc': ast.get_docstring(m) or ''}
           for m in client.body if isinstance(m, ast.FunctionDef) and (not m.name.startswith('_') or m.name == '__init__')]

@@ -32,6 +32,27 @@ Explore [specialist networks, independent verification, nested teams and resumab
 
 Channel delivery is server-managed. Set ordered channels, optional unanswered-request follow-ups, and Agent or Agent role overrides in [delivery preferences](docs/CHANNEL-ROUTING.md).
 
+## Install
+
+Install the engine, workspace, CLI and MCP server on macOS or Linux:
+
+```sh
+brew install beepgrid/tap/beepgrid
+beepgrid version
+```
+
+[Download a binary](https://github.com/beepgrid/beepgrid/releases) for macOS, Linux or Windows. The standard binary includes the workspace; `headless` archives omit the UI. PostgreSQL is required to host the engine. CLI and MCP clients can connect to an existing server without a local database.
+
+SDKs connect your existing agents to that server:
+
+```sh
+npm install @beepgrid/sdk               # TypeScript / JavaScript
+pip install beepgrid                    # Python, or: uv add beepgrid
+go get github.com/beepgrid/beepgrid/sdk/go@v0.1.0
+```
+
+Optional React embeds: `npm install @beepgrid/react @beepgrid/sdk react`. [Installation and hosting →](docs/PACKAGING.md)
+
 ## Try it locally
 
 You need **Docker Compose, Python 3.10+ and Go 1.26.10**. Go can download the toolchain specified in `go.mod`. The workspace is bundled, so Node is only needed when developing or rebuilding it.
@@ -59,7 +80,7 @@ With the playground running, save this as `first-chat.py` in the checkout and ru
 ```python
 from pathlib import Path
 from uuid import uuid4
-from notif import Client
+from beepgrid import Client
 
 token = Path(".local/owner-token")
 if token.stat().st_mode & 0o077:
@@ -80,7 +101,7 @@ print("Open this conversation in Messages:", chat["conversation_id"])
 
 Both messages appear in the same conversation, along with Builder's demo replies. This example uses the local owner identity. To connect your own runtime, use an individually issued worker credential and a [Go, Python or TypeScript starter](examples/README.md). Retain each operation's idempotency key when retrying an unknown result.
 
-Clients: [Go](sdk/go/notif) · [TypeScript](sdk/typescript) · [Python](sdk/python) · [React](sdk/react) · [CLI](docs/CLI.md) · [MCP](docs/LOCAL-MCP.md). Source package and command identifiers currently use `notif`; registry publication is separate from these source-checkout instructions.
+Clients: [Go](sdk/go) · [TypeScript](sdk/typescript) · [Python](sdk/python) · [React](sdk/react) · [CLI](docs/CLI.md) · [MCP](docs/LOCAL-MCP.md). The legacy `notif` CLI command, Go package name and Python import remain compatible.
 
 ## Fits your stack
 

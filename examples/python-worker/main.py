@@ -1,7 +1,7 @@
 """Use an existing worker credential, or explicitly enroll with NOTIF_AGENT_ID."""
 import os
 from pathlib import Path
-from notif import Client
+from beepgrid import Client
 
 token = os.environ.get("NOTIF_TOKEN", "")
 if os.environ.get("NOTIF_TOKEN_FILE"):

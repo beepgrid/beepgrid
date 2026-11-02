@@ -23,12 +23,12 @@ Run these from the OSS repository root:
 | Selection | Supported command | Import for custom code |
 | --- | --- | --- |
 | Go | `go run -buildvcs=false ./examples/go-worker` | `github.com/beepgrid/beepgrid/sdk/go/notif` |
-| Python | `PYTHONPATH=sdk/python python3 examples/python-worker/main.py` | `from notif import Client` |
-| TypeScript / Node | `npm --prefix sdk/typescript ci && npm --prefix sdk/typescript run build`, then `node examples/typescript-worker/main.mjs` | `import { Client } from '@notif/client'` in a packaged consumer |
+| Python | `PYTHONPATH=sdk/python python3 examples/python-worker/main.py` | `from beepgrid import Client` |
+| TypeScript / Node | `npm --prefix sdk/typescript ci && npm --prefix sdk/typescript run build`, then `node examples/typescript-worker/main.mjs` | `import { Client } from '@beepgrid/sdk'` in a packaged consumer |
 
 Custom code constructs `notif.New(url, workerToken)` in Go or `Client(url, workerToken)` in Python/TypeScript, then calls `Run`/`run` with its handler. The maintained TypeScript starter imports the built repository SDK by relative path. Python can alternatively install the local package with `python3 -m pip install ./sdk/python`.
 
-Package names `@notif/client`, `notif-client` and the Go repository path are development placeholders until the public release decision. These commands work from source. Do not show a registry install command as available before publication. Local packed artifacts and external consumers are separately checked by `scripts/sdk-package-check.py`.
+Package names `@beepgrid/sdk`, `beepgrid` and the Go repository path are development placeholders until the public release decision. These commands work from source. Do not show a registry install command as available before publication. Local packed artifacts and external consumers are separately checked by `scripts/sdk-package-check.py`.
 
 ## Local MCP host
 

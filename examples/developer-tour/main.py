@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import time
 import uuid
-from notif import Client, mention_context
+from beepgrid import Client, mention_context
 
 credential = Path(os.environ['NOTIF_TOKEN_FILE'])
 if credential.stat().st_mode & 0o077:

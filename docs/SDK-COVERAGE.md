@@ -19,7 +19,7 @@
 | Shared chat creation and initial mentions | StartChat | startChat | start_chat | JSON API / start_chat |
 | Membership edits, leave, history disclosure | ChangeChatMembership | changeChatMembership | change_chat_membership | JSON API / change_chat_membership |
 | Private draft and initial-message files | StageAttachment + AttachmentIDs | stageAttachment + attachment_ids | stage_attachment + attachment_ids | file-stage + JSON API / stage_attachment + send/ask/start_chat |
-| React Person embed | Same HTTP API | @notif/react request/conversation components | Same HTTP API | Same-origin HttpOnly Person session |
+| React Person embed | Same HTTP API | @beepgrid/react request/conversation components | Same HTTP API | Same-origin HttpOnly Person session |
 | Coordinator automatic or reviewed dispatch | Coordinate / plan + confirm | coordinate / plan + confirm | coordinate / plan + confirm | JSON API; no hosted runtime claim |
 | Approval redemption and reported execution | Redeem/ReportExecution | redeem/reportExecution | redeem/report_execution | JSON API / redeem_approval/report_execution |
 

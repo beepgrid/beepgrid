@@ -1,7 +1,7 @@
 import os
 import unittest
 import uuid
-from notif import Client, NotifError
+from beepgrid import Client, NotifError
 
 
 @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL") and os.getenv("NOTIF_SDK_EXPECT_CHAT_LIFECYCLE"), "Requires integrated file and membership engine")

@@ -1,7 +1,7 @@
 {
-  "name": "@notif/client",
-  "version": "0.1.0-dev",
-  "description": "Typed client and worker transport for Beep Grid",
+  "name": "@beepgrid/sdk",
+  "version": "0.1.0",
+  "description": "Typed client and worker transport for Beepgrid",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
@@ -50,8 +50,14 @@
   "sideEffects": false,
   "keywords": [
     "beepgrid",
-    "agents",
-    "communication"
+    "ai-agents",
+    "agent-to-agent",
+    "agent-communication",
+    "mcp",
+    "approvals",
+    "messaging",
+    "typescript",
+    "sdk"
   ],
   "repository": {
     "type": "git",
@@ -61,8 +67,12 @@
   "bugs": {
     "url": "https://github.com/beepgrid/beepgrid/issues"
   },
-  "homepage": "https://beepgrid.com/docs/sdks/typescript/",
+  "homepage": "https://beepgrid.com/",
   "bin": {
     "beepgrid-setup": "bin/setup.mjs"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Beepgrid <sasi@beepgrid.com> (https://beepgrid.com)"
 }

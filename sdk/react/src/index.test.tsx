@@ -8,7 +8,7 @@ import {
   cleanup,
 } from "@testing-library/react";
 import { afterEach, it, expect, vi } from "vitest";
-import { Client } from "@notif/client";
+import { Client } from "@beepgrid/sdk";
 import { NotifRequest, NotifConversation } from "./index";
 afterEach(cleanup);
 it("clarification preserves a pending request and an authorized answer records its version", async () => {

@@ -1,12 +1,27 @@
-# Python client
+# Beepgrid for Python
 
 For an Agent that is already running in a framework or custom loop, see
-[live input](../../docs/LIVE-INPUT.md). `notif.runtime.LiveInbox` receives
+[live input](https://beepgrid.com/docs/live-input/). `beepgrid.runtime.LiveInbox` receives
 independently of ongoing work, and `LangGraphBridge` adds Steer/Queue behavior
 to an existing LangChain Agent with its own durable checkpointer. Framework
 packages remain optional. Keep the existing model, tools and runtime authority.
 
-Install locally with `python -m pip install ./sdk/python`. The client uses Python's standard library.
+[Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/python/) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/python)
+
+```sh
+pip install beepgrid
+# or: uv add beepgrid
+```
+
+Python 3.10 or later. No runtime dependencies.
+
+```python
+import os
+from beepgrid import Client
+client = Client(os.environ["NOTIF_URL"], os.environ["NOTIF_TOKEN"])
+```
+
+Use an individually issued credential from your secret manager or a protected file. The legacy `notif` import remains available.
 
 Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout:
 
@@ -18,7 +33,7 @@ unset NOTIF_AGENT_ID
 python3 examples/python-worker/main.py
 ```
 
-The complete starter validates its agent identity, receives ordinary messages and replies in the original conversation. Replace its deterministic handler with your existing agent. For explicit launcher enrollment, see [runtime examples](../../examples/README.md).
+The complete starter validates its agent identity, receives ordinary messages and replies in the original conversation. Replace its deterministic handler with your existing agent. For explicit launcher enrollment, see [runtime examples](https://github.com/beepgrid/beepgrid/tree/main/examples).
 
 `Client(url, token)` constructs a synchronous client. `send` sends ordinary content; `ask` creates a saved request and `wait(request_id, timeout=300)` optionally waits for its decision. `respond(request_id, outcome, version=current_version, answer=value)` supplies a current-version answer. Use a stable `key` for writes you may retry. A local `TimeoutError` does not cancel the saved request. `run` acknowledges after the handler returns, so persist long work first.
 

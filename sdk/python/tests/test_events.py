@@ -2,8 +2,8 @@ import io
 import json
 import unittest
 from unittest.mock import patch
-from notif import Client, NotifError
-from notif.events import read_frames
+from beepgrid import Client, NotifError
+from beepgrid.events import read_frames
 
 
 def frame(n):
@@ -20,7 +20,7 @@ class EventTests(unittest.TestCase):
             if len(requests) == 1:
                 return Stream(frame(1) + b'id: 2\nevent: cursor\ndata: {}\n\nid: 3\ndata: {"partial":')
             return Stream(frame(1) + frame(3))
-        with patch("notif._open", side_effect=open_stream):
+        with patch("beepgrid._open", side_effect=open_stream):
             stream = Client("http://localhost", "fixture").events()
             self.assertEqual(next(stream)["sequence"], 1)
             self.assertEqual(next(stream)["sequence"], 3)
@@ -38,7 +38,7 @@ class EventTests(unittest.TestCase):
     def test_revocation_is_terminal(self):
         import urllib.error
         error = urllib.error.HTTPError("http://localhost", 403, "denied", {}, None)
-        with patch("notif._open", side_effect=error) as call:
+        with patch("beepgrid._open", side_effect=error) as call:
             with self.assertRaises(NotifError) as caught:
                 next(Client("http://localhost", "fixture").events())
             self.assertEqual(caught.exception.status, 403)

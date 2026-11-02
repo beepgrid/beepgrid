@@ -5,7 +5,7 @@ from langchain_core.outputs import ChatResult, ChatGeneration
 from langchain_core.messages import AIMessage
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
-from notif.runtime import LiveInbox, LangGraphBridge
+from beepgrid.runtime import LiveInbox, LangGraphBridge
 from pydantic import PrivateAttr
 
 

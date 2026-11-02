@@ -412,8 +412,8 @@ not two receivers for the same worker instance.
 
 ## Custom code
 
-TypeScript imports are available from `@notif/client/runtime`,
-`@notif/client/runtime/node` and `@notif/client/runtime/bindings` in a local packed
+TypeScript imports are available from `@beepgrid/sdk/runtime`,
+`@beepgrid/sdk/runtime/node` and `@beepgrid/sdk/runtime/bindings` in a local packed
 consumer. Source-checkout examples use relative imports.
 
 ```ts

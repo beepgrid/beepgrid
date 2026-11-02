@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 FROM golang:1.26.10-alpine AS go-source
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.mod go.sum go.work ./
+COPY sdk/go/go.mod ./sdk/go/go.mod
 RUN go mod download
 COPY . .
 RUN mkdir /data && chown 65532:65532 /data

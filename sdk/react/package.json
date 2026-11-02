@@ -1,7 +1,7 @@
 {
-  "name": "@notif/react",
-  "version": "0.1.0-dev",
-  "description": "Authenticated request and conversation components for Beep Grid",
+  "name": "@beepgrid/react",
+  "version": "0.1.0",
+  "description": "Authenticated request and conversation components for Beepgrid",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -24,11 +24,11 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@notif/client": ">=0.1.0-dev",
+    "@beepgrid/sdk": "^0.1.0",
     "react": ">=19"
   },
   "devDependencies": {
-    "@notif/client": "file:../typescript",
+    "@beepgrid/sdk": "file:../typescript",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "16.3.3",
     "@types/react": "^19.0.0",
@@ -45,8 +45,13 @@
   ],
   "keywords": [
     "beepgrid",
-    "agents",
-    "communication"
+    "ai-agents",
+    "agent-to-agent",
+    "agent-communication",
+    "mcp",
+    "approvals",
+    "messaging",
+    "react"
   ],
   "repository": {
     "type": "git",
@@ -56,5 +61,9 @@
   "bugs": {
     "url": "https://github.com/beepgrid/beepgrid/issues"
   },
-  "homepage": "https://beepgrid.com/docs/sdks/react/"
+  "homepage": "https://beepgrid.com/",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Beepgrid <sasi@beepgrid.com> (https://beepgrid.com)"
 }

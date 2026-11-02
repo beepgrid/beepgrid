@@ -12,7 +12,7 @@ import tempfile
 from urllib.parse import urlsplit
 import uuid
 
-from notif import Client
+from beepgrid import Client
 
 root = Path(__file__).resolve().parents[2]
 url = os.environ.get('NOTIF_URL', 'http://localhost:4010')

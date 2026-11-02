@@ -13,7 +13,7 @@ import sys
 
 root = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root/'sdk/python'))
-from notif import Client
+from beepgrid import Client
 
 with socket.socket() as probe:
     probe.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)

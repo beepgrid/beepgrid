@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
@@ -34,13 +33,7 @@ func startDiagnostics(ctx context.Context, s *engine.Store, address string) (fun
 	mux.HandleFunc("GET /debug/metrics", func(w http.ResponseWriter, r *http.Request) {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		var usage syscall.Rusage
-		_ = syscall.Getrusage(syscall.RUSAGE_SELF, &usage)
-		cpu := float64(usage.Utime.Sec+usage.Stime.Sec) + float64(usage.Utime.Usec+usage.Stime.Usec)/1e6
-		rss := usage.Maxrss
-		if runtime.GOOS != "darwin" {
-			rss *= 1024
-		}
+		cpu, rss := processUsage()
 		pool := s.Pool.Stat()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"cpu_seconds": cpu, "peak_rss_bytes": rss, "heap_alloc_bytes": m.HeapAlloc, "heap_inuse_bytes": m.HeapInuse, "heap_retained_bytes": m.HeapSys - m.HeapReleased, "total_alloc_bytes": m.TotalAlloc, "gc_count": m.NumGC, "gc_pause_ns": m.PauseTotalNs, "goroutines": runtime.NumGoroutine(), "pool_acquires": pool.AcquireCount(), "pool_wait_ns": pool.AcquireDuration().Nanoseconds(), "pool_connections": pool.TotalConns(), "pool_acquired": pool.AcquiredConns()})

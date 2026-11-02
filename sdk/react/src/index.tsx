@@ -4,7 +4,7 @@ import {
   type RequestItem,
   type Response,
   type Message,
-} from "@notif/client";
+} from "@beepgrid/sdk";
 export type { Client, RequestItem };
 // Browser integration uses the application's authenticated same-origin HttpOnly session.
 // Never pass an owner, enrollment or provider credential to a browser.

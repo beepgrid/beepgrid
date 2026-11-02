@@ -3,7 +3,7 @@ import os
 import unittest
 import uuid
 from unittest.mock import patch
-from notif import Client, NotifError
+from beepgrid import Client, NotifError
 
 
 class ClientTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class ClientTests(unittest.TestCase):
         worker.heartbeat()
 
     def test_rotation_is_not_retried_after_lost_response(self):
-        with patch("notif._open", side_effect=OSError("response lost")) as transport:
+        with patch("beepgrid._open", side_effect=OSError("response lost")) as transport:
             with self.assertRaises(OSError):
                 Client("http://localhost", "fixture").rotate_credential("key_fixture", version=1)
             self.assertEqual(transport.call_count, 1)
@@ -123,7 +123,7 @@ class ClientTests(unittest.TestCase):
         def transport(request, **kwargs):
             calls.append(request.get_header("Idempotency-key"))
             return Response(len(calls)==1)
-        with patch("notif._open", side_effect=transport):
+        with patch("beepgrid._open", side_effect=transport):
             self.assertEqual(Client("http://localhost","token").ask(target={"kind":"person","id":"p"},title="Continue?",key="saved-key")["id"],"request-1")
         self.assertEqual(calls,["saved-key","saved-key"])
 

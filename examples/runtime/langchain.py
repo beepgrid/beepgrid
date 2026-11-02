@@ -6,8 +6,8 @@ exports a helper rather than selecting a provider or installing a new runtime.
 
 import os
 from pathlib import Path
-from notif import Client
-from notif.runtime import LiveInbox, LangGraphBridge
+from beepgrid import Client
+from beepgrid.runtime import LiveInbox, LangGraphBridge
 
 
 def connect():
