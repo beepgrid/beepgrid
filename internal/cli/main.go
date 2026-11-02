@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -25,7 +26,17 @@ import (
 	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
-var Version = "0.2.2"
+var Version = "dev"
+
+func installedVersion() string {
+	if Version != "" && Version != "dev" {
+		return Version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return strings.TrimPrefix(info.Main.Version, "v")
+	}
+	return "dev"
+}
 
 func env(k, fallback string) string {
 	if v := os.Getenv(k); v != "" {
@@ -149,7 +160,7 @@ func run(args []string) error {
 		if err := parseCommandFlags(flag.NewFlagSet("version", flag.ContinueOnError), args[1:]); err != nil {
 			return err
 		}
-		fmt.Println("beepgrid " + Version)
+		fmt.Println("beepgrid " + installedVersion())
 		return nil
 	}
 	return usageError{fmt.Errorf("unknown command: %q", command)}
