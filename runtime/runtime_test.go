@@ -348,3 +348,39 @@ func TestReplicaStreamDrainReplaysCanonicalEvents(t *testing.T) {
 		t.Fatal("replay duplicated accepted work", err)
 	}
 }
+
+func TestAccessDeadlineCannotOverrideSecurityState(t *testing.T) {
+	s, _ := service(t)
+	ctx := context.Background()
+	token := engine.Secret()
+	if e := s.ProvisionWorkspace(ctx, "deadline_isolated", "Isolated", token); e != nil {
+		t.Fatal(e)
+	}
+	until := time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond)
+	if e := s.ApplyWorkspaceDeadline(ctx, "deadline_isolated", 1, until); e != nil {
+		t.Fatal(e)
+	}
+	if e := s.ApplyWorkspaceState(ctx, "deadline_isolated", 8, true); e != nil {
+		t.Fatal(e)
+	}
+	if e := s.ApplyWorkspaceDeadline(ctx, "deadline_isolated", 100, until.Add(time.Hour)); e != nil {
+		t.Fatal(e)
+	}
+	var suspended bool
+	var control, access int64
+	if e := s.store.Pool.QueryRow(ctx, `SELECT suspended,control_version,access_version FROM scopes WHERE id='deadline_isolated/production'`).Scan(&suspended, &control, &access); e != nil {
+		t.Fatal(e)
+	}
+	if !suspended || control != 8 || access != 100 {
+		t.Fatal("access grant changed operator security state", suspended, control, access)
+	}
+	if e := s.ApplyWorkspaceDeadline(ctx, "deadline_isolated", 99, until); e == nil {
+		t.Fatal("stale access grant accepted")
+	}
+	if e := s.ApplyWorkspaceDeadline(ctx, "deadline_isolated", 100, until); e == nil {
+		t.Fatal("conflicting equal access grant accepted")
+	}
+	if e := s.ApplyWorkspaceDeadline(ctx, "deadline_isolated", 100, until.Add(time.Hour)); e != nil {
+		t.Fatal("idempotent replay", e)
+	}
+}

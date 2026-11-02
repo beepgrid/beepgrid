@@ -140,6 +140,14 @@ func (s *Service) ApplyWorkspaceAccess(ctx context.Context, id string, version i
 	return s.store.ApplyWorkspaceAccess(ctx, id+"/production", version, suspended, until)
 }
 
+// ApplyWorkspaceDeadline grants access independently of operator security state.
+func (s *Service) ApplyWorkspaceDeadline(ctx context.Context, id string, version int64, until time.Time) error {
+	if !workspaceID.MatchString(id) || version < 1 {
+		return fmt.Errorf("invalid workspace access")
+	}
+	return s.store.ApplyWorkspaceDeadline(ctx, id+"/production", version, until)
+}
+
 // RunWorkers blocks until cancellation and joins its goroutines before returning.
 // All tenants share the query pool, listener and durable work selectors.
 func (s *Service) RunWorkers(ctx context.Context) {

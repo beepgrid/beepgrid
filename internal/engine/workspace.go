@@ -5,6 +5,47 @@ import (
 	"time"
 )
 
+// ApplyWorkspaceDeadline projects a versioned access grant without changing
+// operator suspension, recovery holds or their independent control revision.
+func (s *Store) ApplyWorkspaceDeadline(ctx context.Context, scope string, version int64, until time.Time) error {
+	if version < 1 {
+		return Bad("An explicit access version is required.")
+	}
+	tx, e := s.Pool.Begin(ctx)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback(ctx)
+	var current int64
+	var previous *time.Time
+	var erasure string
+	if e = tx.QueryRow(ctx, `SELECT access_version,access_until,erasure_operation FROM scopes WHERE id=$1 FOR UPDATE`, scope).Scan(&current, &previous, &erasure); e != nil {
+		return normalize(e)
+	}
+	if erasure != "" {
+		return Conflict("This workspace is reserved for erasure and cannot receive an access grant.")
+	}
+	var next *time.Time
+	if !until.IsZero() {
+		value := until.UTC().Truncate(time.Microsecond)
+		next = &value
+	}
+	same := previous == nil && next == nil || previous != nil && next != nil && previous.Equal(*next)
+	if version < current || version == current && !same {
+		return Conflict("A newer or conflicting access grant is already applied.")
+	}
+	if version == current {
+		return nil
+	}
+	if _, e = tx.Exec(ctx, `UPDATE scopes SET access_until=$2,access_version=$3 WHERE id=$1`, scope, next, version); e != nil {
+		return e
+	}
+	if e = event(ctx, tx, Actor{Scope: scope}, "workspace.access", "", "", map[string]any{"version": version, "access_until": next}); e != nil {
+		return e
+	}
+	return tx.Commit(ctx)
+}
+
 // ApplyWorkspaceState fences delayed operator requests independently of customer
 // credentials. It must only be exposed behind authenticated management access.
 func (s *Store) ApplyWorkspaceState(ctx context.Context, scope string, version int64, suspended bool) error {
