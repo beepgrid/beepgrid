@@ -26,6 +26,48 @@ Open `http://localhost:4010`. The local owner credential is saved in `.local/own
 
 The engine, CLI and local MCP share the `beepgrid` command. A source install is also available with `go install github.com/beepgrid/beepgrid/cmd/beepgrid@v0.2.0`.
 
+## Troubleshooting
+
+Startup errors explain the problem, suggest a next step and link to the relevant guide. No database or service is installed automatically. Use `beepgrid --json serve` when a script needs a structured startup error.
+
+### Database connection
+
+Use an existing PostgreSQL database by setting `BEEPGRID_DATABASE_URL` to its connection URL. Check the hostname, port, database name and credentials. PostgreSQL must be running before Beepgrid starts. The application database must already exist; local `--dev` mode creates and upgrades Beepgrid's schema inside it.
+
+For a new local Homebrew PostgreSQL installation:
+
+```sh
+brew install postgresql@17
+brew services start postgresql@17
+"$(brew --prefix postgresql@17)/bin/createdb" beepgrid
+export BEEPGRID_DATABASE_URL="postgres://$(whoami)@localhost:5432/beepgrid?sslmode=disable"
+beepgrid serve --dev
+```
+
+If PostgreSQL is already configured, use its existing connection settings instead. Other platforms can use the [PostgreSQL installation guide](https://www.postgresql.org/download/) or their existing database provider. Stopping Beepgrid does not stop a PostgreSQL service started through Homebrew.
+
+For production, initialize or upgrade the schema with `beepgrid migrate` using a deployment database credential. The serving credential can have restricted runtime permissions. A newer database schema needs a compatible newer Beepgrid executable; do not downgrade the database. See [operations](OPERATIONS.md#existing-postgresql).
+
+### Server configuration
+
+For local use, start with `beepgrid serve --dev`. It listens only on loopback and saves local credentials in the current directory. Hosting without `--dev` requires `BEEPGRID_BOOTSTRAP_TOKEN` and `BEEPGRID_SECRET_KEY`, as described in [operations](OPERATIONS.md#existing-postgresql). The encryption key must contain 64 hexadecimal characters. Keep the original key and credential files when reopening an existing database.
+
+`BEEPGRID_PUBLIC_URL` is an HTTP(S) origin such as `http://localhost:4010`, without a path, embedded credentials, query or fragment. Optional AI, Coordinator, profiling and OIDC configuration is not needed for a basic local server; configure these only when using those features.
+
+### Listen address
+
+If another process already uses the listen address, stop that process or choose another port. Keep the public URL consistent with the address users access:
+
+```sh
+BEEPGRID_ADDR=127.0.0.1:4020 BEEPGRID_PUBLIC_URL=http://localhost:4020 beepgrid serve --dev
+```
+
+Local development uses a loopback address. Public hosting needs production configuration. The optional `BEEPGRID_PROFILE_ADDR` also needs an available literal loopback address.
+
+### Local files
+
+Run local development from a directory where your account can read and write `.local`. This directory holds the owner token, encryption key and default attachment storage. Keep its contents private and preserve the original credentials for an existing workspace. Beepgrid does not overwrite an existing credential just to get past a setup error.
+
 ## Build targets
 
 | Target | Command | Output | Frontend required? |

@@ -1,8 +1,18 @@
 # Command-line and agent usage
 
-The same `beepgrid` executable is a server, an HTTP client and an MCP stdio adapter. Both workspace and headless builds include these commands. They require a running engine and PostgreSQL; the CLI never implements a second permission or persistence layer.
+The same `beepgrid` executable is a server, an HTTP client and an MCP stdio adapter. Both workspace and headless builds include these commands. A server requires PostgreSQL; CLI and MCP clients can connect to an existing engine without a local database. The CLI never implements a second permission or persistence layer.
 
-Run `beepgrid` or `beepgrid help` for command syntax and local setup guidance. Client flags precede positional arguments. Client JSON results go to stdout; client command errors are JSON on stderr. Server database connection/configuration failures print a short setup message on stderr and exit before the workspace starts. Exit codes are 0 success, 1 other failure, 2 invalid usage/input, 3 authentication/authorization failure and 4 interrupted/deadline-exceeded. Server worker logs remain ordinary operational logs. API conflict and validation details retain the server's error code and HTTP status.
+Run `beepgrid` or `beepgrid help` for command syntax and local setup guidance. Client flags precede positional arguments. Client JSON results go to stdout. Errors in a terminal explain the problem, suggest a next action and link to a guide. Client errors redirected or captured by a program retain JSON on stderr, including the existing error code, message, HTTP status and exit code, plus `hint` and `docs_url`. Put `--json` before the command to force structured errors, including server setup failures: `beepgrid --json serve` or `beepgrid --json list agents`. No interactive prompt or automatic retry is added. Exit codes are 0 success, 1 other failure, 2 invalid usage/input, 3 authentication/authorization failure and 4 interrupted/deadline-exceeded. Server worker logs remain ordinary operational logs. API conflict and validation details retain the server's error code and HTTP status.
+
+## Troubleshooting
+
+- To run a local engine, follow [server setup](PACKAGING.md#database-connection). A client connecting to an existing engine does not need local PostgreSQL.
+- Set `BEEPGRID_URL` to the server's HTTP(S) base URL and `BEEPGRID_TOKEN_FILE` to a readable credential file. Use a credential issued by that server; expired or revoked credentials must be renewed or replaced deliberately. Client commands do not inherit the local owner credential automatically.
+- For connection or TLS failures, check that the server is running, the URL is correct and the server's certificate is trusted. Beepgrid does not bypass certificate validation to make a command succeed.
+- For an authorization error, ask the workspace administrator for the required permission. Retrying cannot add access.
+- For invalid arguments or input, run `beepgrid COMMAND --help` or `beepgrid help`. Input files must contain one JSON value matching the documented command.
+- Check input/output file paths and read/write permissions. Existing output files are never overwritten; choose a new path when needed.
+- A timeout or interrupted client does not cancel a saved request. Check its current state before retrying. For an uncertain write, reuse the same stable operation key and identical input rather than creating a second operation.
 
 ## Authenticate without a browser
 

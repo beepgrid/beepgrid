@@ -34,27 +34,29 @@ func env(k, fallback string) string {
 	return fallback
 }
 func Main() {
-	if e := run(); e != nil {
-		writeCommandError(os.Stderr, e)
+	args := os.Args[1:]
+	forceJSON := len(args) > 0 && args[0] == "--json"
+	if forceJSON {
+		args = args[1:]
+	}
+	if e := run(args); e != nil && !errors.Is(e, flag.ErrHelp) {
+		writeCommandError(os.Stderr, e, forceJSON)
 		os.Exit(clientExitCode(e))
 	}
 }
-func run() error {
+func run(args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	if handled, err := runClientCommand(ctx, os.Args[1:], os.Stdin, os.Stdout); handled {
+	if handled, err := runClientCommand(ctx, args, os.Stdin, os.Stdout); handled {
 		return err
 	}
-	command := "serve"
-	if len(os.Args) > 1 {
-		command = os.Args[1]
-	}
+	command := args[0]
 	switch command {
 	case "reconcile":
 		f := flag.NewFlagSet("reconcile", flag.ContinueOnError)
 		restored := f.Bool("restored", false, "Freeze effects and rotate all credentials after database restore")
 		resume := f.Bool("resume", false, "Resume after external reconciliation; does not replay unknown work")
-		if e := f.Parse(os.Args[2:]); e != nil {
+		if e := parseCommandFlags(f, args[1:]); e != nil {
 			return e
 		}
 		if *restored == *resume {
@@ -92,17 +94,20 @@ func run() error {
 		fmt.Println("Recovery hold set. New owner credential file:", path)
 		return nil
 	case "migrate":
+		if err := parseCommandFlags(flag.NewFlagSet("migrate", flag.ContinueOnError), args[1:]); err != nil {
+			return err
+		}
 		return databaseStartupError(engine.Migrate(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid")))
 	case "seed":
-		return seed(ctx, os.Args[2:])
+		return seed(ctx, args[1:])
 	case "trace":
-		return trace(ctx, os.Args[2:])
+		return trace(ctx, args[1:])
 	case "serve":
-		return serve(ctx, os.Args[2:])
+		return serve(ctx, args[1:])
 	case "mcp":
 		flags := flag.NewFlagSet("mcp", flag.ContinueOnError)
 		liveInput := flags.Bool("live-input", false, "Use a separate live receiver; disable MCP inbox intake")
-		if err := flags.Parse(os.Args[2:]); err != nil {
+		if err := parseCommandFlags(flags, args[1:]); err != nil {
 			return err
 		}
 		c, err := clientFromEnv()
@@ -118,8 +123,11 @@ func run() error {
 		}
 		return mcp.ServeWithInput(ctx, c, os.Stdin, os.Stdout, *liveInput)
 	case "demo":
-		return demo(ctx, os.Args[2:])
+		return demo(ctx, args[1:])
 	case "diagnose":
+		if err := parseCommandFlags(flag.NewFlagSet("diagnose", flag.ContinueOnError), args[1:]); err != nil {
+			return err
+		}
 		c, e := operatorClient()
 		if e != nil {
 			return e
@@ -138,10 +146,13 @@ func run() error {
 		}
 		return nil
 	case "version", "--version":
+		if err := parseCommandFlags(flag.NewFlagSet("version", flag.ContinueOnError), args[1:]); err != nil {
+			return err
+		}
 		fmt.Println("beepgrid " + Version)
 		return nil
 	}
-	return fmt.Errorf("unknown command: %s", command)
+	return usageError{fmt.Errorf("unknown command: %q", command)}
 }
 func localSecret(path string, n int) (string, error) {
 	raw, e := os.ReadFile(path)
@@ -166,39 +177,39 @@ func serve(ctx context.Context, args []string) error {
 	f := flag.NewFlagSet("serve", flag.ContinueOnError)
 	dev := f.Bool("dev", false, "Generate local credentials and allow local provider connections; localhost only")
 	noUI := f.Bool("no-ui", false, "Disable workspace browser pages; keep the authenticated API and workers")
-	if e := f.Parse(args); e != nil {
+	if e := parseCommandFlags(f, args); e != nil {
 		return e
 	}
 	addr := env("BEEPGRID_ADDR", "127.0.0.1:4010")
 	public := env("BEEPGRID_PUBLIC_URL", "http://localhost:4010")
 	if e := httpapi.ValidatePublicURL(public); e != nil {
-		return e
+		return setupFailure(e, "The public server URL is invalid.", "Set BEEPGRID_PUBLIC_URL to an HTTP(S) origin, such as http://localhost:4010, without a path.", "PACKAGING.md#server-configuration")
 	}
 	token := os.Getenv("BEEPGRID_BOOTSTRAP_TOKEN")
 	key := os.Getenv("BEEPGRID_SECRET_KEY")
 	if *dev {
 		if !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
-			return fmt.Errorf("--dev requires a loopback listening address")
+			return setupFailure(usageError{fmt.Errorf("--dev requires a loopback listening address")}, "Local development mode needs a local listen address.", "Set BEEPGRID_ADDR to 127.0.0.1:4010. For public hosting, configure production credentials and run without --dev.", "PACKAGING.md#server-configuration")
 		}
 		var e error
 		if token == "" {
 			token, e = localSecret(".local/owner-token", 32)
 			if e != nil {
-				return e
+				return localFileStartupError(e)
 			}
 		}
 		if key == "" {
 			key, e = localSecret(".local/encryption-key", 32)
 			if e != nil {
-				return e
+				return localFileStartupError(e)
 			}
 		}
 	} else if token == "" || key == "" {
-		return fmt.Errorf("BEEPGRID_BOOTSTRAP_TOKEN and BEEPGRID_SECRET_KEY are required; use --dev for local setup")
+		return setupFailure(fmt.Errorf("server credentials are missing"), "Beepgrid needs its server credentials.", "For local use, run beepgrid serve --dev. For hosting, set BEEPGRID_BOOTSTRAP_TOKEN and BEEPGRID_SECRET_KEY.", "OPERATIONS.md#existing-postgresql")
 	}
 	decoded, e := hex.DecodeString(key)
 	if e != nil || len(decoded) != 32 {
-		return fmt.Errorf("BEEPGRID_SECRET_KEY must contain 64 hexadecimal characters")
+		return setupFailure(fmt.Errorf("invalid encryption key"), "The server encryption key is invalid.", "BEEPGRID_SECRET_KEY must contain 64 hexadecimal characters. Keep the original key when reopening an existing database.", "PACKAGING.md#server-configuration")
 	}
 	openStore := engine.OpenExisting
 	if *dev {
@@ -211,24 +222,24 @@ func serve(ctx context.Context, args []string) error {
 	defer store.Close()
 	stopDiagnostics, e := startDiagnostics(ctx, store, os.Getenv("BEEPGRID_PROFILE_ADDR"))
 	if e != nil {
-		return e
+		return setupFailure(e, "The optional diagnostics listener could not start.", "Use an available literal loopback address in BEEPGRID_PROFILE_ADDR, or unset it to disable profiling.", "OPERATIONS.md#local-profiling-and-load-qualification")
 	}
 	defer stopDiagnostics()
 	store.AllowLocal = *dev
 	store.AttachmentsRoot = env("BEEPGRID_ATTACHMENTS_DIR", ".local/attachments")
 	aiConfig, e := aimodel.FromEnv(os.Getenv)
 	if e != nil {
-		return e
+		return setupFailure(e, "The optional AI configuration is invalid.", "Check BEEPGRID_AI_* settings, or unset them if model assistance is not needed.", "ASSISTANCE.md")
 	}
 	if e = store.ConfigureAI(ctx, aiConfig); e != nil {
-		return e
+		return setupFailure(e, "The optional AI provider could not be configured.", "Check the BEEPGRID_AI_* provider, model, endpoint and credential settings.", "ASSISTANCE.md")
 	}
 	if e = store.ConfigureOverseer(ctx, os.Getenv("BEEPGRID_OVERSEER_URL"), os.Getenv("BEEPGRID_OVERSEER_TOKEN")); e != nil {
-		return e
+		return setupFailure(e, "The optional Coordinator endpoint could not be configured.", "Check BEEPGRID_OVERSEER_URL and BEEPGRID_OVERSEER_TOKEN, or unset them if unused.", "ASSISTANCE.md")
 	}
 	owner, e := store.Bootstrap(ctx, env("BEEPGRID_WORKSPACE", "local")+"/"+env("BEEPGRID_ENVIRONMENT", "development"), env("BEEPGRID_COMPANY", "Local workspace"), env("BEEPGRID_ENVIRONMENT", "development"), token)
 	if e != nil {
-		return e
+		return setupFailure(e, "The workspace could not be opened.", "Check the database permissions and server credentials for this workspace.", "OPERATIONS.md#existing-postgresql")
 	}
 	_ = owner
 	var ui http.Handler
@@ -237,9 +248,14 @@ func serve(ctx context.Context, args []string) error {
 	}
 	handler := httpapi.New(store, public, ui)
 	if e = handler.ConfigureOIDC(ctx, owner.Scope, os.Getenv("BEEPGRID_OIDC_ISSUER"), os.Getenv("BEEPGRID_OIDC_CLIENT_ID"), os.Getenv("BEEPGRID_OIDC_CLIENT_SECRET")); e != nil {
-		return e
+		return setupFailure(e, "The sign-in provider could not be configured.", "Check the BEEPGRID_OIDC_* settings and that the issuer is reachable.", "OPERATIONS.md#credentials-and-accounts")
 	}
 	server := &http.Server{Addr: addr, Handler: handler, BaseContext: func(net.Listener) context.Context { return ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
+	listener, e := net.Listen("tcp", addr)
+	if e != nil {
+		return listenStartupError(e, "BEEPGRID_ADDR")
+	}
+	defer listener.Close()
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	defer stopWorker()
 	go store.RunCoordinatorSummaries(workerCtx)
@@ -272,7 +288,7 @@ func serve(ctx context.Context, args []string) error {
 		if *dev {
 			slog.Info("Local owner credential file", "path", ".local/owner-token")
 		}
-		failures <- server.ListenAndServe()
+		failures <- server.Serve(listener)
 	}()
 	select {
 	case <-ctx.Done():
@@ -291,7 +307,7 @@ func demo(ctx context.Context, args []string) error {
 	f := flag.NewFlagSet("demo", flag.ContinueOnError)
 	name := f.String("name", "scout", "Agent name")
 	ask := f.Bool("ask", false, "Ask the owner a sample question")
-	if e := f.Parse(args); e != nil {
+	if e := parseCommandFlags(f, args); e != nil {
 		return e
 	}
 	token := os.Getenv("BEEPGRID_TOKEN")

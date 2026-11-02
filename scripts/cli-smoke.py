@@ -47,6 +47,81 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
     }
     environment.pop('BEEPGRID_TOKEN', None)
 
+    def startup_checks(binary):
+        # All cases use this disposable database and private temporary files.
+        # The already-running fixture also proves that an occupied port is left alone.
+        with socket.socket() as unavailable:
+            unavailable.bind(('127.0.0.1', 0))
+            unavailable_url = f'postgres://fixture:private_password@127.0.0.1:{unavailable.getsockname()[1]}/beepgrid?sslmode=disable&connect_timeout=1'
+            cases = [
+                (['serve'], {'BEEPGRID_BOOTSTRAP_TOKEN': '', 'BEEPGRID_SECRET_KEY': ''}, {1}, 'server credentials'),
+                (['serve'], {'BEEPGRID_SECRET_KEY': 'private_invalid_key'}, {1}, 'encryption key'),
+                (['serve', '--dev'], {'BEEPGRID_ADDR': '0.0.0.0:4010'}, {2}, 'local listen address'),
+                (['serve'], {'BEEPGRID_PUBLIC_URL': 'https://private_user:private_password@example.com/path'}, {1}, 'public server URL'),
+                (['serve'], {'BEEPGRID_DATABASE_URL': unavailable_url}, {1, 4}, 'connect to PostgreSQL'),
+                (['migrate'], {'BEEPGRID_DATABASE_URL': 'postgres://private_user:private_password@localhost:invalid/db'}, {1}, 'BEEPGRID_DATABASE_URL'),
+                (['serve'], {'BEEPGRID_SCHEMA': 'cli_empty_' + secrets.token_hex(6)}, {1}, 'not initialized'),
+                (['serve'], {}, {1}, 'already in use'),
+                (['serve'], {'BEEPGRID_AI_ALLOW_PRIVATE': 'not-a-boolean'}, {1}, 'AI configuration'),
+                (['serve'], {'BEEPGRID_AI_PROVIDER': 'invalid', 'BEEPGRID_AI_MODEL': 'fixture'}, {1}, 'AI provider'),
+                (['serve'], {'BEEPGRID_PROFILE_ADDR': '0.0.0.0:6060'}, {1}, 'diagnostics listener'),
+                (['serve'], {'BEEPGRID_OIDC_ISSUER': 'http://example.invalid'}, {1}, 'sign-in provider'),
+                (['serve'], {'BEEPGRID_OVERSEER_URL': 'not-a-url'}, {1}, 'Coordinator endpoint'),
+                (['serve', '--help'], {}, {0}, 'Usage: beepgrid serve'),
+                (['mcp', '--help'], {}, {0}, 'Usage: beepgrid mcp'),
+                (['migrate', '--help'], {}, {0}, 'Usage: beepgrid migrate'),
+                (['trace', '--help'], {}, {0}, 'Usage: beepgrid trace'),
+                (['serve', '--invalid-option'], {}, {2}, 'flag provided but not defined'),
+                (['migrate', '--invalid-option'], {}, {2}, 'flag provided but not defined'),
+                (['--json', 'serve'], {'BEEPGRID_BOOTSTRAP_TOKEN': '', 'BEEPGRID_SECRET_KEY': ''}, {1}, 'server credentials'),
+                (['list', 'agents'], {'BEEPGRID_TOKEN_FILE': '', 'BEEPGRID_TOKEN': ''}, {2}, 'BEEPGRID_TOKEN_FILE'),
+                (['list', 'agents'], {'BEEPGRID_URL': 'https://private_user:private_password@example.com'}, {2}, 'BEEPGRID_URL'),
+            ]
+            for args, changes, expected, marker in cases:
+                with tempfile.TemporaryDirectory(dir=directory) as cwd:
+                    result = subprocess.run([str(binary), *args], cwd=cwd, env={**environment, **changes}, text=True, capture_output=True, timeout=12)
+                    text = result.stdout if result.returncode == 0 else result.stderr
+                    assert result.returncode in expected and marker in text, (args, result.returncode, text)
+                    for private in (token, 'private_user', 'private_password', 'private_invalid_key'):
+                        assert private not in text, 'Private configuration appeared in an error'
+                    assert 'panic:' not in text and 'Beep Grid ready' not in text
+                    if result.returncode == 0:
+                        assert not result.stderr and not (Path(cwd) / '.local').exists()
+                    elif text.startswith('{'):
+                        error = json.loads(text)
+                        assert error['exit_code'] == result.returncode and error['hint'] and error['docs_url'].startswith('https://')
+                    else:
+                        assert len(text.strip().splitlines()) == 3 and 'Guide: https://' in text
+                    with urllib.request.urlopen(url+'/readyz', timeout=2) as response:
+                        assert response.status == 200, 'Startup failure disturbed the running fixture'
+
+        if os.name != 'nt':
+            import pty
+            for force_json in (False, True):
+                args = (['--json'] if force_json else []) + ['list', 'agents']
+                pid, master = pty.fork()
+                if pid == 0:
+                    os.chdir(directory)
+                    os.execve(str(binary), [str(binary), *args], {**environment, 'BEEPGRID_TOKEN_FILE': '', 'BEEPGRID_TOKEN': ''})
+                try:
+                    chunks = []
+                    while True:
+                        try:
+                            chunk = os.read(master, 4096)
+                            if not chunk: break
+                            chunks.append(chunk)
+                        except OSError:
+                            break
+                    text = b''.join(chunks).decode()
+                    _, status = os.waitpid(pid, 0)
+                    assert os.waitstatus_to_exitcode(status) == 2
+                    if force_json:
+                        assert json.loads(text)['exit_code'] == 2
+                    else:
+                        assert not text.startswith('{') and len(text.strip().splitlines()) == 3 and 'Guide:' in text
+                finally:
+                    os.close(master)
+
     def cli(args, body=None, credential=owner, expected=0, binary=headless):
         env = {**environment, 'BEEPGRID_TOKEN_FILE': str(credential)}
         result = subprocess.run([str(binary), *args], input=None if body is None else json.dumps(body),
@@ -91,6 +166,8 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
         try:
             subprocess.run([str(headless), 'migrate'], env=environment, cwd=directory, check=True, capture_output=True)
             start(headless)
+            startup_checks(headless)
+            startup_checks(workspace)
             browser_status(404)
             me = cli(['api', 'GET', '/api/v1/me'])
             person = me['person']['id']

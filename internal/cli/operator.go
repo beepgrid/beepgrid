@@ -15,14 +15,14 @@ func operatorClient() (*beepgrid.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return beepgrid.New(env("BEEPGRID_URL", "http://localhost:4010"), token), nil
+	return cliClient(token)
 }
 func seed(ctx context.Context, args []string) error {
 	f := flag.NewFlagSet("seed", flag.ContinueOnError)
 	prefix := f.String("prefix", "examples/", "Allowed agent namespace")
 	name := f.String("name", "Local launcher", "Software service name")
 	out := f.String("out", ".local/launcher-token", "New 0600 credential file, never overwritten")
-	if e := f.Parse(args); e != nil {
+	if e := parseCommandFlags(f, args); e != nil {
 		return e
 	}
 	if e := os.MkdirAll(filepath.Dir(*out), 0700); e != nil {
@@ -45,7 +45,7 @@ func seed(ctx context.Context, args []string) error {
 	}
 	var me struct {
 		Person beepgrid.Person `json:"person"`
-		Admin  bool         `json:"admin"`
+		Admin  bool            `json:"admin"`
 	}
 	if e = c.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
 		return e
@@ -125,8 +125,12 @@ func seed(ctx context.Context, args []string) error {
 	return nil
 }
 func trace(ctx context.Context, args []string) error {
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		fmt.Println("Usage: beepgrid trace REQUEST_ID")
+		return nil
+	}
 	if len(args) != 1 {
-		return fmt.Errorf("usage: beepgrid trace REQUEST_ID")
+		return usageError{fmt.Errorf("usage: beepgrid trace REQUEST_ID")}
 	}
 	c, e := operatorClient()
 	if e != nil {

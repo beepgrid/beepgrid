@@ -26,6 +26,7 @@ Setup: https://github.com/beepgrid/beepgrid/blob/main/docs/PACKAGING.md
 CLI and MCP clients can use an existing server without local PostgreSQL.
 
 Server: serve [--dev] [--no-ui], migrate, reconcile, seed, diagnose
+Global option: --json before the command keeps errors structured, including in a terminal.
 Clients (flags before positional arguments):
   send [--input file|-] [--key KEY] agent|person|group ID MESSAGE
   ask|approve|task --input file|- [--key KEY]
@@ -90,7 +91,16 @@ func clientFromEnv() (*beepgrid.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := beepgrid.New(env("BEEPGRID_URL", "http://localhost:4010"), token)
+	return cliClient(token)
+}
+
+func cliClient(token string) (*beepgrid.Client, error) {
+	base := env("BEEPGRID_URL", "http://localhost:4010")
+	u, err := url.Parse(base)
+	if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return nil, usageError{fmt.Errorf("BEEPGRID_URL must be an HTTP(S) server URL without credentials, query or fragment")}
+	}
+	c := beepgrid.New(base, token)
 	// Bearer credentials must never follow a redirect to another server.
 	c.HTTP.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return c, nil
