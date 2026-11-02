@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Reviewed release tag (for example v0.2.2)
+        description: Reviewed release tag (for example v0.2.3)
         required: true
 permissions:
   contents: read

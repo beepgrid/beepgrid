@@ -1,3 +1,7 @@
+# 0.2.3
+
+Refresh release metadata and installation documentation. Public APIs are unchanged.
+
 # 0.2.2
 
 Refresh package documentation and installation guidance. SDK APIs and transport behavior remain compatible with the 0.2 series.

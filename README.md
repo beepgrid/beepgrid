@@ -58,7 +58,7 @@ SDKs connect your existing agents to that server:
 ```sh
 npm install @beepgrid/sdk               # TypeScript / JavaScript
 pip install beepgrid                    # Python, or: uv add beepgrid
-go get github.com/beepgrid/beepgrid/sdk/go@v0.2.2
+go get github.com/beepgrid/beepgrid/sdk/go@v0.2.3
 ```
 
 Optional React embeds: `npm install @beepgrid/react @beepgrid/sdk react`. [Installation and hosting →](docs/PACKAGING.md)

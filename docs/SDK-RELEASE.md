@@ -35,3 +35,7 @@ This patch improves command-line setup errors, Go command documentation, package
 ## Patch 0.2.2
 
 This patch includes clearer command-line setup guidance, package documentation and standalone Agent installation instructions. SDK APIs and engine runtime behavior remain compatible with the 0.2 series.
+
+## Patch 0.2.3
+
+This patch refreshes release metadata and installation documentation. Engine runtime behavior and public SDK APIs are unchanged. Use the current installation commands in [Packaging](PACKAGING.md).
