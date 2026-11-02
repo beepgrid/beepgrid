@@ -76,6 +76,9 @@ func TestRestrictedTokenHTTPAndCredentialLifecycle(t *testing.T) {
 	if e = reader.Do(ctx, "GET", "/api/v1/me", nil, nil, ""); e != nil {
 		t.Fatal("overlap did not allow switch", e)
 	}
+	if e = admin.Do(ctx, "POST", "/api/v1/credentials/"+meta.ID+"/revoke", nil, nil, ""); e != nil {
+		t.Fatal("legacy bodyless revocation failed", e)
+	}
 	if e = admin.RevokeCredential(ctx, meta.ID, false); e != nil {
 		t.Fatal(e)
 	}

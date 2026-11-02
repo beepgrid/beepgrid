@@ -109,6 +109,7 @@ add('POST','/api/v1/people/{id}/delivery-preferences',ref('DeliveryPreferences')
 add('GET','/api/v1/credentials',result=array(ref('Credential')))
 add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','enrollment']},'prefix':S,'name':S,'expires_at':{'type':'string','format':'date-time'},'permissions':array({'enum':['read','message','request','respond','execute','manage']})},['principal_id','kind']),ref('IssuedCredential'))
 add('POST','/api/v1/credentials/{id}/revoke',obj({'revoke_workers':{'type':'boolean','default':False}}))
+paths['/api/v1/credentials/{id}/revoke']['post']['requestBody']['required']=False
 add('POST','/api/v1/credentials/{id}/edit',obj({'version':{'type':'integer'},'name':S,'expires_at':{'type':'string','format':'date-time'},'permissions':array(S),'clear_permissions':{'type':'boolean'}},['version']),ref('Credential'))
 add('POST','/api/v1/credentials/{id}/rotate',obj({'version':{'type':'integer'},'overlap_seconds':{'type':'integer','minimum':0,'maximum':86400,'default':3600}},['version']),ref('CredentialReplacement'))
 add('POST','/api/v1/credentials/self/renew',obj({}),ref('Credential'))

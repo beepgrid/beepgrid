@@ -270,8 +270,11 @@ func (s *Server) routes() {
 		var in struct {
 			RevokeWorkers bool `json:"revoke_workers"`
 		}
-		if e := decode(r, &in); e != nil {
-			return e
+		// Existing clients revoke without a body. Cascading is explicitly opt-in.
+		if r.ContentLength != 0 {
+			if e := decode(r, &in); e != nil {
+				return e
+			}
 		}
 		return ok(w, map[string]bool{"revoked": true}, s.Store.Revoke(r.Context(), actor(r), r.PathValue("id"), in.RevokeWorkers))
 	}))
