@@ -24,7 +24,7 @@ beepgrid serve --dev
 
 Open `http://localhost:4010`. The local owner credential is saved in `.local/owner-token` in your working directory. Keep it private. `--dev` is loopback-only. Production requires explicit credentials, encryption configuration and migrations, as described in [operations](OPERATIONS.md).
 
-The engine, CLI and local MCP share the `beepgrid` command. A source install is also available with `go install github.com/beepgrid/beepgrid/cmd/beepgrid@v0.2.3`.
+The engine, CLI and local MCP share the `beepgrid` command. A source install is also available with `go install github.com/beepgrid/beepgrid/cmd/beepgrid@latest`.
 
 ## Troubleshooting
 
