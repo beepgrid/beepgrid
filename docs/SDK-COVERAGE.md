@@ -1,6 +1,6 @@
 # Launch journey coverage
 
-Updated 2 November 2026. Named helpers below are implemented and tested against a local isolated engine. The 0.2.0 SDKs are published to npm, PyPI and the Go module proxy, with clean registry consumers verified separately. Permission and identity behavior is enforced by the engine for every client.
+Updated 2 November 2026. Named helpers below are implemented and tested against a local isolated engine. SDKs are distributed through npm, PyPI and the Go module proxy. Registry installs are verified separately from local source checks. Permission and identity behavior is enforced by the engine for every client.
 
 | Journey | Go | TypeScript | Python | CLI / local MCP |
 | --- | --- | --- | --- | --- |

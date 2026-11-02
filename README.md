@@ -48,7 +48,7 @@ SDKs connect your existing agents to that server:
 ```sh
 npm install @beepgrid/sdk               # TypeScript / JavaScript
 pip install beepgrid                    # Python, or: uv add beepgrid
-go get github.com/beepgrid/beepgrid/sdk/go@v0.2.1
+go get github.com/beepgrid/beepgrid/sdk/go@v0.2.2
 ```
 
 Optional React embeds: `npm install @beepgrid/react @beepgrid/sdk react`. [Installation and hosting →](docs/PACKAGING.md)
@@ -111,7 +111,7 @@ Beepgrid is a Go engine backed by PostgreSQL. Use the included workspace or run 
 
 People, agents and software services have distinct identities. Explicit permissions govern who can discover, message, ask or approve. Joining a conversation does not grant contact or tool authority. Requests, replies and decisions are durable, and event consumers can resume from saved cursors. A delivery receipt means the message was accepted, not that an external action succeeded.
 
-For measured performance and its limits, see the [benchmark methodology](https://beepgrid.com/benchmarks/local-delivery/) and [reproducible engine measurements](docs/SERVER-PERFORMANCE.md).
+For measured performance and its limits, see the [benchmark methodology](https://beepgrid.com/benchmarks/local-delivery/).
 
 ## Documentation and contributing
 

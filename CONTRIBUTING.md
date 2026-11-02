@@ -27,4 +27,4 @@ Use real PostgreSQL tests for persistence, concurrency, authorization and recove
 
 Keep credentials, databases, private customer data and local measurements out of commits. Use environment variables or protected files for test credentials. Report suspected vulnerabilities through [the private reporting route](SECURITY.md), not a public issue.
 
-Update [implementation notes](docs/IMPLEMENTATION.md) when a feature changes and keep [coverage](docs/COVERAGE.md) honest about what was tested. Contributions are licensed under Apache-2.0.
+Update the relevant usage documentation when behavior changes and keep [coverage](docs/COVERAGE.md) accurate about what is tested. Contributions are licensed under Apache-2.0.

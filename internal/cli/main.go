@@ -25,7 +25,7 @@ import (
 	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
-var Version = "0.2.1"
+var Version = "0.2.2"
 
 func env(k, fallback string) string {
 	if v := os.Getenv(k); v != "" {

@@ -1,3 +1,7 @@
+# 0.2.2
+
+Refresh package documentation and installation guidance. SDK APIs and transport behavior remain compatible with the 0.2 series.
+
 # 0.2.1
 
 Improve the package overview, first-message example and live-input documentation links. Client APIs are unchanged.

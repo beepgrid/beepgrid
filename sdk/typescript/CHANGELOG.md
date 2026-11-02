@@ -1,3 +1,7 @@
+# 0.2.2
+
+Refresh package documentation and installation guidance. SDK APIs and transport behavior remain compatible with the 0.2 series.
+
 # 0.2.1
 
 Improve published setup guidance, direct registry and integration links, and concise setup-command errors. Runtime and wire behavior are unchanged.

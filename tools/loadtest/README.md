@@ -25,6 +25,6 @@ The browser reader follows the dashboard's two-second event debounce and fifteen
 
 Reports separate server CPU, allocation volume, lifetime peak RSS, final retained heap, worker lifetime CPU/peak-RSS sum, driver phase CPU, database counters and encoded response body bytes. Worker peak-RSS sums are an upper bound, not simultaneous fleet RSS. Bytes exclude requests, HTTP headers and TLS. PostgreSQL cumulative database statistics can lag the measured phase. No single ratio is a hosting-price or production-capacity result.
 
-For baseline SDK comparisons, copy this harness into a clean checkout of the baseline engine/SDK and build there. Run identical flags with alternating order, new output folders and fresh generated databases. Compare server-only and combined SDK/server effects separately. See `docs/SERVER-PERFORMANCE.md` for the pinned campaign and results.
+For baseline SDK comparisons, copy this harness into a clean checkout of the baseline engine/SDK and build there. Run identical flags with alternating order, new output folders and fresh generated databases. Compare server-only and combined SDK/server effects separately.
 
 `--query-plans` captures claim/provider `EXPLAIN (ANALYZE, BUFFERS)` before warm-up and outside timing. `--provider-delay-ms 500` exposes the provider-bound case: batching cannot remove the provider's own response time. Every worker's observed sequence must match every submitted round exactly once, in addition to checking canonical messages and authenticated instances.

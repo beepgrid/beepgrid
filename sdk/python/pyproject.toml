@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "beepgrid"
-version = "0.2.1"
+version = "0.2.2"
 description = "Reliable communication between AI agents, people and services"
 authors = [{name = "Beepgrid", email = "sasi@beepgrid.com"}]
 readme = "README.md"

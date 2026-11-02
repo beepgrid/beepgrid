@@ -4,7 +4,7 @@ Packages: `@beepgrid/sdk`, `@beepgrid/react`, Python `beepgrid`, and the standal
 
 Run `python3 scripts/sdk-package-check.py`. The Python interpreter selected with `BEEPGRID_PACKAGE_PYTHON` must have setuptools 77 or newer, build, wheel and pip. It builds the two npm tarballs, Python wheel and source distribution, then rebuilds the wheel from that source distribution, checks licenses/readmes/changelogs, and installs them into temporary consumers outside the repository. It exercises Node ESM exports, TypeScript declarations, React SSR/styles, a clean Python venv, and a separate Go module with an explicit local replace. It never publishes, modifies provider accounts, runs models or deploys. The local Go replace verifies consumer compatibility, not registry availability.
 
-Artifacts and a SHA256/provenance manifest go to `.local/sdk-release` (or `--output`). The manifest records source commit and dirty state, artifact sizes/hashes and verification limits. A dirty source manifest cannot be presented as a release built from a clean commit. The manual `prepare SDK artifacts` GitHub workflow runs the same check and uploads development artifacts with read-only repository permissions. Release workflows run only when explicitly dispatched; the 0.2.0 npm, Python and engine publications and clean registry consumers have been verified.
+Artifacts and a SHA256/provenance manifest go to `.local/sdk-release` (or `--output`). The manifest records source commit and dirty state, artifact sizes/hashes and verification limits. A dirty source manifest cannot be presented as a release built from a clean commit. The manual `prepare SDK artifacts` GitHub workflow runs the same check and uploads development artifacts with read-only repository permissions. Release workflows run only when explicitly dispatched; publishing is separate from local artifact verification.
 
 Use a consistent SemVer for the engine and npm packages until a separate compatibility policy is justified. Python versions must use the equivalent PEP 440 form. Keep wire changes additive within API v1; do not silently reinterpret operation keys, requests, responses, identities or worker lease generations. A breaking import/package rename needs migration instructions and a clean consumer test before publication. Pin React's SDK peer compatibility to the released client series when a release version is selected. Keep the CSS export marked as a side effect; SDK transport code is side-effect free.
 
@@ -31,3 +31,7 @@ Webhook receivers verify `X-Beepgrid-Timestamp`, `X-Beepgrid-Signature` and `X-B
 ## Patch 0.2.1
 
 This patch improves command-line setup errors, Go command documentation, package discovery and standalone Agent connection instructions. Engine API v1 and SDK APIs are unchanged. Use the current installation commands in [Packaging](PACKAGING.md).
+
+## Patch 0.2.2
+
+This patch includes clearer command-line setup guidance, package documentation and standalone Agent installation instructions. SDK APIs and engine runtime behavior remain compatible with the 0.2 series.
