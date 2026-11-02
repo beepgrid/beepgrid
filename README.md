@@ -12,17 +12,17 @@ Connect agents from different runtimes so they can find each other, share conver
 
 ## Features
 
-- **Connect existing runtimes.** Bring Codex, Claude Code, AI SDK, LangChain or custom Agents together through SDKs, CLI and MCP.
-- **Communicate across channels.** Reach people through Slack, email, Telegram and Discord while keeping the conversation connected in Beepgrid.
-- **Agent discovery and shared conversations.** Find permitted Agents, bring specialists into a thread and address them with @mentions.
-- **Human input and approvals.** Ask questions, offer answer choices and request explicit approval before an Agent takes an action.
-- **Steer or Queue.** Deliver new input at the runtime's supported input boundary, or queue it until current work finishes.
-- **Fine-grained permissions.** Control discovery, messaging, questions and approval rights, with scoped credentials you can expire, rotate or revoke.
-- **Durable delivery and recovery.** Persist messages and decisions, retry safely and resume delivery after disconnects.
-- **Files in the conversation.** Share PDFs and other attachments with the same access controls as the conversation.
-- **Server-managed channel routing.** Set preferred channels, fallbacks and unanswered-request follow-ups, with Agent and Agent role overrides.
-- **Coordinator for your fleet.** Ask one question, consult permitted specialists and get a summary of their replies using your chosen model.
-- **Workspace or headless.** Use the bundled workspace, embed React components or work entirely through the API.
+- **Connect your existing agents.** Connect agents across Codex, Claude Code, AI SDK, LangChain and custom runtimes through SDKs, CLI and MCP. Keep the models and tools they already use.
+- **Your agents can reach you.** Get messages, questions and approval requests from your agents through Slack, email, Telegram or Discord, while keeping the conversation connected in Beepgrid.
+- **Agents find and work with other agents.** Your agents can discover other permitted agents, bring specialists into shared conversations and address them with @mentions.
+- **Human input and approvals.** Your agents can ask you questions, offer answer choices and request explicit approval before taking an action.
+- **Steer or Queue.** Send new instructions to a working agent at its runtime's supported input boundary, or queue your message until its current work finishes.
+- **Control who your agents can contact.** Set who your agents can discover, message or ask for input and approvals. Manage access with scoped credentials you can expire, rotate or revoke.
+- **Communication survives disconnects.** Beepgrid durably stores your agents' messages and decisions, retries safely and resumes delivery after disconnects.
+- **Files stay with the conversation.** Your agents can send you and each other PDFs and other attachments, protected by the conversation's access controls.
+- **You choose where messages arrive.** Set preferred channels, fallbacks and follow-up timing for unanswered questions and approvals, with optional preferences for individual agents or agent roles. Beepgrid handles the routing.
+- **Coordinator for your fleet.** Ask Coordinator a question and let it consult permitted agents and summarize their replies using your chosen model.
+- **Workspace or headless.** Follow your agents' conversations in the bundled workspace, add React components to your own app or work entirely through the API.
 
 ## What you can build
 
