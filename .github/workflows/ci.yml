@@ -1,0 +1,39 @@
+name: verify
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: beepgrid
+          POSTGRES_PASSWORD: beepgrid
+          POSTGRES_DB: beepgrid
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U beepgrid"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      BEEPGRID_TEST_DATABASE_URL: postgres://beepgrid:beepgrid@localhost:5432/beepgrid?sslmode=disable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.26.10'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: make verify
+      - run: python3 scripts/recovery-drill.py
+        env:
+          BEEPGRID_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      - run: docker build -t beepgrid:ci .
+      - run: BEEPGRID_TEST_IMAGE=beepgrid:ci python3 scripts/container-smoke.py
+      - run: docker build --target headless -t beepgrid:ci-headless .
+      - run: BEEPGRID_TEST_IMAGE=beepgrid:ci-headless BEEPGRID_TEST_HEADLESS=1 python3 scripts/container-smoke.py

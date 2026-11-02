@@ -1,0 +1,3555 @@
+[
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Target",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Target = {\n  kind: \"person\" | \"agent\" | \"service\" | \"group\" | \"instance\";\n  id: string;\n};",
+    "fields": [
+      {
+        "name": "kind",
+        "type": "\"person\" | \"agent\" | \"service\" | \"group\" | \"instance\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Person",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Person = {\n  id: string;\n  name: string;\n  external_id: string;\n  metadata: Record<string, unknown>;\n};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "external_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "metadata",
+        "type": "Record<string, unknown>",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Agent",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Agent = {\n  id: string;\n  name: string;\n  external_id: string;\n  metadata: Record<string, unknown>;\n};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "external_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "metadata",
+        "type": "Record<string, unknown>",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Action",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Action = {\n  name: string;\n  executor_id: string;\n  resource: string;\n  resource_version: string;\n  arguments: Record<string, unknown>;\n  operation_key: string;\n};",
+    "fields": [
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "executor_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "resource",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "resource_version",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "arguments",
+        "type": "Record<string, unknown>",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "operation_key",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Response",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Response = {\n  outcome:\n    | \"answered\"\n    | \"approved\"\n    | \"denied\"\n    | \"completed\"\n    | \"failed\"\n    | \"rejected\";\n  answer?: unknown;\n  version: number;\n};",
+    "fields": [
+      {
+        "name": "outcome",
+        "type": "\"answered\" | \"approved\" | \"denied\" | \"completed\" | \"failed\" | \"rejected\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "answer",
+        "type": "unknown",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "RequestItem",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type RequestItem = {\n attachments?:Attachment[];\n mentions?:Mention[];\n blocking?:boolean;\n  requester_instance_id?: string;\n  id: string;\n  requester_id: string;\n  conversation_id: string;\n  kind: \"question\" | \"approval\" | \"task\";\n  title: string;\n  body: string;\n  choices: string[];\n  action?: Action;\n  state: \"open\" | \"resolved\" | \"cancelled\" | \"expired\" | \"superseded\";\n  version: number;\n  response?: Response & {\n    responder_instance_id?: string;\n    source_answer_id?: string;\n    source_invalidated?: boolean;\n    reuse_method?: string;\n    reuse_reason?: string;\n  };\n  expires_at: string;\n};",
+    "fields": [
+      {
+        "name": "attachments",
+        "type": "Attachment[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "mentions",
+        "type": "Mention[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "blocking",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "requester_instance_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "requester_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "conversation_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "\"question\" | \"approval\" | \"task\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "choices",
+        "type": "string[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "action",
+        "type": "Action",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "state",
+        "type": "\"open\" | \"resolved\" | \"cancelled\" | \"expired\" | \"superseded\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "response",
+        "type": "Response & { responder_instance_id?: string; source_answer_id?: string; source_invalidated?: boolean; reuse_method?: string; reuse_reason?: string; }",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Execution",
+    "doc": "An authorized intent and worker-reported state, not proof of an external effect.",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Execution = {\n  id: string;\n  request_id: string;\n  executor_id: string;\n  operation_key: string;\n  action: Action;\n  state: \"authorized\" | \"running\" | \"succeeded\" | \"failed\" | \"unknown\";\n  result: unknown;\n};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "request_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "executor_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "operation_key",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "action",
+        "type": "Action",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "state",
+        "type": "\"failed\" | \"authorized\" | \"running\" | \"succeeded\" | \"unknown\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "result",
+        "type": "unknown",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "AskInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type AskInput = {\n attachment_ids?:string[];\n mentions?:Mention[];\n blocking?:boolean;\n reuse_direct?:boolean;\n  preview_token?: string;\n  /** Omit when asking the current participants of conversation_id. */\n  target?: Target;\n  title?: string;\n  body?: string;\n  kind?: \"question\" | \"approval\" | \"task\";\n  conversation_id?: string;\n  choices?: string[];\n  action?: Action;\n  expires_at?: string;\n  shared_key?: string;\n};",
+    "fields": [
+      {
+        "name": "attachment_ids",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "mentions",
+        "type": "Mention[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "blocking",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "reuse_direct",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "preview_token",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "target",
+        "type": "Target",
+        "optional": true,
+        "doc": "Omit when asking the current participants of conversation_id."
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "\"question\" | \"approval\" | \"task\"",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "conversation_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "choices",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "action",
+        "type": "Action",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "shared_key",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Mention",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Mention = {principal_id:string;start:number;end:number};",
+    "fields": [
+      {
+        "name": "principal_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "start",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "end",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Message",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Message = {\n received_by?:string[];\n attachments?:Attachment[];\n mentions?:Mention[];\n  id: string;\n  conversation_id: string;\n  sender_id: string;\n  instance_id?: string;\n  body: string;\n};",
+    "fields": [
+      {
+        "name": "received_by",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "attachments",
+        "type": "Attachment[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "mentions",
+        "type": "Mention[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "conversation_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "sender_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "instance_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "StartChatInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type StartChatInput = { targets:Target[]; body:string; title?:string; approval?:boolean; choices?:string[]; mentions?:Mention[]; attachment_ids?:string[] };",
+    "fields": [
+      {
+        "name": "targets",
+        "type": "Target[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "approval",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "choices",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "mentions",
+        "type": "Mention[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "attachment_ids",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Attachment",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Attachment = { id:string; conversation_id:string; message_id?:string; request_id?:string; file_name:string; media_type:string; size:number; sha256:string; created_at:string };",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "conversation_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "message_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "request_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "file_name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "media_type",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "size",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "sha256",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "ChatMembershipInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type ChatMembershipInput = {operation:\"rename\"|\"add\"|\"remove\"|\"leave\";version:number;title?:string;members?:string[];share_history?:boolean;next_manager?:string};",
+    "fields": [
+      {
+        "name": "operation",
+        "type": "\"rename\" | \"add\" | \"remove\" | \"leave\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "members",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "share_history",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "next_manager",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "ChatMembershipResult",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type ChatMembershipResult = {conversation_id:string;version:number;left?:boolean};",
+    "fields": [
+      {
+        "name": "conversation_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "left",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Conversation",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Conversation = {id:string;title:string;messages?:Message[];participants:unknown[];shared?:boolean;version?:number;manager_id?:string;history_start?:number;past_participants?:unknown[]};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "messages",
+        "type": "Message[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "participants",
+        "type": "unknown[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "shared",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "manager_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "history_start",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "past_participants",
+        "type": "unknown[]",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "SendInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type SendInput = {\n attachment_ids?:string[];\n mentions?:Mention[];\n reuse_direct?:boolean;\n  preview_token?: string;\n  target?: Target;\n  conversation_id?: string;\n  body: string;\n  title?: string;\n};",
+    "fields": [
+      {
+        "name": "attachment_ids",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "mentions",
+        "type": "Mention[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "reuse_direct",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "preview_token",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "target",
+        "type": "Target",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "conversation_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Delivery",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Delivery = {\n  id: string;\n  generation: number;\n  payload: {\n    type: string;\n    conversation_id: string;\n    message?: Message;\n    request?: RequestItem;\n  };\n};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "generation",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "payload",
+        "type": "{ type: string; conversation_id: string; message?: Message; request?: RequestItem; }",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Credential",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Credential = {id:string;principal_id:string;owner_name:string;name:string;kind:string;prefix:string;token_hint:string;created_at:string;last_used_at:string|null;expires_at:string|null;renewable_until:string|null;previous_until:string|null;permissions:string[]|null;version:number;revoked:boolean;parent_credential_id?:string};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "principal_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "owner_name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "prefix",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "token_hint",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "last_used_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "renewable_until",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "previous_until",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "permissions",
+        "type": "string[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "revoked",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "parent_credential_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "CredentialInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type CredentialInput = {never_expires?:boolean;principal_id:string;kind:\"api\"|\"enrollment\";name?:string;prefix?:string;expires_at?:string;permissions?:Array<\"read\"|\"message\"|\"request\"|\"respond\"|\"execute\"|\"manage\">};",
+    "fields": [
+      {
+        "name": "never_expires",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "principal_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "\"api\" | \"enrollment\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "prefix",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "permissions",
+        "type": "(\"read\" | \"message\" | \"request\" | \"respond\" | \"execute\" | \"manage\")[]",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "CredentialEdit",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type CredentialEdit = {never_expires?:boolean;version:number;name?:string;expires_at?:string;permissions?:string[];clear_permissions?:boolean};",
+    "fields": [
+      {
+        "name": "never_expires",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "permissions",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "clear_permissions",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "IssuedCredential",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type IssuedCredential = {id:string;token:string;kind:string;expires_at:string|null};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "token",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "CredentialReplacement",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type CredentialReplacement = {token:string;credential:Credential};",
+    "fields": [
+      {
+        "name": "token",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "credential",
+        "type": "Credential",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Session",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Session = {\n  token: string;\n  agent: Agent;\n  instance_id: string;\n  expires_at: string | null;\n};",
+    "fields": [
+      {
+        "name": "token",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "agent",
+        "type": "Agent",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "instance_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "AssistanceSettings",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type AssistanceSettings = {\n  overseer: boolean;\n  version: number;\n  overseer_configured: boolean;\n};",
+    "fields": [
+      {
+        "name": "overseer",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "overseer_configured",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "OverseerInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type OverseerInput = { prompt: string; target?: Target; previous_plan_id?: string };",
+    "fields": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "target",
+        "type": "Target",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "previous_plan_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "FleetAgent",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type FleetAgent = {\n  agent: Agent;\n  fresh: boolean;\n  instances: {\n    id: string;\n    agent_id: string;\n    presence: string;\n    last_seen: string;\n    capabilities: string[];\n    progress: Record<string, unknown>;\n  }[];\n};",
+    "fields": [
+      {
+        "name": "agent",
+        "type": "Agent",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "fresh",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "instances",
+        "type": "{ id: string; agent_id: string; presence: string; last_seen: string; capabilities: string[]; progress: Record<string, unknown>; }[]",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "OverseerPlan",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type OverseerPlan = {\n  automatic?: boolean;\n  instructions?: {agent_id:string;operation:\"message\"|\"question\"|\"task\";body:string}[];\n  summary_error?: string;\n  previous_plan_id?: string;\n  id: string;\n  prompt: string;\n  context_agent_ids: string[];\n  target?: Target;\n  operation: \"status\" | \"message\" | \"question\" | \"task\";\n  summary: string;\n  body?: string;\n  sources: FleetAgent[];\n  requires_confirmation: boolean;\n  created_at: string;\n  expires_at: string;\n  dispatches: {\n    agent_id: string;\n    conversation_id: string;\n    request_id?: string;\n  }[];\n  replies: RequestItem[];\n  reply_summary?: string;\n  reply_digest?: string;\n};",
+    "fields": [
+      {
+        "name": "automatic",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "instructions",
+        "type": "{ agent_id: string; operation: \"question\" | \"task\" | \"message\"; body: string; }[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "summary_error",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "previous_plan_id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "prompt",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "context_agent_ids",
+        "type": "string[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "target",
+        "type": "Target",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "operation",
+        "type": "\"question\" | \"task\" | \"message\" | \"status\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "summary",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "sources",
+        "type": "FleetAgent[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "requires_confirmation",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "dispatches",
+        "type": "{ agent_id: string; conversation_id: string; request_id?: string; }[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "replies",
+        "type": "RequestItem[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "reply_summary",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "reply_digest",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "ChannelPolicy",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type ChannelPolicy = { mode: \"preferred\" | \"all\"; destinations: string[]; followup_seconds: number };",
+    "fields": [
+      {
+        "name": "mode",
+        "type": "\"preferred\" | \"all\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "destinations",
+        "type": "string[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "followup_seconds",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "ChannelOverride",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type ChannelOverride = { source: { kind: \"agent\" | \"group\"; id: string }; policy: ChannelPolicy };",
+    "fields": [
+      {
+        "name": "source",
+        "type": "{ kind: \"agent\" | \"group\"; id: string; }",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "policy",
+        "type": "ChannelPolicy",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "DeliveryPreferences",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type DeliveryPreferences = { person_id: string; version: number; default: ChannelPolicy | null; overrides: ChannelOverride[] };",
+    "fields": [
+      {
+        "name": "person_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "default",
+        "type": "ChannelPolicy",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "overrides",
+        "type": "ChannelOverride[]",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "BeepgridError",
+    "doc": "",
+    "kind": "ClassDeclaration",
+    "definition": "export class BeepgridError extends Error {\n  constructor(\n    public readonly code: string,\n    message: string,\n    public readonly status: number,\n  ) {\n    super(message);\n    this.name = \"BeepgridError\";\n  }\n}",
+    "methods": []
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "QueryInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type QueryInput = {collection: string; search?: string; filters?: Record<string,string>; limit?: number; cursor?: string};",
+    "fields": [
+      {
+        "name": "collection",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "filters",
+        "type": "Record<string, string>",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "limit",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "cursor",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "QueryPage",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type QueryPage<T=unknown> = {items:T[]; next_cursor?:string; order:string};",
+    "fields": [
+      {
+        "name": "items",
+        "type": "T[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "next_cursor",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "order",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "CapabilityResult",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type CapabilityResult = {observed_at:string; operations:Record<string,boolean>; request_version?:number; outcomes:string[]};",
+    "fields": [
+      {
+        "name": "observed_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "operations",
+        "type": "Record<string, boolean>",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "request_version",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "outcomes",
+        "type": "string[]",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "DispatchPreviewInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type DispatchPreviewInput = {targets:Target[]; operation:\"message\"|\"ask\"; descriptor?:Action};",
+    "fields": [
+      {
+        "name": "targets",
+        "type": "Target[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "operation",
+        "type": "\"message\" | \"ask\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "descriptor",
+        "type": "Action",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "DispatchPreview",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type DispatchPreview = {recipients:unknown[]; count:number; hidden_recipients:number; token:string; expires_at:string; sends:false};",
+    "fields": [
+      {
+        "name": "recipients",
+        "type": "unknown[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "count",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "hidden_recipients",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "token",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "sends",
+        "type": "false",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "PermissionRule",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type PermissionRule = {effect?: \"allow\" | \"deny\"; action: \"view\" | \"message\" | \"ask\" | \"decide\"; target_kind: Target[\"kind\"]; target_id: string};",
+    "fields": [
+      {
+        "name": "effect",
+        "type": "\"allow\" | \"deny\"",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "action",
+        "type": "\"message\" | \"ask\" | \"view\" | \"decide\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "target_kind",
+        "type": "\"person\" | \"agent\" | \"service\" | \"group\" | \"instance\"",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "target_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "ContactPermissionsInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type ContactPermissionsInput = {subject: Target; rules: PermissionRule[]; version: number};",
+    "fields": [
+      {
+        "name": "subject",
+        "type": "Target",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "rules",
+        "type": "PermissionRule[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "ContactPreviewInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type ContactPreviewInput = {subject: Target; rules?: PermissionRule[]; version?: number; targets?: Target[]};",
+    "fields": [
+      {
+        "name": "subject",
+        "type": "Target",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "rules",
+        "type": "PermissionRule[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "targets",
+        "type": "Target[]",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "Client",
+    "doc": "",
+    "kind": "ClassDeclaration",
+    "definition": "export class Client {\n  readonly baseURL: string;\n  constructor(\n    baseURL: string,\n    private readonly token: string,\n    private readonly transport: typeof fetch = fetch,\n  ) {\n    const u = new URL(baseURL);\n    if (![\"http:\", \"https:\"].includes(u.protocol) || u.username || u.password)\n      throw new Error(\"Invalid Beep Grid server URL\");\n    this.baseURL = baseURL.replace(/\\/$/, \"\");\n  }\n  credentials(){return this.call<Credential[]>(\"GET\",\"/api/v1/credentials\");}\n  createCredential(input:CredentialInput){return this.call<IssuedCredential>(\"POST\",\"/api/v1/credentials\",input);}\n  editCredential(id:string,input:CredentialEdit){return this.call<Credential>(\"POST\",`/api/v1/credentials/${encodeURIComponent(id)}/edit`,input);}\n  /** Returned once. No automatic retry after an uncertain response. */\n  rotateCredential(id:string,version:number,overlapSeconds=3600){return this.call<CredentialReplacement>(\"POST\",`/api/v1/credentials/${encodeURIComponent(id)}/rotate`,{version,overlap_seconds:overlapSeconds});}\n  revokeCredential(id:string,revokeWorkers=false){return this.call<{revoked:true}>(\"POST\",`/api/v1/credentials/${encodeURIComponent(id)}/revoke`,{revoke_workers:revokeWorkers});}\n  renewCredential(){return this.call<Credential>(\"POST\",\"/api/v1/credentials/self/renew\",{});}\n  deliveryPreferences(personId: string): Promise<DeliveryPreferences> {\n    return this.call(\"GET\", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`);\n  }\n  saveDeliveryPreferences(personId: string, preferences: DeliveryPreferences): Promise<DeliveryPreferences> {\n    return this.call(\"POST\", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`, preferences);\n  }\n  async call<T>(\n    method: string,\n    path: string,\n    body?: unknown,\n    options: { key?: string; signal?: AbortSignal; minimal?: boolean } = {},\n  ): Promise<T> {\n    if (!path.startsWith(\"/api/v1/\")) throw new Error(\"Invalid API path\");\n    const headers: Record<string, string> = {\n      \"Content-Type\": \"application/json\",\n      Authorization: `Bearer ${this.token}`,\n    };\n    if (options.key) headers[\"Idempotency-Key\"] = options.key;\n    if (options.minimal) headers[\"Prefer\"] = \"return=minimal\";\n    const raw = body === undefined ? undefined : JSON.stringify(body);\n    for (let attempt = 0; attempt < 3; attempt++) {\n      let response: globalThis.Response;\n      try {\n        response = await this.transport(this.baseURL + path, {\n          method,\n          redirect: \"error\",\n          headers,\n          body: raw,\n          signal: options.signal ?? AbortSignal.timeout(20000),\n        });\n      } catch (error) {\n        if (\n          attempt === 2 ||\n          options.signal?.aborted ||\n          (method !== \"GET\" && !options.key)\n        )\n          throw error;\n        await delay(200 * (attempt + 1), options.signal);\n        continue;\n      }\n      let value: any;\n      try {\n        value = await response.json();\n      } catch (error) {\n        if (\n          attempt === 2 ||\n          options.signal?.aborted ||\n          (method !== \"GET\" && !options.key)\n        )\n          throw error;\n        await delay(200 * (attempt + 1), options.signal);\n        continue;\n      }\n      if (!response.ok)\n        throw new BeepgridError(\n          value.error?.code ?? \"HTTP_ERROR\",\n          value.error?.message ?? `HTTP ${response.status}`,\n          response.status,\n        );\n      return value as T;\n    }\n    throw new Error(\"Request attempts exhausted\");\n  }\n  query<T=unknown>(input:QueryInput) {return this.call<QueryPage<T>>(\"POST\",\"/api/v1/query\",input);}\n  capabilities(input:{target?:{kind:string;id:string};request_id?:string;connection_id?:string;descriptor?:Action}={}) {return this.call<CapabilityResult>(\"POST\",\"/api/v1/capabilities\",input);}\n  previewContactPermissions(input: ContactPreviewInput) {return this.call<unknown>(\"POST\",\"/api/v1/contact-permissions/preview\",input);}\n  saveContactPermissions(input: ContactPermissionsInput) {return this.call<unknown>(\"POST\",\"/api/v1/contact-permissions\",input);}\n  access(subject=\"\") {return this.call<unknown>(\"GET\",\"/api/v1/access?subject_id=\"+encodeURIComponent(subject));}\n  dispatchPreview(input:DispatchPreviewInput) {return this.call<DispatchPreview>(\"POST\",\"/api/v1/dispatch-preview\",input);}\n  sendBatch(input:{targets:Target[];body:string;title?:string;preview_token?:string;attachment_ids?:string[]},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;result:{conversation_id:string;messages:Message[]}}>>(\"POST\",\"/api/v1/message-batches\",input,{key});}\n  askBatch(input:{targets:Target[];request:Omit<AskInput,\"target\"|\"conversation_id\"|\"preview_token\">;preview_token?:string},key:string=crypto.randomUUID()){return this.call<Array<{target:Target;request:RequestItem}>>(\"POST\",\"/api/v1/request-batches\",input,{key});}\n  requestTrace(id:string,cursor=\"\"){return this.call<unknown>(\"GET\",\"/api/v1/requests/\"+encodeURIComponent(id)+\"/trace?delivery_cursor=\"+encodeURIComponent(cursor));}\n  workspace(){return this.call<unknown>(\"GET\",\"/api/v1/workspace\");}\n  account(){return this.call<unknown>(\"GET\",\"/api/v1/workspace/account\");}\n  startChat(input:StartChatInput,key:string=crypto.randomUUID()) { return this.call<{conversation_id:string;messages:Message[]}>(\"POST\",\"/api/v1/conversations\",input,{key}); }\n  changeChatMembership(conversationId:string,input:ChatMembershipInput,key:string=crypto.randomUUID()){return this.call<ChatMembershipResult>(\"POST\",`/api/v1/conversations/${encodeURIComponent(conversationId)}/membership`,input,{key});}\n  attachments(conversationId:string) { return this.call<Attachment[]>(\"GET\",`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`); }\n  async uploadAttachment(conversationId:string, file:Blob, name:string, signal?:AbortSignal):Promise<Attachment> {\n    return this.uploadFile(`/api/v1/conversations/${encodeURIComponent(conversationId)}/attachments`,file,name,signal);\n  }\n  /** Private draft for attachment_ids. No automatic retry; unused drafts expire after 24 hours. */\n  async stageAttachment(file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {\n    return this.uploadFile(\"/api/v1/attachments\",file,name,signal);\n  }\n  private async uploadFile(path:string,file:Blob,name:string,signal?:AbortSignal):Promise<Attachment> {\n    if (!file.size || file.size>5*1024*1024) throw new Error(\"Attachments must be between 1 byte and 5 MiB\");\n    const form=new FormData(); form.append(\"file\",file,name);\n    const response=await this.transport(`${this.baseURL}${path}`,{method:\"POST\",headers:{Authorization:`Bearer ${this.token}`},body:form,signal:signal??AbortSignal.timeout(20000),redirect:\"error\"});\n    const value=await response.json(); if(!response.ok) throw new BeepgridError(value.error?.code??\"HTTP_ERROR\",value.error?.message??\"Attachment upload rejected\",response.status);\n    return value as Attachment;\n  }\n  async downloadAttachment(id:string,signal?:AbortSignal):Promise<Blob> {\n    const response=await this.transport(`${this.baseURL}/api/v1/attachments/${encodeURIComponent(id)}`,{headers:{Authorization:`Bearer ${this.token}`},signal:signal??AbortSignal.timeout(20000),redirect:\"error\"});\n    if(!response.ok) { let value:any;try{value=await response.json();}catch{} throw new BeepgridError(value?.error?.code??\"HTTP_ERROR\",value?.error?.message??\"Attachment download rejected\",response.status); }\n    if (Number(response.headers.get(\"Content-Length\"))>5*1024*1024) { await response.body?.cancel();throw new Error(\"Attachment exceeds 5 MiB\"); }\n    const reader=response.body?.getReader();const chunks:Uint8Array<ArrayBuffer>[]=[];let size=0;\n    if(reader) try {for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>5*1024*1024)throw new Error(\"Attachment exceeds 5 MiB\");chunks.push(new Uint8Array(value));}}finally{await reader.cancel();reader.releaseLock();}\n    return new Blob(chunks,{type:response.headers.get(\"Content-Type\")??\"application/octet-stream\"});\n  }\n  directory(kind:\"agent\"|\"person\"|\"service\",search=\"\") { return this.query<Agent|Person>({collection:kind===\"person\"?\"people\":kind+\"s\",search}); }\n  conversation(id:string) { return this.call<Conversation>(\"GET\",`/api/v1/conversations/${encodeURIComponent(id)}`); }\n  providerCatalog() { return this.call<unknown[]>(\"GET\",\"/api/v1/integrations/catalog\"); }\n  connectionSetup(id:string) { return this.call<unknown>(\"GET\",`/api/v1/connections/${encodeURIComponent(id)}/setup`); }\n  async connect(\n    agent: string,\n    name: string,\n    capabilities: string[] = [],\n    metadata: Record<string, unknown> = {},\n    options: {connection_name?:string;renewable?:boolean;expires_at?:string;never_expires?:boolean} = {},\n  ): Promise<{ client: Client; session: Session }> {\n    const session = await this.call<Session>(\"POST\", \"/api/v1/sessions\", {\n      ...options,\n      agent,\n      name,\n      capabilities,\n      metadata,\n    });\n    return {\n      client: new Client(this.baseURL, session.token, this.transport),\n      session,\n    };\n  }\n  send(input: SendInput, key: string = crypto.randomUUID()) {\n    return this.call<{ conversation_id: string; messages: Message[] }>(\n      \"POST\",\n      \"/api/v1/messages\",\n      input,\n      { key },\n    );\n  }\n  // Confirms durable acceptance only, never provider delivery or execution.\n  // send(input, sameKey) can recover the complete canonical receipt later.\n  sendMinimal(input: SendInput, key: string = crypto.randomUUID()) {\n    return this.call<{ conversation_id: string; message_count: number }>(\n      \"POST\",\n      \"/api/v1/messages\",\n      input,\n      { key, minimal: true },\n    );\n  }\n  ask(input: AskInput, key: string = crypto.randomUUID()) {\n    return this.call<RequestItem>(\"POST\", \"/api/v1/requests\", input, { key });\n  }\n  getRequest(id: string, signal?: AbortSignal) {\n    return this.call<RequestItem>(\n      \"GET\",\n      \"/api/v1/requests/\" + encodeURIComponent(id),\n      undefined,\n      { signal },\n    );\n  }\n  respond(id: string, response: Response) {\n    return this.call<RequestItem>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/responses`,\n      response,\n    );\n  }\n  redeem(id: string, action: Action) {\n    return this.call<Execution>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/redeem`,\n      action,\n      { key: crypto.randomUUID() },\n    );\n  }\n  reportExecution(\n    id: string,\n    state: \"running\" | \"succeeded\" | \"failed\" | \"unknown\",\n    result: unknown = null,\n  ) {\n    return this.call<Execution>(\n      \"POST\",\n      `/api/v1/executions/${encodeURIComponent(id)}`,\n      { state, result },\n      { key: crypto.randomUUID() },\n    );\n  }\n  assistance(signal?: AbortSignal) {\n    return this.call<AssistanceSettings>(\n      \"GET\",\n      \"/api/v1/assistance/settings\",\n      undefined,\n      { signal },\n    );\n  }\n  updateAssistance(\n    settings: Partial<\n      Pick<AssistanceSettings, \"overseer\" | \"version\">\n    >,\n  ) {\n    return this.call<AssistanceSettings>(\n      \"POST\",\n      \"/api/v1/assistance/settings\",\n      settings,\n    );\n  }\n  setRequestBlocking(id:string, blocking:boolean) {\n    return this.call<RequestItem>(\"POST\", `/api/v1/requests/${encodeURIComponent(id)}/blocking`, {blocking});\n  }\n  coordinate(input:OverseerInput, signal?:AbortSignal, key?:string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/coordinate\", input, {key,signal});\n  }\n  planOverseer(input: OverseerInput, signal?: AbortSignal, key?: string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/plan\", input, {\n      key, signal,\n    });\n  }\n  overseerPlans(signal?: AbortSignal) {\n    return this.call<OverseerPlan[]>(\"GET\", \"/api/v1/fleet/plans\", undefined, {\n      signal,\n    });\n  }\n  overseerPlan(id: string, signal?: AbortSignal) {\n    return this.call<OverseerPlan>(\n      \"GET\",\n      \"/api/v1/fleet/plans/\" + encodeURIComponent(id),\n      undefined,\n      { signal },\n    );\n  }\n  confirmOverseer(id: string) {\n    return this.call<OverseerPlan>(\"POST\", \"/api/v1/fleet/command\", {\n      plan_id: id,\n    });\n  }\n  summarizeOverseer(id: string, signal?: AbortSignal) {\n    return this.call<OverseerPlan>(\n      \"POST\",\n      \"/api/v1/fleet/plans/\" + encodeURIComponent(id) + \"/summary\",\n      {},\n      { signal },\n    );\n  }\n  // Full, durable events contain canonical message data. Consumers can append\n  // message.created directly instead of downloading a growing history again.\n  events(options: EventOptions = {}) {\n    return readEvents(this.baseURL, this.token, this.transport, options);\n  }\n  async wait(id: string, signal?: AbortSignal): Promise<RequestItem> {\n    for (;;) {\n      const request = await this.getRequest(id, signal);\n      if (request.state !== \"open\") return request;\n      await delay(1000, signal);\n    }\n  }\n  replaceRequest(id: string, input: { version: number; body: string; mentions?: Mention[] }, key: string = crypto.randomUUID()) {\n    return this.call<{ previous: RequestItem; replacement: RequestItem }>(\"POST\", `/api/v1/requests/${encodeURIComponent(id)}/replace`, input, {key});\n  }\n  cancel(id: string, version: number) {\n    return this.call<RequestItem>(\n      \"POST\",\n      `/api/v1/requests/${encodeURIComponent(id)}/cancel`,\n      { version },\n    );\n  }\n  inbox(signal?: AbortSignal, waitMs = 0) {\n    return this.call<Delivery[]>(\"GET\", `/api/v1/worker/inbox?wait_ms=${Math.max(0, Math.min(15000, Math.floor(waitMs)))}`, undefined, {\n      signal,\n    });\n  }\n  ack(delivery: Delivery) {\n    return this.call(\n      \"POST\",\n      `/api/v1/worker/inbox/${encodeURIComponent(delivery.id)}/ack`,\n      { generation: delivery.generation },\n    );\n  }\n  heartbeat(progress: Record<string, unknown> = {}) {\n    return this.call(\"POST\", \"/api/v1/worker/heartbeat\", progress);\n  }\n  async run(\n    handler: (delivery: Delivery) => Promise<void>,\n    signal?: AbortSignal,\n  ) {\n    while (!signal?.aborted) {\n      let jobs: Delivery[];\n      try {\n        jobs = await this.call<Delivery[]>(\n          \"GET\",\n          \"/api/v1/worker/inbox?wait_ms=15000\",\n          undefined,\n          { signal },\n        );\n      } catch (e) {\n        if (signal?.aborted) throw e;\n        if (e instanceof BeepgridError && e.status < 500 && e.status !== 429)\n          throw e;\n        await delay(2000, signal);\n        continue;\n      }\n      for (const job of jobs) {\n        await handler(job);\n        await this.ack(job);\n      }\n      if (!jobs.length) await delay(100, signal);\n    }\n  }\n}",
+    "methods": [
+      {
+        "name": "credentials",
+        "signature": "(): Promise<Credential[]>",
+        "parameters": [],
+        "returns": "Promise<Credential[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "createCredential",
+        "signature": "(input: CredentialInput): Promise<IssuedCredential>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "CredentialInput",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<IssuedCredential>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "editCredential",
+        "signature": "(id: string, input: CredentialEdit): Promise<Credential>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "input",
+            "type": "CredentialEdit",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<Credential>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "rotateCredential",
+        "signature": "(id: string, version: number, overlapSeconds?: number): Promise<CredentialReplacement>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "version",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "overlapSeconds",
+            "type": "number",
+            "optional": true,
+            "default": "3600"
+          }
+        ],
+        "returns": "Promise<CredentialReplacement>",
+        "doc": "Returned once. No automatic retry after an uncertain response.",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "revokeCredential",
+        "signature": "(id: string, revokeWorkers?: boolean): Promise<{ revoked: true; }>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "revokeWorkers",
+            "type": "boolean",
+            "optional": true,
+            "default": "false"
+          }
+        ],
+        "returns": "Promise<{ revoked: true; }>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "renewCredential",
+        "signature": "(): Promise<Credential>",
+        "parameters": [],
+        "returns": "Promise<Credential>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "deliveryPreferences",
+        "signature": "(personId: string): Promise<DeliveryPreferences>",
+        "parameters": [
+          {
+            "name": "personId",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<DeliveryPreferences>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "saveDeliveryPreferences",
+        "signature": "(personId: string, preferences: DeliveryPreferences): Promise<DeliveryPreferences>",
+        "parameters": [
+          {
+            "name": "personId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "preferences",
+            "type": "DeliveryPreferences",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<DeliveryPreferences>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "call",
+        "signature": "<T>(method: string, path: string, body?: unknown, options?: { key?: string; signal?: AbortSignal; minimal?: boolean; }): Promise<T>",
+        "parameters": [
+          {
+            "name": "method",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "body",
+            "type": "unknown",
+            "optional": true
+          },
+          {
+            "name": "options",
+            "type": "{ key?: string; signal?: AbortSignal; minimal?: boolean }",
+            "optional": true,
+            "default": "{}"
+          }
+        ],
+        "returns": "Promise<T>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "query",
+        "signature": "<T = unknown>(input: QueryInput): Promise<QueryPage<T>>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "QueryInput",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<QueryPage<T>>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "capabilities",
+        "signature": "(input?: { target?: { kind: string; id: string; }; request_id?: string; connection_id?: string; descriptor?: Action; }): Promise<CapabilityResult>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "{target?:{kind:string;id:string};request_id?:string;connection_id?:string;descriptor?:Action}",
+            "optional": true,
+            "default": "{}"
+          }
+        ],
+        "returns": "Promise<CapabilityResult>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "previewContactPermissions",
+        "signature": "(input: ContactPreviewInput): Promise<unknown>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "ContactPreviewInput",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "saveContactPermissions",
+        "signature": "(input: ContactPermissionsInput): Promise<unknown>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "ContactPermissionsInput",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "access",
+        "signature": "(subject?: string): Promise<unknown>",
+        "parameters": [
+          {
+            "name": "subject",
+            "type": "string",
+            "optional": true,
+            "default": "\"\""
+          }
+        ],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "dispatchPreview",
+        "signature": "(input: DispatchPreviewInput): Promise<DispatchPreview>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "DispatchPreviewInput",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<DispatchPreview>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "sendBatch",
+        "signature": "(input: { targets: Target[]; body: string; title?: string; preview_token?: string; attachment_ids?: string[]; }, key?: string): Promise<{ target: Target; result: { conversation_id: string; messages: Message[]; }; }[]>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "{targets:Target[];body:string;title?:string;preview_token?:string;attachment_ids?:string[]}",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<{ target: Target; result: { conversation_id: string; messages: Message[]; }; }[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "askBatch",
+        "signature": "(input: { targets: Target[]; request: Omit<AskInput, \"target\" | \"conversation_id\" | \"preview_token\">; preview_token?: string; }, key?: string): Promise<{ target: Target; request: RequestItem; }[]>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "{targets:Target[];request:Omit<AskInput,\"target\"|\"conversation_id\"|\"preview_token\">;preview_token?:string}",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<{ target: Target; request: RequestItem; }[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "requestTrace",
+        "signature": "(id: string, cursor?: string): Promise<unknown>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "optional": true,
+            "default": "\"\""
+          }
+        ],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "workspace",
+        "signature": "(): Promise<unknown>",
+        "parameters": [],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "account",
+        "signature": "(): Promise<unknown>",
+        "parameters": [],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "startChat",
+        "signature": "(input: StartChatInput, key?: string): Promise<{ conversation_id: string; messages: Message[]; }>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "StartChatInput",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<{ conversation_id: string; messages: Message[]; }>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "changeChatMembership",
+        "signature": "(conversationId: string, input: ChatMembershipInput, key?: string): Promise<ChatMembershipResult>",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "input",
+            "type": "ChatMembershipInput",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<ChatMembershipResult>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "attachments",
+        "signature": "(conversationId: string): Promise<Attachment[]>",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<Attachment[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "uploadAttachment",
+        "signature": "(conversationId: string, file: Blob, name: string, signal?: AbortSignal): Promise<Attachment>",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "file",
+            "type": "Blob",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<Attachment>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "stageAttachment",
+        "signature": "(file: Blob, name: string, signal?: AbortSignal): Promise<Attachment>",
+        "parameters": [
+          {
+            "name": "file",
+            "type": "Blob",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<Attachment>",
+        "doc": "Private draft for attachment_ids. No automatic retry; unused drafts expire after 24 hours.",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "downloadAttachment",
+        "signature": "(id: string, signal?: AbortSignal): Promise<Blob>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<Blob>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "directory",
+        "signature": "(kind: \"person\" | \"agent\" | \"service\", search?: string): Promise<QueryPage<Person | Agent>>",
+        "parameters": [
+          {
+            "name": "kind",
+            "type": "\"agent\"|\"person\"|\"service\"",
+            "optional": false
+          },
+          {
+            "name": "search",
+            "type": "string",
+            "optional": true,
+            "default": "\"\""
+          }
+        ],
+        "returns": "Promise<QueryPage<Person | Agent>>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "conversation",
+        "signature": "(id: string): Promise<Conversation>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<Conversation>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "providerCatalog",
+        "signature": "(): Promise<unknown[]>",
+        "parameters": [],
+        "returns": "Promise<unknown[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "connectionSetup",
+        "signature": "(id: string): Promise<unknown>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "connect",
+        "signature": "(agent: string, name: string, capabilities?: string[], metadata?: Record<string, unknown>, options?: { connection_name?: string; renewable?: boolean; expires_at?: string; never_expires?: boolean; }): Promise<{ client: Client; session: Session; }>",
+        "parameters": [
+          {
+            "name": "agent",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "capabilities",
+            "type": "string[]",
+            "optional": true,
+            "default": "[]"
+          },
+          {
+            "name": "metadata",
+            "type": "Record<string, unknown>",
+            "optional": true,
+            "default": "{}"
+          },
+          {
+            "name": "options",
+            "type": "{connection_name?:string;renewable?:boolean;expires_at?:string;never_expires?:boolean}",
+            "optional": true,
+            "default": "{}"
+          }
+        ],
+        "returns": "Promise<{ client: Client; session: Session; }>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "send",
+        "signature": "(input: SendInput, key?: string): Promise<{ conversation_id: string; messages: Message[]; }>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "SendInput",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<{ conversation_id: string; messages: Message[]; }>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "sendMinimal",
+        "signature": "(input: SendInput, key?: string): Promise<{ conversation_id: string; message_count: number; }>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "SendInput",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<{ conversation_id: string; message_count: number; }>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "ask",
+        "signature": "(input: AskInput, key?: string): Promise<RequestItem>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "AskInput",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<RequestItem>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "getRequest",
+        "signature": "(id: string, signal?: AbortSignal): Promise<RequestItem>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<RequestItem>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "respond",
+        "signature": "(id: string, response: Response): Promise<RequestItem>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "response",
+            "type": "Response",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<RequestItem>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "redeem",
+        "signature": "(id: string, action: Action): Promise<Execution>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "action",
+            "type": "Action",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<Execution>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "reportExecution",
+        "signature": "(id: string, state: \"failed\" | \"running\" | \"succeeded\" | \"unknown\", result?: unknown): Promise<Execution>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "state",
+            "type": "\"running\" | \"succeeded\" | \"failed\" | \"unknown\"",
+            "optional": false
+          },
+          {
+            "name": "result",
+            "type": "unknown",
+            "optional": true,
+            "default": "null"
+          }
+        ],
+        "returns": "Promise<Execution>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "assistance",
+        "signature": "(signal?: AbortSignal): Promise<AssistanceSettings>",
+        "parameters": [
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<AssistanceSettings>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "updateAssistance",
+        "signature": "(settings: Partial<Pick<AssistanceSettings, \"version\" | \"overseer\">>): Promise<AssistanceSettings>",
+        "parameters": [
+          {
+            "name": "settings",
+            "type": "Partial<\n      Pick<AssistanceSettings, \"overseer\" | \"version\">\n    >",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<AssistanceSettings>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "setRequestBlocking",
+        "signature": "(id: string, blocking: boolean): Promise<RequestItem>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "blocking",
+            "type": "boolean",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<RequestItem>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "coordinate",
+        "signature": "(input: OverseerInput, signal?: AbortSignal, key?: string): Promise<OverseerPlan>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "OverseerInput",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<OverseerPlan>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "planOverseer",
+        "signature": "(input: OverseerInput, signal?: AbortSignal, key?: string): Promise<OverseerPlan>",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "OverseerInput",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<OverseerPlan>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "overseerPlans",
+        "signature": "(signal?: AbortSignal): Promise<OverseerPlan[]>",
+        "parameters": [
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<OverseerPlan[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "overseerPlan",
+        "signature": "(id: string, signal?: AbortSignal): Promise<OverseerPlan>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<OverseerPlan>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "confirmOverseer",
+        "signature": "(id: string): Promise<OverseerPlan>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<OverseerPlan>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "summarizeOverseer",
+        "signature": "(id: string, signal?: AbortSignal): Promise<OverseerPlan>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<OverseerPlan>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "events",
+        "signature": "(options?: EventOptions): AsyncGenerator<BeepgridEvent, any, any>",
+        "parameters": [
+          {
+            "name": "options",
+            "type": "EventOptions",
+            "optional": true,
+            "default": "{}"
+          }
+        ],
+        "returns": "AsyncGenerator<BeepgridEvent, any, any>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "wait",
+        "signature": "(id: string, signal?: AbortSignal): Promise<RequestItem>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<RequestItem>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "replaceRequest",
+        "signature": "(id: string, input: { version: number; body: string; mentions?: Mention[]; }, key?: string): Promise<{ previous: RequestItem; replacement: RequestItem; }>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "input",
+            "type": "{ version: number; body: string; mentions?: Mention[] }",
+            "optional": false
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "optional": true,
+            "default": "crypto.randomUUID()"
+          }
+        ],
+        "returns": "Promise<{ previous: RequestItem; replacement: RequestItem; }>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "cancel",
+        "signature": "(id: string, version: number): Promise<RequestItem>",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "version",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<RequestItem>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "inbox",
+        "signature": "(signal?: AbortSignal, waitMs?: number): Promise<Delivery[]>",
+        "parameters": [
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          },
+          {
+            "name": "waitMs",
+            "type": "number",
+            "optional": true,
+            "default": "0"
+          }
+        ],
+        "returns": "Promise<Delivery[]>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "ack",
+        "signature": "(delivery: Delivery): Promise<unknown>",
+        "parameters": [
+          {
+            "name": "delivery",
+            "type": "Delivery",
+            "optional": false
+          }
+        ],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "heartbeat",
+        "signature": "(progress?: Record<string, unknown>): Promise<unknown>",
+        "parameters": [
+          {
+            "name": "progress",
+            "type": "Record<string, unknown>",
+            "optional": true,
+            "default": "{}"
+          }
+        ],
+        "returns": "Promise<unknown>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      },
+      {
+        "name": "run",
+        "signature": "(handler: (delivery: Delivery) => Promise<void>, signal?: AbortSignal): Promise<void>",
+        "parameters": [
+          {
+            "name": "handler",
+            "type": "(delivery: Delivery) => Promise<void>",
+            "optional": false
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "Promise<void>",
+        "doc": "",
+        "file": "sdk/typescript/src/index.ts"
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/index.ts",
+    "name": "mentionContext",
+    "doc": "A mention identifies an explicit addressee. Observers may still contribute.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function mentionContext(message:Message, recipient:string):string {\n if(!message.mentions?.length)return \"\";\n return message.mentions.some(m=>m.principal_id===recipient)?\"You are explicitly addressed. Other participants may contribute relevant context.\":\"Other participants are explicitly addressed. You may contribute relevant context.\";\n}"
+  },
+  {
+    "file": "sdk/typescript/src/events.ts",
+    "name": "BeepgridEvent",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type BeepgridEvent = {\n  sequence: number;\n  kind: string;\n  actor_id: string;\n  conversation_id: string;\n  recipient_id: string;\n  data: unknown;\n  created_at: string;\n};",
+    "fields": [
+      {
+        "name": "sequence",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "actor_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "conversation_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "recipient_id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "data",
+        "type": "unknown",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/events.ts",
+    "name": "EventOptions",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type EventOptions = { after?: number; signal?: AbortSignal; summary?: boolean };",
+    "fields": [
+      {
+        "name": "after",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "signal",
+        "type": "AbortSignal",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "summary",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/events.ts",
+    "name": "readEvents",
+    "doc": "",
+    "kind": "FunctionDeclaration",
+    "definition": "export async function* readEvents(base: string, token: string, transport: typeof fetch, options: EventOptions): AsyncGenerator<BeepgridEvent> {\n  let cursor = options.after ?? 0;\n  if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error(\"Invalid event cursor\");\n  const control = new AbortController();\n  const abort = () => control.abort(options.signal?.reason);\n  options.signal?.addEventListener(\"abort\", abort, { once: true });\n  if (options.signal?.aborted) abort();\n  let backoff = 100;\n  try {\n    while (!control.signal.aborted) {\n      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;\n      let received = false;\n      try {\n        const response = await transport(`${base}/api/v1/events?stream=1&after=${cursor}${options.summary ? \"&summary=1\" : \"\"}`, {\n          redirect: \"error\", headers: { Authorization: `Bearer ${token}`, \"Last-Event-ID\": String(cursor) }, signal: control.signal,\n        });\n        if (!response.ok) {\n          // Do not retry revoked credentials or a policy denial indefinitely.\n          if (response.status < 500 && response.status !== 429) {\n            await response.body?.cancel();\n            throw new BeepgridError(\"EVENT_STREAM_REJECTED\", \"Event stream rejected\", response.status);\n          }\n          await response.body?.cancel();\n          throw new Error(\"Event stream temporarily unavailable\");\n        }\n        if (!response.body || !response.headers.get(\"Content-Type\")?.includes(\"text/event-stream\")) {\n          await response.body?.cancel();\n          throw new BeepgridError(\"INVALID_EVENT_STREAM\", \"Expected an event stream\", 502);\n        }\n        reader = response.body.getReader();\n        const decoder = new TextDecoder();\n        let buffer = \"\", bytes = 0, data: string[] = [], id = \"\", kind = \"\";\n        for (;;) {\n          const chunk = await reader.read();\n          if (chunk.done) break; // Never commit an unterminated frame after a disconnect.\n          buffer += decoder.decode(chunk.value, { stream: true });\n          let end;\n          while ((end = buffer.indexOf(\"\\n\")) >= 0) {\n            let line = buffer.slice(0, end); buffer = buffer.slice(end + 1);\n            if (line.endsWith(\"\\r\")) line = line.slice(0, -1);\n            bytes += line.length + 1;\n            if (bytes > MAX_FRAME) throw new BeepgridError(\"INVALID_EVENT_STREAM\", \"Event frame exceeds limit\", 502);\n            if (line === \"\") {\n              if (id && data.length) {\n                const sequence = Number(id);\n                if (!Number.isSafeInteger(sequence) || sequence < 0) throw new BeepgridError(\"INVALID_EVENT_STREAM\", \"Invalid event ID\", 502);\n                if (sequence > cursor) {\n                  if (kind === \"cursor\") { cursor = sequence; }\n                  else {\n                    let event: BeepgridEvent;\n                    try { event = JSON.parse(data.join(\"\\n\")); } catch { throw new BeepgridError(\"INVALID_EVENT_STREAM\", \"Invalid event JSON\", 502); }\n                    if (event.sequence !== sequence || typeof event.kind !== \"string\") throw new BeepgridError(\"INVALID_EVENT_STREAM\", \"Event identity mismatch\", 502);\n                    cursor = sequence;\n                    received = true;\n                    backoff = 100;\n                    yield event;\n                  }\n                }\n              }\n              bytes = 0; data = []; id = \"\"; kind = \"\";\n            } else if (!line.startsWith(\":\")) {\n              const colon = line.indexOf(\":\"), name = colon < 0 ? line : line.slice(0, colon);\n              let value = colon < 0 ? \"\" : line.slice(colon + 1);\n              if (value.startsWith(\" \")) value = value.slice(1);\n              if (name === \"data\") data.push(value);\n              else if (name === \"id\") id = value;\n              else if (name === \"event\") kind = value;\n            }\n          }\n          if (buffer.length + bytes > MAX_FRAME) throw new BeepgridError(\"INVALID_EVENT_STREAM\", \"Event frame exceeds limit\", 502);\n        }\n      } catch (error) {\n        if (control.signal.aborted) return;\n        if (error instanceof BeepgridError) throw error;\n        // Connection loss is retried from the last completely consumed event.\n      } finally {\n        if (reader) { try { await reader.cancel(); } catch {} reader.releaseLock(); }\n      }\n      if (!received) {\n        await pause(backoff, control.signal);\n        backoff = Math.min(backoff * 2, 2000);\n      }\n    }\n  } finally {\n    control.abort();\n    options.signal?.removeEventListener(\"abort\", abort);\n  }\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "BusyMode",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type BusyMode = \"steer\" | \"queue\";",
+    "fields": [
+      {
+        "name": "toString",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a string representation of a string."
+      },
+      {
+        "name": "charAt",
+        "type": "(pos: number) => string",
+        "optional": false,
+        "doc": "Returns the character at the specified index."
+      },
+      {
+        "name": "charCodeAt",
+        "type": "(index: number) => number",
+        "optional": false,
+        "doc": "Returns the Unicode value of the character at the specified location."
+      },
+      {
+        "name": "concat",
+        "type": "(...strings: string[]) => string",
+        "optional": false,
+        "doc": "Returns a string that contains the concatenation of two or more strings."
+      },
+      {
+        "name": "indexOf",
+        "type": "(searchString: string, position?: number) => number",
+        "optional": false,
+        "doc": "Returns the position of the first occurrence of a substring."
+      },
+      {
+        "name": "lastIndexOf",
+        "type": "(searchString: string, position?: number) => number",
+        "optional": false,
+        "doc": "Returns the last occurrence of a substring in the string."
+      },
+      {
+        "name": "localeCompare",
+        "type": "{ (that: string): number; (that: string, locales?: string | string[], options?: CollatorOptions): number; (that: string, locales?: LocalesArgument, options?: CollatorOptions): number; }",
+        "optional": false,
+        "doc": "Determines whether two strings are equivalent in the current locale.\nDetermines whether two strings are equivalent in the current or specified locale."
+      },
+      {
+        "name": "match",
+        "type": "{ (regexp: string | RegExp): RegExpMatchArray; (matcher: { [Symbol.match](string: string): RegExpMatchArray; }): RegExpMatchArray; }",
+        "optional": false,
+        "doc": "Matches a string with a regular expression, and returns an array containing the results of that search.\nMatches a string or an object that supports being matched against, and returns an array\ncontaining the results of that search, or null if no matches are found."
+      },
+      {
+        "name": "replace",
+        "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; (searchValue: { [Symbol.replace](string: string, replaceValue: string): string; }, replaceValue: string): string; (searchValue: { [Symbol.replace](string: string, replacer: (substring: string, ...args: any[]) => string): string; }, replacer: (substring: string, ...args: any[]) => string): string; }",
+        "optional": false,
+        "doc": "Replaces text in a string, using a regular expression or search string.\nPasses a string and {@linkcode replaceValue} to the `[Symbol.replace]` method on {@linkcode searchValue}. This method is expected to implement its own replacement algorithm.\nReplaces text in a string, using an object that supports replacement within a string."
+      },
+      {
+        "name": "search",
+        "type": "{ (regexp: string | RegExp): number; (searcher: { [Symbol.search](string: string): number; }): number; }",
+        "optional": false,
+        "doc": "Finds the first substring match in a regular expression search."
+      },
+      {
+        "name": "slice",
+        "type": "(start?: number, end?: number) => string",
+        "optional": false,
+        "doc": "Returns a section of a string."
+      },
+      {
+        "name": "split",
+        "type": "{ (separator: string | RegExp, limit?: number): string[]; (splitter: { [Symbol.split](string: string, limit?: number): string[]; }, limit?: number): string[]; }",
+        "optional": false,
+        "doc": "Split a string into substrings using the specified separator and return them as an array."
+      },
+      {
+        "name": "substring",
+        "type": "(start: number, end?: number) => string",
+        "optional": false,
+        "doc": "Returns the substring at the specified location within a String object."
+      },
+      {
+        "name": "toLowerCase",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Converts all the alphabetic characters in a string to lowercase."
+      },
+      {
+        "name": "toLocaleLowerCase",
+        "type": "{ (locales?: string | string[]): string; (locales?: LocalesArgument): string; }",
+        "optional": false,
+        "doc": "Converts all alphabetic characters to lowercase, taking into account the host environment's current locale."
+      },
+      {
+        "name": "toUpperCase",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Converts all the alphabetic characters in a string to uppercase."
+      },
+      {
+        "name": "toLocaleUpperCase",
+        "type": "{ (locales?: string | string[]): string; (locales?: LocalesArgument): string; }",
+        "optional": false,
+        "doc": "Returns a string where all alphabetic characters have been converted to uppercase, taking into account the host environment's current locale."
+      },
+      {
+        "name": "trim",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Removes the leading and trailing white space and line terminator characters from a string."
+      },
+      {
+        "name": "length",
+        "type": "number",
+        "optional": false,
+        "doc": "Returns the length of a String object."
+      },
+      {
+        "name": "substr",
+        "type": "(from: number, length?: number) => string",
+        "optional": false,
+        "doc": "Gets a substring beginning at the specified location and having the specified length."
+      },
+      {
+        "name": "valueOf",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns the primitive value of the specified object."
+      },
+      {
+        "name": "codePointAt",
+        "type": "(pos: number) => number",
+        "optional": false,
+        "doc": "Returns a nonnegative integer Number less than 1114112 (0x110000) that is the code point\nvalue of the UTF-16 encoded code point starting at the string element at position pos in\nthe String resulting from converting this object to a String.\nIf there is no element at that position, the result is undefined.\nIf a valid UTF-16 surrogate pair does not begin at pos, the result is the code unit at pos."
+      },
+      {
+        "name": "includes",
+        "type": "(searchString: string, position?: number) => boolean",
+        "optional": false,
+        "doc": "Returns true if searchString appears as a substring of the result of converting this\nobject to a String, at one or more positions that are\ngreater than or equal to position; otherwise, returns false."
+      },
+      {
+        "name": "endsWith",
+        "type": "(searchString: string, endPosition?: number) => boolean",
+        "optional": false,
+        "doc": "Returns true if the sequence of elements of searchString converted to a String is the\nsame as the corresponding elements of this object (converted to a String) starting at\nendPosition \u2013 length(this). Otherwise returns false."
+      },
+      {
+        "name": "normalize",
+        "type": "{ (form: \"NFC\" | \"NFD\" | \"NFKC\" | \"NFKD\"): string; (form?: string): string; }",
+        "optional": false,
+        "doc": "Returns the String value result of normalizing the string into the normalization form\nnamed by form as specified in Unicode Standard Annex #15, Unicode Normalization Forms."
+      },
+      {
+        "name": "repeat",
+        "type": "(count: number) => string",
+        "optional": false,
+        "doc": "Returns a String value that is made from count copies appended together. If count is 0,\nthe empty string is returned."
+      },
+      {
+        "name": "startsWith",
+        "type": "(searchString: string, position?: number) => boolean",
+        "optional": false,
+        "doc": "Returns true if the sequence of elements of searchString converted to a String is the\nsame as the corresponding elements of this object (converted to a String) starting at\nposition. Otherwise returns false."
+      },
+      {
+        "name": "anchor",
+        "type": "(name: string) => string",
+        "optional": false,
+        "doc": "Returns an `<a>` HTML anchor element and sets the name attribute to the text value"
+      },
+      {
+        "name": "big",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<big>` HTML element"
+      },
+      {
+        "name": "blink",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<blink>` HTML element"
+      },
+      {
+        "name": "bold",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<b>` HTML element"
+      },
+      {
+        "name": "fixed",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<tt>` HTML element"
+      },
+      {
+        "name": "fontcolor",
+        "type": "(color: string) => string",
+        "optional": false,
+        "doc": "Returns a `<font>` HTML element and sets the color attribute value"
+      },
+      {
+        "name": "fontsize",
+        "type": "{ (size: number): string; (size: string): string; }",
+        "optional": false,
+        "doc": "Returns a `<font>` HTML element and sets the size attribute value"
+      },
+      {
+        "name": "italics",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns an `<i>` HTML element"
+      },
+      {
+        "name": "link",
+        "type": "(url: string) => string",
+        "optional": false,
+        "doc": "Returns an `<a>` HTML element and sets the href attribute value"
+      },
+      {
+        "name": "small",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<small>` HTML element"
+      },
+      {
+        "name": "strike",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<strike>` HTML element"
+      },
+      {
+        "name": "sub",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<sub>` HTML element"
+      },
+      {
+        "name": "sup",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Returns a `<sup>` HTML element"
+      },
+      {
+        "name": "padStart",
+        "type": "(maxLength: number, fillString?: string) => string",
+        "optional": false,
+        "doc": "Pads the current string with a given string (possibly repeated) so that the resulting string reaches a given length.\nThe padding is applied from the start (left) of the current string."
+      },
+      {
+        "name": "padEnd",
+        "type": "(maxLength: number, fillString?: string) => string",
+        "optional": false,
+        "doc": "Pads the current string with a given string (possibly repeated) so that the resulting string reaches a given length.\nThe padding is applied from the end (right) of the current string."
+      },
+      {
+        "name": "trimEnd",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Removes the trailing white space and line terminator characters from a string."
+      },
+      {
+        "name": "trimStart",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Removes the leading white space and line terminator characters from a string."
+      },
+      {
+        "name": "trimLeft",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Removes the leading white space and line terminator characters from a string."
+      },
+      {
+        "name": "trimRight",
+        "type": "() => string",
+        "optional": false,
+        "doc": "Removes the trailing white space and line terminator characters from a string."
+      },
+      {
+        "name": "matchAll",
+        "type": "(regexp: RegExp) => RegExpStringIterator<RegExpExecArray>",
+        "optional": false,
+        "doc": "Matches a string with a regular expression, and returns an iterable of matches\ncontaining the results of that search."
+      },
+      {
+        "name": "replaceAll",
+        "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; }",
+        "optional": false,
+        "doc": "Replace all instances of a substring in a string, using a regular expression or search string."
+      },
+      {
+        "name": "at",
+        "type": "(index: number) => string",
+        "optional": false,
+        "doc": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
+      },
+      {
+        "name": "__@iterator@627",
+        "type": "() => StringIterator<string>",
+        "optional": false,
+        "doc": "Iterator"
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "LiveInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type LiveInput = {\n  /** Stable across transport lease generations. Use this in host checkpoints. */\n  id: string;\n  conversationId: string;\n  kind: string;\n  delivery: Delivery;\n};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": "Stable across transport lease generations. Use this in host checkpoints."
+      },
+      {
+        "name": "conversationId",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "delivery",
+        "type": "Delivery",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "StoredInput",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type StoredInput = LiveInput & {\n  state: \"pending\" | \"submitting\" | \"accepted\";\n};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": "Stable across transport lease generations. Use this in host checkpoints."
+      },
+      {
+        "name": "conversationId",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "delivery",
+        "type": "Delivery",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "state",
+        "type": "\"pending\" | \"submitting\" | \"accepted\"",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "InboxStore",
+    "doc": "",
+    "kind": "InterfaceDeclaration",
+    "definition": "export interface InboxStore {\n  put(input: LiveInput): void;\n  pending(limit?: number): StoredInput[];\n  setState(id: string, state: StoredInput[\"state\"]): void;\n  get(id: string): StoredInput | undefined;\n  close(): void;\n}",
+    "fields": [
+      {
+        "name": "put",
+        "type": "(input: LiveInput) => void",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "pending",
+        "type": "(limit?: number) => StoredInput[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "setState",
+        "type": "(id: string, state: \"pending\" | \"submitting\" | \"accepted\") => void",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "get",
+        "type": "(id: string) => StoredInput",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "close",
+        "type": "() => void",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "InputBinding",
+    "doc": "",
+    "kind": "InterfaceDeclaration",
+    "definition": "export interface InputBinding {\n  readonly name: string;\n  readonly supportsSteer: boolean;\n  /** Return after native acceptance/checkpoint, never after the whole business job.\n   * Honor input.id for deduplication. Do not elevate peer content to owner authority. */\n  submit(input: LiveInput, mode: BusyMode, signal?: AbortSignal): Promise<void>;\n  resume?(input: LiveInput, signal?: AbortSignal): Promise<void>;\n  /** A crash/network error may leave native acceptance uncertain. No blind replay. */\n  reconcile?(input: LiveInput): Promise<\"accepted\" | \"retry\" | \"unknown\">;\n}",
+    "fields": [
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "supportsSteer",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "submit",
+        "type": "(input: LiveInput, mode: BusyMode, signal?: AbortSignal) => Promise<void>",
+        "optional": false,
+        "doc": "Return after native acceptance/checkpoint, never after the whole business job.\nHonor input.id for deduplication. Do not elevate peer content to owner authority."
+      },
+      {
+        "name": "resume",
+        "type": "(input: LiveInput, signal?: AbortSignal) => Promise<void>",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "reconcile",
+        "type": "(input: LiveInput) => Promise<\"unknown\" | \"accepted\" | \"retry\">",
+        "optional": true,
+        "doc": "A crash/network error may leave native acceptance uncertain. No blind replay."
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "liveInput",
+    "doc": "",
+    "kind": "FunctionDeclaration",
+    "definition": "export function liveInput(delivery: Delivery): LiveInput {\n  const conversationId =\n    delivery.payload.conversation_id ||\n    delivery.payload.request?.conversation_id ||\n    delivery.payload.message?.conversation_id;\n  if (!delivery.id || !conversationId)\n    throw new Error(\"Delivery has no stable conversation identity\");\n  return {\n    id: delivery.id,\n    conversationId,\n    kind: delivery.payload.type,\n    delivery,\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "LiveConnection",
+    "doc": "Serialized receiver with independent intake and native submission loops.\nOwn one worker credential exclusively. Do not also call worker.run/MCP receive.",
+    "kind": "ClassDeclaration",
+    "definition": "export class LiveConnection {\n  private accepting?: Promise<void>;\n  private pumping?: Promise<void>;\n  private stopped = false;\n  private ready = false;\n  private nudge?: () => void;\n  private controller?: AbortController;\n  private failure?: unknown;\n  private active = new Map<string, Promise<void>>();\n  private checked = new Map<string, number>();\n  constructor(\n    readonly client: Pick<Client, \"inbox\" | \"ack\">,\n    readonly store: InboxStore,\n    readonly binding: InputBinding,\n    readonly mode: BusyMode = \"steer\",\n    readonly onError: (error: unknown) => void = () => {},\n  ) {\n    if (![\"steer\", \"queue\"].includes(mode))\n      throw new Error(\"Use steer or queue\");\n    if (mode === \"steer\" && !binding.supportsSteer)\n      throw new Error(`${binding.name} supports Queue only`);\n  }\n  /** Non-blocking start. Stop and await done() before closing the store. */\n  start(signal?: AbortSignal): this {\n    if (this.controller) throw new Error(\"Connection already started\");\n    this.controller = new AbortController();\n    if (signal?.aborted) this.controller.abort(signal.reason);\n    else\n      signal?.addEventListener(\"abort\", () => this.stop(), {\n        once: true,\n        signal: this.controller.signal,\n      });\n    this.accepting = this.intake(this.controller.signal).catch((e) => {\n      this.failure = e;\n      this.stop();\n    });\n    this.pumping = this.dispatch(this.controller.signal).catch((e) => {\n      this.failure = e;\n      this.stop();\n    });\n    return this;\n  }\n  stop() {\n    this.stopped = true;\n    this.controller?.abort();\n  }\n  async done() {\n    await Promise.all([this.accepting, this.pumping]);\n    await Promise.all(this.active.values());\n    if (this.failure) throw this.failure;\n  }\n  private async intake(signal: AbortSignal) {\n    while (!this.stopped && !signal.aborted) {\n      try {\n        const deliveries = await this.client.inbox(\n          signal,\n          this.ready ? 15000 : 0,\n        );\n        this.ready = true;\n        for (const delivery of deliveries) {\n          // Synchronous durable transaction happens before ACK or a host call.\n          this.store.put(liveInput(delivery));\n          this.nudge?.();\n          await this.client.ack(delivery);\n        }\n        if (!deliveries.length) await pause(50, signal);\n      } catch (error) {\n        if (signal.aborted) return;\n        // Revoked credentials and malformed deliveries require operator action.\n        const status = (error as { status?: number }).status;\n        if (status && status < 500 && status !== 429 && status !== 409)\n          throw error;\n        this.onError(error);\n        await pause(500, signal);\n      }\n    }\n  }\n  private async dispatch(signal: AbortSignal) {\n    while (!signal.aborted) {\n      if (!this.ready) {\n        await pause(10, signal);\n        continue;\n      }\n      const sessions = new Set<string>();\n      // Scan the bounded journal, not only its oldest page: a busy session or\n      // uncertain native submission must not starve independent conversations.\n      const pending = this.store.pending();\n      // Control results must not sit behind ordinary queued work.\n      pending.sort(\n        (a, b) =>\n          Number(b.kind === \"request.resolved\") -\n          Number(a.kind === \"request.resolved\"),\n      );\n      for (const input of pending) {\n        const lane =\n          input.conversationId +\n          (input.kind === \"request.resolved\" ? \"/result\" : \"/input\");\n        if (signal.aborted) break;\n        if (\n          this.active.size >= 8 &&\n          !(input.kind === \"request.resolved\" && this.binding.resume)\n        )\n          continue;\n        if (sessions.has(lane) || this.active.has(lane)) continue;\n        sessions.add(lane);\n        if ((this.checked.get(input.id) ?? 0) > Date.now() - 1000) continue;\n        this.checked.set(input.id, Date.now());\n        const job = this.deliver(input, signal)\n          .catch((error) => {\n            this.onError(error);\n          })\n          .finally(() => {\n            this.active.delete(lane);\n            this.nudge?.();\n          });\n        this.active.set(lane, job);\n      }\n      await new Promise<void>((resolve) => {\n        const wake = () => {\n          clearTimeout(timer);\n          signal.removeEventListener(\"abort\", wake);\n          this.nudge = undefined;\n          resolve();\n        };\n        const timer = setTimeout(wake, 1000);\n        this.nudge = wake;\n        signal.addEventListener(\"abort\", wake, { once: true });\n        if (signal.aborted) wake();\n      });\n    }\n  }\n  private async deliver(input: StoredInput, signal: AbortSignal) {\n    if (input.state === \"submitting\") {\n      const outcome = (await this.binding.reconcile?.(input)) ?? \"unknown\";\n      if (outcome === \"accepted\") this.store.setState(input.id, \"accepted\");\n      if (outcome !== \"retry\") return;\n    }\n    this.store.setState(input.id, \"submitting\");\n    try {\n      if (input.kind === \"request.resolved\" && this.binding.resume)\n        await interruptible(this.binding.resume(input, signal), signal);\n      else {\n        if (input.kind === \"request.resolved\" && !this.binding.supportsSteer)\n          throw new Error(\n            \"Connect a result resume handler for this Queue-only runtime\",\n          );\n        await interruptible(\n          this.binding.submit(\n            input,\n            input.kind === \"request.resolved\" ? \"steer\" : this.mode,\n            signal,\n          ),\n          signal,\n        );\n      }\n      this.store.setState(input.id, \"accepted\");\n      this.checked.delete(input.id);\n    } catch (error) {\n      this.onError(error);\n    }\n  }\n}",
+    "methods": [
+      {
+        "name": "start",
+        "signature": "(signal?: AbortSignal): this",
+        "parameters": [
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ],
+        "returns": "this",
+        "doc": "Non-blocking start. Stop and await done() before closing the store.",
+        "file": "sdk/typescript/src/runtime/index.ts"
+      },
+      {
+        "name": "stop",
+        "signature": "(): void",
+        "parameters": [],
+        "returns": "void",
+        "doc": "",
+        "file": "sdk/typescript/src/runtime/index.ts"
+      },
+      {
+        "name": "done",
+        "signature": "(): Promise<void>",
+        "parameters": [],
+        "returns": "Promise<void>",
+        "doc": "",
+        "file": "sdk/typescript/src/runtime/index.ts"
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/index.ts",
+    "name": "inputText",
+    "doc": "External input stays data. The original delivery retains sender, request,\nattachments, mentions and authority; bindings must not turn this into system text.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function inputText(input: LiveInput): string {\n  return JSON.stringify({\n    beepgrid: {\n      ...input.delivery.payload,\n      delivery_id: input.id,\n      conversation_id: input.conversationId,\n    },\n  });\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/node.ts",
+    "name": "SQLiteInbox",
+    "doc": "Private local custody, suitable for a persistent VM/container volume.\nOne database per workspace + exact worker instance. Never place it in a repo.\nFor ephemeral/serverless hosts implement InboxStore using the host's durable DB.",
+    "kind": "ClassDeclaration",
+    "definition": "export class SQLiteInbox implements InboxStore {\n  private db: DatabaseSync;\n  private lease = randomUUID();\n  private timer: ReturnType<typeof setInterval>;\n  private closed = false;\n  constructor(\n    path: string,\n    identity: string,\n    private maxPending = 1000,\n  ) {\n    if (\n      !identity ||\n      path === \":memory:\" ||\n      !Number.isInteger(maxPending) ||\n      maxPending < 1\n    )\n      throw new Error(\"Persistent path and exact connection identity required\");\n    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });\n    this.db = new DatabaseSync(path);\n    chmodSync(path, 0o600);\n    this.db\n      .exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;\n      CREATE TABLE IF NOT EXISTS identity (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);\n      CREATE TABLE IF NOT EXISTS lease (id INTEGER PRIMARY KEY CHECK(id=1), owner TEXT NOT NULL, expires INTEGER NOT NULL);\n      CREATE TABLE IF NOT EXISTS inputs (id TEXT PRIMARY KEY, payload TEXT NOT NULL, state TEXT NOT NULL, created INTEGER NOT NULL);`);\n    try {\n      this.db.exec(\"BEGIN IMMEDIATE\");\n      const previous = this.db\n        .prepare(\"SELECT value FROM identity WHERE id=1\")\n        .get() as { value: string } | undefined;\n      if (previous && previous.value !== identity)\n        throw new Error(\"Inbox belongs to another connection\");\n      this.db\n        .prepare(\"INSERT OR IGNORE INTO identity VALUES(1,?)\")\n        .run(identity);\n      const lease = this.db\n        .prepare(\"SELECT owner,expires FROM lease WHERE id=1\")\n        .get() as { owner: string; expires: number } | undefined;\n      if (lease && lease.expires > Date.now())\n        throw new Error(\"This inbox already has a receiver\");\n      this.db\n        .prepare(\"INSERT OR REPLACE INTO lease VALUES(1,?,?)\")\n        .run(this.lease, Date.now() + 15000);\n      this.db.exec(\"COMMIT\");\n    } catch (error) {\n      this.db.exec(\"ROLLBACK\");\n      this.db.close();\n      throw error;\n    }\n    this.timer = setInterval(() => {\n      try {\n        this.guard();\n        this.db\n          .prepare(\"UPDATE lease SET expires=? WHERE owner=?\")\n          .run(Date.now() + 15000, this.lease);\n      } catch {\n        /* Subsequent operations fail closed. */\n      }\n    }, 5000);\n    this.timer.unref();\n  }\n  private guard() {\n    if (this.closed) throw new Error(\"Inbox closed\");\n    const row = this.db\n      .prepare(\"SELECT owner,expires FROM lease WHERE id=1\")\n      .get() as { owner: string; expires: number } | undefined;\n    if (row?.owner !== this.lease || row.expires <= Date.now())\n      throw new Error(\"Receiver lease lost; restart before receiving\");\n  }\n  put(input: LiveInput) {\n    this.guard();\n    if (this.get(input.id)) return;\n    const row = this.db\n      .prepare(\"SELECT count(*) AS n FROM inputs WHERE state!='accepted'\")\n      .get() as { n: number };\n    if (row.n >= this.maxPending)\n      throw new Error(\n        \"Local inbox full; receiving paused until inputs are accepted\",\n      );\n    this.db\n      .prepare(\"INSERT INTO inputs VALUES(?,?,'pending',?)\")\n      .run(input.id, JSON.stringify(input), Date.now());\n    // Accepted engine deliveries expire in 30 days. Keep the dedup horizon longer.\n    this.db\n      .prepare(\"DELETE FROM inputs WHERE state='accepted' AND created<?\")\n      .run(Date.now() - 31 * 86400000);\n  }\n  pending(limit = 1000): StoredInput[] {\n    this.guard();\n    return (\n      this.db\n        .prepare(\n          \"SELECT payload,state FROM inputs WHERE state!='accepted' ORDER BY (json_extract(payload,'$.kind')='request.resolved') DESC,created,rowid LIMIT ?\",\n        )\n        .all(Math.max(1, Math.min(1000, Math.floor(limit)))) as {\n        payload: string;\n        state: StoredInput[\"state\"];\n      }[]\n    ).map((row) => ({ ...JSON.parse(row.payload), state: row.state }));\n  }\n  get(id: string): StoredInput | undefined {\n    this.guard();\n    const row = this.db\n      .prepare(\"SELECT payload,state FROM inputs WHERE id=?\")\n      .get(id) as { payload: string; state: StoredInput[\"state\"] } | undefined;\n    return row ? { ...JSON.parse(row.payload), state: row.state } : undefined;\n  }\n  setState(id: string, state: StoredInput[\"state\"]) {\n    this.guard();\n    if (![\"pending\", \"submitting\", \"accepted\"].includes(state))\n      throw new Error(\"Invalid custody state\");\n    if (\n      !this.db\n        .prepare(\n          \"UPDATE inputs SET state=?,payload=CASE WHEN ?='accepted' THEN json_remove(payload,'$.delivery.payload.message','$.delivery.payload.request') ELSE payload END WHERE id=?\",\n        )\n        .run(state, state, id).changes\n    )\n      throw new Error(\"Unknown input\");\n  }\n  close() {\n    if (this.closed) return;\n    clearInterval(this.timer);\n    this.db.prepare(\"DELETE FROM lease WHERE owner=?\").run(this.lease);\n    this.db.close();\n    this.closed = true;\n  }\n}",
+    "methods": [
+      {
+        "name": "put",
+        "signature": "(input: LiveInput): void",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "LiveInput",
+            "optional": false
+          }
+        ],
+        "returns": "void",
+        "doc": "",
+        "file": "sdk/typescript/src/runtime/node.ts"
+      },
+      {
+        "name": "pending",
+        "signature": "(limit?: number): StoredInput[]",
+        "parameters": [
+          {
+            "name": "limit",
+            "type": "number",
+            "optional": true,
+            "default": "1000"
+          }
+        ],
+        "returns": "StoredInput[]",
+        "doc": "",
+        "file": "sdk/typescript/src/runtime/node.ts"
+      },
+      {
+        "name": "get",
+        "signature": "(id: string): StoredInput",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "StoredInput",
+        "doc": "",
+        "file": "sdk/typescript/src/runtime/node.ts"
+      },
+      {
+        "name": "setState",
+        "signature": "(id: string, state: \"pending\" | \"submitting\" | \"accepted\"): void",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "state",
+            "type": "StoredInput[\"state\"]",
+            "optional": false
+          }
+        ],
+        "returns": "void",
+        "doc": "",
+        "file": "sdk/typescript/src/runtime/node.ts"
+      },
+      {
+        "name": "close",
+        "signature": "(): void",
+        "parameters": [],
+        "returns": "void",
+        "doc": "",
+        "file": "sdk/typescript/src/runtime/node.ts"
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "SessionRoute",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type SessionRoute = (conversationId: string) => Promise<string>;",
+    "fields": []
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "RPC",
+    "doc": "Use an authenticated, initialized native client, not a URL provided by a message.",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type RPC = (\n  method: string,\n  params: Record<string, unknown>,\n  signal?: AbortSignal,\n) => Promise<unknown>;",
+    "fields": []
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "withResultResume",
+    "doc": "Connect correlated Beepgrid results to the host's existing request waiter.\nKeep this separate from ordinary turn input so Queue cannot block a result.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function withResultResume(\n  binding: InputBinding,\n  resume: NonNullable<InputBinding[\"resume\"]>,\n): InputBinding {\n  return { ...binding, resume };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "codexBinding",
+    "doc": "Codex app-server's documented active-turn API. No cancel/replay fallback.\nactiveTurn must come from the same session's turn events. A turn race remains\nuncertain until the host transcript is reconciled with the delivery ID.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function codexBinding(options: {\n  rpc: RPC;\n  route: SessionRoute;\n  activeTurn: (session: string) => string | undefined;\n  idle: (session: string) => Promise<void>;\n  reconcile: Reconcile;\n}): InputBinding {\n  return {\n    name: \"Codex\",\n    supportsSteer: true,\n    reconcile: options.reconcile,\n    async submit(input, mode, signal) {\n      const threadId = await options.route(input.conversationId);\n      if (mode === \"queue\") await options.idle(threadId);\n      // Queue must never become a steer if another native turn races idle.\n      // turn/start may reject that race, leaving custody for reconciliation.\n      const turn = mode === \"steer\" ? options.activeTurn(threadId) : undefined;\n      const content = [{ type: \"text\", text: inputText(input) }];\n      if (turn)\n        await options.rpc(\n          \"turn/steer\",\n          {\n            threadId,\n            expectedTurnId: turn,\n            clientUserMessageId: input.id,\n            input: content,\n          },\n          signal,\n        );\n      else\n        await options.rpc(\n          \"turn/start\",\n          { threadId, clientUserMessageId: input.id, input: content },\n          signal,\n        );\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "piBinding",
+    "doc": "Pi RPC acknowledges prompt acceptance separately from streamed Agent events.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function piBinding(options: {\n  rpc: (\n    session: string,\n    command: Record<string, unknown>,\n    signal?: AbortSignal,\n  ) => Promise<{ success: boolean; error?: string }>;\n  route: SessionRoute;\n  reconcile: Reconcile;\n}): InputBinding {\n  return {\n    name: \"Pi\",\n    supportsSteer: true,\n    reconcile: options.reconcile,\n    async submit(input, mode, signal) {\n      const result = await options.rpc(\n        await options.route(input.conversationId),\n        {\n          id: input.id,\n          type: \"prompt\",\n          message: inputText(input),\n          streamingBehavior: mode === \"steer\" ? \"steer\" : \"followUp\",\n        },\n        signal,\n      );\n      if (!result.success) throw new Error(result.error || \"Pi rejected input\");\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "acpBinding",
+    "doc": "ACP v1 has no universal steering method. Codex and Claude ACP advertise the\nsame _session/steering extension in initialize._meta.steering.supported.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function acpBinding(options: {\n  rpc: RPC;\n  route: SessionRoute;\n  idle: (session: string) => Promise<void>;\n  steer?: (session: string, text: string, id: string) => Promise<void>;\n  initialization?: unknown;\n  reconcile: Reconcile;\n}): InputBinding {\n  const initialized = options.initialization as\n    | {\n        _meta?: { steering?: { supported?: boolean } | null } | null;\n      }\n    | null\n    | undefined;\n  const nativeSteer = initialized?._meta?.steering?.supported === true;\n  return {\n    name: \"ACP\",\n    supportsSteer: nativeSteer || !!options.steer,\n    reconcile: options.reconcile,\n    async submit(input, mode, signal) {\n      const sessionId = await options.route(input.conversationId);\n      if (nativeSteer && mode === \"steer\") {\n        const result = (await options.rpc(\n          \"_session/steering\",\n          {\n            sessionId,\n            prompt: [{ type: \"text\", text: inputText(input) }],\n          },\n          signal,\n        )) as { outcome?: string } | null;\n        // Without idleBehavior:promptRequired, both qualified adapters start an\n        // idle turn and return acceptance separately from turn completion.\n        if (\n          result?.outcome !== \"injected\" &&\n          result?.outcome !== \"startedNewTurn\"\n        )\n          throw new Error(\"ACP steering did not confirm input acceptance\");\n        return;\n      }\n      if (mode === \"steer\") {\n        if (!options.steer)\n          throw new Error(\"ACP host did not negotiate steering\");\n        await options.steer(sessionId, inputText(input), input.id);\n      } else {\n        await options.idle(sessionId);\n        await options.rpc(\n          \"session/prompt\",\n          { sessionId, prompt: [{ type: \"text\", text: inputText(input) }] },\n          signal,\n        );\n      }\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "openCodeV2Binding",
+    "doc": "OpenCode V2's durable session inbox. V1 prompt_async has different semantics.\nUse the installed native client's session.prompt, which returns admission,\nnot task completion. Keep the deterministic message ID for reconciliation.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function openCodeV2Binding(options: {\n  prompt: (input: {\n    sessionID: string;\n    id: string;\n    text: string;\n    delivery: BusyMode;\n    metadata: Record<string, unknown>;\n  }) => Promise<{\n    id: string;\n    sessionID: string;\n    type: string;\n    delivery: string;\n  }>;\n  route: SessionRoute;\n  reconcile: Reconcile;\n}): InputBinding {\n  return {\n    name: \"OpenCode V2\",\n    supportsSteer: true,\n    reconcile: options.reconcile,\n    async submit(input, mode) {\n      const sessionID = await options.route(input.conversationId);\n      const messageID = \"msg_beepgrid_\" + input.id;\n      const receipt = await options.prompt({\n        sessionID,\n        id: messageID,\n        text: inputText(input),\n        delivery: mode,\n        metadata: { beepgridDeliveryId: input.id },\n      });\n      if (\n        receipt.id !== messageID ||\n        receipt.sessionID !== sessionID ||\n        receipt.type !== \"user\" ||\n        receipt.delivery !== mode\n      )\n        throw new Error(\"OpenCode V2 returned a different input admission\");\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "aiSDKBinding",
+    "doc": "AI SDK 7 steering objects are per invocation. The host owns persistent\nmessages and wake(), including final-boundary not-delivered outcomes.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function aiSDKBinding(options: {\n  route: SessionRoute;\n  steering: (session: string) =>\n    | undefined\n    | {\n        steer: (\n          message: { role: \"user\"; content: string },\n          options: { id: string },\n        ) => Promise<{ type: string; reason?: string }>;\n      };\n  wake: (session: string, input: LiveInput) => Promise<void>;\n  queue: (session: string, input: LiveInput) => Promise<void>;\n  reconcile: Reconcile;\n}): InputBinding {\n  return {\n    name: \"AI SDK\",\n    supportsSteer: true,\n    reconcile: options.reconcile,\n    async submit(input, mode) {\n      const session = await options.route(input.conversationId);\n      if (mode === \"queue\") return options.queue(session, input);\n      const steering = options.steering(session);\n      if (!steering) return options.wake(session, input);\n      const result = await steering.steer(\n        { role: \"user\", content: inputText(input) },\n        { id: input.id },\n      );\n      if (result.type === \"delivered\") return;\n      // Host wake() serializes against the finishing run and retains this ID.\n      if (result.type === \"not-delivered\") return options.wake(session, input);\n      throw new Error(\"Unknown AI SDK steering outcome\");\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "checkpointBinding",
+    "doc": "Framework-independent checkpoint port. Suitable for OpenAI Agents, LangGraph,\nClaude Agent SDK or a custom loop. append() takes durable custody and wake()\nschedules the existing loop. It must not start a second model-state writer.\nCorrelated results go to resolve(), even in Queue mode.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function checkpointBinding(options: {\n  name?: string;\n  append: (session: string, input: LiveInput, mode: BusyMode) => Promise<void>;\n  wake: (session: string) => Promise<void>;\n  resolve: (session: string, input: LiveInput) => Promise<void>;\n  route: SessionRoute;\n  reconcile: Reconcile;\n}): InputBinding {\n  return {\n    name: options.name || \"Custom harness\",\n    supportsSteer: true,\n    reconcile: options.reconcile,\n    async submit(input, mode) {\n      const session = await options.route(input.conversationId);\n      await options.append(session, input, mode);\n      await options.wake(session);\n    },\n    async resume(input) {\n      await options.resolve(await options.route(input.conversationId), input);\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "openCodeBinding",
+    "doc": "OpenCode's asynchronous prompt endpoint. Queue only until active injection\nhas been qualified against the installed server version. request() is the\nuser's existing authenticated SDK/HTTP transport. Never cancel a busy run.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function openCodeBinding(options: {\n  request: (path: string, body: unknown, signal?: AbortSignal) => Promise<void>;\n  route: SessionRoute;\n  idle: (session: string) => Promise<void>;\n  reconcile: Reconcile;\n}): InputBinding {\n  return {\n    name: \"OpenCode\",\n    supportsSteer: false,\n    reconcile: options.reconcile,\n    async submit(input, _mode, signal) {\n      const session = await options.route(input.conversationId);\n      await options.idle(session);\n      await options.request(\n        `/session/${encodeURIComponent(session)}/prompt_async`,\n        { parts: [{ type: \"text\", text: inputText(input) }] },\n        signal,\n      );\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/bindings.ts",
+    "name": "claudeSDKBinding",
+    "doc": "Claude Agent SDK's streaming input iterator. Native next priority steers\nafter running tools finish; later waits for the turn to end. Never use now,\nwhich may interrupt a tool, or mislabel Agent input as human origin.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function claudeSDKBinding(options: {\n  route: SessionRoute;\n  append: (\n    session: string,\n    message: {\n      type: \"user\";\n      message: { role: \"user\"; content: string };\n      parent_tool_use_id: null;\n      session_id: string;\n      priority: \"next\" | \"later\";\n      client_composed: true;\n    },\n    id: string,\n    mode: BusyMode,\n  ) => Promise<void>;\n  reconcile: Reconcile;\n}): InputBinding {\n  return {\n    name: \"Claude Agent SDK\",\n    supportsSteer: true,\n    reconcile: options.reconcile,\n    async submit(input, mode) {\n      const session = await options.route(input.conversationId);\n      await options.append(\n        session,\n        {\n          type: \"user\",\n          message: { role: \"user\", content: inputText(input) },\n          parent_tool_use_id: null,\n          session_id: session,\n          priority: mode === \"steer\" ? \"next\" : \"later\",\n          client_composed: true,\n        },\n        input.id,\n        mode,\n      );\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/goose.ts",
+    "name": "gooseBinding",
+    "doc": "Goose's versioned ACP extension, not a capability of arbitrary ACP agents.\nFeed existing session/update notifications to observe(). Native user echo or\noutput from the newly fenced run releases input before its long turn finishes.\nKeep the existing event consumer and error reporting alive until turn end.",
+    "kind": "FunctionDeclaration",
+    "definition": "export function gooseBinding(options: {\n  rpc: RPC;\n  route: SessionRoute;\n  idle: (session: string) => Promise<void>;\n  reconcile: InputBinding[\"reconcile\"];\n  onError: (error: unknown) => void;\n}): InputBinding & { observe: (params: unknown) => void } {\n  const runs = new Map<string, string>();\n  const waiting = new Map<\n    string,\n    { text: string; echo: string; run?: string; accept: () => void }\n  >();\n  return {\n    name: \"Goose ACP\",\n    supportsSteer: true,\n    reconcile: options.reconcile,\n    observe(params) {\n      const p = params as {\n        sessionId?: string;\n        update?: {\n          sessionUpdate?: string;\n          _meta?: { goose?: { activeRunId?: string | null } };\n          content?: { type?: string; text?: string };\n        };\n      } | null;\n      if (!p?.sessionId || !p.update) return;\n      const { sessionId, update } = p;\n      const goose = update._meta?.goose;\n      if (\n        update.sessionUpdate === \"session_info_update\" &&\n        goose &&\n        \"activeRunId\" in goose\n      ) {\n        if (typeof goose.activeRunId === \"string\") {\n          runs.set(sessionId, goose.activeRunId);\n          const pending = waiting.get(sessionId);\n          if (pending) pending.run = goose.activeRunId;\n        } else if (goose.activeRunId === null) runs.delete(sessionId);\n      }\n      const pending = waiting.get(sessionId);\n      if (\n        pending?.run === runs.get(sessionId) &&\n        pending?.run &&\n        [\"agent_message_chunk\", \"agent_thought_chunk\", \"tool_call\"].includes(\n          update.sessionUpdate || \"\",\n        )\n      ) {\n        // Reviewed Goose start_reply persists the user input before returning\n        // the stream forwarded as these updates. One host writer owns this\n        // session. activeRunId alone is emitted earlier and is insufficient.\n        pending.accept();\n        return;\n      }\n      if (\n        pending &&\n        update.sessionUpdate === \"user_message_chunk\" &&\n        update.content?.type === \"text\"\n      ) {\n        pending.echo += update.content.text || \"\";\n        if (pending.echo === pending.text) pending.accept();\n        // Do not retain arbitrary transcript text if the echo differs.\n        else if (!pending.text.startsWith(pending.echo)) pending.echo = \"\";\n      }\n    },\n    async submit(input, mode, signal) {\n      const sessionId = await options.route(input.conversationId);\n      if (mode === \"queue\") await options.idle(sessionId);\n      const text = inputText(input);\n      const prompt = [{ type: \"text\", text }];\n      const run = mode === \"steer\" ? runs.get(sessionId) : undefined;\n      if (run) {\n        const receipt = (await options.rpc(\n          \"_goose/unstable/session/steer\",\n          {\n            sessionId,\n            expectedRunId: run,\n            prompt,\n          },\n          signal,\n        )) as { runId?: string; messageId?: string } | null;\n        if (receipt?.runId !== run || !receipt.messageId)\n          throw new Error(\"Goose did not confirm fenced steering acceptance\");\n        return;\n      }\n      if (waiting.has(sessionId))\n        throw new Error(\"Another Goose prompt is awaiting acceptance\");\n      await new Promise<void>((resolve, reject) => {\n        let accepted = false,\n          stopped = false;\n        const accept = () => {\n          if (stopped) return;\n          accepted = true;\n          cleanup();\n          resolve();\n        };\n        const abort = () => {\n          stopped = true;\n          cleanup();\n          reject(new Error(\"Goose input acceptance is uncertain\"));\n        };\n        const cleanup = () => {\n          waiting.delete(sessionId);\n          signal?.removeEventListener(\"abort\", abort);\n        };\n        if (signal?.aborted) return abort();\n        waiting.set(sessionId, { text, echo: \"\", accept });\n        signal?.addEventListener(\"abort\", abort, { once: true });\n        // ACP v1 returns at turn end. A matching native user echo is earlier\n        // acceptance. Reviewed Goose output also proves start_reply persisted\n        // input; run-start metadata alone precedes persistence and cannot.\n        Promise.resolve()\n          .then(() => options.rpc(\"session/prompt\", { sessionId, prompt }))\n          .then(\n            () => {\n              if (!accepted) accept();\n            },\n            (error) => {\n              if (accepted || stopped) options.onError(error);\n              else {\n                cleanup();\n                reject(error);\n              }\n            },\n          );\n      });\n    },\n  };\n}"
+  },
+  {
+    "file": "sdk/typescript/src/runtime/catalog.ts",
+    "name": "Environment",
+    "doc": "Shared by setup UI and the published setup command. No runtime imports.",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Environment = {\n  id: string;\n  label: string;\n  group: string;\n  steer: boolean;\n  binding: string;\n  guide: string;\n  note: string;\n};",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "group",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "steer",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "binding",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "guide",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "note",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/typescript/src/runtime/catalog.ts",
+    "name": "setupPrompt",
+    "doc": "",
+    "kind": "FunctionDeclaration",
+    "definition": "export function setupPrompt(\n  id: string,\n  base: string,\n  mode: \"steer\" | \"queue\",\n  connectionId: string,\n): string {\n  const env = environments.find((e) => e.id === id);\n  if (!env) throw new Error(\"Choose an environment\");\n  if (env.group === \"Advanced\")\n    throw new Error(\"Use the worker or MCP setup guide for this environment\");\n  if (mode === \"steer\" && !env.steer)\n    throw new Error(\"This setup offers Queue only\");\n  const url = new URL(base);\n  if (\n    ![\"http:\", \"https:\"].includes(url.protocol) ||\n    url.username ||\n    url.password ||\n    url.pathname !== \"/\" ||\n    url.search ||\n    url.hash\n  )\n    throw new Error(\n      \"Use a workspace origin without credentials or query parameters\",\n    );\n  if (!/^ins_[A-Za-z0-9_-]+$/.test(connectionId))\n    throw new Error(\"Use the exact worker instance ID\");\n  const guide = `https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md#${env.guide}`;\n  const specifics: Record<string, string> = {\n    codex:\n      \"Reuse the initialized app-server client and existing thread mapping. Track turn events; turn/steer uses expectedTurnId, idle input uses turn/start. Do not launch a second independent session.\",\n    pi: \"Reuse Pi RPC; prompt uses streamingBehavior steer or followUp. Keep consuming native events separately from prompt acceptance.\",\n    \"claude-code\":\n      \"Use the existing claude-agent-acp connection. Inspect initialize._meta.steering.supported; acpBinding handles the advertised _session/steering method, including idle start. Preserve native permission requests.\",\n    goose:\n      \"Verify the installed Goose ACP version exposes _goose/unstable/session/steer and activeRunId notifications. Use gooseBinding, feed existing session/update notifications to binding.observe and report background turn errors. Never guess a run ID.\",\n    acp: \"Inspect initialize capabilities. acpBinding handles the Codex/Claude _session/steering extension when advertised. Otherwise Queue through idle session/prompt, or implement a documented extension. ACP v1 alone does not promise steering; do not cancel to simulate it.\",\n    \"gemini-cli\":\n      \"Queue through the existing ACP session only when idle. The reviewed Gemini ACP path aborts its previous prompt on a second prompt, so do not send concurrent prompts to simulate steering.\",\n    opencode:\n      \"This is the V1 server: await its idle event before prompt_async. If the project actually uses OpenCode V2, switch to openCodeV2Binding instead.\",\n    \"opencode-v2\":\n      \"Use the V2 native client session.prompt (not V1 prompt_async) with deterministic id and delivery steer/queue. Validate its durable inbox receipt and reconcile against native stored input.\",\n    \"ai-sdk\":\n      \"Use AI SDK 7 experimental_createSteering per invocation and experimental_steering. Attach aiSDKBinding to that existing invocation, persist steering messages with step state, and serialize idle/final-boundary wake with the current loop. Preserve injected messages in prepareStep overrides.\",\n    langchain:\n      \"Use the Python LangGraphBridge before_model middleware with the existing create_agent graph and durable checkpointer. Pass thread_id mapping if existing thread IDs differ. Native interrupts use the host's existing Command(resume=...) path, never a second graph writer. For JS LangGraph use the custom checkpoint port; the Python helper is not a JS binding.\",\n    \"claude-sdk\":\n      \"Use claudeSDKBinding with the existing streaming-input async iterator and durable append. Native priority next steers after running tools finish; later queues until turn end. Verify the installed SDK supports these priorities and client_composed. Do not use priority now or spoof human origin; preserve the native session and result lifecycle.\",\n    \"custom-ts\":\n      \"Use checkpointBinding with durable append, wake, exact session routing, result resume and transcript reconciliation. Insert pending input before the next model call without replacing the host loop.\",\n    \"custom-python\":\n      \"Use LiveInbox for independent durable intake; at the host's before-model boundary inject pending input as user data and checkpoint IDs after persistence. Reuse its idle/final-boundary wake mechanism.\",\n  };\n  return [\n    `Integrate Beepgrid into my existing ${env.label} Agent project. Keep its model, tools, memory, permissions and runtime. Make the smallest complete integration patch, not a replacement harness.`,\n    `First read docs/LIVE-INPUT.md in the Beepgrid checkout if available, including Manual setup and the ${env.label} section. Online setup guide: ${guide}. Project README: https://github.com/beepgrid/beepgrid#readme . Full guide: https://github.com/beepgrid/beepgrid/blob/main/docs/LIVE-INPUT.md . If GitHub rendering is unavailable, fetch https://raw.githubusercontent.com/beepgrid/beepgrid/main/docs/LIVE-INPUT.md . Inspect the installed runtime version and follow its current APIs.`,\n    `Requested busy mode: ${mode === \"steer\" ? \"Steer, at the next supported input boundary\" : \"Queue, after current work\"}. ${specifics[id] || env.note} If a required capability is missing, explain the exact version/API gap and offer Queue or the documented alternative; do not silently cancel/restart work.`,\n    `Engine origin: ${url.origin}. Already-created worker instance: ${connectionId}. Reuse it, do not enroll again. Ask me for the absolute path of the private token file, never the token in chat. If not saved yet, walk me through the guide's hidden terminal-entry step outside the repository. Never read the credential into your tool output, source, logs or prompt.`,\n    `Install the published SDK into this Agent project: npm install @beepgrid/sdk for TypeScript/JavaScript, or uv add beepgrid (python3 -m pip install beepgrid if using pip) for Python. Import TypeScript helpers from @beepgrid/sdk/runtime, @beepgrid/sdk/runtime/node and @beepgrid/sdk/runtime/bindings; Python helpers from beepgrid.runtime. ${env.binding} is the matching integration entry point. Use the guide's runtime examples as integration references; cloning or building Beepgrid is optional.`,\n    `Configure BEEPGRID_URL=${url.origin}, BEEPGRID_TOKEN_FILE=<private absolute path>, BEEPGRID_CONNECTION_ID=${connectionId}, BEEPGRID_INBOX_PATH=<private persistent volume>, BEEPGRID_BUSY_MODE=${mode}. BEEPGRID_TOKEN must be unset so it cannot override the file. Keep secrets outside version control. Receiver lifecycle references: https://github.com/beepgrid/beepgrid/blob/main/examples/runtime/typescript.mjs and https://github.com/beepgrid/beepgrid/blob/main/examples/runtime/langchain.py . Those source-checkout examples use relative imports; use the installed package imports in this Agent project.`,\n    \"Receive independently of the model loop. Retain private durable custody before ACK, stable delivery IDs and conversation-to-session mapping. Keep one intake owner per connection and one model-state writer per session. Resume correlated Beepgrid results separately from ordinary Queue input. Preserve sender, request and attachment metadata as user data, never system instructions or permission grants. Existing MCP tools use mcp --live-input so they cannot race receiving. Reconcile uncertain native acceptance before any retry; never blindly replay. Do not poll HTTP before each model step.\",\n    \"Validate an idle message, an input while a long tool is running, Queue ordering, an approval result, attachment access and restart recovery using a safe local task. Check the selected mode at the next model boundary and preserve ongoing work. Then reply to the workspace connection check from this exact worker instance. Report what was actually exercised and any remaining runtime-version limits.\",\n  ].join(\"\\n\\n\");\n}"
+  },
+  {
+    "file": "sdk/react/src/index.tsx",
+    "name": "browserClient",
+    "doc": "",
+    "kind": "FunctionDeclaration",
+    "definition": "export function browserClient(baseURL: string = window.location.origin) {\n  return new Client(baseURL, \"\");\n}"
+  },
+  {
+    "file": "sdk/react/src/index.tsx",
+    "name": "useBeepgridRequest",
+    "doc": "",
+    "kind": "FunctionDeclaration",
+    "definition": "export function useBeepgridRequest(client: Client, id: string) {\n  const [request, setRequest] = useState<RequestItem | null>(null),\n    [error, setError] = useState(\"\"),\n    [busy, setBusy] = useState(false);\n  const generation = useRef(0);\n  useEffect(() => {\n    ++generation.current;\n    setBusy(false);\n    const abort = new AbortController();\n    setRequest(null);\n    setError(\"\");\n    let pending = false;\n    const refresh = async () => {\n      if (pending) return;\n      pending = true;\n      try {\n        const r = await client.getRequest(id, abort.signal);\n        if (!abort.signal.aborted) {\n          setRequest(r);\n          setError(\"\");\n        }\n      } catch (e) {\n        if (!abort.signal.aborted) {\n          setRequest(null);\n          setError((e as Error).message);\n        }\n      } finally {\n        pending = false;\n      }\n    };\n    void refresh();\n    const timer = setInterval(() => void refresh(), 1000);\n    return () => {\n      ++generation.current;\n      abort.abort();\n      clearInterval(timer);\n    };\n  }, [client, id]);\n  async function respond(outcome: Response[\"outcome\"], answer?: unknown) {\n    if (!request || request.id !== id) return;\n    const current = generation.current;\n    setBusy(true);\n    setError(\"\");\n    try {\n      const result = await client.respond(id, {\n        outcome,\n        answer,\n        version: request.version,\n      });\n      if (current === generation.current) setRequest(result);\n    } catch (e) {\n      if (current === generation.current) setError((e as Error).message);\n    } finally {\n      if (current === generation.current) setBusy(false);\n    }\n  }\n  return { request, error, busy, respond };\n}"
+  },
+  {
+    "file": "sdk/react/src/index.tsx",
+    "name": "BeepgridRequest",
+    "doc": "",
+    "kind": "FunctionDeclaration",
+    "definition": "export function BeepgridRequest({\n  client,\n  id,\n  onConversation,\n  onResolved,\n}: {\n  client: Client;\n  id: string;\n  onConversation?: (id: string) => void;\n  onResolved?: (request: RequestItem) => void;\n}) {\n  const { request: r, error, busy, respond } = useBeepgridRequest(client, id);\n  const [answer, setAnswer] = useState(\"\");\n  const notified = useRef(\"\");\n  useEffect(() => {\n    setAnswer(\"\");\n    notified.current = \"\";\n  }, [id]);\n  useEffect(() => {\n    if (r && r.state !== \"open\" && notified.current !== r.id) {\n      notified.current = r.id;\n      onResolved?.(r);\n    }\n  }, [r, onResolved]);\n  return (\n    <section className=\"beepgrid-request\" aria-label=\"Agent request\">\n      {error && <p role=\"alert\">{error}</p>}\n      {!r || r.id !== id ? (\n        <p role=\"status\">Loading request\u2026</p>\n      ) : (\n        <>\n          <h3>{r.title}</h3>\n          <p>{r.body}</p>\n          {r.response?.source_answer_id && (\n            <p role=\"status\">\n              {r.response.reuse_method === \"automatic\"\n                ? \"Answered from a published source.\"\n                : \"Answered from a shared answer.\"}{\" \"}\n              {r.response.reuse_reason}\n            </p>\n          )}\n          {r.response?.source_invalidated && (\n            <p role=\"alert\">\n              The source answer is no longer valid. Review before relying on it.\n            </p>\n          )}\n          {r.state !== \"open\" ? (\n            <p role=\"status\">\n              {r.response?.outcome ?? r.state}\n              {r.response?.answer !== undefined\n                ? \": \" + String(r.response.answer)\n                : \"\"}\n            </p>\n          ) : (\n            <>\n              {onConversation && (\n                <button\n                  type=\"button\"\n                  onClick={() => onConversation(r.conversation_id)}\n                >\n                  Ask for clarification\n                </button>\n              )}\n              {r.kind === \"approval\" ? (\n                <div>\n                  {r.action && (\n                    <dl aria-label=\"Exact action requiring approval\">\n                      <dt>Action</dt>\n                      <dd>{r.action.name}</dd>\n                      <dt>Executor</dt>\n                      <dd>{r.action.executor_id}</dd>\n                      <dt>Resource</dt>\n                      <dd>{r.action.resource}</dd>\n                      <dt>Resource version</dt>\n                      <dd>{r.action.resource_version}</dd>\n                      <dt>Arguments</dt>\n                      <dd>\n                        <pre>{JSON.stringify(r.action.arguments, null, 2)}</pre>\n                      </dd>\n                      <dt>Operation</dt>\n                      <dd>{r.action.operation_key}</dd>\n                      <dt>Expires</dt>\n                      <dd>{r.expires_at}</dd>\n                    </dl>\n                  )}\n                  <button\n                    disabled={busy}\n                    onClick={() => void respond(\"denied\")}\n                  >\n                    Deny\n                  </button>\n                  <button\n                    disabled={busy}\n                    onClick={() => void respond(\"approved\")}\n                  >\n                    Approve\n                  </button>\n                </div>\n              ) : r.kind === \"question\" ? (\n                <form\n                  onSubmit={(e) => {\n                    e.preventDefault();\n                    void respond(\"answered\", answer);\n                  }}\n                >\n                  <fieldset disabled={busy}>\n                    <legend>Your answer</legend>\n                    {r.choices?.length ? (\n                      r.choices.map((c) => (\n                        <label key={c}>\n                          <input\n                            type=\"radio\"\n                            name={\"beepgrid-answer-\" + id}\n                            value={c}\n                            checked={answer === c}\n                            onChange={() => setAnswer(c)}\n                          />\n                          {c}\n                        </label>\n                      ))\n                    ) : (\n                      <textarea\n                        aria-label=\"Your answer\"\n                        value={answer}\n                        onChange={(e) => setAnswer(e.target.value)}\n                        required\n                      />\n                    )}\n                    <button disabled={!answer.trim()}>Send answer</button>\n                  </fieldset>\n                </form>\n              ) : (\n                <div>\n                  <button\n                    disabled={busy}\n                    onClick={() => void respond(\"rejected\")}\n                  >\n                    Reject task\n                  </button>\n                  <button\n                    disabled={busy}\n                    onClick={() => void respond(\"completed\")}\n                  >\n                    Report completed\n                  </button>\n                </div>\n              )}\n            </>\n          )}\n        </>\n      )}\n    </section>\n  );\n}"
+  },
+  {
+    "file": "sdk/react/src/index.tsx",
+    "name": "Conversation",
+    "doc": "",
+    "kind": "TypeAliasDeclaration",
+    "definition": "export type Conversation = { id: string; title: string; messages: Message[] };",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "messages",
+        "type": "Message[]",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "file": "sdk/react/src/index.tsx",
+    "name": "BeepgridConversation",
+    "doc": "",
+    "kind": "FunctionDeclaration",
+    "definition": "export function BeepgridConversation({\n  client,\n  id,\n}: {\n  client: Client;\n  id: string;\n}) {\n  const [c, setC] = useState<Conversation | null>(null),\n    [draft, setDraft] = useState(\"\"),\n    [error, setError] = useState(\"\"),\n    [busy, setBusy] = useState(false);\n  const attempt = useRef({ body: \"\", key: \"\" });\n  const generation = useRef(0);\n  useEffect(() => {\n    ++generation.current;\n    attempt.current = { body: \"\", key: \"\" };\n    setBusy(false);\n    setC(null);\n    setDraft(\"\");\n    setError(\"\");\n    const abort = new AbortController();\n    let pending = false;\n    const refresh = async () => {\n      if (pending) return;\n      pending = true;\n      try {\n        const next = await client.call<Conversation>(\n          \"GET\",\n          \"/api/v1/conversations/\" + encodeURIComponent(id),\n          undefined,\n          { signal: abort.signal },\n        );\n        if (!abort.signal.aborted) {\n          setC(next);\n          setError(\"\");\n        }\n      } catch (e) {\n        if (!abort.signal.aborted) {\n          setC(null);\n          setError((e as Error).message);\n        }\n      } finally {\n        pending = false;\n      }\n    };\n    void refresh();\n    const timer = setInterval(() => void refresh(), 1000);\n    return () => {\n      ++generation.current;\n      abort.abort();\n      clearInterval(timer);\n    };\n  }, [client, id]);\n  async function send(e: FormEvent) {\n    e.preventDefault();\n    if (!c || c.id !== id || busy) return;\n    const current = generation.current;\n    setBusy(true);\n    if (attempt.current.body !== draft || !attempt.current.key)\n      attempt.current = { body: draft, key: crypto.randomUUID() };\n    try {\n      await client.sendMinimal(\n        { conversation_id: id, body: draft },\n        attempt.current.key,\n      );\n      if (current === generation.current) {\n        setDraft(\"\");\n        attempt.current = { body: \"\", key: \"\" };\n        setError(\"\");\n      }\n    } catch (e) {\n      if (current === generation.current) setError((e as Error).message);\n    } finally {\n      if (current === generation.current) setBusy(false);\n    }\n  }\n  return (\n    <section className=\"beepgrid-conversation\" aria-label=\"Conversation\">\n      {error && <p role=\"alert\">{error}</p>}\n      {c && c.id === id ? (\n        <>\n          <h3>{c.title}</h3>\n          <div role=\"log\" aria-live=\"polite\">\n            {c.messages.map((m) => (\n              <article key={m.id}>\n                <small>\n                  {m.sender_id}\n                  {m.instance_id ? \" \u00b7 \" + m.instance_id : \"\"}\n                </small>\n                <p>{m.body}</p>\n              </article>\n            ))}\n          </div>\n          <form onSubmit={(e) => void send(e)}>\n            <textarea\n              aria-label=\"Message\"\n              value={draft}\n              onChange={(e) => setDraft(e.target.value)}\n              maxLength={32768}\n              required\n            />\n            <button disabled={busy || !draft.trim()}>Send</button>\n          </form>\n        </>\n      ) : (\n        <p role=\"status\">Loading conversation\u2026</p>\n      )}\n    </section>\n  );\n}"
+  }
+]

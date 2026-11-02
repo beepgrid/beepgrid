@@ -1,0 +1,46 @@
+name: Bug report
+description: Report unexpected behavior with steps we can reproduce.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For suspected vulnerabilities, use the private reporting address in SECURITY.md.
+        Remove credentials, private conversation content and customer data from examples and logs.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the SDK version too if a client is involved.
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: How are you running Beepgrid?
+      options:
+        - Source checkout with workspace
+        - Headless source build
+        - Container
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: A small runnable example is helpful. Include relevant configuration without secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: Include any error code and relevant redacted logs.
+    validations:
+      required: true

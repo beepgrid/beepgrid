@@ -1,0 +1,65 @@
+[
+  {
+    "name": "inter",
+    "version": "5.3.0",
+    "file": "inter-latin-5.3.0.woff2",
+    "bytes": 72920,
+    "sha256": "2c295d99e26dcf357d4d01bcf270fd6924b600c9a13dd8c363ef114f4c6976fa",
+    "source": "https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.3.0.tgz",
+    "license": "OFL-1.1"
+  },
+  {
+    "name": "geist",
+    "version": "5.3.0",
+    "file": "geist-latin-5.3.0.woff2",
+    "bytes": 29400,
+    "sha256": "19f9c92546aa300c312235e3125af1b81394d8db9a4bc4a425cd5b641d2d54e1",
+    "source": "https://registry.npmjs.org/@fontsource-variable/geist/-/geist-5.3.0.tgz",
+    "license": "OFL-1.1"
+  },
+  {
+    "name": "source-sans-3",
+    "version": "5.3.1",
+    "file": "source-sans-3-latin-5.3.1.woff2",
+    "bytes": 28872,
+    "sha256": "19143dca075972bc84e3fd9eab7416dd40cc565dccb2435a044bdfabe060c7d5",
+    "source": "https://registry.npmjs.org/@fontsource-variable/source-sans-3/-/source-sans-3-5.3.1.tgz",
+    "license": "OFL-1.1"
+  },
+  {
+    "name": "dm-sans",
+    "version": "5.3.0",
+    "file": "dm-sans-latin-5.3.0.woff2",
+    "bytes": 62724,
+    "sha256": "ca72d2bcea8f4daa783dbdfa2d9b46068c3ce38168e05918fb867aa453b4f890",
+    "source": "https://registry.npmjs.org/@fontsource-variable/dm-sans/-/dm-sans-5.3.0.tgz",
+    "license": "OFL-1.1"
+  },
+  {
+    "name": "ibm-plex-sans",
+    "version": "5.3.0",
+    "file": "ibm-plex-sans-latin-5.3.0.woff2",
+    "bytes": 45712,
+    "sha256": "e2291e842cf5af167122a22881a740c7f2dda7716f1e8cd76680264f4a859470",
+    "source": "https://registry.npmjs.org/@fontsource-variable/ibm-plex-sans/-/ibm-plex-sans-5.3.0.tgz",
+    "license": "OFL-1.1"
+  },
+  {
+    "name": "manrope",
+    "version": "5.3.0",
+    "file": "manrope-latin-5.3.0.woff2",
+    "bytes": 24836,
+    "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972",
+    "source": "https://registry.npmjs.org/@fontsource-variable/manrope/-/manrope-5.3.0.tgz",
+    "license": "OFL-1.1"
+  },
+  {
+    "name": "plus-jakarta-sans",
+    "version": "5.3.0",
+    "file": "plus-jakarta-sans-latin-5.3.0.woff2",
+    "bytes": 27348,
+    "sha256": "153fc85b70298beeb1d61a5f723331649e7f23bb77302a66e61cb3e2fbdb5e79",
+    "source": "https://registry.npmjs.org/@fontsource-variable/plus-jakarta-sans/-/plus-jakarta-sans-5.3.0.tgz",
+    "license": "OFL-1.1"
+  }
+]

@@ -1,0 +1,10 @@
+.git
+.local
+.env
+.env.*
+**/node_modules
+**/__pycache__
+**/dist
+!internal/web/dist
+**/.venv
+**/test-results

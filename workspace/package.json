@@ -1,0 +1,29 @@
+{
+  "name": "@beepgrid/workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/typography.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/typography.mjs && tsc --noEmit && vite build && node scripts/assets.mjs",
+    "test": "vitest run",
+    "embed": "node scripts/assets.mjs --embed"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.104.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "16.3.3",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "jsdom": "^27.0.0",
+    "prettier": "^3.9.10",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

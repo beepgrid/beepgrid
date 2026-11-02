@@ -1,0 +1,27 @@
+[
+  {
+    "id": "open-tabs",
+    "name": "Phosphor \u00b7 Outline",
+    "description": "Phosphor shapes with a slightly heavier outline on flat neutral tiles."
+  },
+  {
+    "id": "lucide-tint",
+    "name": "Phosphor \u00b7 Tinted",
+    "description": "The same outline symbols with a restrained color wash."
+  },
+  {
+    "id": "phosphor-duotone",
+    "name": "Phosphor \u00b7 Duotone",
+    "description": "Rounder silhouettes with two-tone fills and a quiet, flat surface."
+  },
+  {
+    "id": "geometric-flat",
+    "name": "Phosphor \u00b7 Flat",
+    "description": "Recognizable, bold symbols on solid-color tiles."
+  },
+  {
+    "id": "dimensional",
+    "name": "Geometric \u00b7 Shaded",
+    "description": "The previous geometric marks with softly shaded tiles, kept for comparison."
+  }
+]

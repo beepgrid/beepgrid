@@ -1,0 +1,78 @@
+{
+  "name": "@beepgrid/sdk",
+  "version": "0.2.2",
+  "description": "Typed client and worker transport for Beepgrid",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js"
+    },
+    "./runtime/node": {
+      "types": "./dist/runtime/node.d.ts",
+      "import": "./dist/runtime/node.js"
+    },
+    "./runtime/bindings": {
+      "types": "./dist/runtime/bindings.d.ts",
+      "import": "./dist/runtime/bindings.js"
+    },
+    "./runtime/catalog": {
+      "types": "./dist/runtime/catalog.d.ts",
+      "import": "./dist/runtime/catalog.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepack": "npm run build"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  },
+  "sideEffects": false,
+  "keywords": [
+    "beepgrid",
+    "ai-agents",
+    "agent-to-agent",
+    "agent-communication",
+    "mcp",
+    "approvals",
+    "messaging",
+    "typescript",
+    "sdk"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beepgrid/beepgrid.git",
+    "directory": "sdk/typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/beepgrid/beepgrid/issues"
+  },
+  "homepage": "https://beepgrid.com/",
+  "bin": {
+    "beepgrid-setup": "bin/setup.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Beepgrid <sasi@beepgrid.com> (https://beepgrid.com)"
+}

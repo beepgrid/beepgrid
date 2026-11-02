@@ -1,0 +1,185 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"github.com/beepgrid/beepgrid/internal/engine"
+	"io"
+	"net/http"
+	"net/url"
+	"time"
+)
+
+func (s *Server) channelRoutes() {
+	m := s.mux
+	m.HandleFunc("GET /api/v1/people/{id}/delivery-preferences", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.DeliveryPreferences(r.Context(), actor(r), r.PathValue("id"))
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/people/{id}/delivery-preferences", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.DeliveryPreferences
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.SaveDeliveryPreferences(r.Context(), actor(r), r.PathValue("id"), in)
+		return ok(w, x, e)
+	}))
+
+	m.HandleFunc("POST /integrations/discord/{id}", s.discordEvents)
+	m.HandleFunc("POST /api/v1/people/{id}/discord-account/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		return ok(w, map[string]bool{"removed": true}, s.Store.UnlinkDiscordAccount(r.Context(), actor(r), r.PathValue("id")))
+	}))
+	m.HandleFunc("POST /api/v1/people/{id}/discord-account", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			ApplicationID string `json:"application_id"`
+			UserID        string `json:"user_id"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		return ok(w, map[string]bool{"linked": true}, s.Store.LinkDiscordAccount(r.Context(), actor(r), r.PathValue("id"), in.ApplicationID, in.UserID))
+	}))
+	m.HandleFunc("POST /integrations/telegram/{id}", s.telegramEvents)
+	m.HandleFunc("POST /api/v1/people/{id}/telegram-account/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		return ok(w, map[string]bool{"removed": true}, s.Store.UnlinkTelegramAccount(r.Context(), actor(r), r.PathValue("id")))
+	}))
+	m.HandleFunc("POST /api/v1/people/{id}/telegram-account", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			BotID  string `json:"bot_id"`
+			UserID string `json:"user_id"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		return ok(w, map[string]bool{"linked": true}, s.Store.LinkTelegramAccount(r.Context(), actor(r), r.PathValue("id"), in.BotID, in.UserID))
+	}))
+	m.HandleFunc("GET /api/v1/connections/{id}/setup", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.ConnectionSetup(r.Context(), actor(r), r.PathValue("id"), s.PublicURL)
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /integrations/slack/{id}/events", s.slackEvents)
+	m.HandleFunc("POST /integrations/webhook/{id}", s.incomingWebhook)
+	m.HandleFunc("GET /api/v1/connections", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.Connections(r.Context(), actor(r))
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/connections", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.Connection
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.SaveConnection(r.Context(), actor(r), in)
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/destinations/{id}/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			Version int64 `json:"version"`
+		}
+		if r.ContentLength != 0 {
+			if e := decode(r, &in); e != nil {
+				return e
+			}
+		}
+		return ok(w, map[string]bool{"removed": true}, s.Store.RemoveDestination(r.Context(), actor(r), r.PathValue("id"), in.Version))
+	}))
+	m.HandleFunc("GET /api/v1/destinations", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.Destinations(r.Context(), actor(r))
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/destinations", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.Destination
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.SaveDestination(r.Context(), actor(r), in)
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/people/{id}/slack-account", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			UserID string `json:"user_id"`
+			TeamID string `json:"team_id"`
+		}
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		return ok(w, map[string]bool{"linked": true}, s.Store.LinkSlackAccount(r.Context(), actor(r), r.PathValue("id"), in.UserID, in.TeamID))
+	}))
+	m.HandleFunc("POST /integrations/slack/{id}", func(w http.ResponseWriter, r *http.Request) {
+		body, e := io.ReadAll(io.LimitReader(r.Body, 131073))
+		if e != nil || len(body) > 131072 {
+			writeError(w, engine.Bad("Invalid callback body."))
+			return
+		}
+		c, scope, e := s.Store.InboundConnection(r.Context(), r.PathValue("id"))
+		if e != nil || c.Kind != "slack" {
+			writeError(w, engine.Missing())
+			return
+		}
+		var secrets struct {
+			BotToken      string `json:"bot_token"`
+			SigningSecret string `json:"signing_secret"`
+		}
+		if json.Unmarshal([]byte(c.Secret), &secrets) != nil || secrets.SigningSecret == "" || !engine.VerifySlack(secrets.SigningSecret, r.Header.Get("X-Slack-Request-Timestamp"), r.Header.Get("X-Slack-Signature"), body, time.Now()) {
+			writeError(w, engine.Denied())
+			return
+		}
+		form, e := url.ParseQuery(string(body))
+		if e != nil {
+			writeError(w, engine.Bad("Invalid Slack payload."))
+			return
+		}
+		var payload struct {
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+			Team struct {
+				ID string `json:"id"`
+			} `json:"team"`
+			Actions []struct {
+				ActionID string `json:"action_id"`
+				Value    string `json:"value"`
+			} `json:"actions"`
+		}
+		if json.Unmarshal([]byte(form.Get("payload")), &payload) != nil || len(payload.Actions) != 1 || payload.Team.ID != c.Config["team_id"] {
+			writeError(w, engine.Denied())
+			return
+		}
+		eventID := engine.Digest(string(body))
+		if s.Store.HasProviderEvent(r.Context(), scope, c.ID, eventID) {
+			output(w, 200, map[string]bool{"ok": true})
+			return
+		}
+		a, e := s.Store.SlackActor(r.Context(), scope, payload.User.ID, payload.Team.ID)
+		if e != nil {
+			writeError(w, e)
+			return
+		}
+		a.ProviderConnection = c.ID
+		var value struct {
+			RequestID string `json:"request_id"`
+			Version   int    `json:"version"`
+		}
+		if json.Unmarshal([]byte(payload.Actions[0].Value), &value) != nil {
+			writeError(w, engine.Bad("Invalid response action."))
+			return
+		}
+		outcome := ""
+		switch payload.Actions[0].ActionID {
+		case "beepgrid_approve":
+			outcome = "approved"
+		case "beepgrid_deny":
+			outcome = "denied"
+		default:
+			writeError(w, engine.Bad("Unsupported Slack action."))
+			return
+		}
+		if _, e = s.Store.Respond(r.Context(), a, value.RequestID, engine.Response{Outcome: outcome, Version: value.Version}); e != nil {
+			writeError(w, e)
+			return
+		}
+		if e = s.Store.RecordProviderEvent(r.Context(), scope, c.ID, eventID); e != nil {
+			writeError(w, e)
+			return
+		}
+		output(w, 200, map[string]bool{"ok": true})
+	})
+}

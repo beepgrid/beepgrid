@@ -1,0 +1,30 @@
+.env
+.env.*
+!.env.example
+.local/
+bin/
+node_modules/
+web/dist/
+coverage/
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+test-results/
+playwright-report/
+.DS_Store
+
+sdk/typescript/dist/
+
+sdk/react/dist/
+
+sdk/python/build/
+
+# Internal naming experiments never belong in the open source release.
+/domain-picker*/
+/naming-research/
+/naming-experiments*.zip
+
+# Source entry point, not a compiled binary.
+!sdk/typescript/bin/
+!sdk/typescript/bin/setup.mjs

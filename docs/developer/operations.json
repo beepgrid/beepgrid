@@ -1,0 +1,772 @@
+{
+  "GET /api/v1/me": {
+    "description": "Read the authenticated identity and credential scope.",
+    "returns": "`identity_type`, matching `person`/`agent`/`service`, `instance_id`, `admin`, `can_publish_answers`, `company` and `environment`. Only the matching identity-kind key is returned.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/requests/{id}/replace": {
+    "description": "Atomically supersede your pending request and create its replacement.",
+    "returns": "Object with previous and replacement Request records. Continue using replacement.id.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "GET /api/v1/events": {
+    "description": "Read canonical authorized events after a sequence, or follow them as an SSE stream.",
+    "returns": "JSON event page when stream is omitted; text/event-stream when stream=1. Summary mode omits full payload bodies.",
+    "family": "workers",
+    "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
+    "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
+  },
+  "GET /api/v1/conversations/{id}/attachments": {
+    "description": "List currently visible attachments in a conversation.",
+    "returns": "Array of Attachment metadata.",
+    "family": "files",
+    "audience": "Authenticated uploader or currently authorized conversation participant, subject to history visibility.",
+    "errors": "Empty/oversized files are rejected. An already claimed or expired staged ID cannot be bound again. Removed members cannot bypass history checks with a known ID."
+  },
+  "POST /api/v1/conversations/{id}/attachments": {
+    "description": "Upload a file into existing authorized history.",
+    "returns": "Attachment metadata; multipart/form-data with one file field, bounded to 5 MiB.",
+    "family": "files",
+    "audience": "Authenticated uploader or currently authorized conversation participant, subject to history visibility.",
+    "errors": "Empty/oversized files are rejected. An already claimed or expired staged ID cannot be bound again. Removed members cannot bypass history checks with a known ID."
+  },
+  "GET /api/v1/attachments/{id}": {
+    "description": "Download a currently visible attachment.",
+    "returns": "Raw file bytes with media type and download filename, not a JSON envelope.",
+    "family": "files",
+    "audience": "Authenticated uploader or currently authorized conversation participant, subject to history visibility.",
+    "errors": "Empty/oversized files are rejected. An already claimed or expired staged ID cannot be bound again. Removed members cannot bypass history checks with a known ID."
+  },
+  "GET /api/v1/people": {
+    "description": "List visible people.",
+    "returns": "Array of Person records. Use query for complete pagination.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/people": {
+    "description": "Create or update a person identity.",
+    "returns": "Person with its stable id. Email metadata alone does not verify a provider account.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/people/{id}/status": {
+    "description": "Disable or re-enable a person.",
+    "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /api/v1/agents": {
+    "description": "List visible logical agents.",
+    "returns": "Array of Agent records, separate from runtime instances.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/agents/{id}/status": {
+    "description": "Disable or re-enable a logical agent.",
+    "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /api/v1/services": {
+    "description": "List visible software service identities.",
+    "returns": "Array of Service records.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/services": {
+    "description": "Create or update a software service identity.",
+    "returns": "Service with a stable id for credentials and contact policy.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/services/{id}/status": {
+    "description": "Disable or re-enable a software service.",
+    "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/people/{id}/profile": {
+    "description": "Update a person's profile information.",
+    "returns": "Updated Person. This does not change their policy-role bindings.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/sessions": {
+    "description": "Enroll a runtime through a bounded launcher or operator.",
+    "returns": "Session containing a new worker token, logical Agent, exact instance_id and expires_at. The token is secret.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /api/v1/agents/{id}/instances": {
+    "description": "Read an agent's visible runtime connections.",
+    "returns": "Array of Instance presence/progress observations.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /api/v1/groups": {
+    "description": "List visible directory groups.",
+    "returns": "Group array. purpose distinguishes teams, agent roles and contact groups.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/groups": {
+    "description": "Create or update a directory group and its members.",
+    "returns": "Group with id and version. This does not create a shared chat.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /api/v1/roles": {
+    "description": "List visible policy roles.",
+    "returns": "Role array. These are permission rule sets, separate from agent roles.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/roles": {
+    "description": "Create or version-update a policy role.",
+    "returns": "Saved Role. Delegated managers cannot grant authority beyond their own ceiling.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /api/v1/role-bindings": {
+    "description": "Read visible individual and group role assignments.",
+    "returns": "Binding array.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/role-bindings": {
+    "description": "Add or remove a policy-role assignment.",
+    "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /api/v1/connections": {
+    "description": "List visible provider connections.",
+    "returns": "Safe Connection array; provider secrets are not returned.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "POST /api/v1/connections": {
+    "description": "Create or version-update a channel connection.",
+    "returns": "Saved Connection with secret_configured, not the secret value.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "GET /api/v1/destinations": {
+    "description": "Read visible identity delivery destinations.",
+    "returns": "Destination array with connection, address, mode and priority.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "POST /api/v1/destinations": {
+    "description": "Create or version-update a linked identity's channel destination.",
+    "returns": "Saved Destination. A destination does not grant contact permission.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "POST /api/v1/destinations/{id}/remove": {
+    "description": "Remove a channel destination.",
+    "returns": "`{removed: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "GET /api/v1/credentials": {
+    "description": "List credential metadata visible to the operator.",
+    "returns": "Metadata array with expiry/revocation state; no recoverable plaintext tokens.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/credentials": {
+    "description": "Issue a named API or namespace-restricted enrollment token with an optional expiry and API permission ceiling. Defaults to 30 days.",
+    "returns": "Token secret once with id, kind and expires_at. Metadata listing never recovers plaintext.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/credentials/{id}/revoke": {
+    "description": "Revoke this exact credential, including its rotation overlap. An enrollment token may explicitly revoke_workers to stop connections it issued after lineage tracking was introduced.",
+    "returns": "`{revoked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/permissions/explain": {
+    "description": "Explain the current decision for a subject, action and target.",
+    "returns": "Allowed/denied projection and the applicable authorization basis.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/route-preview": {
+    "description": "Inspect eligible delivery routes without sending.",
+    "returns": "`recipients`, total `count`, `hidden_recipients`, `mode=private_per_recipient` and `sends=false`. This preview has no dispatch token.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "GET /api/v1/conversations": {
+    "description": "Read visible conversation summaries in recent-activity order.",
+    "returns": "Conversation array. Use query for bounded complete pagination.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "GET /api/v1/conversations/{id}": {
+    "description": "Read a conversation's currently disclosed history.",
+    "returns": "Conversation with participants, messages and shared membership metadata.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "GET /api/v1/requests": {
+    "description": "List requests visible to the caller.",
+    "returns": "Request array. Use query to filter/page; visibility is not the same as being the requester.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/requests": {
+    "description": "Open a question, approval or task with a saved final response.",
+    "returns": "Request with state=open and current version. Ordinary communication has no implicit deadline; bound action approvals default to seven days when expiry is omitted.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "GET /api/v1/requests/{id}": {
+    "description": "Read a visible request and its current decision.",
+    "returns": "Request with optional response. Terminal state must be inspected explicitly.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/requests/{id}/responses": {
+    "description": "Record an eligible typed final decision.",
+    "returns": "Updated Request. Sending ordinary conversation text never records this decision.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/requests/{id}/answer-and-share": {
+    "description": "Answer a question and publish authorized reusable information atomically.",
+    "returns": "Resolved Request and published answer information. Only informational question answers can be reused.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/requests/{id}/cancel": {
+    "description": "Withdraw your own pending request at its current version.",
+    "returns": "Request with state=cancelled. Does not undo an external effect.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/requests/{id}/supersede": {
+    "description": "Mark your pending request as superseded.",
+    "returns": "Request with state=superseded; this does not create a replacement. Use replace to create a revised request atomically.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/requests/{id}/redeem": {
+    "description": "Redeem an exact bound approval for its declared executor/action.",
+    "returns": "Execution intent. The external resource owner still enforces execution and idempotency fences.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "GET /api/v1/executions": {
+    "description": "Read currently visible execution observations.",
+    "returns": "Execution array; worker-reported state is not independent verification.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/executions/{id}": {
+    "description": "Record an authorized executor's observed outcome.",
+    "returns": "Updated Execution; terminal results cannot be overwritten.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "GET /api/v1/worker/inbox": {
+    "description": "Lease pending deliveries for this worker instance.",
+    "returns": "Delivery array containing canonical payload, id and lease generation.",
+    "family": "workers",
+    "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
+    "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
+  },
+  "POST /api/v1/worker/heartbeat": {
+    "description": "Refresh this runtime's presence with optional progress metadata.",
+    "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "workers",
+    "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
+    "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
+  },
+  "POST /api/v1/worker/inbox/{id}/ack": {
+    "description": "Acknowledge safe handling of the current delivery lease.",
+    "returns": "`{received: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "workers",
+    "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
+    "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
+  },
+  "GET /api/v1/deliveries": {
+    "description": "Read authorized transport delivery evidence.",
+    "returns": "Delivery array with current state and attempts.",
+    "family": "workers",
+    "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
+    "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
+  },
+  "POST /api/v1/deliveries/{id}/retry": {
+    "description": "Request an authorized retry of a safely retryable failed delivery.",
+    "returns": "`{queued: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "workers",
+    "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
+    "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
+  },
+  "GET /api/v1/activity": {
+    "description": "Read administrative activity evidence.",
+    "returns": "Authorized event/activity records. This is not a model execution tracing system.",
+    "family": "workers",
+    "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
+    "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
+  },
+  "GET /api/v1/answers": {
+    "description": "Find currently usable published informational answers.",
+    "returns": "SharedAnswer array filtered by current source/publisher authority, audience and validity.",
+    "family": "answers",
+    "audience": "Current authorized reader, or publisher with manage answer authority. Reuse requires audience membership and current source/publisher authority.",
+    "errors": "Expired, invalidated or unauthorized sources cannot be reused. An approval or task outcome cannot be published as a reusable informational answer."
+  },
+  "POST /api/v1/answers": {
+    "description": "Publish an existing resolved question's answer for an explicit audience.",
+    "returns": "SharedAnswer with source provenance, context hash and validity.",
+    "family": "answers",
+    "audience": "Current authorized reader, or publisher with manage answer authority. Reuse requires audience membership and current source/publisher authority.",
+    "errors": "Expired, invalidated or unauthorized sources cannot be reused. An approval or task outcome cannot be published as a reusable informational answer."
+  },
+  "POST /api/v1/answers/{id}/invalidate": {
+    "description": "Invalidate a published informational answer.",
+    "returns": "`{invalidated: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "answers",
+    "audience": "Current authorized reader, or publisher with manage answer authority. Reuse requires audience membership and current source/publisher authority.",
+    "errors": "Expired, invalidated or unauthorized sources cannot be reused. An approval or task outcome cannot be published as a reusable informational answer."
+  },
+  "GET /api/v1/assistance/settings": {
+    "description": "Read OSS Coordinator settings and provider availability.",
+    "returns": "AssistanceSettings: overseer, version and overseer_configured.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "POST /api/v1/assistance/settings": {
+    "description": "Owner-controlled optional assistance. Enabling requires a configured provider. Coordinator supports automatic dispatch and a separate explicit review flow.",
+    "returns": "Updated AssistanceSettings. Provider setup is a separate server configuration.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "POST /api/v1/fleet/status": {
+    "description": "Read-only structured fleet status filtered by current View permission.",
+    "returns": "Authorized `agents`, dependency `deadlocks`, counts and `as_of`. Each agent item contains `agent`, `instances` and `fresh`. This is communication/presence evidence, not inferred model execution.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "POST /api/v1/fleet/plan": {
+    "description": "Optional overseer. Acts only as the caller. Outbound messages, questions and tasks require a saved preview and explicit confirmation.",
+    "returns": "OverseerPlan; instructions are not dispatched until confirmation where required.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "GET /api/v1/fleet/plans": {
+    "description": "List Coordinator plans belonging to the authorized caller.",
+    "returns": "OverseerPlan array.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "GET /api/v1/fleet/plans/{id}": {
+    "description": "Read a Coordinator plan and its current attributed replies.",
+    "returns": "OverseerPlan with dispatches, replies and optional summary.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "POST /api/v1/fleet/plans/{id}/summary": {
+    "description": "Read-only summary of currently authorized replies; changed permissions or replies invalidate derived output.",
+    "returns": "Updated OverseerPlan with reply_summary or safe summary error.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "POST /api/v1/fleet/command": {
+    "description": "Atomically confirm a server-saved preview under current caller permissions. Idempotent per plan. No free-form targets or instructions accepted.",
+    "returns": "OverseerPlan with attributed dispatches. Repeated confirmation does not create duplicate instructions.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "POST /api/v1/people/{id}/slack-account": {
+    "description": "Link an administrator-attested immutable Slack account to a person.",
+    "returns": "`{linked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/people/{id}/oidc-account": {
+    "description": "Link a verified OIDC issuer/subject to a person.",
+    "returns": "`{linked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "GET /healthz": {
+    "description": "Check that the engine process is alive.",
+    "returns": "`{status: \"ok\"}` on success. Readiness returns status unavailable with HTTP 503 when the database cannot be reached.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "GET /readyz": {
+    "description": "Check that the engine can serve with its database/schema.",
+    "returns": "`{status: \"ready\"}` on success. Readiness returns status unavailable with HTTP 503 when the database cannot be reached.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "GET /openapi.json": {
+    "description": "Retrieve this engine's public API contract.",
+    "returns": "OpenAPI JSON document.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "GET /api/v1/auth/methods": {
+    "description": "Discover the login methods configured for this deployment.",
+    "returns": "`token` and `oidc` booleans describe the configured login methods, without secrets.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "GET /auth/oidc/start": {
+    "description": "Start the configured OIDC browser login flow.",
+    "returns": "Browser redirect with protected state and nonce cookies.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "GET /auth/oidc/callback": {
+    "description": "Complete the configured OIDC login flow.",
+    "returns": "Validated browser session and redirect; not a general worker token endpoint.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "POST /api/v1/auth/login": {
+    "description": "Create a browser session using the deployment's enabled login mechanism.",
+    "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "POST /api/v1/auth/logout": {
+    "description": "End the current browser session.",
+    "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "authentication",
+    "audience": "Public health/discovery or browser authentication flow, as indicated by the operation. Provider callbacks validate their own state.",
+    "errors": "Readiness may return 503. Login rejects missing/invalid credentials and OIDC state; a redirect is not JSON."
+  },
+  "POST /integrations/webhook/{id}": {
+    "description": "Accept a signed inbound webhook for one configured connection.",
+    "returns": "SendResult: canonical conversation_id and messages. This signed callback supports ordinary messages, not implicit final approval.",
+    "family": "callbacks",
+    "audience": "Provider callback. Use its native signature/secret verification, not a worker bearer token.",
+    "errors": "Invalid signatures or account linkage are rejected. Duplicate delivery is deduplicated; changed content under the same provider event identity conflicts."
+  },
+  "POST /integrations/slack/{id}": {
+    "description": "Accept authenticated Slack interactive actions for a connection.",
+    "returns": "Slack acknowledgment after canonical handling; current decision authority still applies.",
+    "family": "callbacks",
+    "audience": "Provider callback. Use its native signature/secret verification, not a worker bearer token.",
+    "errors": "Invalid signatures or account linkage are rejected. Duplicate delivery is deduplicated; changed content under the same provider event identity conflicts."
+  },
+  "POST /integrations/slack/{id}/events": {
+    "description": "Accept authenticated Slack event callbacks.",
+    "returns": "Slack challenge or event acknowledgment with duplicate-event handling.",
+    "family": "callbacks",
+    "audience": "Provider callback. Use its native signature/secret verification, not a worker bearer token.",
+    "errors": "Invalid signatures or account linkage are rejected. Duplicate delivery is deduplicated; changed content under the same provider event identity conflicts."
+  },
+  "POST /api/v1/people/{id}/telegram-account": {
+    "description": "Administrator-attested immutable private Telegram identity. Grants no contact or decision authority.",
+    "returns": "`{linked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/people/{id}/discord-account": {
+    "description": "Administrator-attested immutable Discord application/user identity. Grants no contact or decision authority.",
+    "returns": "`{linked: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/requests/{id}/blocking": {
+    "description": "Only the requesting agent may declare or clear its own open single-agent blocking dependency. Does not cancel the request.",
+    "returns": "Updated Request with blocking state.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "POST /api/v1/fleet/coordinate": {
+    "description": "Plan and dispatch distinct ordinary communications under current permissions, then durably collect and summarize settled replies. Idempotent recovery. Does not grant business execution authority. Use /fleet/plan and /fleet/command for explicit review.",
+    "returns": "Automatic OverseerPlan with selected specialists and attributed dispatches, or a status answer.",
+    "family": "coordinator",
+    "audience": "Authenticated person with current fleet visibility and required contact/assistance permissions. This is available in OSS without the UI.",
+    "errors": "Disabled/unconfigured assistance or provider failure returns an assistance error. Stale/expired plans, changed scope or revoked access block dispatch. Per-person model calls are rate-limited."
+  },
+  "POST /api/v1/capabilities": {
+    "description": "Current operation eligibility, not an authorization token. Every mutation rechecks current policy. Exact requests include audience, original Ask, reverse response and conditions.",
+    "returns": "CapabilityResult: observed_at, operation-name booleans, and optional request_version/outcomes for a requested decision.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "GET /api/v1/access": {
+    "description": "Own effective access, including direct/group role provenance. Inspecting another subject requires identity visibility and explicit view access:<subject ID>, or an administrator credential.",
+    "returns": "AccessSnapshot: subject, authority basis, role assignments with provenance and observation time.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/query": {
+    "description": "Complete bounded keyset reads with current per-record authorization. Continue until next_cursor is absent, including empty pages. Cursors are encrypted and bound to scope, actor, filters and limit for 24 hours. Message history requires conversation_id and is chronological; other collections use stable ascending IDs. Unsupported filters are rejected.",
+    "returns": "QueryPage: collection-specific items, optional next_cursor and stable order. Continue while next_cursor exists, including empty visible pages.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/agents/{id}/contacts": {
+    "description": "Non-sending current contact observation for an agent. Requires subject access inspection. Returns only caller-visible contacts that the agent can view and contact. Channel kinds/modes are shown only where the caller can inspect the recipient destination. No addresses, installation IDs, credentials or send authority are returned.",
+    "returns": "AgentContacts: contacts with target, name, message/ask capability and route projections, plus observed_at.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/dispatch-preview": {
+    "description": "Non-sending preview of 1 to 100 explicit individual/instance targets. Includes native, primary, copy and fallback permission/enablement observations. Token binds the authorized audience and route revisions for ten minutes. Hidden recipient identities and addresses remain private.",
+    "returns": "Resolved recipient and route projection, a short-lived token and expiry; `sends` is false.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/message-batches": {
+    "description": "Atomic explicit recipient dispatch, deduplicated by logical identity. Conflicting replica targets are rejected. Private conversations and per-target receipts; failure rolls back the entire batch. Optional preview token prevents changed routes/audience from silently proceeding.",
+    "returns": "Array of {target, result: SendResult}. Every target retains its own private history and canonical attribution.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/request-batches": {
+    "description": "Atomic private request per explicit target. Each request has an independent response and execution lifecycle; no implicit shared approval or first-responder broadcast. The nested request must omit target and conversation_id.",
+    "returns": "Array of {target, request: Request}. Requests resolve independently after atomic batch creation.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "GET /api/v1/integrations/catalog": {
+    "description": "Supported providers and actual fields/capabilities only. Native inbox is built in; no planned integration is installable.",
+    "returns": "Array of ProviderCapability records with required configuration fields, native reply/approval support and setup modes.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "GET /api/v1/connections/{id}/diagnostics": {
+    "description": "Non-sending credential checks and correlated diagnostic transport evidence. Configuration changes reset test evidence. Provider acceptance is distinct from attributed reply and independent live qualification.",
+    "returns": "ConnectionDiagnostic with safe configuration, provider acceptance and attributed engine-observed test evidence. This read sends nothing.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "POST /api/v1/connections/{id}/test": {
+    "description": "Explicit durable test message to one configured destination only. Requires installation/destination management and Message permission. Queue acceptance is not provider acceptance. Inspect delivery evidence afterwards.",
+    "returns": "Queued test Delivery. Read diagnostics and obtain an attributed native reply separately; acceptance is not receipt.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "GET /api/v1/requests/{id}/trace": {
+    "description": "Current authorized request, paged delivery evidence and execution reports. Audience members see their own projection; requesters can inspect their outgoing deliveries. Provider acceptance never proves execution.",
+    "returns": "`request` plus independently paginated `deliveries` and `executions`, with an `evidence` explanation. Continue transport pages using the supplied cursor.",
+    "family": "requests",
+    "audience": "Current requester, authorized original decision recipient or exact bound executor, according to operation.",
+    "errors": "Invalid outcome/choice fails validation. A stale request version or terminal-state race conflicts. Permission is rechecked at decision, redemption and reporting."
+  },
+  "GET /api/v1/workspace": {
+    "description": "Authenticated scope, company, environment, deployment kind and schema version. Managed composition supplies deployment metadata explicitly.",
+    "returns": "Workspace metadata and current account-read capability.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "GET /api/v1/workspace/account": {
+    "description": "Person-only scoped account access requires view account:workspace or an administrator credential. This entry point permits status inspection during service suspension with a still-valid credential and current account policy. Runtime-applied quotas/usage are separate from server-side managed requested/provisioning/entitlement state. No operator tokens enter the browser; managed read failures are 503, never zero usage.",
+    "returns": "Current authorized account snapshot, applied limits and UTC-month usage. This OSS projection does not expose a managed payment provider.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/roles/preview": {
+    "description": "Non-saving, version-checked role-edit preview. Same rule ceiling and assignment boundaries as SaveRole; reports exact affected assignments and before/after role-grant checks for authorized subjects. Administrator credential power and new assignments are not simulated. Other assigned roles remain effective.",
+    "returns": "`can_save`, current `version`, `affected_assignments`, before/after `checks`, `basis` and `saves=false`. This simulates existing assignments without saving or granting new ones.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /api/v1/conversations": {
+    "description": "Start an explicit shared chat with a durable first message. Individual recipients only; all members must have current mutual view permission. Every later send checks current contact access. Idempotent; private broadcast contracts are unchanged.",
+    "returns": "SendResult containing the new shared conversation_id and canonical first messages.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/contact-permissions": {
+    "description": "Atomically save and assign a dedicated contact-access policy. Only view, message, ask and decide toward exact contacts. Existing delegation ceilings and observed-version checks apply. Inherited policies remain effective.",
+    "returns": "The saved Role containing the chosen directional contact rules. Chat membership is separate.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/conversations/{id}/membership": {
+    "description": "Versioned and idempotent shared-chat membership. Manager or admin can rename/add/remove; members can leave. New members see history from joining unless share_history is explicitly true. Current mutual View is required; membership grants no contact, decision or tool authority. Removing or leaving stops future read and delivery; already downloaded data cannot be recalled. A departing manager names an existing successor.",
+    "returns": "conversation_id and new version, with left=true when the caller leaves.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/messages": {
+    "description": "Durably store canonical messages and queue deliveries. Prefer: return=minimal returns a compact acceptance receipt; it is not delivery or execution confirmation. Replay the same input and idempotency key without Prefer to retrieve the full result without resending.",
+    "returns": "SendResult containing conversation_id and messages, or SendReceipt containing conversation_id and message_count when Prefer: return=minimal is requested.",
+    "family": "communication",
+    "audience": "Authenticated caller with view/message/ask authority for the resolved recipients or current conversation history.",
+    "errors": "Changed audience/preview, conflicting versions, hidden history or missing reverse contact rights reject the operation. Reuse the same saved key only for the same intended write."
+  },
+  "POST /api/v1/attachments": {
+    "description": "Stage a private file for up to 24 hours. Only its uploader can read it until a keyed communication atomically claims attachment_ids. Maximum five files per message, 5 MiB each. An abandoned draft expires; upload itself has no automatic retry contract.",
+    "returns": "Attachment metadata with its private draft ID or authorized conversation association. The response is not the file bytes.",
+    "family": "files",
+    "audience": "Authenticated uploader or currently authorized conversation participant, subject to history visibility.",
+    "errors": "Empty/oversized files are rejected. An already claimed or expired staged ID cannot be bound again. Removed members cannot bypass history checks with a known ID."
+  },
+  "GET /api/v1/connections/{id}/setup": {
+    "description": "Authorized credential-free setup steps and generated BYO manifest. Never contacts providers or changes registrations.",
+    "returns": "ProviderSetup: safe callbacks, manifests/registration steps and current diagnostic evidence, without credentials.",
+    "family": "channels",
+    "audience": "Authenticated identity with current connection/destination visibility or management authority. Sending a test also requires contact rights.",
+    "errors": "Invalid provider fields, missing verified account or disallowed URL fail validation. A stale configuration version conflicts. Provider acceptance alone does not establish a reply."
+  },
+  "POST /api/v1/people/{id}/telegram-account/remove": {
+    "description": "Unlink the Person Telegram identity under current account-link authority. Old destinations and callbacks lose authority.",
+    "returns": "`{removed: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /integrations/telegram/{id}": {
+    "description": "Secret-authenticated private bot updates. Canonical message/decision, thread and dedup receipt commit before success. Same ID with changed content conflicts. See docs/TELEGRAM.md.",
+    "returns": "A message receipt has conversation_id and message_count. A decision receipt has conversation_id, request_id and outcome (approved or denied). Ignored unsupported update categories return {ignored: true}. Each handled receipt follows durable commit.",
+    "family": "callbacks",
+    "audience": "Provider callback. Use its native signature/secret verification, not a worker bearer token.",
+    "errors": "Invalid signatures or account linkage are rejected. Duplicate delivery is deduplicated; changed content under the same provider event identity conflicts."
+  },
+  "POST /api/v1/people/{id}/discord-account/remove": {
+    "description": "Unlink the Person Discord identity. Queued sends and callbacks lose authority.",
+    "returns": "`{removed: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
+    "family": "identities",
+    "audience": "Authenticated identity; mutations require management authority over the relevant resource. Enrollment requires a bounded launcher or operator.",
+    "errors": "Unknown/hidden identity is 404 or denied. Stale version conflicts. Delegated managers cannot create broader authority than they possess; revoked credentials cannot be used."
+  },
+  "POST /integrations/discord/{id}": {
+    "description": "Ed25519-authenticated Discord interactions. Bot DM commands, reply forms and versioned approvals only. Commits canonical actions and dedup receipt before acknowledgment. See docs/DISCORD.md.",
+    "returns": "Discord interaction response: type plus optional data in the native Discord schema. Canonical receipt metadata stays internal; do not expect a Beepgrid message object in this HTTP response.",
+    "family": "callbacks",
+    "audience": "Provider callback. Use its native signature/secret verification, not a worker bearer token.",
+    "errors": "Invalid signatures or account linkage are rejected. Duplicate delivery is deduplicated; changed content under the same provider event identity conflicts."
+  },
+  "POST /api/v1/contact-permissions/preview": {
+    "description": "Preview current contact permissions or a proposed versioned edit without saving. Explicit blocks override matching role grants.",
+    "audience": "The subject, an authorized access inspector or the administrator. Proposed edits require current management and assignment authority.",
+    "returns": "The current direct policy, effective action cells and sources for up to 100 contacts, warnings and save eligibility.",
+    "errors": "Reload on version conflict. Visibility and assignment authority remain separate. A preview is never a grant.",
+    "family": "Permissions"
+  },
+  "POST /api/v1/appearance": {
+    "description": "Change an Agent or group icon from the bundled pack, or reset its default.",
+    "returns": "Target, selected icon and current group version. Appearance changes do not alter membership or permissions.",
+    "family": "identities",
+    "audience": "A current manager of the target Agent or group.",
+    "errors": "Invalid icons are rejected. A stale group revision conflicts. Other workspaces and unmanaged identities remain inaccessible."
+  },
+  "GET /api/v1/people/{id}/delivery-preferences": {
+    "family": "Channels",
+    "audience": "Person self, administrator or an explicitly authorized identity manager. Preferences never grant contact or channel authority.",
+    "errors": "Forbidden for another Person without management authority; stale versions conflict. Invalid selectors, foreign destinations and invalid timer bounds fail validation.",
+    "description": "Read recipient channel defaults and ordered Agent/Agent role overrides.",
+    "returns": "DeliveryPreferences with its current version; null default retains legacy destination settings."
+  },
+  "POST /api/v1/people/{id}/delivery-preferences": {
+    "family": "Channels",
+    "audience": "Person self, administrator or an explicitly authorized identity manager. Preferences never grant contact or channel authority.",
+    "errors": "Forbidden for another Person without management authority; stale versions conflict. Invalid selectors, foreign destinations and invalid timer bounds fail validation.",
+    "description": "Save versioned recipient channel preferences. Individual Agent overrides win, then the first matching Agent role, then default. Preferred channels fail over on definite failure and optionally on an unresolved question/approval timer after provider acceptance. All sends selected channels immediately. Empty destinations means workspace only. Saving cancels pending external sends from the previous configuration; in-flight effects cannot be recalled.",
+    "returns": "Saved DeliveryPreferences with the incremented version."
+  },
+  "POST /api/v1/credentials/{id}/edit": {
+    "description": "Rename a token, change expiry or update its permission ceiling using the observed version.",
+    "returns": "Current metadata with the next version. Never returns the secret.",
+    "family": "identities",
+    "audience": "Authorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.",
+    "errors": "Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials."
+  },
+  "POST /api/v1/credentials/{id}/rotate": {
+    "description": "Replace a token secret while preserving its identity, instance and permissions. Choose a zero to 86400 second overlap.",
+    "returns": "New token secret once, plus metadata including previous_until. No automatic retry after an uncertain outcome.",
+    "family": "identities",
+    "audience": "Authorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.",
+    "errors": "Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials."
+  },
+  "POST /api/v1/credentials/self/renew": {
+    "description": "Renew the current renewable worker lease, capped by its hard deadline. Active traffic renews near expiry automatically.",
+    "returns": "Current credential metadata. No new instance or secret is created.",
+    "family": "identities",
+    "audience": "Authorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.",
+    "errors": "Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials."
+  }
+}

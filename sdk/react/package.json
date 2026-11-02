@@ -1,0 +1,69 @@
+{
+  "name": "@beepgrid/react",
+  "version": "0.2.2",
+  "description": "Authenticated request and conversation components for Beepgrid",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./src/styles.css"
+  },
+  "files": [
+    "dist",
+    "src/styles.css",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@beepgrid/sdk": "^0.2.0",
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@beepgrid/sdk": "file:../typescript",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "16.3.3",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jsdom": "^27.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "keywords": [
+    "beepgrid",
+    "ai-agents",
+    "agent-to-agent",
+    "agent-communication",
+    "mcp",
+    "approvals",
+    "messaging",
+    "react"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beepgrid/beepgrid.git",
+    "directory": "sdk/react"
+  },
+  "bugs": {
+    "url": "https://github.com/beepgrid/beepgrid/issues"
+  },
+  "homepage": "https://beepgrid.com/",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Beepgrid <sasi@beepgrid.com> (https://beepgrid.com)"
+}

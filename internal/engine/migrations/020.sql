@@ -1,0 +1,4 @@
+ALTER TABLE groups ADD COLUMN version bigint NOT NULL DEFAULT 1;
+ALTER TABLE roles ADD COLUMN version bigint NOT NULL DEFAULT 1;
+ALTER TABLE connections ADD COLUMN version bigint NOT NULL DEFAULT 1;
+ALTER TABLE destinations ADD COLUMN version bigint NOT NULL DEFAULT 1;
