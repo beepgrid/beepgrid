@@ -28,7 +28,7 @@ Run these from the OSS repository root:
 
 Custom code constructs `beepgrid.New(url, workerToken)` in Go or `Client(url, workerToken)` in Python/TypeScript, then calls `Run`/`run` with its handler. The maintained TypeScript starter imports the built repository SDK by relative path. Python can alternatively install the local package with `python3 -m pip install ./sdk/python`.
 
-Package names `@beepgrid/sdk`, `beepgrid` and the Go repository path are development placeholders until the public release decision. These commands work from source. Do not show a registry install command as available before publication. Local packed artifacts and external consumers are separately checked by `scripts/sdk-package-check.py`.
+The SDKs are published: `npm install @beepgrid/sdk`, `uv add beepgrid` (or `python3 -m pip install beepgrid`), and `go get github.com/beepgrid/beepgrid/sdk/go@v0.2.0`. The commands above run the maintained source examples; installed applications use the same imports and worker credential. See [package distribution](PUBLISHING-PLAN.md).
 
 ## Local MCP host
 
