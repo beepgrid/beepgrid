@@ -61,9 +61,10 @@ schemas['DeliveryPreferences']=obj({'person_id':S,'version':{'type':'integer','m
 # Programmatic token lifecycle. Raw secrets appear only in issue/rotate responses.
 nullableDate={'type':['string','null'],'format':'date-time'}
 schemas['Credential']=obj({'id':S,'principal_id':S,'owner_name':S,'name':S,'kind':S,'prefix':S,'token_hint':S,'created_at':S,'last_used_at':nullableDate,'expires_at':nullableDate,'renewable_until':nullableDate,'previous_until':nullableDate,'permissions':{'type':['array','null'],'items':{'enum':['read','message','request','respond','execute','manage']}},'version':{'type':'integer'},'revoked':{'type':'boolean'},'parent_credential_id':S})
-schemas['IssuedCredential']=obj({'id':S,'kind':S,'token':S,'expires_at':S})
+schemas['IssuedCredential']=obj({'id':S,'kind':S,'token':S,'expires_at':nullableDate})
+schemas['Session']['properties']['expires_at']=nullableDate
 schemas['CredentialReplacement']=obj({'token':S,'credential':ref('Credential')})
-schemas['Enrollment']['properties'].update({'connection_name':S,'renewable':{'type':'boolean','default':False},'expires_at':{'type':'string','format':'date-time','description':'Hard deadline. Renewable workers use a 24-hour active lease up to this date.'}})
+schemas['Enrollment']['properties'].update({'connection_name':S,'never_expires':{'type':'boolean','default':False,'description':'Explicit non-expiring connection. Cannot be combined with renewable or expires_at.'},'renewable':{'type':'boolean','default':False},'expires_at':{'type':'string','format':'date-time','description':'Hard deadline. Renewable workers use a 24-hour active lease up to this date.'}})
 paths={}
 def add(method,path,body=None,result=None,description=''):
  op={'operationId':method.lower()+'_'+re.sub('[^A-Za-z0-9]+','_',path).strip('_'),'description':description or path,'responses':{'200':response(result or {'type':'object'}),'400':response(ref('Error')),'401':response(ref('Error')),'403':response(ref('Error')),'404':response(ref('Error')),'409':response(ref('Error')),'429':response(ref('Error'))},'parameters':[]}
@@ -107,10 +108,10 @@ add('GET','/api/v1/people/{id}/delivery-preferences',result=ref('DeliveryPrefere
 add('POST','/api/v1/people/{id}/delivery-preferences',ref('DeliveryPreferences'),ref('DeliveryPreferences'),description='Atomically save versioned recipient defaults and ordered Agent/Agent-role overrides. Destinations must belong to this Person; group selectors must be Agent roles. Preferred tries the first permitted enabled channel, fails over after definite failure, and optionally follows up on unresolved questions/approvals after provider acceptance. All sends selected channels immediately. Empty destinations means workspace only. Saving cancels pending external sends from the old policy; in-flight effects cannot be recalled. Native history stays available. Stale versions conflict.')
 
 add('GET','/api/v1/credentials',result=array(ref('Credential')))
-add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','enrollment']},'prefix':S,'name':S,'expires_at':{'type':'string','format':'date-time'},'permissions':array({'enum':['read','message','request','respond','execute','manage']})},['principal_id','kind']),ref('IssuedCredential'))
+add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','enrollment']},'prefix':S,'name':S,'never_expires':{'type':'boolean','default':False},'expires_at':{'type':'string','format':'date-time'},'permissions':array({'enum':['read','message','request','respond','execute','manage']})},['principal_id','kind']),ref('IssuedCredential'))
 add('POST','/api/v1/credentials/{id}/revoke',obj({'revoke_workers':{'type':'boolean','default':False}}))
 paths['/api/v1/credentials/{id}/revoke']['post']['requestBody']['required']=False
-add('POST','/api/v1/credentials/{id}/edit',obj({'version':{'type':'integer'},'name':S,'expires_at':{'type':'string','format':'date-time'},'permissions':array(S),'clear_permissions':{'type':'boolean'}},['version']),ref('Credential'))
+add('POST','/api/v1/credentials/{id}/edit',obj({'version':{'type':'integer'},'name':S,'never_expires':{'type':'boolean'},'expires_at':{'type':'string','format':'date-time'},'permissions':array(S),'clear_permissions':{'type':'boolean'}},['version']),ref('Credential'))
 add('POST','/api/v1/credentials/{id}/rotate',obj({'version':{'type':'integer'},'overlap_seconds':{'type':'integer','minimum':0,'maximum':86400,'default':3600}},['version']),ref('CredentialReplacement'))
 add('POST','/api/v1/credentials/self/renew',obj({}),ref('Credential'))
 add('POST','/api/v1/permissions/explain',obj({'subject_id':S,'action':S,'target':obj({'kind':S,'id':S},['kind','id']),'connection_id':S,'action_name':S,'descriptor':ref('Action')},['action','target']))

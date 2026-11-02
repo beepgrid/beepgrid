@@ -226,6 +226,11 @@ test("real token lifecycle keeps names, limits and rotation metadata", {skip: !p
   const {client,session}=await owner.connect("sdk/renew-ts-"+crypto.randomUUID(),"Renewable",[],{},{renewable:true,connection_name:"TS live"});
   const renewed=await client.renewCredential();assert.equal(renewed.kind,"worker");assert.ok(renewed.renewable_until);
   assert.equal((await client.call("GET","/api/v1/me")).instance_id,session.instance_id);
+  const permanent=await owner.createCredential({principal_id:me.person.id,kind:"api",never_expires:true});
+  assert.equal(permanent.expires_at,null);
+  const always=await owner.connect("sdk/persistent-ts-"+crypto.randomUUID(),"Persistent",[],{},{never_expires:true});
+  assert.equal(always.session.expires_at,null);
+  await always.client.heartbeat({});
 });
 test("rotation never blindly retries an uncertain secret response",async()=>{
   let calls=0;const client=new Client("http://localhost","fixture",async()=>{calls++;throw new TypeError("response lost")});

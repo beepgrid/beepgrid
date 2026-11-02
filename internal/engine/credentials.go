@@ -11,11 +11,13 @@ import (
 
 // Permissions are an upper bound, never grants. nil preserves existing identity permissions.
 type CredentialOptions struct {
-	Name        string     `json:"name,omitempty"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty"`
+	Name         string     `json:"name,omitempty"`
+	NeverExpires bool       `json:"never_expires,omitempty"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+	Permissions  []string   `json:"permissions,omitempty"`
 }
 type CredentialEdit struct {
+	NeverExpires     bool       `json:"never_expires,omitempty"`
 	ClearPermissions bool       `json:"clear_permissions,omitempty"`
 	Version          int64      `json:"version"`
 	Name             *string    `json:"name,omitempty"`
@@ -128,6 +130,12 @@ func (s *Store) EditCredential(ctx context.Context, a Actor, id string, in Crede
 		if c.Revoked || (c.ExpiresAt != nil && !c.ExpiresAt.After(time.Now())) || in.Version != c.Version {
 			return Conflict("This token changed. Refresh it before saving.")
 		}
+		if in.NeverExpires {
+			if in.ExpiresAt != nil {
+				return Bad("Choose an expiry date or never expires, not both.")
+			}
+			c.ExpiresAt, c.RenewableUntil = nil, nil
+		}
 		if in.Name != nil {
 			if len(strings.TrimSpace(*in.Name)) > 120 {
 				return Bad("Token name must be at most 120 characters.")
@@ -188,7 +196,7 @@ func (s *Store) RotateCredential(ctx context.Context, a Actor, id string, in Cre
 		if e != nil {
 			return e
 		}
-		if c.Revoked || c.ExpiresAt == nil || !c.ExpiresAt.After(time.Now()) || in.Version != c.Version {
+		if c.Revoked || (c.ExpiresAt != nil && !c.ExpiresAt.After(time.Now())) || in.Version != c.Version {
 			return Conflict("This token changed, expired or was revoked. Refresh it before rotating.")
 		}
 		if _, e = tx.Exec(ctx, `UPDATE credentials SET previous_digest=CASE WHEN $4>0 THEN digest ELSE NULL END,previous_until=CASE WHEN $4>0 THEN LEAST(expires_at,now()+make_interval(secs=>$4)) ELSE NULL END,digest=$3,token_hint=$5,version=version+1 WHERE scope=$1 AND id=$2`, a.Scope, id, Digest(token), in.OverlapSeconds, tokenHint(token)); e != nil {

@@ -162,6 +162,7 @@ function ExpiryField({
           onChange(e.target.value === "custom" ? "date:" : e.target.value)
         }
       >
+        <option value="never">Never expires</option>
         <option value="7">In 7 days</option>
         <option value="30">In 30 days</option>
         <option value="90">In 90 days</option>
@@ -185,6 +186,11 @@ function expires(value: string) {
   return value.startsWith("date:")
     ? new Date(value.slice(5)).toISOString()
     : new Date(Date.now() + Number(value) * 86400000).toISOString();
+}
+function expiryInput(value: string) {
+  return value === "never"
+    ? { never_expires: true }
+    : { expires_at: expires(value) };
 }
 type Secret = {
   token: string;
@@ -315,7 +321,7 @@ export default function AccessTokens() {
                       ) : c.expires_at ? (
                         <TokenDate value={c.expires_at} />
                       ) : (
-                        "No expiry"
+                        "Never expires"
                       )}
                     </td>
                     <td>
@@ -450,7 +456,7 @@ function TokenForm({
     [target, setTarget] = useState<Target[]>([]),
     [kind, setKind] = useState(c?.kind || "api"),
     [prefix, setPrefix] = useState(c?.prefix || ""),
-    [expiry, setExpiry] = useState("30"),
+    [expiry, setExpiry] = useState(c && !c.expires_at ? "never" : "30"),
     [changeExpiry, setChangeExpiry] = useState(!c),
     [permissions, setPermissions] = useState<string[] | null>(
       c?.permissions || null,
@@ -473,7 +479,7 @@ function TokenForm({
                 ? {
                     version: c.version,
                     name,
-                    ...(changeExpiry ? { expires_at: expires(expiry) } : {}),
+                    ...(changeExpiry ? expiryInput(expiry) : {}),
                     ...(kind === "api"
                       ? permissions === null
                         ? { clear_permissions: true }
@@ -485,7 +491,7 @@ function TokenForm({
                     principal_id: target[0]?.id,
                     kind,
                     prefix: kind === "enrollment" ? prefix : "",
-                    expires_at: expires(expiry),
+                    ...expiryInput(expiry),
                     ...(permissions ? { permissions } : {}),
                   },
             )

@@ -4835,6 +4835,10 @@
                     "type": "string",
                     "description": "Human-readable name. It is not necessarily unique."
                   },
+                  "never_expires": {
+                    "type": "boolean",
+                    "default": false
+                  },
                   "expires_at": {
                     "type": "string",
                     "format": "date-time",
@@ -5085,6 +5089,9 @@
                   "name": {
                     "type": "string",
                     "description": "Human-readable name. It is not necessarily unique."
+                  },
+                  "never_expires": {
+                    "type": "boolean"
                   },
                   "expires_at": {
                     "type": "string",
@@ -12511,6 +12518,11 @@
           "connection_name": {
             "type": "string"
           },
+          "never_expires": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit non-expiring connection. Cannot be combined with renewable or expires_at."
+          },
           "renewable": {
             "type": "boolean",
             "default": false
@@ -12544,7 +12556,11 @@
             "description": "Exact connected runtime ID, separate from the logical agent identity."
           },
           "expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
             "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
           }
         },
@@ -14075,7 +14091,11 @@
             "description": "Bearer credential. Save in protected server-side storage and never expose it in browser code or logs."
           },
           "expires_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
             "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
           }
         },

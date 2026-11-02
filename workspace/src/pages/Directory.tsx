@@ -564,8 +564,7 @@ export function Connect({
       agent: external,
       name,
  connection_name: name+" connection",
- renewable,
- expires_at: new Date(Date.now()+Number(connectionDays)*86400000).toISOString(),
+ ...(connectionDays === "never" ? {never_expires:true} : {renewable,expires_at:new Date(Date.now()+Number(connectionDays)*86400000).toISOString()}),
       capabilities: ["message", "status"],
     });
     if (!result) return;
@@ -686,7 +685,7 @@ export function Connect({
             </label>
           ) : null}
           <ErrorView error={op.error} />
-          <details className="connection-security"><summary>Connection security</summary><div className="form"><Field label="Connection valid for"><select value={connectionDays} onChange={e=>setConnectionDays(e.target.value)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></Field><label className="check"><input type="checkbox" checked={renewable} onChange={e=>setRenewable(e.target.checked)}/>Renew automatically while connected</label><p className="help">Renewable connections use a 24-hour lease, up to this deadline. Manage or revoke them in Settings → Access tokens.</p></div></details><div className="form-actions">
+          <details className="connection-security"><summary>Connection security</summary><div className="form"><Field label="Connection valid for"><select value={connectionDays} onChange={e=>setConnectionDays(e.target.value)}><option value="never">Never expires</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></Field>{connectionDays !== "never" ? <><label className="check"><input type="checkbox" checked={renewable} onChange={e=>setRenewable(e.target.checked)}/>Renew automatically while connected</label><p className="help">Renewable connections use a 24-hour lease, up to this deadline. Manage or revoke them in Settings → Access tokens.</p></> : null}</div></details><div className="form-actions">
             <Button onClick={onClose}>Cancel</Button>
             <Button primary type="submit" disabled={op.pending || !name.trim() || !runtime}>
               Create connection

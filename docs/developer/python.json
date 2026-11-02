@@ -171,7 +171,7 @@
   },
   {
     "name": "connect",
-    "signature": "connect(self, agent: str, name: str, capabilities: list[str] | None=None, metadata: dict[str, Any] | None=None, *, renewable: bool=False, expires_at: str | None=None, connection_name: str='')",
+    "signature": "connect(self, agent: str, name: str, capabilities: list[str] | None=None, metadata: dict[str, Any] | None=None, *, renewable: bool=False, expires_at: str | None=None, connection_name: str='', never_expires: bool=False)",
     "doc": ""
   },
   {

@@ -258,3 +258,68 @@ func TestCredentialNarrowingStopsQueuedDelivery(t *testing.T) {
 		t.Fatal("queued content survived narrowed authority", e)
 	}
 }
+
+func TestNeverExpiringCredentialsRemainRotatableRevocableAndVisible(t *testing.T) {
+	s, owner := testStore(t)
+	ctx := context.Background()
+	for _, kind := range []string{"api", "enrollment"} {
+		issued, err := s.NewCredential(ctx, owner, owner.ID, kind, "permanent/", CredentialOptions{Name: "Persistent " + kind, NeverExpires: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := credential(ctx, s.Pool, owner.Scope, issued["id"].(string))
+		if err != nil || c.ExpiresAt != nil {
+			t.Fatal("permanent token has expiry", err)
+		}
+		rotated, err := s.RotateCredential(ctx, owner, c.ID, CredentialRotation{Version: c.Version, OverlapSeconds: 300})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c = rotated["credential"].(Credential)
+		if c.ExpiresAt != nil || c.PreviousUntil == nil || !c.PreviousUntil.After(time.Now()) {
+			t.Fatal("permanent rotation lost bounded overlap")
+		}
+		if _, err = s.Authenticate(ctx, issued["token"].(string)); err != nil {
+			t.Fatal(err)
+		}
+		until := time.Now().Add(time.Hour)
+		c, err = s.EditCredential(ctx, owner, c.ID, CredentialEdit{Version: c.Version, ExpiresAt: &until})
+		if err != nil || c.ExpiresAt == nil {
+			t.Fatal("could not add expiry", err)
+		}
+		c, err = s.EditCredential(ctx, owner, c.ID, CredentialEdit{Version: c.Version, NeverExpires: true})
+		if err != nil || c.ExpiresAt != nil {
+			t.Fatal("could not remove expiry", err)
+		}
+		if _, err = s.EditCredential(ctx, owner, c.ID, CredentialEdit{Version: c.Version, NeverExpires: true, ExpiresAt: &until}); ErrorStatus(err) != 400 {
+			t.Fatal("contradictory expiry accepted", err)
+		}
+		if err = s.Revoke(ctx, owner, c.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = s.Authenticate(ctx, rotated["token"].(string)); ErrorStatus(err) != 401 {
+			t.Fatal("revoked permanent token authenticated", err)
+		}
+		if _, err = s.EditCredential(ctx, owner, c.ID, CredentialEdit{Version: c.Version + 1, NeverExpires: true}); ErrorStatus(err) != 409 {
+			t.Fatal("never-expire revived revoked token", err)
+		}
+	}
+	session, err := s.Enroll(ctx, owner, EnrollInput{Agent: "permanent/worker", Name: "Persistent worker", NeverExpires: true})
+	if err != nil || session.ExpiresAt != nil {
+		t.Fatal("permanent connection has expiry", err)
+	}
+	a, err := s.Authenticate(ctx, session.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Heartbeat(ctx, a, nil); err != nil {
+		t.Fatal(err)
+	}
+	page, err := s.Query(ctx, owner, QueryInput{Collection: "agents", Filters: map[string]string{"presence": "connected"}})
+	if err != nil || !strings.Contains(string(JSON(page.Items)), session.Agent.ID) {
+		t.Fatal("permanent worker missing from connected filter", err)
+	}
+	if _, err = s.Enroll(ctx, owner, EnrollInput{Agent: "invalid", Name: "Invalid", NeverExpires: true, Renewable: true}); ErrorStatus(err) != 400 {
+		t.Fatal("conflicting connection lifetime accepted", err)
+	}
+}

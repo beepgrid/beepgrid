@@ -26,14 +26,16 @@ type Credential struct {
 	ParentCredentialID string     `json:"parent_credential_id,omitempty"`
 }
 type CredentialInput struct {
-	PrincipalID string     `json:"principal_id"`
-	Kind        string     `json:"kind"`
-	Name        string     `json:"name,omitempty"`
-	Prefix      string     `json:"prefix,omitempty"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty"`
+	NeverExpires bool       `json:"never_expires,omitempty"`
+	PrincipalID  string     `json:"principal_id"`
+	Kind         string     `json:"kind"`
+	Name         string     `json:"name,omitempty"`
+	Prefix       string     `json:"prefix,omitempty"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+	Permissions  []string   `json:"permissions,omitempty"`
 }
 type CredentialEdit struct {
+	NeverExpires     bool       `json:"never_expires,omitempty"`
 	Version          int64      `json:"version"`
 	Name             *string    `json:"name,omitempty"`
 	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
@@ -41,9 +43,10 @@ type CredentialEdit struct {
 	ClearPermissions bool       `json:"clear_permissions,omitempty"`
 }
 type IssuedCredential struct {
-	Token     string    `json:"token"`
-	ID        string    `json:"id"`
-	Kind      string    `json:"kind"`
+	Token string `json:"token"`
+	ID    string `json:"id"`
+	Kind  string `json:"kind"`
+	// ExpiresAt is zero when the token never expires.
 	ExpiresAt time.Time `json:"expires_at"`
 }
 type CredentialReplacement struct {

@@ -106,6 +106,7 @@ type CreatePerson struct {
 	Email      string `json:"email"`
 }
 type EnrollInput struct {
+	NeverExpires   bool           `json:"never_expires,omitempty"`
 	ConnectionName string         `json:"connection_name,omitempty"`
 	ExpiresAt      *time.Time     `json:"expires_at,omitempty"`
 	Renewable      bool           `json:"renewable,omitempty"`
@@ -124,10 +125,10 @@ type Instance struct {
 	Presence     string         `json:"presence"`
 }
 type Session struct {
-	Token      string    `json:"token"`
-	Agent      Principal `json:"agent"`
-	InstanceID string    `json:"instance_id"`
-	ExpiresAt  time.Time `json:"expires_at"`
+	Token      string     `json:"token"`
+	Agent      Principal  `json:"agent"`
+	InstanceID string     `json:"instance_id"`
+	ExpiresAt  *time.Time `json:"expires_at"`
 }
 type Credential struct {
 	Name               string     `json:"name"`

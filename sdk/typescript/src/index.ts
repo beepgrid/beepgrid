@@ -123,15 +123,15 @@ export type Delivery = {
   };
 };
 export type Credential = {id:string;principal_id:string;owner_name:string;name:string;kind:string;prefix:string;token_hint:string;created_at:string;last_used_at:string|null;expires_at:string|null;renewable_until:string|null;previous_until:string|null;permissions:string[]|null;version:number;revoked:boolean;parent_credential_id?:string};
-export type CredentialInput = {principal_id:string;kind:"api"|"enrollment";name?:string;prefix?:string;expires_at?:string;permissions?:Array<"read"|"message"|"request"|"respond"|"execute"|"manage">};
-export type CredentialEdit = {version:number;name?:string;expires_at?:string;permissions?:string[];clear_permissions?:boolean};
-export type IssuedCredential = {id:string;token:string;kind:string;expires_at:string};
+export type CredentialInput = {never_expires?:boolean;principal_id:string;kind:"api"|"enrollment";name?:string;prefix?:string;expires_at?:string;permissions?:Array<"read"|"message"|"request"|"respond"|"execute"|"manage">};
+export type CredentialEdit = {never_expires?:boolean;version:number;name?:string;expires_at?:string;permissions?:string[];clear_permissions?:boolean};
+export type IssuedCredential = {id:string;token:string;kind:string;expires_at:string|null};
 export type CredentialReplacement = {token:string;credential:Credential};
 export type Session = {
   token: string;
   agent: Agent;
   instance_id: string;
-  expires_at: string;
+  expires_at: string | null;
 };
 export type AssistanceSettings = {
   overseer: boolean;
@@ -324,7 +324,7 @@ export class Client {
     name: string,
     capabilities: string[] = [],
     metadata: Record<string, unknown> = {},
-    options: {connection_name?:string;renewable?:boolean;expires_at?:string} = {},
+    options: {connection_name?:string;renewable?:boolean;expires_at?:string;never_expires?:boolean} = {},
   ): Promise<{ client: Client; session: Session }> {
     const session = await this.call<Session>("POST", "/api/v1/sessions", {
       ...options,

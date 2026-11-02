@@ -91,6 +91,28 @@ it("edits the observed version without changing expiry unless requested", async 
     permissions: ["read"],
   });
 });
+it("makes never-expiring access a direct expiry choice without sending a fake date", async () => {
+  const fetcher = setup([{ ...credential, kind: "api" }], () =>
+    json({ ...credential, expires_at: null, version: 5 }),
+  );
+  await screen.findByText("Production worker");
+  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+  fireEvent.click(screen.getByLabelText("Change expiry"));
+  fireEvent.change(screen.getByLabelText("Expires"), {
+    target: { value: "never" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() =>
+    expect(fetcher.mock.calls.some(([p]) => p.endsWith("/edit"))).toBe(true),
+  );
+  const call = fetcher.mock.calls.find(([p]) => p.endsWith("/edit"))!;
+  expect(requestBody(call[1])).toEqual({
+    version: 4,
+    name: "Production worker",
+    never_expires: true,
+    clear_permissions: true,
+  });
+});
 it("rotates with a bounded overlap and shows the replacement secret only after success", async () => {
   const fetcher = setup([credential], () =>
     json({

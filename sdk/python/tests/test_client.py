@@ -38,6 +38,11 @@ class ClientTests(unittest.TestCase):
         renewed = worker.renew_credential()
         self.assertIsNotNone(renewed["renewable_until"])
         self.assertEqual(worker.call("GET", "/api/v1/me")["instance_id"], session["instance_id"])
+        permanent = owner.create_credential(person, never_expires=True)
+        self.assertIsNone(permanent["expires_at"])
+        worker, session = owner.connect("sdk/persistent-py-"+str(uuid.uuid4()), "Persistent", never_expires=True)
+        self.assertIsNone(session["expires_at"])
+        worker.heartbeat()
 
     def test_rotation_is_not_retried_after_lost_response(self):
         with patch("notif._open", side_effect=OSError("response lost")) as transport:

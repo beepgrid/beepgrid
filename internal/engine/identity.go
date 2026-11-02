@@ -108,9 +108,17 @@ func (s *Store) NewCredential(ctx context.Context, a Actor, pid, kind, prefix st
 	if len(strings.TrimSpace(opt.Name)) > 120 {
 		return nil, Bad("Token name must be at most 120 characters.")
 	}
-	expires, e := credentialExpiry(opt.ExpiresAt, 30*24*time.Hour)
-	if e != nil {
-		return nil, e
+	if opt.NeverExpires && opt.ExpiresAt != nil {
+		return nil, Bad("Choose an expiry date or never expires, not both.")
+	}
+	var expires *time.Time
+	var ttl time.Duration
+	if !opt.NeverExpires {
+		until, e := credentialExpiry(opt.ExpiresAt, 30*24*time.Hour)
+		if e != nil {
+			return nil, e
+		}
+		expires, ttl = &until, time.Until(until)
 	}
 	permissions, e := credentialPermissions(opt.Permissions)
 	if e != nil {
@@ -137,11 +145,11 @@ func (s *Store) NewCredential(ctx context.Context, a Actor, pid, kind, prefix st
 		if kind == "enrollment" && !ValidText(prefix, 120) {
 			return Bad("An enrollment namespace prefix is required.")
 		}
-		token, id, e = issue(ctx, tx, a, pid, kind, prefix, time.Until(expires))
+		token, id, e = issue(ctx, tx, a, pid, kind, prefix, ttl)
 		if e != nil {
 			return e
 		}
-		if _, e = tx.Exec(ctx, `UPDATE credentials SET name=$3,permissions=$4 WHERE scope=$1 AND id=$2`, a.Scope, id, strings.TrimSpace(opt.Name), permissions); e != nil {
+		if _, e = tx.Exec(ctx, `UPDATE credentials SET name=$3,permissions=$4,expires_at=$5 WHERE scope=$1 AND id=$2`, a.Scope, id, strings.TrimSpace(opt.Name), permissions, expires); e != nil {
 			return e
 		}
 		return event(ctx, tx, a, "credential.created", "", pid, map[string]any{"id": id, "kind": kind})
@@ -236,9 +244,16 @@ func (s *Store) Enroll(ctx context.Context, a Actor, in EnrollInput) (Session, e
 	if in.Renewable {
 		fallback = 30 * 24 * time.Hour
 	}
-	deadline, e := credentialExpiry(in.ExpiresAt, fallback)
-	if e != nil {
-		return out, e
+	if in.NeverExpires && (in.ExpiresAt != nil || in.Renewable) {
+		return out, Bad("A connection that never expires does not need renewal or an expiry date.")
+	}
+	var deadline time.Time
+	if !in.NeverExpires {
+		var e error
+		deadline, e = credentialExpiry(in.ExpiresAt, fallback)
+		if e != nil {
+			return out, e
+		}
 	}
 	if len(strings.TrimSpace(in.ConnectionName)) > 120 {
 		return out, Bad("Connection name must be at most 120 characters.")
@@ -296,7 +311,12 @@ func (s *Store) Enroll(ctx context.Context, a Actor, in EnrollInput) (Session, e
 		if in.Renewable && lease.After(time.Now().Add(24*time.Hour)) {
 			lease = time.Now().Add(24 * time.Hour)
 		}
-		token, cid, e := issue(ctx, tx, a, p.ID, "worker", "", time.Until(lease))
+		var ttl time.Duration
+		var expires *time.Time
+		if !in.NeverExpires {
+			ttl, expires = time.Until(lease), &lease
+		}
+		token, cid, e := issue(ctx, tx, a, p.ID, "worker", "", ttl)
 		if e != nil {
 			return e
 		}
@@ -308,14 +328,14 @@ func (s *Store) Enroll(ctx context.Context, a Actor, in EnrollInput) (Session, e
 		if a.CredentialKind == "enrollment" {
 			parent = &a.CredentialID
 		}
-		if _, e = tx.Exec(ctx, `UPDATE credentials SET name=$3,renewable_until=$4,parent_credential_id=$5,expires_at=$6 WHERE scope=$1 AND id=$2`, a.Scope, cid, strings.TrimSpace(in.ConnectionName), renewable, parent, lease); e != nil {
+		if _, e = tx.Exec(ctx, `UPDATE credentials SET name=$3,renewable_until=$4,parent_credential_id=$5,expires_at=$6 WHERE scope=$1 AND id=$2`, a.Scope, cid, strings.TrimSpace(in.ConnectionName), renewable, parent, expires); e != nil {
 			return e
 		}
 		instance := ID("ins")
 		if _, e = tx.Exec(ctx, `INSERT INTO instances(id,scope,agent_id,credential_id,capabilities) VALUES($1,$2,$3,$4,$5)`, instance, a.Scope, p.ID, cid, JSON(in.Capabilities)); e != nil {
 			return e
 		}
-		out = Session{token, p, instance, lease}
+		out = Session{token, p, instance, expires}
 		return event(ctx, tx, a, "agent.connected", "", p.ID, map[string]any{"agent_id": p.ID, "instance_id": instance})
 	})
 	return out, err

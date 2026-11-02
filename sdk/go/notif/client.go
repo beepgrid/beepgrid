@@ -52,12 +52,14 @@ type Agent struct {
 	Metadata   map[string]any `json:"metadata"`
 }
 type Session struct {
-	Token      string    `json:"token"`
-	Agent      Agent     `json:"agent"`
-	InstanceID string    `json:"instance_id"`
-	ExpiresAt  time.Time `json:"expires_at"`
+	Token      string `json:"token"`
+	Agent      Agent  `json:"agent"`
+	InstanceID string `json:"instance_id"`
+	// ExpiresAt is zero when the connection never expires.
+	ExpiresAt time.Time `json:"expires_at"`
 }
 type EnrollInput struct {
+	NeverExpires   bool           `json:"never_expires,omitempty"`
 	ConnectionName string         `json:"connection_name,omitempty"`
 	Renewable      bool           `json:"renewable,omitempty"`
 	ExpiresAt      *time.Time     `json:"expires_at,omitempty"`

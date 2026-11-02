@@ -111,3 +111,27 @@ func TestCredentialRequestPermissionsFailClosed(t *testing.T) {
 		}
 	}
 }
+
+func TestNeverExpiringGoClientLifecycle(t *testing.T) {
+	_, admin, _ := setup(t)
+	ctx := context.Background()
+	var me struct {
+		Person struct {
+			ID string `json:"id"`
+		} `json:"person"`
+	}
+	if err := admin.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil {
+		t.Fatal(err)
+	}
+	issued, err := admin.CreateCredential(ctx, notif.CredentialInput{PrincipalID: me.Person.ID, Kind: "api", NeverExpires: true})
+	if err != nil || !issued.ExpiresAt.IsZero() {
+		t.Fatal("nullable API expiry did not round trip", err)
+	}
+	worker, session, err := admin.Enroll(ctx, notif.EnrollInput{Agent: "permanent/go", Name: "Persistent Go", NeverExpires: true})
+	if err != nil || !session.ExpiresAt.IsZero() {
+		t.Fatal("nullable worker expiry did not round trip", err)
+	}
+	if err = worker.Heartbeat(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+}

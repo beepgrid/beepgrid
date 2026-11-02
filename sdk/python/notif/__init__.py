@@ -218,8 +218,8 @@ class Client:
 
     def connect(self, agent: str, name: str, capabilities: list[str] | None = None,
                 metadata: dict[str, Any] | None = None, *, renewable: bool = False,
-                expires_at: str | None = None, connection_name: str = "") -> tuple[Client, dict[str, Any]]:
-        data = {"agent": agent, "name": name, "capabilities": capabilities or [], "metadata": metadata or {}, "renewable": renewable, "connection_name": connection_name}
+                expires_at: str | None = None, connection_name: str = "", never_expires: bool = False) -> tuple[Client, dict[str, Any]]:
+        data = {"agent": agent, "name": name, "capabilities": capabilities or [], "metadata": metadata or {}, "renewable": renewable, "connection_name": connection_name, "never_expires": never_expires}
         if expires_at is not None:
             data["expires_at"] = expires_at
         session = self.call("POST", "/api/v1/sessions", data)

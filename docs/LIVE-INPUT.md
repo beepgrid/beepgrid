@@ -84,7 +84,8 @@ project that **already runs your Agent**, not to a second replacement Agent.
    private. Use a different filename for each connection. The workspace form
    defaults to a renewable connection with a 90-day hard deadline. Normal
    authenticated activity renews its 24-hour lease without a model tool call.
-   Headless enrollment can opt in too; existing fixed tokens keep their expiry.
+   Headless enrollment can opt in too. Choose **Never expires** for a persistent
+   connection that stays valid while idle; existing tokens keep their expiry.
    See [access token management](ACCESS-TOKENS.md) for exact renewal and rotation
    behavior. Update the existing host's secret when rotating rather than
    enrolling on every message or process restart. Rotation does not extend expiry.

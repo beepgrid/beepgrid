@@ -621,7 +621,7 @@
     "name": "Agent"
   },
   {
-    "definition": "struct {\n\tToken      string    `json:\"token\"`\n\tAgent      Agent     `json:\"agent\"`\n\tInstanceID string    `json:\"instance_id\"`\n\tExpiresAt  time.Time `json:\"expires_at\"`\n}",
+    "definition": "struct {\n\tToken      string `json:\"token\"`\n\tAgent      Agent  `json:\"agent\"`\n\tInstanceID string `json:\"instance_id\"`\n\t// ExpiresAt is zero when the connection never expires.\n\tExpiresAt time.Time `json:\"expires_at\"`\n}",
     "doc": "",
     "fields": [
       {
@@ -643,7 +643,7 @@
         "type": "string"
       },
       {
-        "doc": "",
+        "doc": "ExpiresAt is zero when the connection never expires.\n",
         "name": "ExpiresAt",
         "tag": "`json:\"expires_at\"`",
         "type": "time.Time"
@@ -654,9 +654,15 @@
     "name": "Session"
   },
   {
-    "definition": "struct {\n\tConnectionName string         `json:\"connection_name,omitempty\"`\n\tRenewable      bool           `json:\"renewable,omitempty\"`\n\tExpiresAt      *time.Time     `json:\"expires_at,omitempty\"`\n\tParentID       string         `json:\"parent_id,omitempty\"`\n\tAgent          string         `json:\"agent\"`\n\tName           string         `json:\"name\"`\n\tCapabilities   []string       `json:\"capabilities\"`\n\tMetadata       map[string]any `json:\"metadata,omitempty\"`\n}",
+    "definition": "struct {\n\tNeverExpires   bool           `json:\"never_expires,omitempty\"`\n\tConnectionName string         `json:\"connection_name,omitempty\"`\n\tRenewable      bool           `json:\"renewable,omitempty\"`\n\tExpiresAt      *time.Time     `json:\"expires_at,omitempty\"`\n\tParentID       string         `json:\"parent_id,omitempty\"`\n\tAgent          string         `json:\"agent\"`\n\tName           string         `json:\"name\"`\n\tCapabilities   []string       `json:\"capabilities\"`\n\tMetadata       map[string]any `json:\"metadata,omitempty\"`\n}",
     "doc": "",
     "fields": [
+      {
+        "doc": "",
+        "name": "NeverExpires",
+        "tag": "`json:\"never_expires,omitempty\"`",
+        "type": "bool"
+      },
       {
         "doc": "",
         "name": "ConnectionName",
@@ -1841,9 +1847,15 @@
     "name": "Credential"
   },
   {
-    "definition": "struct {\n\tPrincipalID string     `json:\"principal_id\"`\n\tKind        string     `json:\"kind\"`\n\tName        string     `json:\"name,omitempty\"`\n\tPrefix      string     `json:\"prefix,omitempty\"`\n\tExpiresAt   *time.Time `json:\"expires_at,omitempty\"`\n\tPermissions []string   `json:\"permissions,omitempty\"`\n}",
+    "definition": "struct {\n\tNeverExpires bool       `json:\"never_expires,omitempty\"`\n\tPrincipalID  string     `json:\"principal_id\"`\n\tKind         string     `json:\"kind\"`\n\tName         string     `json:\"name,omitempty\"`\n\tPrefix       string     `json:\"prefix,omitempty\"`\n\tExpiresAt    *time.Time `json:\"expires_at,omitempty\"`\n\tPermissions  []string   `json:\"permissions,omitempty\"`\n}",
     "doc": "",
     "fields": [
+      {
+        "doc": "",
+        "name": "NeverExpires",
+        "tag": "`json:\"never_expires,omitempty\"`",
+        "type": "bool"
+      },
       {
         "doc": "",
         "name": "PrincipalID",
@@ -1886,9 +1898,15 @@
     "name": "CredentialInput"
   },
   {
-    "definition": "struct {\n\tVersion          int64      `json:\"version\"`\n\tName             *string    `json:\"name,omitempty\"`\n\tExpiresAt        *time.Time `json:\"expires_at,omitempty\"`\n\tPermissions      *[]string  `json:\"permissions,omitempty\"`\n\tClearPermissions bool       `json:\"clear_permissions,omitempty\"`\n}",
+    "definition": "struct {\n\tNeverExpires     bool       `json:\"never_expires,omitempty\"`\n\tVersion          int64      `json:\"version\"`\n\tName             *string    `json:\"name,omitempty\"`\n\tExpiresAt        *time.Time `json:\"expires_at,omitempty\"`\n\tPermissions      *[]string  `json:\"permissions,omitempty\"`\n\tClearPermissions bool       `json:\"clear_permissions,omitempty\"`\n}",
     "doc": "",
     "fields": [
+      {
+        "doc": "",
+        "name": "NeverExpires",
+        "tag": "`json:\"never_expires,omitempty\"`",
+        "type": "bool"
+      },
       {
         "doc": "",
         "name": "Version",
@@ -1925,7 +1943,7 @@
     "name": "CredentialEdit"
   },
   {
-    "definition": "struct {\n\tToken     string    `json:\"token\"`\n\tID        string    `json:\"id\"`\n\tKind      string    `json:\"kind\"`\n\tExpiresAt time.Time `json:\"expires_at\"`\n}",
+    "definition": "struct {\n\tToken string `json:\"token\"`\n\tID    string `json:\"id\"`\n\tKind  string `json:\"kind\"`\n\t// ExpiresAt is zero when the token never expires.\n\tExpiresAt time.Time `json:\"expires_at\"`\n}",
     "doc": "",
     "fields": [
       {
@@ -1947,7 +1965,7 @@
         "type": "string"
       },
       {
-        "doc": "",
+        "doc": "ExpiresAt is zero when the token never expires.\n",
         "name": "ExpiresAt",
         "tag": "`json:\"expires_at\"`",
         "type": "time.Time"

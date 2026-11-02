@@ -16,7 +16,7 @@ required. People, Agents and software services keep separate identities.
   directly with any SDK, CLI or MCP connection. Do not enroll again on each call.
 
 New API and enrollment tokens default to 30 days. Choose an expiry from one
-minute to one year ahead. Existing tokens keep their current lifetime. Tokens
+minute to one year ahead, or select **Never expires**. Existing tokens keep their current lifetime. Tokens
 have names, a non-secret hint, creation time and last-use information. Last use
 is recorded at most once per five minutes, so it is approximate.
 
@@ -24,6 +24,21 @@ Secrets are generated randomly, returned once and stored only as SHA-256 digests
 Listings, queries and audit events never return a secret or its digest. Store
 the secret outside source control, in a private file or secret manager. Use TLS
 outside local development.
+
+### Never-expiring keys
+
+**Never expires** is available directly in the expiry selector, including when
+editing an active key. In Agent connection setup it is an option under
+**Connection security → Connection valid for**. Such connections remain valid
+while idle and need no automatic renewal.
+
+Headless callers send `never_expires: true` when creating a token, enrolling a
+connection or editing a credential with its current `version`. Omit
+`expires_at`; for connections also leave `renewable` false. The response and
+metadata use `expires_at: null`. Go SDK response timestamps use `IsZero()` for
+this case. Choosing a dated expiry later is supported. Rotation still has a
+bounded old-secret overlap; revocation, disabled identities and all permission
+checks continue to apply. An expired or revoked key cannot be revived this way.
 
 ## Keep an Agent connected
 
