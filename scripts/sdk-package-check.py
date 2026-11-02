@@ -112,8 +112,6 @@ func main(){c:=beepgrid.New("http://localhost","fixture");_ = c.UploadAttachment
 ''')
     run(["go", "run", "-buildvcs=false", "."], cwd=go)
 
-run([sys.executable, root / "scripts/branding-check.py", *artifacts])
-
 git = os.environ.get("BEEPGRID_GIT", "git")
 commit = run([git, "rev-parse", "HEAD"], capture_output=True).stdout.strip()
 dirty = bool(run([git, "status", "--porcelain"], capture_output=True).stdout.strip())

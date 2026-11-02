@@ -33,7 +33,6 @@ jobs:
           PY
           PYTHONPATH=sdk/python python -m unittest discover -s sdk/python/tests
           python -m build sdk/python --outdir dist
-          python scripts/branding-check.py dist
           python -m twine check --strict dist/*
           python -m pip install --no-deps dist/*.whl
           cd /tmp

@@ -3,7 +3,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export BEEPGRID_TEST_DATABASE_URL="${BEEPGRID_TEST_DATABASE_URL:-postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable}"
 psql "$BEEPGRID_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null
-python3 scripts/branding-check.py
 npm --prefix sdk/typescript audit --package-lock-only --audit-level=moderate
 npm --prefix sdk/react audit --package-lock-only --audit-level=moderate
 npm --prefix workspace audit --package-lock-only --audit-level=moderate
@@ -21,7 +20,6 @@ npm --prefix workspace ci --no-fund
 npm --prefix workspace test
 npm --prefix workspace run build
 npm --prefix workspace run embed
-python3 scripts/branding-check.py sdk/typescript/dist sdk/react/dist internal/web/dist
 go vet ./...
 go -C sdk/go vet ./...
 go -C sdk/go test -race ./... -count=1

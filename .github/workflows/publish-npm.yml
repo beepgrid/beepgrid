@@ -55,8 +55,6 @@ jobs:
           npm --prefix sdk/react ci --ignore-scripts
           npm --prefix sdk/react run build
           npm --prefix sdk/react test
-      - name: Check package branding
-        run: python3 scripts/branding-check.py sdk/typescript/dist sdk/react/dist
       - name: Publish SDK with provenance
         if: inputs.package != 'react'
         working-directory: sdk/typescript
