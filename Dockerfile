@@ -3,7 +3,10 @@ FROM golang:1.26.10-alpine AS go-source
 WORKDIR /src
 COPY go.mod go.sum go.work ./
 COPY sdk/go/go.mod ./sdk/go/go.mod
-RUN go mod download
+# Warm external dependencies without fetching our SDK from a registry.
+# COPY below restores the published go.mod; compilation uses go.work source.
+RUN GOWORK=off go mod edit -replace=github.com/beepgrid/beepgrid/sdk/go=./sdk/go \
+    && GOWORK=off go mod download
 COPY . .
 RUN mkdir /data && chown 65532:65532 /data
 

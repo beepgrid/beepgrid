@@ -15,7 +15,7 @@ Before a release, rerun real PostgreSQL default/headless race suites, the isolat
 
 1. Run the artifact and engine qualification checks on the intended release commit.
 2. Publish the Go SDK directory tag before the engine tag so the root module resolves the released SDK.
-3. Publish the exact checked npm tarballs through the `beepgrid` account. Subsequent npm releases may use the dedicated `publish-npm.yml` workflow once trusted publishing is configured for both packages.
+3. Publish the exact checked npm tarballs through the `beepgrid` account. Both packages now trust the dedicated `publish-npm.yml` workflow in the `npm` environment. Subsequent releases use OIDC and provenance.
 4. Dispatch `publish-python.yml` with the reviewed engine tag. Only its `pypi` environment has OIDC publishing permission. The workflow builds and checks wheel/sdist before the separate publish job.
 5. Build versioned default/headless archives with `python3 scripts/build-release.py --version <version>`, publish their checksums, and update the Homebrew tap with those exact hashes.
 6. Install from each public registry with clean caches before announcing the release.

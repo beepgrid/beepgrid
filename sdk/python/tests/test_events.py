@@ -37,7 +37,7 @@ class EventTests(unittest.TestCase):
 
     def test_revocation_is_terminal(self):
         import urllib.error
-        error = urllib.error.HTTPError("http://localhost", 403, "denied", {}, None)
+        error = urllib.error.HTTPError("http://localhost", 403, "denied", {}, io.BytesIO())
         with patch("beepgrid._open", side_effect=error) as call:
             with self.assertRaises(NotifError) as caught:
                 next(Client("http://localhost", "fixture").events())
