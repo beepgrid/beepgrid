@@ -1,7 +1,7 @@
 {
   "internal/mcp/server.go": "eef3ec883112e0e5f42ecb3572ef09a505a5957768418cfe078caa55bba95e48",
   "internal/aimodel/config.go": "bdb20eed736ac15b32dc14dd3ea8bf9a3461662b4661f1880b3daf9463baf49f",
-  "internal/cli/main.go": "27414fbe555b267a51d0160a735944e7eeb5bd81595ee7c7910c9d431e8073be",
+  "internal/cli/main.go": "2f4b39558af4e3cc2c5fdd6c8e7ec65b721829586145eaed3b942b021a6719b6",
   "internal/cli/client.go": "f6b2210acd65b87c3804c0baea127e92702e82a36399c83387d78617cf2aa635",
   "internal/cli/operator.go": "d0d8ecd11f1eb3bc0e1badbf269440cbbbbe33d77b4652d44be734a47bef813e"
 }

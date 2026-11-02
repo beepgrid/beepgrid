@@ -4,6 +4,8 @@ The same `beepgrid` executable is a server, an HTTP client and an MCP stdio adap
 
 Run `beepgrid` or `beepgrid help` for command syntax and local setup guidance. Client flags precede positional arguments. Client JSON results go to stdout. Errors in a terminal explain the problem, suggest a next action and link to a guide. Client errors redirected or captured by a program retain JSON on stderr, including the existing error code, message, HTTP status and exit code, plus `hint` and `docs_url`. Put `--json` before the command to force structured errors, including server setup failures: `beepgrid --json serve` or `beepgrid --json list agents`. No interactive prompt or automatic retry is added. Exit codes are 0 success, 1 other failure, 2 invalid usage/input, 3 authentication/authorization failure and 4 interrupted/deadline-exceeded. Server worker logs remain ordinary operational logs. API conflict and validation details retain the server's error code and HTTP status.
 
+`beepgrid version` reports the installed release for both downloaded binaries and `go install`. A development build from a checkout reports `dev` unless a release version is supplied at build time.
+
 ## Troubleshooting
 
 - To run a local engine, follow [server setup](PACKAGING.md#database-connection). A client connecting to an existing engine does not need local PostgreSQL.
