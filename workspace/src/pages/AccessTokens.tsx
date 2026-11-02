@@ -126,7 +126,7 @@ function PermissionFields({
         <fieldset className="token-permissions">
           <legend>Allowed actions</legend>
           {permissionOptions.map(([id, label]) => (
-            <label key={id}>
+            <label key={id} className="inline-check">
               <input
                 type="checkbox"
                 checked={value?.includes(id) || false}
@@ -550,7 +550,7 @@ function TokenForm({
           <PermissionFields value={permissions} onChange={setPermissions} />
         ) : null}
         {c ? (
-          <label className="check">
+          <label className="inline-check">
             <input
               type="checkbox"
               checked={changeExpiry}
@@ -654,7 +654,7 @@ function RevokeToken({
           authenticated calls. History is preserved.
         </p>
         {c.kind === "enrollment" ? (
-          <label className="check">
+          <label className="inline-check">
             <input
               type="checkbox"
               checked={workers}
