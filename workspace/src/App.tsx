@@ -55,6 +55,7 @@ export type WorkspaceExtension = {
   pages?: PageLoader;
   navigation?: string[][];
   navigationSection?: (page: string) => string;
+  pageTitles?: Record<string, string>;
   sidebar?: ReactNode;
   authRequired?: ReactNode;
   logout?: () => Promise<unknown>;
@@ -337,7 +338,7 @@ function WorkspaceApp({
             ? "integrations"
             : route.page;
     document.title =
-      (links.find(
+      (extension.pageTitles?.[section] || links.find(
         (x) => x[0] === (extension.navigationSection?.(section) || section),
       )?.[1] || "Settings") + " · beepgrid";
   }, [route.page]);
@@ -357,6 +358,7 @@ function WorkspaceApp({
           : page;
   const activeSection =
     extension.navigationSection?.(sectionPage) || sectionPage;
+  const environmentName = me.environment === "production" ? "Production" : me.environment;
   const section = usePage(pages, page);
   const Component = section.component;
   function link(path: string) {
@@ -389,7 +391,7 @@ function WorkspaceApp({
           <span className="workspace-avatar">{me.company.slice(0, 1)}</span>
           <div>
             <strong>{me.company}</strong>
-            <span>{me.environment}</span>
+            <span>{environmentName}</span>
           </div>
           <BadgeDeployment deployment={meta.data?.deployment} />
         </div>
@@ -488,14 +490,14 @@ function WorkspaceApp({
           <span>{me.company}</span>
           <span className="slash">/</span>
           <span>
-            {links.find((x) => x[0] === activeSection)?.[1] || "Settings"}
+            {extension.pageTitles?.[sectionPage] || links.find((x) => x[0] === activeSection)?.[1] || "Settings"}
           </span>
           <span
             className={`live-indicator ${live === "Live" ? "good" : "warn"}`}
           >
             {live}
           </span>
-          <span className="environment">{me.environment}</span>
+          <span className="environment">{environmentName}</span>
         </header>
         <main
           id="main"
