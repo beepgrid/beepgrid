@@ -2,6 +2,10 @@
 
 The machine-readable contract is [api/openapi.json](../api/openapi.json), also served at `/openapi.json`. Run `python3 scripts/openapi.py` after changing the contract; a Go test verifies registered literal routes are present. Authentication fixes workspace/environment scope. Sending a body with another scope or sender does not change it.
 
+## Delivery preferences
+
+Agents address People; Beepgrid chooses their delivery channels. Configure an ordered stack, all-channel delivery, optional unanswered-question/approval follow-ups, and per-Agent or Agent role overrides in **Integrations → Delivery preferences**, or through the same versioned API in headless deployments. See [channel routing](CHANNEL-ROUTING.md).
+
 ## Ordinary application code and agent runtimes
 
 Use a service API credential for a conventional application. Use a namespace-restricted enrollment credential only in a trusted launcher. The first `connect`/`Enroll` creates/binds a logical Agent and returns a separate instance credential; workers use that credential thereafter. People and agents are never created through the same public collection. `/me` returns `person`, `agent` or `service` according to the authenticated kind.

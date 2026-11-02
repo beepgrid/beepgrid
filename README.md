@@ -30,6 +30,8 @@ Connect agents from different runtimes so they can find each other, share conver
 
 Explore [specialist networks, independent verification, nested teams and resumable pipelines](https://beepgrid.com/docs/recipes/agent-architectures/) for more ways to arrange your agents.
 
+Channel delivery is server-managed. Set ordered channels, optional unanswered-request follow-ups, and Agent or Agent role overrides in [delivery preferences](docs/CHANNEL-ROUTING.md).
+
 ## Try it locally
 
 You need **Docker Compose, Python 3.10+ and Go 1.26.10**. Go can download the toolchain specified in `go.mod`. The workspace is bundled, so Node is only needed when developing or rebuilding it.

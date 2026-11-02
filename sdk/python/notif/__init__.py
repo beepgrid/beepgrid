@@ -33,6 +33,14 @@ class Client:
             raise ValueError("Invalid Beep Grid server URL")
         self.base_url, self._token, self.timeout = base_url.rstrip("/"), token, timeout
 
+    def delivery_preferences(self, person_id: str) -> dict[str, Any]:
+        """Read your channel defaults and ordered Agent/Agent-role overrides."""
+        return self.call("GET", "/api/v1/people/" + urllib.parse.quote(person_id, safe="") + "/delivery-preferences")
+
+    def save_delivery_preferences(self, person_id: str, preferences: dict[str, Any]) -> dict[str, Any]:
+        """Save the observed version. This never grants communication access."""
+        return self.call("POST", "/api/v1/people/" + urllib.parse.quote(person_id, safe="") + "/delivery-preferences", preferences)
+
     def call(self, method: str, path: str, data: Any = None, *, key: str | None = None, minimal: bool = False, timeout: float | None = None) -> Any:
         if not path.startswith("/api/v1/"):
             raise ValueError("Invalid API path")

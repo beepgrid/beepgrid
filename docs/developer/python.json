@@ -5,6 +5,16 @@
     "doc": ""
   },
   {
+    "name": "delivery_preferences",
+    "signature": "delivery_preferences(self, person_id: str)",
+    "doc": "Read your channel defaults and ordered Agent/Agent-role overrides."
+  },
+  {
+    "name": "save_delivery_preferences",
+    "signature": "save_delivery_preferences(self, person_id: str, preferences: dict[str, Any])",
+    "doc": "Save the observed version. This never grants communication access."
+  },
+  {
     "name": "call",
     "signature": "call(self, method: str, path: str, data: Any=None, *, key: str | None=None, minimal: bool=False, timeout: float | None=None)",
     "doc": ""

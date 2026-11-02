@@ -65,7 +65,7 @@ func (s *Store) ReplaceRequest(ctx context.Context, a Actor, id string, in Repla
 			if _, err = tx.Exec(ctx, `UPDATE requests SET state='superseded',resolved_at=now() WHERE scope=$1 AND id=$2`, a.Scope, id); err != nil {
 				return err
 			}
-			if _, err = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled' WHERE scope=$1 AND operation_id=$2 AND state IN ('queued','leased','waiting')`, a.Scope, id); err != nil {
+			if _, err = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled' WHERE scope=$1 AND operation_id=$2 AND state IN ('queued','leased','waiting','standby')`, a.Scope, id); err != nil {
 				return err
 			}
 			out.Previous, err = s.request(ctx, tx, a, id)

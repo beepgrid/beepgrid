@@ -12,31 +12,7 @@ import (
 // Resolve configured destinations once and batch canonical and provider writes
 // together. Existing conversations and requests retain the full enqueue path.
 func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, rs []recipient, out *SendResult) (bool, error) {
-	ids := make([]string, 0, len(rs))
-	for _, r := range rs {
-		ids = append(ids, r.ID)
-	}
-	type route struct {
-		ConnectionID string `json:"connection_id"`
-		Address      string `json:"address"`
-		DeliveryID   string `json:"delivery_id"`
-	}
-	routes := map[string][]route{}
-	rows, err := tx.Query(ctx, `SELECT d.principal_id,d.connection_id,d.address FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) AND c.enabled AND d.mode IN ('primary','copy') ORDER BY d.priority,d.id`, a.Scope, ids)
-	if err != nil {
-		return true, err
-	}
-	for rows.Next() {
-		var pid string
-		var d route
-		if err = rows.Scan(&pid, &d.ConnectionID, &d.Address); err != nil {
-			rows.Close()
-			return true, err
-		}
-		routes[pid] = append(routes[pid], d)
-	}
-	err = rows.Err()
-	rows.Close()
+	routes, err := s.resolveProviderRoutes(ctx, tx, a, rs, "", "message", "", nil)
 	if err != nil {
 		return true, err
 	}
@@ -46,27 +22,22 @@ func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInp
 		title = "Conversation"
 	}
 	type record struct {
-		ConversationID string    `json:"conversation_id"`
-		RecipientID    string    `json:"recipient_id"`
-		ExactInstance  string    `json:"exact_instance"`
-		DeliveryID     string    `json:"delivery_id"`
-		MessageID      string    `json:"message_id"`
-		CreatedAt      time.Time `json:"created_at"`
-		PolicyTarget   Target    `json:"policy_target"`
-		Native         bool      `json:"native"`
-		Providers      []route   `json:"providers"`
+		ConversationID string          `json:"conversation_id"`
+		RecipientID    string          `json:"recipient_id"`
+		ExactInstance  string          `json:"exact_instance"`
+		DeliveryID     string          `json:"delivery_id"`
+		MessageID      string          `json:"message_id"`
+		CreatedAt      time.Time       `json:"created_at"`
+		PolicyTarget   Target          `json:"policy_target"`
+		Native         bool            `json:"native"`
+		Providers      []providerRoute `json:"providers"`
 	}
 	items := make([]record, 0, len(rs))
 	for _, r := range rs {
 		m := Message{ID: ID("msg"), ConversationID: ID("con"), SenderID: a.ID, InstanceID: a.InstanceID, Body: in.Body, CreatedAt: time.Now()}
 		item := record{ConversationID: m.ConversationID, RecipientID: r.ID, ExactInstance: r.ExactInstance, DeliveryID: ID("del"), MessageID: m.ID, CreatedAt: m.CreatedAt, PolicyTarget: r.PolicyTarget,
 			Native: s.allowed(ctx, tx, a, "message", r.PolicyTarget, "", "")}
-		for _, d := range routes[r.ID] {
-			if s.allowed(ctx, tx, a, "message", r.PolicyTarget, d.ConnectionID, "") {
-				d.DeliveryID = ID("del")
-				item.Providers = append(item.Providers, d)
-			}
-		}
+		item.Providers = routes[r.ID]
 		if !item.Native && len(item.Providers) == 0 {
 			return true, &Error{"NO_ELIGIBLE_ROUTE", "No permitted destination is configured for this recipient.", 403}
 		}

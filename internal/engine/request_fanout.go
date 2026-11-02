@@ -13,52 +13,30 @@ import (
 // audience policy, events, configured provider routes and native inboxes.
 func (s *Store) newRequestAudience(ctx context.Context, tx pgx.Tx, a Actor, request Request, recipients []recipient) error {
 	ctx = withPolicySnapshot(ctx)
-	type route struct {
-		Connection string `json:"connection_id"`
-		Address    string `json:"address"`
-		ID         string `json:"delivery_id"`
-	}
-	ids := []string{}
-	for _, r := range recipients {
-		if s.recipientBlocked(ctx, tx, a, "ask", r.ID) {
-			return Denied()
-		}
-		ids = append(ids, r.ID)
-	}
-	rows, err := tx.Query(ctx, `SELECT d.principal_id,d.connection_id,d.address FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) AND c.enabled AND d.mode IN ('primary','copy') ORDER BY d.priority,d.id`, a.Scope, ids)
-	if err != nil {
-		return err
-	}
-	routes := map[string][]route{}
-	for rows.Next() {
-		var id string
-		var r route
-		if err = rows.Scan(&id, &r.Connection, &r.Address); err != nil {
-			rows.Close()
-			return err
-		}
-		routes[id] = append(routes[id], r)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	type record struct {
-		Recipient    string  `json:"recipient_id"`
-		Conversation string  `json:"conversation_id"`
-		Exact        string  `json:"exact_instance"`
-		Delivery     string  `json:"delivery_id"`
-		Target       Target  `json:"policy_target"`
-		Native       bool    `json:"native"`
-		Routes       []route `json:"providers"`
-		Request      Request `json:"request"`
-	}
-	items := []record{}
 	actionName := ""
 	if request.Action != nil {
 		actionName = request.Action.Name
 	}
+	for _, r := range recipients {
+		if s.recipientBlocked(ctx, tx, a, "ask", r.ID) {
+			return Denied()
+		}
+	}
+	routes, err := s.resolveProviderRoutes(ctx, tx, a, recipients, "", "ask", actionName, request.Action)
+	if err != nil {
+		return err
+	}
+	type record struct {
+		Recipient    string          `json:"recipient_id"`
+		Conversation string          `json:"conversation_id"`
+		Exact        string          `json:"exact_instance"`
+		Delivery     string          `json:"delivery_id"`
+		Target       Target          `json:"policy_target"`
+		Native       bool            `json:"native"`
+		Routes       []providerRoute `json:"providers"`
+		Request      Request         `json:"request"`
+	}
+	items := []record{}
 	for _, r := range recipients {
 		view := request
 		view.Attachments = append([]Attachment(nil), request.Attachments...)
@@ -69,12 +47,7 @@ func (s *Store) newRequestAudience(ctx context.Context, tx pgx.Tx, a Actor, requ
 			view.Attachments[i].ConversationID = view.ConversationID
 		}
 		x := record{Recipient: r.ID, Conversation: view.ConversationID, Exact: r.ExactInstance, Delivery: ID("del"), Target: r.PolicyTarget, Native: s.allowed(ctx, tx, a, "ask", r.PolicyTarget, "", actionName, request.Action), Request: view}
-		for _, d := range routes[r.ID] {
-			if s.allowed(ctx, tx, a, "ask", r.PolicyTarget, d.Connection, actionName, request.Action) {
-				d.ID = ID("del")
-				x.Routes = append(x.Routes, d)
-			}
-		}
+		x.Routes = routes[r.ID]
 		if !x.Native && len(x.Routes) == 0 {
 			return &Error{"NO_ELIGIBLE_ROUTE", "No permitted destination is configured for this recipient.", 403}
 		}

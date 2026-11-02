@@ -29,6 +29,57 @@ const provider: Provider = {
     { name: "webhook_secret", required: true, secret: true },
   ],
 };
+
+it("keeps a destination scoped to the selected Person and leaves ordering to the channel stack", async () => {
+  const fn = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.endsWith("/capabilities"))
+      return json({ operations: { manage_destination: true } });
+    if (path.endsWith("/destinations")) return json({ id: "dst_new" });
+    const body = requestBody(init);
+    return json({
+      items:
+        body.collection === "connections"
+          ? [{ ...connection, kind: "email" }]
+          : body.collection === "people"
+            ? [me.person]
+            : [],
+    });
+  });
+  vi.stubGlobal("fetch", fn);
+  const { Wrapper } = harness();
+  render(
+    <DestinationForm
+      connection={{ ...connection, kind: "email" }}
+      recipientID={me.person.id}
+      recipientName={me.person.name}
+      routingControls={false}
+      onClose={vi.fn()}
+    />,
+    { wrapper: Wrapper },
+  );
+  expect(screen.queryByLabelText("Mode")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Priority")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Provider address"), {
+    target: { value: "taylor@example.test" },
+  });
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Save destination" }),
+    ).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Save destination" }));
+  await waitFor(() =>
+    expect(fn.mock.calls.some(([path]) => path.endsWith("/destinations"))).toBe(
+      true,
+    ),
+  );
+  const call = fn.mock.calls.find(([path]) => path.endsWith("/destinations"))!;
+  expect(requestBody(call[1])).toMatchObject({
+    principal_id: me.person.id,
+    address: "taylor@example.test",
+    mode: "fallback",
+  });
+});
 afterEach(() => {
   vi.unstubAllGlobals();
   sessionStorage.clear();

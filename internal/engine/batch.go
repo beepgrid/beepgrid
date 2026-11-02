@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/jackc/pgx/v5"
 	"sort"
 	"time"
@@ -143,6 +144,15 @@ func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in Dispatch
 	if e != nil {
 		return out, "", e
 	}
+	resolved, e := s.resolveProviderRoutes(ctx, db, a, rs, "", in.Operation, name, in.Descriptor)
+	if e != nil {
+		return out, "", e
+	}
+	var preferences []byte
+	if e = db.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY person_id),'[]'::jsonb) FROM delivery_preferences p WHERE scope=$1 AND person_id=ANY($2::text[])`, a.Scope, ids).Scan(&preferences); e != nil {
+		return out, "", e
+	}
+	fingerprint = append(fingerprint, string(preferences))
 	for _, r := range rs {
 		p := PreviewRecipient{Target: Target{r.Kind, r.ID}, Name: r.Name, Routes: []PreviewRoute{}}
 		if r.ExactInstance != "" {
@@ -163,7 +173,29 @@ func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in Dispatch
 			} else if !allowed {
 				reason = "Current contact permission excludes this installation."
 			}
-			p.Routes = append(p.Routes, PreviewRoute{d.kind, d.mode, d.enabled, allowed, reason})
+			selected := false
+			effectiveMode := "excluded"
+			for _, route := range resolved[r.ID] {
+				if route.ConnectionID == d.cid && route.Address == d.address {
+					selected = true
+					effectiveMode = "primary"
+					if route.Routing.Copy {
+						effectiveMode = "copy"
+					}
+					if route.State == "standby" {
+						effectiveMode = "fallback"
+						reason = "Try after definite failure."
+						if route.Routing.FollowupSeconds > 0 {
+							reason = fmt.Sprintf("Try after delivery failure, or after %d seconds without a response to a question or approval.", route.Routing.FollowupSeconds)
+						}
+					}
+					break
+				}
+			}
+			if !selected && d.enabled && allowed {
+				reason = "Not selected by recipient delivery preferences."
+			}
+			p.Routes = append(p.Routes, PreviewRoute{d.kind, effectiveMode, d.enabled, allowed && selected, reason})
 			fingerprint = append(fingerprint, []any{r.ID, d.did, d.dv, d.mode, d.priority, d.address, d.cid, d.cv, d.enabled, allowed})
 		}
 		if a.ID == r.ID || s.allowed(ctx, db, a, "view", Target{r.Kind, r.ID}, "", "") {

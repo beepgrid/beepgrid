@@ -171,6 +171,9 @@ export type OverseerPlan = {
   reply_summary?: string;
   reply_digest?: string;
 };
+export type ChannelPolicy = { mode: "preferred" | "all"; destinations: string[]; followup_seconds: number };
+export type ChannelOverride = { source: { kind: "agent" | "group"; id: string }; policy: ChannelPolicy };
+export type DeliveryPreferences = { person_id: string; version: number; default: ChannelPolicy | null; overrides: ChannelOverride[] };
 export class NotifError extends Error {
   constructor(
     public readonly code: string,
@@ -200,6 +203,12 @@ export class Client {
     if (!["http:", "https:"].includes(u.protocol) || u.username || u.password)
       throw new Error("Invalid Beep Grid server URL");
     this.baseURL = baseURL.replace(/\/$/, "");
+  }
+  deliveryPreferences(personId: string): Promise<DeliveryPreferences> {
+    return this.call("GET", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`);
+  }
+  saveDeliveryPreferences(personId: string, preferences: DeliveryPreferences): Promise<DeliveryPreferences> {
+    return this.call("POST", `/api/v1/people/${encodeURIComponent(personId)}/delivery-preferences`, preferences);
   }
   async call<T>(
     method: string,

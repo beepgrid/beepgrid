@@ -25,7 +25,7 @@ func (s *Store) promoteQuestions(ctx context.Context) error {
 		var d Delivery
 		var raw []byte
 		var scope string
-		if e = rows.Scan(&d.ID, &d.RecipientID, &d.OperationID, &raw, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.Address, &d.ExpiresAt, &scope); e != nil {
+		if e = rows.Scan(&d.ID, &d.RecipientID, &d.OperationID, &raw, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.Address, &d.ExpiresAt, jsonColumn{&d.Routing}, &scope); e != nil {
 			rows.Close()
 			return e
 		}
@@ -58,6 +58,9 @@ func (s *Store) promoteQuestions(ctx context.Context) error {
 			}
 			if successor == d.OperationID {
 				state = "queued"
+				if d.Routing.Managed && !d.Routing.Copy && d.Routing.Position > 0 {
+					state = "standby"
+				}
 				detail = "Matching question ended; next independent request requires attention"
 			} else {
 				d.Payload["_cluster"] = successor

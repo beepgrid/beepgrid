@@ -1,3 +1,4 @@
+import { DeliveryPreferences } from "./DeliveryPreferences";
 import { useState } from "react";
 import {
   useCapabilities,
@@ -184,7 +185,13 @@ export default function Integrations() {
           </table>
         </QueryState>
       ) : null}
-      {tab === "destinations" ? <Destinations /> : null}
+      {tab === "destinations" ? (
+        <DeliveryPreferences
+          renderDestinations={(personID) => (
+            <Destinations personID={personID} />
+          )}
+        />
+      ) : null}
       {provider ? (
         <ConnectionForm
           provider={provider}
@@ -702,7 +709,7 @@ export function ConnectionDetail({
     </Modal>
   );
 }
-function Destinations() {
+function Destinations({ personID }: { personID?: string }) {
   const q = useCollection<Destination>("destinations"),
     [create, setCreate] = useState(false),
     [edit, setEdit] = useState<Destination | null>(null);
@@ -716,40 +723,53 @@ function Destinations() {
       <div className="toolbar">
         <Button onClick={() => setCreate(true)}>Add destination</Button>
       </div>
-      <QueryState query={q} empty="No permitted destinations">
+      <QueryState
+        query={{
+          ...q,
+          items: q.items.filter(
+            (d) => !personID || d.principal_id === personID,
+          ),
+        }}
+        empty="No permitted destinations"
+      >
         <table>
           <thead>
             <tr>
               <th>Address</th>
               <th>Recipient</th>
-              <th>Mode / priority</th>
+              <th>Connection</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {q.items.map((d) => (
-              <DestinationRow
-                key={d.id}
-                destination={d}
-                recipientName={
-                  contacts.find((p) => p.id === d.principal_id)?.name ||
-                  "Contact"
-                }
-                connectionName={
-                  connections.items.find((c) => c.id === d.connection_id)
-                    ?.name || "Connection"
-                }
-                onEdit={() => setEdit(d)}
-              />
-            ))}
+            {q.items
+              .filter((d) => !personID || d.principal_id === personID)
+              .map((d) => (
+                <DestinationRow
+                  key={d.id}
+                  destination={d}
+                  recipientName={
+                    contacts.find((p) => p.id === d.principal_id)?.name ||
+                    "Contact"
+                  }
+                  connectionName={
+                    connections.items.find((c) => c.id === d.connection_id)
+                      ?.name || "Connection"
+                  }
+                  onEdit={() => setEdit(d)}
+                />
+              ))}
           </tbody>
         </table>
       </QueryState>
       {create || edit ? (
         <DestinationForm
           destination={edit || undefined}
+          recipientID={personID}
+          routingControls={!personID}
           recipientName={
-            contacts.find((p) => p.id === edit?.principal_id)?.name
+            contacts.find((p) => p.id === (edit?.principal_id || personID))
+              ?.name
           }
           onClose={() => {
             setCreate(false);
@@ -786,9 +806,7 @@ function DestinationRow({
         </p>
       </td>
       <td>{recipientName}</td>
-      <td>
-        {d.mode} · {d.priority}
-      </td>
+      <td>{connectionName}</td>
       <td>
         {connection.data?.operations.manage ? (
           <div className="actions">
@@ -828,11 +846,15 @@ export function DestinationForm({
   connection: initialConnection,
   destination: d,
   recipientName,
+  recipientID,
+  routingControls = true,
   onClose,
 }: {
   destination?: Destination;
   connection?: Connection;
   recipientName?: string;
+  recipientID?: string;
+  routingControls?: boolean;
   onClose: () => void;
 }) {
   const connections = useCollection<Connection>("connections"),
@@ -841,13 +863,15 @@ export function DestinationForm({
       d?.connection_id || initialConnection?.id || "",
     ),
     [address, setAddress] = useState(d?.address || ""),
-    [mode, setMode] = useState(d?.mode || "primary"),
+    [mode, setMode] = useState(
+      d?.mode || (routingControls ? "primary" : "fallback"),
+    ),
     [priority, setPriority] = useState(d?.priority || 0),
     op = useOperation();
   const selectedConnection =
     connections.items.find((c) => c.id === connection) ||
     (initialConnection?.id === connection ? initialConnection : undefined);
-  const personID = d?.principal_id || target[0]?.id || "";
+  const personID = d?.principal_id || recipientID || target[0]?.id || "";
   const person = useCollection<Identity>(
     "people",
     "",
@@ -868,7 +892,11 @@ export function DestinationForm({
         : person.items[0]?.metadata?.slack_team_id ===
           selectedConnection.config.team_id);
   const recipient = useCapabilities(
-    d ? { kind: "destination", id: d.id } : target[0],
+    d
+      ? { kind: "destination", id: d.id }
+      : recipientID
+        ? { kind: "person", id: recipientID }
+        : target[0],
     undefined,
     connection,
   );
@@ -884,7 +912,7 @@ export function DestinationForm({
             .run("/destinations", {
               ...(d ? { id: d.id, version: d.version } : {}),
               connection_id: connection,
-              principal_id: d?.principal_id || target[0]?.id,
+              principal_id: personID,
               address,
               mode,
               priority,
@@ -918,7 +946,7 @@ export function DestinationForm({
             Load more connections
           </Button>
         ) : null}
-        {d ? (
+        {d || recipientID ? (
           <p>
             Recipient: <strong>{recipientName || "Selected contact"}</strong>
           </p>
@@ -986,28 +1014,34 @@ export function DestinationForm({
           </Button>
         ) : null}
 
-        <div className="form-grid">
-          <Field label="Mode">
-            <select value={mode} onChange={(e) => setMode(e.target.value)}>
-              <option value="primary">Primary</option>
-              <option value="fallback">Fallback after definite failure</option>
-              <option value="copy">Copy on every delivery</option>
-            </select>
-          </Field>
-          <Field label="Priority">
-            <input
-              type="number"
-              step={1}
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value))}
-            />
-          </Field>
-        </div>
-        <p className="help">
-          A new primary replaces the previous primary according to engine
-          routing policy. Unknown provider acceptance does not trigger an
-          automatic duplicate fallback.
-        </p>
+        {routingControls ? (
+          <>
+            <div className="form-grid">
+              <Field label="Mode">
+                <select value={mode} onChange={(e) => setMode(e.target.value)}>
+                  <option value="primary">Primary</option>
+                  <option value="fallback">
+                    Fallback after definite failure
+                  </option>
+                  <option value="copy">Copy on every delivery</option>
+                </select>
+              </Field>
+              <Field label="Priority">
+                <input
+                  type="number"
+                  step={1}
+                  value={priority}
+                  onChange={(e) => setPriority(Number(e.target.value))}
+                />
+              </Field>
+            </div>
+            <p className="help">
+              A new primary replaces the previous primary according to engine
+              routing policy. Unknown provider acceptance does not trigger an
+              automatic duplicate fallback.
+            </p>
+          </>
+        ) : null}
         <ErrorView error={op.error} />
         <div className="form-actions">
           <Button onClick={onClose}>Cancel</Button>

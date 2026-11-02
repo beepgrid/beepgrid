@@ -198,3 +198,15 @@ test("real workspace queries and preview-fenced batches",{skip:!process.env.NOTI
  assert.equal((await c.requestTrace(requests[0].request.id)).request.id,requests[0].request.id);
  assert.equal((await c.workspace()).deployment,"self_hosted");assert.ok((await c.account()).applied);assert.ok((await c.access()).roles);
 });
+
+test("real recipient preferences preserve inheritance and reject stale edits", {skip: !process.env.NOTIF_SDK_TEST_URL}, async () => {
+  const c = new Client(process.env.NOTIF_SDK_TEST_URL, process.env.NOTIF_SDK_TEST_TOKEN);
+  const {person} = await c.call("GET", "/api/v1/me");
+  const before = await c.deliveryPreferences(person.id);
+  const saved = await c.saveDeliveryPreferences(person.id, {...before, default: {mode:"preferred", destinations:[], followup_seconds:0}});
+  assert.equal(saved.version, before.version + 1);
+  assert.deepEqual((await c.deliveryPreferences(person.id)).default.destinations, []);
+  await assert.rejects(c.saveDeliveryPreferences(person.id, before), error => error.status === 409);
+  const restored = await c.saveDeliveryPreferences(person.id, {...before, version:saved.version});
+  assert.deepEqual(restored.default, before.default);
+});

@@ -379,6 +379,9 @@ func (s *Store) respondTx(ctx context.Context, tx pgx.Tx, a Actor, id string, in
 	if _, e = tx.Exec(ctx, `UPDATE requests SET state='resolved',response=$3,resolved_by=$4,resolved_at=now(),decision_connection=$5 WHERE scope=$1 AND id=$2 AND state='open'`, a.Scope, id, JSON(in), a.ID, a.ProviderConnection); e != nil {
 		return e
 	}
+	if _, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Request resolved' WHERE scope=$1 AND operation_id=$2 AND connection_id<>'' AND state IN ('queued','standby','waiting')`, a.Scope, id); e != nil {
+		return e
+	}
 	*out, e = s.request(ctx, tx, a, id)
 	if e != nil {
 		return e
@@ -423,7 +426,7 @@ func (s *Store) EndRequest(ctx context.Context, a Actor, id, state string, versi
 		if _, e = tx.Exec(ctx, `UPDATE requests SET state=$3,resolved_at=now() WHERE scope=$1 AND id=$2`, a.Scope, id, state); e != nil {
 			return e
 		}
-		if _, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled' WHERE scope=$1 AND operation_id=$2 AND state IN ('queued','leased','waiting')`, a.Scope, id); e != nil {
+		if _, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled' WHERE scope=$1 AND operation_id=$2 AND state IN ('queued','leased','waiting','standby')`, a.Scope, id); e != nil {
 			return e
 		}
 		out, e = s.request(ctx, tx, a, id)

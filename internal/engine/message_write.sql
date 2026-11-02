@@ -25,8 +25,8 @@ WITH input AS MATERIALIZED (
  SELECT delivery_id,$1,$2::jsonb->>'id',recipient_id,exact_instance,payload,$6 FROM payloads WHERE native
  ON CONFLICT DO NOTHING RETURNING id
 ), external AS (
- INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at)
- SELECT d->>'delivery_id',$1,$2::jsonb->>'id',i.recipient_id,d->>'connection_id',d->>'address',i.payload,$6
+ INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at,state,routing)
+ SELECT d->>'delivery_id',$1,$2::jsonb->>'id',i.recipient_id,d->>'connection_id',d->>'address',i.payload,$6,COALESCE(d->>'state','queued'),COALESCE(d->'routing','{}'::jsonb)
  FROM payloads i CROSS JOIN LATERAL jsonb_array_elements(COALESCE(NULLIF(i.providers,'null'::jsonb),'[]'::jsonb)) d
  ON CONFLICT DO NOTHING RETURNING id
 )

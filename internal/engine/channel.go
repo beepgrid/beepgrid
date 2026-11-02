@@ -658,6 +658,9 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 	if d.ExpiresAt.Before(time.Now()) || !s.currentDeliveryPolicy(ctx, tx, scope, d) {
 		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Expired or permission revoked' WHERE id=$1`, d.ID)
 		if e == nil {
+			e = s.advanceProviderRoute(ctx, tx, scope, d, true)
+		}
+		if e == nil {
 			e = tx.Commit(ctx)
 		}
 		return nil, worked, e
@@ -672,6 +675,9 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 	if !c.Enabled {
 		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled' WHERE id=$1`, d.ID)
 		if e == nil {
+			e = s.advanceProviderRoute(ctx, tx, scope, d, true)
+		}
+		if e == nil {
 			e = tx.Commit(ctx)
 		}
 		return nil, worked, e
@@ -679,12 +685,18 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 	if c.Kind == "telegram" && !s.telegramDestination(ctx, tx, scope, c.ID, d.RecipientID, d.Address) {
 		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Telegram identity link changed' WHERE id=$1`, d.ID)
 		if e == nil {
+			e = s.advanceProviderRoute(ctx, tx, scope, d, true)
+		}
+		if e == nil {
 			e = tx.Commit(ctx)
 		}
 		return nil, worked, e
 	}
 	if c.Kind == "discord" && !s.discordDestination(ctx, tx, scope, c.ID, d.RecipientID, d.Address) {
 		_, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Discord identity link changed' WHERE id=$1`, d.ID)
+		if e == nil {
+			e = s.advanceProviderRoute(ctx, tx, scope, d, true)
+		}
 		if e == nil {
 			e = tx.Commit(ctx)
 		}
@@ -694,6 +706,9 @@ func (s *Store) claimProvider(ctx context.Context) (*providerJob, bool, error) {
 	if e != nil {
 		_, updateErr := tx.Exec(ctx, `UPDATE deliveries SET state='failed',last_error='Provider secret cannot be decrypted; verify encryption key' WHERE id=$1`, d.ID)
 		if updateErr != nil {
+			return nil, worked, updateErr
+		}
+		if updateErr = s.advanceProviderRoute(ctx, tx, scope, d, true); updateErr != nil {
 			return nil, worked, updateErr
 		}
 		return nil, worked, tx.Commit(ctx)
@@ -752,7 +767,11 @@ func (s *Store) finishProvider(ctx context.Context, publicURL string, job *provi
 			return e
 		}
 	}
-	if result.State == "failed" {
+	if d.Routing.Managed && (result.State == "failed" || result.State == "provider_accepted") {
+		if e = s.advanceProviderRoute(ctx, tx, scope, d, result.State == "failed"); e != nil {
+			return e
+		}
+	} else if !d.Routing.Managed && result.State == "failed" {
 		if e = s.queueFallback(ctx, tx, scope, d); e != nil {
 			return e
 		}

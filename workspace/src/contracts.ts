@@ -247,3 +247,16 @@ export type Preview = {
   expires_at: string;
   sends: false;
 };
+
+export type ChannelPolicy = {
+  mode: "preferred" | "all";
+  destinations: string[];
+  followup_seconds: number;
+};
+export type ChannelOverride = { source: Target; policy: ChannelPolicy };
+export type DeliveryPreferences = {
+  person_id: string;
+  version: number;
+  default: ChannelPolicy | null;
+  overrides: ChannelOverride[];
+};

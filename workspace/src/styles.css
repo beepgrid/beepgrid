@@ -3451,3 +3451,23 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 @media(max-width:600px) { .setup-instruction { align-items:flex-start;flex-direction:column }.setup-instruction .button { width:100% } }
 
 @media(max-width:600px) { .setup-token { flex-wrap:wrap;gap:8px }.setup-token input { flex-basis:100%;height:24px } }
+
+/* One ordered stack for recipient defaults and Agent overrides. */
+.delivery-preferences { max-width: 760px; padding-block: 20px; }
+.delivery-preferences h2, .delivery-destinations h2 { font-size: 18px; margin: 0 0 4px; }
+.routing-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin-bottom: 18px; }
+.routing-info { display: inline-flex; align-self: center; color: var(--sub); cursor: help; }
+.routing-inherit { margin-bottom: 11px; white-space: nowrap; }
+.routing-editor { border: 0; padding: 0; margin: 0; min-width: 0; }
+.routing-stack { display: grid; list-style: none; padding: 0; margin: 12px 0; gap: 6px; }
+.routing-stack > li { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.routing-stack select { flex: 1; min-width: 0; border-color: transparent; background: transparent; }
+.routing-grip { cursor: grab; color: var(--sub); background: transparent; border: 0; padding: 6px; font-size: 24px; line-height: 1; }
+.routing-grip:focus-visible { color: var(--ink); background: var(--raised); border-radius: 4px; }
+.routing-followup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; font-size: 14px; }
+.routing-delay input { width: 76px; padding: 7px 9px; }
+.routing-save { margin-top: 20px; }
+.routing-role-order { margin-top: 24px; }
+.delivery-destinations { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 12px; }
+
+.routing-number { color: var(--sub); font-size: 13px; }

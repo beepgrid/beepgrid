@@ -4442,6 +4442,198 @@
         ]
       }
     },
+    "/api/v1/people/{id}/delivery-preferences": {
+      "get": {
+        "operationId": "get_api_v1_people_id_delivery_preferences",
+        "description": "Read recipient channel defaults and ordered Agent/Agent role overrides.\n\nPerson self, administrator or an explicitly authorized identity manager. Preferences never grant contact or channel authority.\n\nReturns: DeliveryPreferences with its current version; null default retains legacy destination settings.\n\nRecovery: Forbidden for another Person without management authority; stale versions conflict. Invalid selectors, foreign destinations and invalid timer bounds fail validation.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPreferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Read recipient channel defaults and ordered Agent/Agent role overrides",
+        "tags": [
+          "Channels"
+        ]
+      },
+      "post": {
+        "operationId": "post_api_v1_people_id_delivery_preferences",
+        "description": "Save versioned recipient channel preferences. Individual Agent overrides win, then the first matching Agent role, then default. Preferred channels fail over on definite failure and optionally on an unresolved question/approval timer after provider acceptance. All sends selected channels immediately. Empty destinations means workspace only. Saving cancels pending external sends from the previous configuration; in-flight effects cannot be recalled.\n\nPerson self, administrator or an explicitly authorized identity manager. Preferences never grant contact or channel authority.\n\nReturns: Saved DeliveryPreferences with the incremented version.\n\nRecovery: Forbidden for another Person without management authority; stale versions conflict. Invalid selectors, foreign destinations and invalid timer bounds fail validation.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPreferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryPreferences"
+              }
+            }
+          }
+        },
+        "summary": "Save versioned recipient channel preferences",
+        "tags": [
+          "Channels"
+        ]
+      }
+    },
     "/api/v1/credentials": {
       "get": {
         "operationId": "get_api_v1_credentials",
@@ -13290,6 +13482,108 @@
           }
         },
         "description": "Stable explicit addressee. start/end are Unicode code-point offsets for the exact @name token. Must be a current visible conversation participant. All members receive the original message and may contribute."
+      },
+      "ChannelPolicy": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "enum": [
+              "preferred",
+              "all"
+            ],
+            "description": "primary, copy or fallback routing mode."
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "uniqueItems": true
+          },
+          "followup_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 604800,
+            "description": "0 disables unanswered-request follow-ups. Otherwise 60 to 604800 seconds. Only questions and approvals; all mode requires 0."
+          }
+        },
+        "required": [
+          "mode",
+          "destinations",
+          "followup_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "ChannelOverride": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "agent",
+                  "group"
+                ],
+                "description": "Resource or operation kind. Use one of the listed values, not a display label."
+              },
+              "id": {
+                "type": "string",
+                "description": "Stable identifier returned by the engine. Treat it as opaque."
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ChannelPolicy"
+          }
+        },
+        "required": [
+          "source",
+          "policy"
+        ],
+        "additionalProperties": false
+      },
+      "DeliveryPreferences": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current optimistic-concurrency version. Read the object before a guarded change; a stale version conflicts."
+          },
+          "default": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelOverride"
+            },
+            "maxItems": 64
+          }
+        },
+        "required": [
+          "version",
+          "default",
+          "overrides"
+        ],
+        "additionalProperties": false
       },
       "ProviderField": {
         "type": "object",

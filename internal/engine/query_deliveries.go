@@ -23,7 +23,7 @@ func (s *Store) queryDeliveryRecords(ctx context.Context, a Actor, ids []string)
 	all := []DeliveryEvidence{}
 	for rows.Next() {
 		var x DeliveryEvidence
-		if err = rows.Scan(&x.ID, &x.RecipientID, &x.OperationID, &x.Payload, &x.State, &x.Generation, &x.Delivery.Attempts, &x.LastError, &x.ConnectionID, &x.Address, &x.ExpiresAt, &x.CreatedAt, &x.NextAt, &x.LeaseUntil, &x.ExactInstanceID, &x.OwnerInstanceID); err != nil {
+		if err = rows.Scan(&x.ID, &x.RecipientID, &x.OperationID, &x.Payload, &x.State, &x.Generation, &x.Delivery.Attempts, &x.LastError, &x.ConnectionID, &x.Address, &x.ExpiresAt, jsonColumn{&x.Routing}, &x.CreatedAt, &x.NextAt, &x.LeaseUntil, &x.ExactInstanceID, &x.OwnerInstanceID); err != nil {
 			rows.Close()
 			return nil, err
 		}

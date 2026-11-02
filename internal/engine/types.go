@@ -290,7 +290,8 @@ type Execution struct {
 	Result       any    `json:"result"`
 }
 type Delivery struct {
-	Address string `json:"address"`
+	Routing DeliveryRouting `json:"-"`
+	Address string          `json:"address"`
 
 	ID           string         `json:"id"`
 	RecipientID  string         `json:"recipient_id"`

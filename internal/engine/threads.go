@@ -53,11 +53,19 @@ func (s *Store) SlackMessage(ctx context.Context, a Actor, c Connection, channel
 		if e = s.sendTx(ctx, tx, a, in, "slack-event/"+c.ID+"/"+eventID, &result); e != nil {
 			return e
 		}
-		if e = s.recordThread(ctx, tx, a.Scope, c.ID, channel, thread, result.ConversationID, a.ID); e != nil {
+		if e = s.recordInboundThread(ctx, tx, a.Scope, c.ID, channel, thread, result.ConversationID, a.ID); e != nil {
 			return e
 		}
 		_, e = tx.Exec(ctx, `INSERT INTO provider_events(scope,connection_id,external_id,input_hash,response) VALUES($1,$2,$3,$4,$5)`, a.Scope, c.ID, key, hash, JSON(result))
 		return e
 	})
 	return result, err
+}
+
+func (s *Store) recordInboundThread(ctx context.Context, db DB, scope, connection, channel, thread, conv, person string) error {
+	if err := s.recordThread(ctx, db, scope, connection, channel, thread, conv, person); err != nil {
+		return err
+	}
+	_, err := db.Exec(ctx, `UPDATE provider_threads SET last_inbound_at=now() WHERE scope=$1 AND connection_id=$2 AND channel_id=$3 AND thread_id=$4 AND person_id=$5`, scope, connection, channel, thread, person)
+	return err
 }

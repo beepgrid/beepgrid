@@ -7,6 +7,20 @@ from notif import Client, NotifError
 
 
 class ClientTests(unittest.TestCase):
+    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    def test_recipient_preferences_preserve_inheritance_and_reject_stale_edits(self):
+        c = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        person = c.call("GET", "/api/v1/me")["person"]["id"]
+        before = c.delivery_preferences(person)
+        saved = c.save_delivery_preferences(person, {**before, "default": {"mode": "preferred", "destinations": [], "followup_seconds": 0}})
+        self.assertEqual(saved["version"], before["version"] + 1)
+        self.assertEqual(c.delivery_preferences(person)["default"]["destinations"], [])
+        with self.assertRaises(NotifError) as error:
+            c.save_delivery_preferences(person, before)
+        self.assertEqual(error.exception.status, 409)
+        restored = c.save_delivery_preferences(person, {**before, "version": saved["version"]})
+        self.assertEqual(restored["default"], before["default"])
+
     def test_identified_client_works_behind_a_gateway_rejecting_generic_urllib(self):
         import http.server
         import threading

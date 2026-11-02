@@ -11,6 +11,19 @@ import (
 
 func (s *Server) channelRoutes() {
 	m := s.mux
+	m.HandleFunc("GET /api/v1/people/{id}/delivery-preferences", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.DeliveryPreferences(r.Context(), actor(r), r.PathValue("id"))
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/people/{id}/delivery-preferences", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.DeliveryPreferences
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.SaveDeliveryPreferences(r.Context(), actor(r), r.PathValue("id"), in)
+		return ok(w, x, e)
+	}))
+
 	m.HandleFunc("POST /integrations/discord/{id}", s.discordEvents)
 	m.HandleFunc("POST /api/v1/people/{id}/discord-account/remove", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		return ok(w, map[string]bool{"removed": true}, s.Store.UnlinkDiscordAccount(r.Context(), actor(r), r.PathValue("id")))

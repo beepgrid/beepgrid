@@ -39,10 +39,10 @@ for (const name of assets) {
 }
 const budgets = {
   entry_js_gzip_kib: 96,
-  // Environment-specific setup metadata and copyable integration instructions.
-  all_js_gzip_kib: 148,
-  // Shared request context, compact question/approval panel and icon chooser.
-  css_gzip_kib: 15.5,
+  // Environment setup and the recipient channel-policy editor, loaded with Integrations.
+  all_js_gzip_kib: 152,
+  // Shared request context, question panel, icon chooser and channel stack.
+  css_gzip_kib: 15.75,
   all_fonts_kib: 320,
   largest_font_kib: 96,
 };

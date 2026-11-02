@@ -9,6 +9,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -27,7 +28,13 @@ func main() {
 		return b.String()
 	}
 	for _, p := range packages {
-		for path, f := range p.Files {
+		paths := make([]string, 0, len(p.Files))
+		for path := range p.Files {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
+		for _, path := range paths {
+			f := p.Files[path]
 			for _, decl := range f.Decls {
 				switch d := decl.(type) {
 				case *ast.FuncDecl:

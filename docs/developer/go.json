@@ -1718,6 +1718,125 @@
     "signature": "func(ctx context.Context, in ContactPermissionsInput) (map[string]any, error)"
   },
   {
+    "definition": "struct {\n\tMode            string   `json:\"mode\"`\n\tDestinations    []string `json:\"destinations\"`\n\tFollowupSeconds int      `json:\"followup_seconds\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Mode",
+        "tag": "`json:\"mode\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Destinations",
+        "tag": "`json:\"destinations\"`",
+        "type": "[]string"
+      },
+      {
+        "doc": "",
+        "name": "FollowupSeconds",
+        "tag": "`json:\"followup_seconds\"`",
+        "type": "int"
+      }
+    ],
+    "file": "sdk/go/notif/delivery_preferences.go",
+    "kind": "type",
+    "name": "ChannelPolicy"
+  },
+  {
+    "definition": "struct {\n\tSource Target        `json:\"source\"`\n\tPolicy ChannelPolicy `json:\"policy\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "Source",
+        "tag": "`json:\"source\"`",
+        "type": "Target"
+      },
+      {
+        "doc": "",
+        "name": "Policy",
+        "tag": "`json:\"policy\"`",
+        "type": "ChannelPolicy"
+      }
+    ],
+    "file": "sdk/go/notif/delivery_preferences.go",
+    "kind": "type",
+    "name": "ChannelOverride"
+  },
+  {
+    "definition": "struct {\n\tPersonID  string            `json:\"person_id\"`\n\tVersion   int64             `json:\"version\"`\n\tDefault   *ChannelPolicy    `json:\"default\"`\n\tOverrides []ChannelOverride `json:\"overrides\"`\n}",
+    "doc": "",
+    "fields": [
+      {
+        "doc": "",
+        "name": "PersonID",
+        "tag": "`json:\"person_id\"`",
+        "type": "string"
+      },
+      {
+        "doc": "",
+        "name": "Version",
+        "tag": "`json:\"version\"`",
+        "type": "int64"
+      },
+      {
+        "doc": "",
+        "name": "Default",
+        "tag": "`json:\"default\"`",
+        "type": "*ChannelPolicy"
+      },
+      {
+        "doc": "",
+        "name": "Overrides",
+        "tag": "`json:\"overrides\"`",
+        "type": "[]ChannelOverride"
+      }
+    ],
+    "file": "sdk/go/notif/delivery_preferences.go",
+    "kind": "type",
+    "name": "DeliveryPreferences"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/delivery_preferences.go",
+    "kind": "method",
+    "name": "DeliveryPreferences",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "person",
+        "type": "string"
+      }
+    ],
+    "signature": "func(ctx context.Context, person string) (DeliveryPreferences, error)"
+  },
+  {
+    "doc": "",
+    "file": "sdk/go/notif/delivery_preferences.go",
+    "kind": "method",
+    "name": "SaveDeliveryPreferences",
+    "parameters": [
+      {
+        "name": "ctx",
+        "type": "context.Context"
+      },
+      {
+        "name": "person",
+        "type": "string"
+      },
+      {
+        "name": "in",
+        "type": "DeliveryPreferences"
+      }
+    ],
+    "signature": "func(ctx context.Context, person string, in DeliveryPreferences) (DeliveryPreferences, error)"
+  },
+  {
     "definition": "struct {\n\tSequence       int64           `json:\"sequence\"`\n\tKind           string          `json:\"kind\"`\n\tActorID        string          `json:\"actor_id\"`\n\tConversationID string          `json:\"conversation_id\"`\n\tRecipientID    string          `json:\"recipient_id\"`\n\tData           json.RawMessage `json:\"data\"`\n\tCreatedAt      time.Time       `json:\"created_at\"`\n}",
     "doc": "",
     "fields": [

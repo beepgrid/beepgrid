@@ -9,15 +9,24 @@ import (
 
 func deliveryScan(row pgx.Row) (Delivery, error) {
 	var d Delivery
-	e := row.Scan(&d.ID, &d.RecipientID, &d.OperationID, jsonColumn{&d.Payload}, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.Address, &d.ExpiresAt)
+	e := row.Scan(&d.ID, &d.RecipientID, &d.OperationID, jsonColumn{&d.Payload}, &d.State, &d.Generation, &d.Attempts, &d.LastError, &d.ConnectionID, &d.Address, &d.ExpiresAt, jsonColumn{&d.Routing})
 	return d, normalize(e)
 }
 
-const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,attempts,last_error,connection_id,address,expires_at`
+const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,attempts,last_error,connection_id,address,expires_at,routing`
 
 // currentDeliveryPolicy rechecks the originating credential, group membership and route grants before exposing content.
 func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, d Delivery) bool {
 	ctx = withPolicySnapshot(ctx)
+	if d.ConnectionID != "" && d.Routing.Managed {
+		var valid bool
+		if err := db.QueryRow(ctx, `SELECT
+   COALESCE((SELECT version FROM delivery_preferences WHERE scope=$1 AND person_id=$2),0)=$3
+   AND ($4='' OR EXISTS(SELECT 1 FROM destinations WHERE scope=$1 AND principal_id=$2 AND id=$4 AND connection_id=$5 AND version=$6))`, scope, d.RecipientID, d.Routing.Version, d.Routing.DestinationID, d.ConnectionID, d.Routing.DestinationVersion).Scan(&valid); err != nil || !valid {
+			return false
+		}
+	}
+
 	conv, _ := d.Payload["conversation_id"].(string)
 	var policy struct {
 		CredentialID       string `json:"credential_id"`

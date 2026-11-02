@@ -55,6 +55,9 @@ for name in ['Message','Request']: schemas[name]['properties']['attachments']=ar
 schemas['Message']['properties']['received_by']={'type':'array','items':S,'description':'Read-only native Agent runtime acknowledgement IDs, visible only to the message sender for current Agent participants. Not evidence of model reading or business execution. Provider acceptance is excluded.'}
 for name in ['message_id','request_id']: schemas['Attachment']['properties'][name]=S
 schemas['Conversation']['properties'].update({'shared':{'type':'boolean'},'version':{'type':'integer'},'manager_id':S,'history_start':{'type':'integer'},'past_participants':array({'type':'object'})})
+schemas['ChannelPolicy']=obj({'mode':{'enum':['preferred','all']},'destinations':{'type':'array','items':S,'maxItems':16,'uniqueItems':True},'followup_seconds':{'type':'integer','minimum':0,'maximum':604800,'description':'0 disables unanswered-request follow-ups. Otherwise 60 to 604800 seconds. Only questions and approvals; all mode requires 0.'}},['mode','destinations','followup_seconds'])
+schemas['ChannelOverride']=obj({'source':obj({'kind':{'enum':['agent','group']},'id':S},['kind','id']),'policy':ref('ChannelPolicy')},['source','policy'])
+schemas['DeliveryPreferences']=obj({'person_id':S,'version':{'type':'integer','minimum':0},'default':{'anyOf':[ref('ChannelPolicy'),{'type':'null'}]},'overrides':{'type':'array','items':ref('ChannelOverride'),'maxItems':64}},['version','default','overrides'])
 paths={}
 def add(method,path,body=None,result=None,description=''):
  op={'operationId':method.lower()+'_'+re.sub('[^A-Za-z0-9]+','_',path).strip('_'),'description':description or path,'responses':{'200':response(result or {'type':'object'}),'400':response(ref('Error')),'401':response(ref('Error')),'403':response(ref('Error')),'404':response(ref('Error')),'409':response(ref('Error')),'429':response(ref('Error'))},'parameters':[]}
@@ -94,6 +97,9 @@ for name,schema in [('groups','Group'),('roles','Role'),('role-bindings','Bindin
  add('GET','/api/v1/'+name,result=array(ref(schema)))
  add('POST','/api/v1/'+name,ref(schema),ref(schema) if name!='role-bindings' else None)
 add('POST','/api/v1/destinations/{id}/remove',obj({}))
+add('GET','/api/v1/people/{id}/delivery-preferences',result=ref('DeliveryPreferences'),description='Read recipient-owned channel preferences. Person self, administrator or identity manager only. Agent override wins over ordered Agent role overrides, then default. Null default retains legacy destinations. Does not grant contact permission.')
+add('POST','/api/v1/people/{id}/delivery-preferences',ref('DeliveryPreferences'),ref('DeliveryPreferences'),description='Atomically save versioned recipient defaults and ordered Agent/Agent-role overrides. Destinations must belong to this Person; group selectors must be Agent roles. Preferred tries the first permitted enabled channel, fails over after definite failure, and optionally follows up on unresolved questions/approvals after provider acceptance. All sends selected channels immediately. Empty destinations means workspace only. Saving cancels pending external sends from the old policy; in-flight effects cannot be recalled. Native history stays available. Stale versions conflict.')
+
 add('GET','/api/v1/credentials',result=array({'type':'object','description':'Credential metadata only; no digest or plaintext.'}))
 add('POST','/api/v1/credentials',obj({'principal_id':S,'kind':{'enum':['api','enrollment']},'prefix':S},['principal_id','kind']))
 add('POST','/api/v1/credentials/{id}/revoke',obj({}))

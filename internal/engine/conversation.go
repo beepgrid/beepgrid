@@ -367,52 +367,21 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 		}
 		queued++
 	}
-	// Destination dispatch is additional to the durable native inbox. One provider does not replace canonical history.
-	rows, e := db.Query(ctx, `SELECT d.connection_id,d.address FROM destinations d JOIN connections c ON c.id=d.connection_id AND c.scope=d.scope WHERE d.scope=$1 AND d.principal_id=$2 AND c.enabled AND d.mode IN ('primary','copy') ORDER BY d.priority,d.id`, a.Scope, r.ID)
+	routes, e := s.resolveProviderRoutes(ctx, db, a, []recipient{r}, conv, action, actionName, descriptor)
 	if e != nil {
 		return e
 	}
-	type dest struct{ id, address string }
-	dests := []dest{}
-	for rows.Next() {
-		var d dest
-		if e = rows.Scan(&d.id, &d.address); e != nil {
-			rows.Close()
-			return e
+	for _, route := range routes[r.ID] {
+		if externalState == "waiting" {
+			route.State = "waiting"
 		}
-		dests = append(dests, d)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return e
-	}
-	// A verified incoming Slack thread is a route for this conversation only. It grants no contact permission.
-	rows, e = db.Query(ctx, `SELECT t.connection_id,t.channel_id FROM provider_threads t JOIN connections c ON c.id=t.connection_id AND c.scope=t.scope WHERE t.scope=$1 AND t.conversation_id=$2 AND t.person_id=$3 AND c.enabled`, a.Scope, conv, r.ID)
-	if e != nil {
-		return e
-	}
-	for rows.Next() {
-		var d dest
-		if e = rows.Scan(&d.id, &d.address); e != nil {
-			rows.Close()
-			return e
-		}
-		dests = append(dests, d)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return e
-	}
-	for _, d := range dests {
-		if !s.allowed(ctx, db, a, action, r.PolicyTarget, d.id, actionName, descriptor) {
-			continue
-		}
-		if _, e = db.Exec(ctx, `WITH queued AS (INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at,state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING RETURNING state) SELECT pg_notify('notif_provider','') FROM queued WHERE state='queued'`, ID("del"), a.Scope, op, r.ID, d.id, d.address, JSON(payload), expiry, externalState); e != nil {
+		if e = insertProviderRoute(ctx, db, a.Scope, op, r.ID, payload, expiry, route); e != nil {
 			return e
 		}
 		queued++
+	}
+	if _, e = db.Exec(ctx, `SELECT pg_notify('notif_provider','')`); e != nil {
+		return e
 	}
 	if queued == 0 {
 		return &Error{"NO_ELIGIBLE_ROUTE", "No permitted destination is configured for this recipient.", 403}

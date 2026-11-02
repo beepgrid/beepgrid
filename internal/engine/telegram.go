@@ -248,7 +248,7 @@ func (s *Store) ReceiveTelegram(ctx context.Context, c Connection, scope string,
 			if err = s.sendTx(ctx, tx, a, send, "telegram-event/"+c.ID+"/"+key, &result); err != nil {
 				return err
 			}
-			if err = s.recordThread(ctx, tx, scope, c.ID, channel, strconv.FormatInt(message.ID, 10), result.ConversationID, p.ID); err != nil {
+			if err = s.recordInboundThread(ctx, tx, scope, c.ID, channel, strconv.FormatInt(message.ID, 10), result.ConversationID, p.ID); err != nil {
 				return err
 			}
 			out = map[string]any{"conversation_id": result.ConversationID, "message_count": len(result.Messages)}

@@ -116,7 +116,7 @@ func TestPrimaryFallbackAndUnknownOutcome(t *testing.T) {
 		t.Fatal(e)
 	}
 	var count int
-	_ = s.Pool.QueryRow(ctx, `SELECT count(*) FROM deliveries WHERE connection_id<>''`).Scan(&count)
+	_ = s.Pool.QueryRow(ctx, `SELECT count(*) FROM deliveries WHERE connection_id<>'' AND state='queued'`).Scan(&count)
 	if count != 1 {
 		t.Fatal("default sent everywhere", count)
 	}

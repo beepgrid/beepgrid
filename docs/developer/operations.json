@@ -733,5 +733,19 @@
     "family": "identities",
     "audience": "A current manager of the target Agent or group.",
     "errors": "Invalid icons are rejected. A stale group revision conflicts. Other workspaces and unmanaged identities remain inaccessible."
+  },
+  "GET /api/v1/people/{id}/delivery-preferences": {
+    "family": "Channels",
+    "audience": "Person self, administrator or an explicitly authorized identity manager. Preferences never grant contact or channel authority.",
+    "errors": "Forbidden for another Person without management authority; stale versions conflict. Invalid selectors, foreign destinations and invalid timer bounds fail validation.",
+    "description": "Read recipient channel defaults and ordered Agent/Agent role overrides.",
+    "returns": "DeliveryPreferences with its current version; null default retains legacy destination settings."
+  },
+  "POST /api/v1/people/{id}/delivery-preferences": {
+    "family": "Channels",
+    "audience": "Person self, administrator or an explicitly authorized identity manager. Preferences never grant contact or channel authority.",
+    "errors": "Forbidden for another Person without management authority; stale versions conflict. Invalid selectors, foreign destinations and invalid timer bounds fail validation.",
+    "description": "Save versioned recipient channel preferences. Individual Agent overrides win, then the first matching Agent role, then default. Preferred channels fail over on definite failure and optionally on an unresolved question/approval timer after provider acceptance. All sends selected channels immediately. Empty destinations means workspace only. Saving cancels pending external sends from the previous configuration; in-flight effects cannot be recalled.",
+    "returns": "Saved DeliveryPreferences with the incremented version."
   }
 }

@@ -421,5 +421,23 @@
     "purpose": "Save the subject's dedicated contact defaults and exceptions atomically.",
     "returns": "The saved policy and its new version.",
     "recovery": "Use the observed version and preserve deny effects. Explicit blocks override other matching grants; omission restores defaults."
+  },
+  {
+    "python": "delivery_preferences",
+    "go": "DeliveryPreferences",
+    "typescript": "deliveryPreferences",
+    "family": "channels",
+    "purpose": "Read a Person's versioned delivery defaults and Agent/Agent-role overrides.",
+    "returns": "DeliveryPreferences with person_id, version, default and ordered overrides.",
+    "recovery": "Person self, administrator or authorized identity manager only. Reload after a stale-version conflict; preferences grant no contact authority."
+  },
+  {
+    "python": "save_delivery_preferences",
+    "go": "SaveDeliveryPreferences",
+    "typescript": "saveDeliveryPreferences",
+    "family": "channels",
+    "purpose": "Save a Person's channel policy using its observed version.",
+    "returns": "DeliveryPreferences with the incremented version; pending external sends from the previous configuration stop.",
+    "recovery": "Person self, administrator or authorized identity manager only. Reload after a stale-version conflict; preferences grant no contact authority."
   }
 ]
