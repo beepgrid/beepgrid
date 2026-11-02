@@ -1,6 +1,6 @@
 # 0.2.2
 
-Reissue from the clean public release source. SDK APIs and transport behavior are unchanged.
+Refresh package documentation and installation guidance. SDK APIs and transport behavior remain compatible with the 0.2 series.
 
 # 0.2.1
 

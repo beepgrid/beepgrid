@@ -34,4 +34,4 @@ This patch improves command-line setup errors, Go command documentation, package
 
 ## Patch 0.2.2
 
-This release uses the clean public source tree, without internal planning documents, trial logs or review artifacts. SDK APIs and engine runtime behavior are unchanged from the qualified 0.2 series.
+This patch includes clearer command-line setup guidance, package documentation and standalone Agent installation instructions. SDK APIs and engine runtime behavior remain compatible with the 0.2 series.
