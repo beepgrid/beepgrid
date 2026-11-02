@@ -27,3 +27,7 @@ No payment integration, marketing analytics or private managed source belongs in
 This release finishes the Beepgrid namespace migration. Set `BEEPGRID_*` configuration variables, import the Go SDK directly from `github.com/beepgrid/beepgrid/sdk/go`, and use `BeepgridError`, `BeepgridEvent` and the `Beepgrid*` React exports. The compact-send helpers are `sendMinimal` in TypeScript, `send_minimal` in Python and `SendMinimal` in Go. Standard `send`/`Send` behavior is unchanged.
 
 Webhook receivers verify `X-Beepgrid-Timestamp`, `X-Beepgrid-Signature` and `X-Beepgrid-Event-ID`. Update receiver configuration with the server release. Existing browser sessions sign in again after the cookie namespace change. Migration 38 upgrades persisted receipt fields and the metering function while preserving canonical messages, operation keys, permissions and existing migration checksums. Current packages contain no compatibility package under the retired name. Previous immutable registry versions and historical migration SQL remain historical records.
+
+## Patch 0.2.1
+
+This patch improves command-line setup errors, Go command documentation, package discovery and standalone Agent connection instructions. Engine API v1 and SDK APIs are unchanged. Use the current installation commands in [Packaging](PACKAGING.md).

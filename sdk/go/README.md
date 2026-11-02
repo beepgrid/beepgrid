@@ -3,7 +3,7 @@
 [Website](https://beepgrid.com) · [Documentation](https://beepgrid.com/docs/sdks/go/) · [Go package](https://pkg.go.dev/github.com/beepgrid/beepgrid/sdk/go) · [Source](https://github.com/beepgrid/beepgrid/tree/main/sdk/go)
 
 ```sh
-go get github.com/beepgrid/beepgrid/sdk/go@v0.2.0
+go get github.com/beepgrid/beepgrid/sdk/go@v0.2.1
 ```
 
 ```go

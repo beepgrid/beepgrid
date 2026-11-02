@@ -1,3 +1,7 @@
+# 0.2.1
+
+Improve published setup guidance, direct registry and integration links, and concise setup-command errors. Runtime and wire behavior are unchanged.
+
 # 0.2.0
 
 Use the canonical Beepgrid package names, BEEPGRID environment variables and Beepgrid-prefixed exports. The Go SDK imports from github.com/beepgrid/beepgrid/sdk/go. Compact sends use SendMinimal in Go, sendMinimal in TypeScript and send_minimal in Python. This release changes configuration and import names; update the host and SDK together.
