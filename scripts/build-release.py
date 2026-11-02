@@ -59,4 +59,5 @@ This is the public Apache-2.0 engine. Managed billing and website analytics are 
                     for file in sorted(stage.iterdir()): bundle.add(file, file.name)
             artifacts.append(archive)
             print(archive.name, flush=True)
+artifacts = sorted(path for path in output.glob(f'beepgrid_{version}_*') if path.name.endswith(('.tar.gz', '.zip')))
 (output / 'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n' for path in sorted(artifacts)))

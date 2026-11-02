@@ -1,0 +1,46 @@
+name: publish npm packages
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Reviewed release tag (for example v0.1.0)
+        required: true
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Validate and publish SDK, then React
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          node --input-type=module - <<'JS'
+          import {readFileSync} from 'node:fs';
+          const tag=process.env.RELEASE_TAG;
+          if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error('Use a stable version tag');
+          for (const p of ['typescript','react']) {
+            const pkg=JSON.parse(readFileSync(`sdk/${p}/package.json`));
+            if (`v${pkg.version}`!==tag) throw new Error('Package version differs from release tag');
+          }
+          JS
+          npm --prefix sdk/typescript ci --ignore-scripts
+          npm --prefix sdk/typescript test
+          npm --prefix sdk/react ci --ignore-scripts
+          npm --prefix sdk/react run build
+          npm --prefix sdk/react test
+          cd sdk/typescript
+          npm publish --access public --provenance
+          cd ../react
+          npm publish --access public --provenance
