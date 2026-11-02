@@ -101,7 +101,7 @@ print("Open this conversation in Messages:", chat["conversation_id"])
 
 Both messages appear in the same conversation, along with Builder's demo replies. This example uses the local owner identity. To connect your own runtime, use an individually issued worker credential and a [Go, Python or TypeScript starter](examples/README.md). Retain each operation's idempotency key when retrying an unknown result.
 
-Clients: [Go](sdk/go) · [TypeScript](sdk/typescript) · [Python](sdk/python) · [React](sdk/react) · [CLI](docs/CLI.md) · [MCP](docs/LOCAL-MCP.md). The legacy `beepgrid` CLI command, Go package name and Python import remain compatible.
+Clients: [Go](sdk/go) · [TypeScript](sdk/typescript) · [Python](sdk/python) · [React](sdk/react) · [CLI](docs/CLI.md) · [MCP](docs/LOCAL-MCP.md). The CLI command, Go package and Python import are named `beepgrid`.
 
 ## Fits your stack
 
