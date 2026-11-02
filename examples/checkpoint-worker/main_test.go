@@ -11,9 +11,9 @@ import (
 )
 
 func TestCheckpointRestartDoesNotDuplicateQuestionOrResult(t *testing.T) {
-	url := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	url := os.Getenv("BEEPGRID_TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("Set NOTIF_TEST_DATABASE_URL")
+		t.Skip("Set BEEPGRID_TEST_DATABASE_URL")
 	}
 	ctx := context.Background()
 	schema := "checkpoint_" + engine.Digest(engine.Secret())[:20]
@@ -46,9 +46,9 @@ func TestCheckpointRestartDoesNotDuplicateQuestionOrResult(t *testing.T) {
 	server := httptest.NewServer(h)
 	defer server.Close()
 	h.PublicURL = server.URL
-	t.Setenv("NOTIF_URL", server.URL)
-	t.Setenv("NOTIF_TOKEN", key["token"].(string))
-	t.Setenv("NOTIF_PERSON_ID", a.ID)
+	t.Setenv("BEEPGRID_URL", server.URL)
+	t.Setenv("BEEPGRID_TOKEN", key["token"].(string))
+	t.Setenv("BEEPGRID_PERSON_ID", a.ID)
 	state := filepath.Join(t.TempDir(), "state.json")
 	if e = run(ctx, []string{"--state", state, "--stop-after-question"}); e != nil {
 		t.Fatal(e)

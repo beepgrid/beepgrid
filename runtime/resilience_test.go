@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/beepgrid/beepgrid/internal/engine"
-	sdk "github.com/beepgrid/beepgrid/sdk/go/notif"
+	sdk "github.com/beepgrid/beepgrid/sdk/go"
 	"io"
 	"math/rand/v2"
 	"net"
@@ -215,7 +215,7 @@ func TestFleetRecoversFromDatabasePartitionWithoutDuplicateAcceptedWork(t *testi
 				t.Fatal(e)
 			}
 			seconds := 2
-			if value := os.Getenv("NOTIF_RESILIENCE_PARTITION_SECONDS"); value != "" {
+			if value := os.Getenv("BEEPGRID_RESILIENCE_PARTITION_SECONDS"); value != "" {
 				n, e := strconv.Atoi(value)
 				if e != nil || n < 2 || n > 90 {
 					t.Fatal("invalid partition duration")

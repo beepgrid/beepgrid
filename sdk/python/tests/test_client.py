@@ -3,27 +3,27 @@ import os
 import unittest
 import uuid
 from unittest.mock import patch
-from beepgrid import Client, NotifError
+from beepgrid import Client, BeepgridError
 
 
 class ClientTests(unittest.TestCase):
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Requires real HTTP")
     def test_recipient_preferences_preserve_inheritance_and_reject_stale_edits(self):
-        c = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        c = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         person = c.call("GET", "/api/v1/me")["person"]["id"]
         before = c.delivery_preferences(person)
         saved = c.save_delivery_preferences(person, {**before, "default": {"mode": "preferred", "destinations": [], "followup_seconds": 0}})
         self.assertEqual(saved["version"], before["version"] + 1)
         self.assertEqual(c.delivery_preferences(person)["default"]["destinations"], [])
-        with self.assertRaises(NotifError) as error:
+        with self.assertRaises(BeepgridError) as error:
             c.save_delivery_preferences(person, before)
         self.assertEqual(error.exception.status, 409)
         restored = c.save_delivery_preferences(person, {**before, "version": saved["version"]})
         self.assertEqual(restored["default"], before["default"])
 
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Requires real HTTP")
     def test_token_lifecycle_and_renewable_connection(self):
-        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        owner = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         person = owner.call("GET", "/api/v1/me")["person"]["id"]
         issued = owner.create_credential(person, name="Python reports", permissions=["read"])
         meta = next(c for c in owner.credentials() if c["id"] == issued["id"])
@@ -32,7 +32,7 @@ class ClientTests(unittest.TestCase):
         replacement = owner.rotate_credential(meta["id"], version=edited["version"], overlap_seconds=300)
         Client(owner.base_url, replacement["token"]).call("GET", "/api/v1/me")
         owner.revoke_credential(meta["id"])
-        with self.assertRaises(NotifError):
+        with self.assertRaises(BeepgridError):
             Client(owner.base_url, replacement["token"]).call("GET", "/api/v1/me")
         worker, session = owner.connect("sdk/renew-py-"+str(uuid.uuid4()), "Renewable", renewable=True, connection_name="Python live")
         renewed = worker.renew_credential()
@@ -127,9 +127,9 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(Client("http://localhost","token").ask(target={"kind":"person","id":"p"},title="Continue?",key="saved-key")["id"],"request-1")
         self.assertEqual(calls,["saved-key","saved-key"])
 
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Real HTTP SDK test requires BEEPGRID_SDK_TEST_URL")
     def test_real_question_in_existing_chat_without_redundant_target(self):
-        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        owner = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         person = owner.call("GET", "/api/v1/me")["person"]["id"]
         worker, session = owner.connect("sdk/python-followup-" + str(uuid.uuid4()), "Follow-up worker")
         target = {"kind": "agent", "id": session["agent"]["id"]}
@@ -140,21 +140,21 @@ class ClientTests(unittest.TestCase):
         worker.respond(question["id"], "answered", version=question["version"], answer="v2")
         self.assertEqual(owner.get_request(question["id"])["response"]["answer"], "v2")
 
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Real HTTP SDK test requires BEEPGRID_SDK_TEST_URL")
     def test_real_compact_receipt_and_full_replay(self):
-        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        owner = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         _, session = owner.connect("sdk/python-receipt-" + str(uuid.uuid4()), "Receipt worker")
         options = dict(body="Receipt body", target={"kind": "agent", "id": session["agent"]["id"]}, key=str(uuid.uuid4()))
-        receipt = owner.notify(**options)
+        receipt = owner.send_minimal(**options)
         self.assertEqual(receipt["message_count"], 1)
         self.assertNotIn("messages", receipt)
         full = owner.send(**options)
         self.assertEqual(full["conversation_id"], receipt["conversation_id"])
         self.assertEqual(full["messages"][0]["body"], "Receipt body")
 
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Real HTTP SDK test requires BEEPGRID_SDK_TEST_URL")
     def test_real_worker_transport(self):
-        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        owner = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         worker, session = owner.connect("sdk/python-" + str(uuid.uuid4()), "Python worker", ["message"])
         owner.send(body="Hello from Python", target={"kind": "agent", "id": session["agent"]["id"]})
         messages = worker.inbox()
@@ -162,30 +162,30 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(messages[0]["payload"]["message"]["body"], "Hello from Python")
         worker.ack(messages[0])
 
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Real HTTP SDK test requires NOTIF_SDK_TEST_URL")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Real HTTP SDK test requires BEEPGRID_SDK_TEST_URL")
     def test_real_approval_execution_lifecycle(self):
-        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        owner = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         me = owner.call("GET", "/api/v1/me")
         worker, session = owner.connect("sdk/python-exec-"+str(uuid.uuid4()), "Python executor")
         action = {"name":"fixture", "executor_id":session["agent"]["id"], "resource":"fixture", "resource_version":"1", "arguments":{"value":1}, "operation_key":str(uuid.uuid4())}
         q = owner.ask(kind="approval", title="Fixture?", target={"kind":"person","id":me["person"]["id"]}, action=action)
-        with self.assertRaises(NotifError) as raised:
+        with self.assertRaises(BeepgridError) as raised:
             worker.redeem(q["id"], action)
         self.assertEqual(raised.exception.status,409)
         owner.respond(q["id"],"approved",version=q["version"])
         execution=worker.redeem(q["id"], action)
         self.assertEqual(worker.redeem(q["id"],action)["id"],execution["id"])
-        with self.assertRaises(NotifError) as raised:
+        with self.assertRaises(BeepgridError) as raised:
             worker.redeem(q["id"],{**action,"resource_version":"2"})
         self.assertEqual(raised.exception.status,403)
         self.assertEqual(worker.report_execution(execution["id"],"succeeded",{"reported":True})["state"],"succeeded")
-        with self.assertRaises(NotifError) as raised:
+        with self.assertRaises(BeepgridError) as raised:
             worker.report_execution(execution["id"],"failed")
         self.assertEqual(raised.exception.status,409)
 
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Requires real HTTP")
     def test_real_workspace_queries_and_batches(self):
-        c = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        c = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         _, session = c.connect("sdk/query-python-" + str(uuid.uuid4()), "Query worker")
         target = {"kind": "agent", "id": session["agent"]["id"]}
         preview = c.dispatch_preview([target], "message")
@@ -208,9 +208,9 @@ if __name__ == "__main__":
     unittest.main()
 
 class FileJourneyTests(unittest.TestCase):
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL"), "Requires real HTTP")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL"), "Requires real HTTP")
     def test_files_events_and_current_isolation(self):
-        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        owner = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         worker, session = owner.connect("sdk/python-files-" + str(uuid.uuid4()), "Python file worker")
         person = owner.call("GET", "/api/v1/me")["person"]["id"]
         role = owner.call("POST", "/api/v1/roles", {"name": "File reader " + str(uuid.uuid4()), "rules": [{"action": "view", "target_kind": "person", "target_id": person}]})
@@ -220,7 +220,7 @@ class FileJourneyTests(unittest.TestCase):
         file = owner.upload_attachment(sent["conversation_id"], "brief.pdf", "application/pdf", b"%PDF-1.4\nfixture")
         self.assertEqual(worker.attachments(sent["conversation_id"])[0]["id"], file["id"])
         self.assertEqual(worker.download_attachment(file["id"]), b"%PDF-1.4\nfixture")
-        with self.assertRaises(NotifError): other.download_attachment(file["id"])
+        with self.assertRaises(BeepgridError): other.download_attachment(file["id"])
         self.assertGreaterEqual(len(owner.directory("person")["items"]), 1)
         stream = worker.events()
         try:
@@ -261,9 +261,9 @@ class StartChatTests(unittest.TestCase):
             call.assert_called_once_with("POST", "/api/v1/conversations", {"targets":[{"kind":"agent","id":"a"}],
                 "body":"👋 @Reviewer 2 please review","approval":True,"choices":["Yes","No"],"mentions":mentions,"attachment_ids":["draft"]}, key="shared-1")
 
-    @unittest.skipUnless(os.getenv("NOTIF_SDK_TEST_URL") and os.getenv("NOTIF_SDK_EXPECT_START_CHAT_MENTIONS"), "Requires integrated StartChat mention engine")
+    @unittest.skipUnless(os.getenv("BEEPGRID_SDK_TEST_URL") and os.getenv("BEEPGRID_SDK_EXPECT_START_CHAT_MENTIONS"), "Requires integrated StartChat mention engine")
     def test_real_start_chat_mentions(self):
-        owner = Client(os.environ["NOTIF_SDK_TEST_URL"], os.environ["NOTIF_SDK_TEST_TOKEN"])
+        owner = Client(os.environ["BEEPGRID_SDK_TEST_URL"], os.environ["BEEPGRID_SDK_TEST_TOKEN"])
         worker, session = owner.connect("sdk/python-shared-" + str(uuid.uuid4()), "Reviewer 2")
         person = owner.call("GET", "/api/v1/me")["person"]["id"]
         role = owner.call("POST", "/api/v1/roles", {"name":"Shared reader " + str(uuid.uuid4()), "rules":[{"action":"view","target_kind":"person","target_id":person}]})

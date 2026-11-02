@@ -20,7 +20,7 @@ func startDiagnostics(ctx context.Context, s *engine.Store, address string) (fun
 	}
 	host, _, e := net.SplitHostPort(address)
 	if e != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
-		return nil, engine.Bad("NOTIF_PROFILE_ADDR must use a literal loopback IP and port")
+		return nil, engine.Bad("BEEPGRID_PROFILE_ADDR must use a literal loopback IP and port")
 	}
 	listener, e := net.Listen("tcp", address)
 	if e != nil {

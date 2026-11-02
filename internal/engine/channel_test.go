@@ -22,7 +22,7 @@ func TestSignedProviderRetriesAndEncryptedCredentials(t *testing.T) {
 	var count atomic.Int32
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
-		if !VerifySignature(secret, r.Header.Get("X-Notif-Timestamp"), r.Header.Get("X-Notif-Signature"), raw, time.Now()) {
+		if !VerifySignature(secret, r.Header.Get("X-Beepgrid-Timestamp"), r.Header.Get("X-Beepgrid-Signature"), raw, time.Now()) {
 			t.Error("unsigned provider delivery")
 		}
 		if strings.Contains(string(raw), "_policy") {
@@ -208,7 +208,7 @@ func TestSMTPRelayWithoutInventedSigningSecret(t *testing.T) {
 			}
 		}
 	}()
-	c, e := s.SaveConnection(ctx, owner, Connection{Name: "Local mail", Kind: "email", Enabled: true, Config: map[string]string{"smtp_addr": listener.Addr().String(), "from": "notif@localhost.test"}})
+	c, e := s.SaveConnection(ctx, owner, Connection{Name: "Local mail", Kind: "email", Enabled: true, Config: map[string]string{"smtp_addr": listener.Addr().String(), "from": "beepgrid@localhost.test"}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -231,10 +231,10 @@ func TestSMTPRelayWithoutInventedSigningSecret(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("SMTP message missing")
 	}
-	if _, e = s.SaveConnection(ctx, owner, Connection{Name: "Missing password", Kind: "email", Enabled: true, Config: map[string]string{"smtp_addr": listener.Addr().String(), "from": "notif@localhost.test", "username": "sender"}}); ErrorStatus(e) != 400 {
+	if _, e = s.SaveConnection(ctx, owner, Connection{Name: "Missing password", Kind: "email", Enabled: true, Config: map[string]string{"smtp_addr": listener.Addr().String(), "from": "beepgrid@localhost.test", "username": "sender"}}); ErrorStatus(e) != 400 {
 		t.Fatal(e)
 	}
-	if _, e = s.SaveConnection(ctx, owner, Connection{Name: "Short valid SMTP password", Kind: "email", Enabled: true, Config: map[string]string{"smtp_addr": listener.Addr().String(), "from": "notif@localhost.test", "username": "sender"}, Secret: "p4ssw0rd"}); e != nil {
+	if _, e = s.SaveConnection(ctx, owner, Connection{Name: "Short valid SMTP password", Kind: "email", Enabled: true, Config: map[string]string{"smtp_addr": listener.Addr().String(), "from": "beepgrid@localhost.test", "username": "sender"}, Secret: "p4ssw0rd"}); e != nil {
 		t.Fatal(e)
 	}
 }

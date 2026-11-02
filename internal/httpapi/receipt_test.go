@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestCompactAcceptancePreservesDurabilityReplayAndFullDefault(t *testing.T) {
@@ -34,8 +34,8 @@ func TestCompactAcceptancePreservesDurabilityReplayAndFullDefault(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := notif.SendInput{Target: notif.Target{Kind: "group", ID: group.ID}, Body: strings.Repeat("<tag>é\n", 3000)}
-	receipt, err := client.Notify(ctx, input, "compact-once")
+	input := beepgrid.SendInput{Target: beepgrid.Target{Kind: "group", ID: group.ID}, Body: strings.Repeat("<tag>é\n", 3000)}
+	receipt, err := client.SendMinimal(ctx, input, "compact-once")
 	if err != nil || receipt.MessageCount != 2 || receipt.ConversationID == "" {
 		t.Fatal(receipt, err)
 	}
@@ -63,7 +63,7 @@ func TestCompactAcceptancePreservesDurabilityReplayAndFullDefault(t *testing.T) 
 	}
 	// A representation preference never bypasses input/idempotency validation.
 	input.Body = "changed"
-	if _, err = client.Notify(ctx, input, "compact-once"); err == nil {
+	if _, err = client.SendMinimal(ctx, input, "compact-once"); err == nil {
 		t.Fatal("conflicting operation acknowledged")
 	}
 	for _, m := range full.Messages {

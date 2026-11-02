@@ -8,7 +8,7 @@ import (
 
 	"github.com/beepgrid/beepgrid/internal/engine"
 	"github.com/beepgrid/beepgrid/internal/web"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestOptionalWorkspaceUsesSameEngineAndAuthorization(t *testing.T) {
@@ -50,12 +50,12 @@ func TestOptionalWorkspaceUsesSameEngineAndAuthorization(t *testing.T) {
 	if res.StatusCode != want {
 		t.Fatal("default workspace packaging changed", res.StatusCode)
 	}
-	cli := notif.New(headlessHTTP.URL, token)
-	var me struct{ Person notif.Person }
+	cli := beepgrid.New(headlessHTTP.URL, token)
+	var me struct{ Person beepgrid.Person }
 	if err = cli.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil {
 		t.Fatal(err)
 	}
-	worker, session, err := cli.Enroll(ctx, notif.EnrollInput{Agent: "headless/scout", Name: "Scout"})
+	worker, session, err := cli.Enroll(ctx, beepgrid.EnrollInput{Agent: "headless/scout", Name: "Scout"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,22 +66,22 @@ func TestOptionalWorkspaceUsesSameEngineAndAuthorization(t *testing.T) {
 	if err = cli.Do(ctx, "POST", "/api/v1/role-bindings", map[string]string{"role_id": role.ID, "subject_kind": "principal", "subject_id": session.Agent.ID}, nil, ""); err != nil {
 		t.Fatal(err)
 	}
-	q, err := worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Report status"}, "shared-across-ui")
+	q, err := worker.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Title: "Report status"}, "shared-across-ui")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Owner authorization is identical from either API composition.
-	ui := notif.New(fullHTTP.URL, token)
+	ui := beepgrid.New(fullHTTP.URL, token)
 	if got, err := ui.GetRequest(ctx, q.ID); err != nil || got.ID != q.ID {
 		t.Fatal("workspace cannot read the headless request", got, err)
 	}
-	if got, err := ui.Respond(ctx, q.ID, notif.Response{Outcome: "answered", Version: q.Version, Answer: "Ready"}); err != nil || got.State != "resolved" {
+	if got, err := ui.Respond(ctx, q.ID, beepgrid.Response{Outcome: "answered", Version: q.Version, Answer: "Ready"}); err != nil || got.State != "resolved" {
 		t.Fatal("workspace response failed", got, err)
 	}
 	if got, err := cli.GetRequest(ctx, q.ID); err != nil || got.Response == nil || got.Response.Answer != "Ready" {
 		t.Fatal("canonical result differs across clients", got, err)
 	}
-	if err = notif.New(headlessHTTP.URL, "invalid").Do(ctx, "GET", "/api/v1/me", nil, nil, ""); err == nil {
+	if err = beepgrid.New(headlessHTTP.URL, "invalid").Do(ctx, "GET", "/api/v1/me", nil, nil, ""); err == nil {
 		t.Fatal("headless mode bypassed authentication")
 	}
 	if _, err = worker.Assistance(ctx); err != nil {

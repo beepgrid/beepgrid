@@ -10,7 +10,7 @@ import urllib.request
 from typing import Any, Callable
 
 
-class NotifError(Exception):
+class BeepgridError(Exception):
     def __init__(self, code: str, message: str, status: int):
         super().__init__(f"{code}: {message}")
         self.code, self.message, self.status = code, message, status
@@ -82,7 +82,7 @@ class Client:
                         detail = json.load(error).get("error", {})
                 except (ValueError, AttributeError):
                     detail = {}
-                raise NotifError(detail.get("code", "HTTP_ERROR"), detail.get("message", "Request failed"), error.code) from error
+                raise BeepgridError(detail.get("code", "HTTP_ERROR"), detail.get("message", "Request failed"), error.code) from error
             except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead):
                 if attempt == 2 or (method != "GET" and not key):
                     raise
@@ -154,7 +154,7 @@ class Client:
             with error:
                 try: detail = json.loads(error.read(65536)).get("error", {})
                 except (ValueError, AttributeError): detail = {}
-            raise NotifError(detail.get("code", "HTTP_ERROR"), detail.get("message", "Attachment request rejected"), error.code) from error
+            raise BeepgridError(detail.get("code", "HTTP_ERROR"), detail.get("message", "Attachment request rejected"), error.code) from error
 
     def directory(self, kind: str, search: str = "") -> dict[str, Any]:
         if kind not in ("agent", "person", "service"): raise ValueError("Invalid identity kind")
@@ -240,7 +240,7 @@ class Client:
             data["preview_token"] = preview_token
         return self.call("POST", "/api/v1/messages", data, key=key or str(uuid.uuid4()), minimal=minimal)
 
-    def notify(self, **options: Any) -> dict[str, Any]:
+    def send_minimal(self, **options: Any) -> dict[str, Any]:
         """Durable acceptance only. send with the same input/key recovers the full receipt."""
         return self.send(**{**options, "minimal": True})
 
@@ -328,7 +328,7 @@ class Client:
         while not stop():
             try:
                 deliveries = self.call("GET", "/api/v1/worker/inbox?wait_ms=15000")
-            except NotifError as error:
+            except BeepgridError as error:
                 if error.status < 500 and error.status != 429:
                     raise
                 time.sleep(2)
@@ -343,7 +343,7 @@ class Client:
                 time.sleep(.1)
 
 
-__all__ = ["Client", "NotifError"]
+__all__ = ["Client", "BeepgridError"]
 
 
 def mention_context(message: dict[str, Any], recipient: str) -> str:

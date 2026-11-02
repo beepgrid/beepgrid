@@ -1,6 +1,6 @@
-import { NotifError } from "./index.js";
+import { BeepgridError } from "./index.js";
 
-export type NotifEvent = {
+export type BeepgridEvent = {
   sequence: number;
   kind: string;
   actor_id: string;
@@ -14,7 +14,7 @@ export type EventOptions = { after?: number; signal?: AbortSignal; summary?: boo
 // The server bounds event payloads through its request limits. A finite parser
 // budget also prevents a broken intermediary from retaining an unbounded frame.
 const MAX_FRAME = 8 * 1024 * 1024;
-export async function* readEvents(base: string, token: string, transport: typeof fetch, options: EventOptions): AsyncGenerator<NotifEvent> {
+export async function* readEvents(base: string, token: string, transport: typeof fetch, options: EventOptions): AsyncGenerator<BeepgridEvent> {
   let cursor = options.after ?? 0;
   if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error("Invalid event cursor");
   const control = new AbortController();
@@ -34,14 +34,14 @@ export async function* readEvents(base: string, token: string, transport: typeof
           // Do not retry revoked credentials or a policy denial indefinitely.
           if (response.status < 500 && response.status !== 429) {
             await response.body?.cancel();
-            throw new NotifError("EVENT_STREAM_REJECTED", "Event stream rejected", response.status);
+            throw new BeepgridError("EVENT_STREAM_REJECTED", "Event stream rejected", response.status);
           }
           await response.body?.cancel();
           throw new Error("Event stream temporarily unavailable");
         }
         if (!response.body || !response.headers.get("Content-Type")?.includes("text/event-stream")) {
           await response.body?.cancel();
-          throw new NotifError("INVALID_EVENT_STREAM", "Expected an event stream", 502);
+          throw new BeepgridError("INVALID_EVENT_STREAM", "Expected an event stream", 502);
         }
         reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -55,17 +55,17 @@ export async function* readEvents(base: string, token: string, transport: typeof
             let line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
             if (line.endsWith("\r")) line = line.slice(0, -1);
             bytes += line.length + 1;
-            if (bytes > MAX_FRAME) throw new NotifError("INVALID_EVENT_STREAM", "Event frame exceeds limit", 502);
+            if (bytes > MAX_FRAME) throw new BeepgridError("INVALID_EVENT_STREAM", "Event frame exceeds limit", 502);
             if (line === "") {
               if (id && data.length) {
                 const sequence = Number(id);
-                if (!Number.isSafeInteger(sequence) || sequence < 0) throw new NotifError("INVALID_EVENT_STREAM", "Invalid event ID", 502);
+                if (!Number.isSafeInteger(sequence) || sequence < 0) throw new BeepgridError("INVALID_EVENT_STREAM", "Invalid event ID", 502);
                 if (sequence > cursor) {
                   if (kind === "cursor") { cursor = sequence; }
                   else {
-                    let event: NotifEvent;
-                    try { event = JSON.parse(data.join("\n")); } catch { throw new NotifError("INVALID_EVENT_STREAM", "Invalid event JSON", 502); }
-                    if (event.sequence !== sequence || typeof event.kind !== "string") throw new NotifError("INVALID_EVENT_STREAM", "Event identity mismatch", 502);
+                    let event: BeepgridEvent;
+                    try { event = JSON.parse(data.join("\n")); } catch { throw new BeepgridError("INVALID_EVENT_STREAM", "Invalid event JSON", 502); }
+                    if (event.sequence !== sequence || typeof event.kind !== "string") throw new BeepgridError("INVALID_EVENT_STREAM", "Event identity mismatch", 502);
                     cursor = sequence;
                     received = true;
                     backoff = 100;
@@ -83,11 +83,11 @@ export async function* readEvents(base: string, token: string, transport: typeof
               else if (name === "event") kind = value;
             }
           }
-          if (buffer.length + bytes > MAX_FRAME) throw new NotifError("INVALID_EVENT_STREAM", "Event frame exceeds limit", 502);
+          if (buffer.length + bytes > MAX_FRAME) throw new BeepgridError("INVALID_EVENT_STREAM", "Event frame exceeds limit", 502);
         }
       } catch (error) {
         if (control.signal.aborted) return;
-        if (error instanceof NotifError) throw error;
+        if (error instanceof BeepgridError) throw error;
         // Connection loss is retried from the last completely consumed event.
       } finally {
         if (reader) { try { await reader.cancel(); } catch {} reader.releaseLock(); }

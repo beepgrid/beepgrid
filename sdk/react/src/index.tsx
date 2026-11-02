@@ -11,7 +11,7 @@ export type { Client, RequestItem };
 export function browserClient(baseURL: string = window.location.origin) {
   return new Client(baseURL, "");
 }
-export function useNotifRequest(client: Client, id: string) {
+export function useBeepgridRequest(client: Client, id: string) {
   const [request, setRequest] = useState<RequestItem | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -69,7 +69,7 @@ export function useNotifRequest(client: Client, id: string) {
   }
   return { request, error, busy, respond };
 }
-export function NotifRequest({
+export function BeepgridRequest({
   client,
   id,
   onConversation,
@@ -80,7 +80,7 @@ export function NotifRequest({
   onConversation?: (id: string) => void;
   onResolved?: (request: RequestItem) => void;
 }) {
-  const { request: r, error, busy, respond } = useNotifRequest(client, id);
+  const { request: r, error, busy, respond } = useBeepgridRequest(client, id);
   const [answer, setAnswer] = useState("");
   const notified = useRef("");
   useEffect(() => {
@@ -94,7 +94,7 @@ export function NotifRequest({
     }
   }, [r, onResolved]);
   return (
-    <section className="notif-request" aria-label="Agent request">
+    <section className="beepgrid-request" aria-label="Agent request">
       {error && <p role="alert">{error}</p>}
       {!r || r.id !== id ? (
         <p role="status">Loading request…</p>
@@ -181,7 +181,7 @@ export function NotifRequest({
                         <label key={c}>
                           <input
                             type="radio"
-                            name={"notif-answer-" + id}
+                            name={"beepgrid-answer-" + id}
                             value={c}
                             checked={answer === c}
                             onChange={() => setAnswer(c)}
@@ -224,7 +224,7 @@ export function NotifRequest({
   );
 }
 export type Conversation = { id: string; title: string; messages: Message[] };
-export function NotifConversation({
+export function BeepgridConversation({
   client,
   id,
 }: {
@@ -285,7 +285,7 @@ export function NotifConversation({
     if (attempt.current.body !== draft || !attempt.current.key)
       attempt.current = { body: draft, key: crypto.randomUUID() };
     try {
-      await client.notify(
+      await client.sendMinimal(
         { conversation_id: id, body: draft },
         attempt.current.key,
       );
@@ -301,7 +301,7 @@ export function NotifConversation({
     }
   }
   return (
-    <section className="notif-conversation" aria-label="Conversation">
+    <section className="beepgrid-conversation" aria-label="Conversation">
       {error && <p role="alert">{error}</p>}
       {c && c.id === id ? (
         <>

@@ -180,8 +180,8 @@
     "doc": ""
   },
   {
-    "name": "notify",
-    "signature": "notify(self, **options: Any)",
+    "name": "send_minimal",
+    "signature": "send_minimal(self, **options: Any)",
     "doc": "Durable acceptance only. send with the same input/key recovers the full receipt."
   },
   {

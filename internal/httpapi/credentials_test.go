@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestRestrictedTokenHTTPAndCredentialLifecycle(t *testing.T) {
@@ -29,11 +29,11 @@ func TestRestrictedTokenHTTPAndCredentialLifecycle(t *testing.T) {
 		t.Fatal(e)
 	}
 	until := time.Now().Add(7 * 24 * time.Hour)
-	created, e := admin.CreateCredential(ctx, notif.CredentialInput{PrincipalID: p.ID, Kind: "api", Name: "Read-only reports", Permissions: []string{"read"}, ExpiresAt: &until})
+	created, e := admin.CreateCredential(ctx, beepgrid.CredentialInput{PrincipalID: p.ID, Kind: "api", Name: "Read-only reports", Permissions: []string{"read"}, ExpiresAt: &until})
 	if e != nil {
 		t.Fatal(e)
 	}
-	reader := notif.New(admin.BaseURL, created.Token)
+	reader := beepgrid.New(admin.BaseURL, created.Token)
 	for _, path := range []string{"/api/v1/me", "/api/v1/credentials", "/api/v1/events"} {
 		if e = reader.Do(ctx, "GET", path, nil, nil, ""); e != nil {
 			t.Fatal(path, e)
@@ -48,7 +48,7 @@ func TestRestrictedTokenHTTPAndCredentialLifecycle(t *testing.T) {
 			body["token"] = created.Token
 		}
 		e = reader.Do(ctx, "POST", path, body, nil, "")
-		if api, ok := e.(*notif.APIError); !ok || api.Status != 403 {
+		if api, ok := e.(*beepgrid.APIError); !ok || api.Status != 403 {
 			t.Fatalf("restricted operation %s was not denied: %v", path, e)
 		}
 	}
@@ -56,7 +56,7 @@ func TestRestrictedTokenHTTPAndCredentialLifecycle(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	var meta notif.Credential
+	var meta beepgrid.Credential
 	for _, c := range list {
 		if c.ID == created.ID {
 			meta = c
@@ -69,7 +69,7 @@ func TestRestrictedTokenHTTPAndCredentialLifecycle(t *testing.T) {
 	if e != nil || replacement.Credential.ID != meta.ID {
 		t.Fatal(e)
 	}
-	updated := notif.New(admin.BaseURL, replacement.Token)
+	updated := beepgrid.New(admin.BaseURL, replacement.Token)
 	if e = updated.Do(ctx, "GET", "/api/v1/me", nil, nil, ""); e != nil {
 		t.Fatal(e)
 	}
@@ -82,7 +82,7 @@ func TestRestrictedTokenHTTPAndCredentialLifecycle(t *testing.T) {
 	if e = admin.RevokeCredential(ctx, meta.ID, false); e != nil {
 		t.Fatal(e)
 	}
-	for _, client := range []*notif.Client{reader, updated} {
+	for _, client := range []*beepgrid.Client{reader, updated} {
 		if e = client.Do(ctx, "GET", "/api/v1/me", nil, nil, ""); e == nil {
 			t.Fatal("revoked secret accepted")
 		}
@@ -123,11 +123,11 @@ func TestNeverExpiringGoClientLifecycle(t *testing.T) {
 	if err := admin.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil {
 		t.Fatal(err)
 	}
-	issued, err := admin.CreateCredential(ctx, notif.CredentialInput{PrincipalID: me.Person.ID, Kind: "api", NeverExpires: true})
+	issued, err := admin.CreateCredential(ctx, beepgrid.CredentialInput{PrincipalID: me.Person.ID, Kind: "api", NeverExpires: true})
 	if err != nil || !issued.ExpiresAt.IsZero() {
 		t.Fatal("nullable API expiry did not round trip", err)
 	}
-	worker, session, err := admin.Enroll(ctx, notif.EnrollInput{Agent: "permanent/go", Name: "Persistent Go", NeverExpires: true})
+	worker, session, err := admin.Enroll(ctx, beepgrid.EnrollInput{Agent: "permanent/go", Name: "Persistent Go", NeverExpires: true})
 	if err != nil || !session.ExpiresAt.IsZero() {
 		t.Fatal("nullable worker expiry did not round trip", err)
 	}

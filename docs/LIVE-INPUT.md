@@ -108,15 +108,15 @@ existing host, not to a second replacement Agent.
    example values with your engine origin, supplied instance ID and private paths:
 
    ```sh
-   unset NOTIF_TOKEN
-   export NOTIF_URL=https://your-engine.example
-   export NOTIF_TOKEN_FILE="$HOME/.config/beepgrid/worker-token"
+   unset BEEPGRID_TOKEN
+   export BEEPGRID_URL=https://your-engine.example
+   export BEEPGRID_TOKEN_FILE="$HOME/.config/beepgrid/worker-token"
    export BEEPGRID_CONNECTION_ID=ins_your_connection
    export BEEPGRID_INBOX_PATH="$HOME/.local/share/beepgrid/connection/inbox.db"
    export BEEPGRID_BUSY_MODE=steer
    ```
 
-   `NOTIF_TOKEN` otherwise overrides the file. The inbox needs a private persistent
+   `BEEPGRID_TOKEN` otherwise overrides the file. The inbox needs a private persistent
    volume on a VM/container, or a durable remote `InboxStore` on an ephemeral host.
    Use `queue` for a Queue-only binding. An instance ID is an identifier, never a token.
 5. Choose a binding in the table below. Reuse the native session and model loop;
@@ -152,7 +152,7 @@ Save enrollment input such as:
 {"agent":"research/scout","name":"Scout","capabilities":["message","request"]}
 ```
 
-With `NOTIF_URL` set and `NOTIF_TOKEN_FILE` pointing to that launcher, run:
+With `BEEPGRID_URL` set and `BEEPGRID_TOKEN_FILE` pointing to that launcher, run:
 
 ```sh
 beepgrid enroll --input enroll.json --out /private/path/scout-token

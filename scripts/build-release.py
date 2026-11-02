@@ -45,7 +45,7 @@ Source: https://github.com/beepgrid/beepgrid
 
 Move beepgrid to a directory on PATH, then run: beepgrid version
 PostgreSQL is required to run the engine. No PostgreSQL is needed for CLI/MCP clients.
-For local setup, set NOTIF_DATABASE_URL and run: beepgrid serve --dev
+For local setup, set BEEPGRID_DATABASE_URL and run: beepgrid serve --dev
 For production credentials and migrations, see:
 https://github.com/beepgrid/beepgrid/blob/main/docs/OPERATIONS.md
 This is the public Apache-2.0 engine. Managed billing and website analytics are excluded.

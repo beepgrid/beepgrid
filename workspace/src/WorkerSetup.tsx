@@ -7,12 +7,12 @@ function quote(value: string) {
 }
 export function connectionGuide(method: string, base: string, host = "codex") {
   const env = [
-    "NOTIF_URL=" + quote(base) + " \\",
-    "NOTIF_TOKEN_FILE='/absolute/path/worker-token' \\",
+    "BEEPGRID_URL=" + quote(base) + " \\",
+    "BEEPGRID_TOKEN_FILE='/absolute/path/worker-token' \\",
   ];
   if (method === "mcp") {
     return {
-      prepare: "go build -buildvcs=false -o .local/beepgrid ./cmd/notif",
+      prepare: "go build -buildvcs=false -o .local/beepgrid ./cmd/beepgrid",
       run:
         host === "codex"
           ? [
@@ -21,8 +21,8 @@ export function connectionGuide(method: string, base: string, host = "codex") {
               'args = ["mcp"]',
               "",
               "[mcp_servers.beepgrid.env]",
-              "NOTIF_URL = " + JSON.stringify(base),
-              'NOTIF_TOKEN_FILE = "/absolute/path/worker-token"',
+              "BEEPGRID_URL = " + JSON.stringify(base),
+              'BEEPGRID_TOKEN_FILE = "/absolute/path/worker-token"',
             ].join("\n")
           : JSON.stringify(
               {
@@ -31,8 +31,8 @@ export function connectionGuide(method: string, base: string, host = "codex") {
                     command: "/absolute/path/beepgrid",
                     args: ["mcp"],
                     env: {
-                      NOTIF_URL: base,
-                      NOTIF_TOKEN_FILE: "/absolute/path/worker-token",
+                      BEEPGRID_URL: base,
+                      BEEPGRID_TOKEN_FILE: "/absolute/path/worker-token",
                     },
                   },
                 },

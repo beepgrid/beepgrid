@@ -41,9 +41,9 @@ for path, group in spec['paths'].items():
 assert all(s.get('properties') for s in spec['components']['schemas'].values()), 'A public model still lacks field documentation'
 for file, expected in json.loads((metadata / 'surface-hashes.json').read_text()).items():
     assert hashlib.sha256((root/file).read_bytes()).hexdigest()==expected, 'Operator/provider/tool surface changed; review documented settings: '+file
-binary=root/'.local/notif-doc-tour'
+binary=root/'.local/beepgrid-doc-tour'
 if binary.exists():
-    environment={**os.environ,'NOTIF_URL':'http://localhost:1','NOTIF_TOKEN':'documentation-schema-only','NOTIF_AGENT_ID':''}
+    environment={**os.environ,'BEEPGRID_URL':'http://localhost:1','BEEPGRID_TOKEN':'documentation-schema-only','BEEPGRID_AGENT_ID':''}
     message=json.dumps({'jsonrpc':'2.0','id':1,'method':'tools/list','params':{}})+'\n'
     process=subprocess.run([str(binary),'mcp'],input=message,text=True,capture_output=True,env=environment,check=True)
     assert json.loads(process.stdout)['result']['tools']==json.loads((metadata/'mcp.json').read_text()), 'MCP schemas changed; refresh tools and examples'

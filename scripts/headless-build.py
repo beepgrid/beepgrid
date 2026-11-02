@@ -27,5 +27,5 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-headless-') as directory:
     package = json.loads(result)
     assert not package.get('EmbedFiles'), package.get('EmbedFiles')
     assert package['GoFiles'] == ['headless.go'], package['GoFiles']
-    subprocess.run(['go', 'build', '-trimpath', '-tags', 'headless', '-o', str(Path(directory)/'notif'), './cmd/notif'], cwd=source, env=environment, check=True)
+    subprocess.run(['go', 'build', '-trimpath', '-tags', 'headless', '-o', str(Path(directory)/'beepgrid'), './cmd/beepgrid'], cwd=source, env=environment, check=True)
     print('Headless build passed with no frontend source, assets or JavaScript manifest')

@@ -15,11 +15,11 @@ import uuid
 from beepgrid import Client
 
 root = Path(__file__).resolve().parents[2]
-url = os.environ.get('NOTIF_URL', 'http://localhost:4010')
+url = os.environ.get('BEEPGRID_URL', 'http://localhost:4010')
 host = urlsplit(url).hostname
 if host != 'localhost' and not (host and ipaddress.ip_address(host).is_loopback):
     raise RuntimeError('This fixture only runs against a disposable loopback workspace')
-path = Path(os.environ.get('NOTIF_TOKEN_FILE', root / '.local/owner-token'))
+path = Path(os.environ.get('BEEPGRID_TOKEN_FILE', root / '.local/owner-token'))
 if path.stat().st_mode & 0o077:
     raise RuntimeError('Credential file must be owner-only: chmod 600')
 owner = Client(url, path.read_text().strip())
@@ -52,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-shared-example-') as scratch:
     def builder(operation, **fields):
         result = subprocess.run([str(binary)], input=json.dumps({'operation': operation, 'key': run, **fields}),
             text=True, capture_output=True, check=True, cwd=root,
-            env={**os.environ, 'NOTIF_URL': url, 'NOTIF_TOKEN_FILE': str(credential)})
+            env={**os.environ, 'BEEPGRID_URL': url, 'BEEPGRID_TOKEN_FILE': str(credential)})
         return json.loads(result.stdout)
 
     chat = builder('start', person_id=person, reviewer_id=peers['Reviewer'][1]['agent']['id'])

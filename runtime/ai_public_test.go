@@ -9,7 +9,7 @@ import (
 )
 
 func TestModelConfigurationIsUsableWithoutInternalPackages(t *testing.T) {
-	values := map[string]string{"NOTIF_AI_PROVIDER": "google", "NOTIF_AI_MODEL": "explicit-selection", "NOTIF_AI_API_KEY": "fixture-private-key"}
+	values := map[string]string{"BEEPGRID_AI_PROVIDER": "google", "BEEPGRID_AI_MODEL": "explicit-selection", "BEEPGRID_AI_API_KEY": "fixture-private-key"}
 	ai, err := server.AIConfigFromEnv(func(k string) string { return values[k] })
 	if err != nil {
 		t.Fatal(err)

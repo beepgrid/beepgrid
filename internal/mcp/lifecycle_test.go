@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestStagedFilesAndMembershipPreserveAuthorityAndExplicitHistory(t *testing.T) {
@@ -42,7 +42,7 @@ func TestStagedFilesAndMembershipPreserveAuthorityAndExplicitHistory(t *testing.
 		fmt.Fprint(w, `{"conversation_id":"shared","version":2}`)
 	}))
 	defer backend.Close()
-	client := notif.New(backend.URL, "bounded-worker")
+	client := beepgrid.New(backend.URL, "bounded-worker")
 	for _, step := range []struct{ name, input string }{
 		{"stage_attachment", `{"file_name":"brief.txt","media_type":"text/plain","base64":"eA=="}`},
 		{"start_chat", `{"targets":[{"kind":"agent","id":"peer"}],"body":"Review","attachment_ids":["draft"],"idempotency_key":"start-1"}`},
@@ -67,9 +67,9 @@ func TestReplaceRequestPreservesObservedVersionAndStableKey(t *testing.T) {
 		fmt.Fprint(w, `{"previous":{"id":"req_one","state":"superseded"},"replacement":{"id":"req_new","state":"open"}}`)
 	}))
 	defer backend.Close()
-	client := notif.New(backend.URL, "bounded-worker")
+	client := beepgrid.New(backend.URL, "bounded-worker")
 	out, err := call(context.Background(), client, "replace_request", json.RawMessage(`{"id":"req_one","version":7,"body":"Restart after the demo?","idempotency_key":"replace-one"}`))
-	if err != nil || out.(notif.ReplacedRequest).Replacement.ID != "req_new" {
+	if err != nil || out.(beepgrid.ReplacedRequest).Replacement.ID != "req_new" {
 		t.Fatal(out, err)
 	}
 }

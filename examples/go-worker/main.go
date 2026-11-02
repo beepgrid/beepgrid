@@ -8,14 +8,14 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	token := os.Getenv("NOTIF_TOKEN")
-	if file := os.Getenv("NOTIF_TOKEN_FILE"); file != "" {
+	token := os.Getenv("BEEPGRID_TOKEN")
+	if file := os.Getenv("BEEPGRID_TOKEN_FILE"); file != "" {
 		info, err := os.Stat(file)
 		if err != nil {
 			panic(err)
@@ -30,16 +30,16 @@ func main() {
 		token = strings.TrimSpace(string(raw))
 	}
 	if token == "" {
-		panic("set NOTIF_TOKEN_FILE or NOTIF_TOKEN")
+		panic("set BEEPGRID_TOKEN_FILE or BEEPGRID_TOKEN")
 	}
-	c := notif.New(value("NOTIF_URL", "http://localhost:4010"), token)
+	c := beepgrid.New(value("BEEPGRID_URL", "http://localhost:4010"), token)
 	var identity struct {
 		Kind       string      `json:"identity_type"`
-		Agent      notif.Agent `json:"agent"`
+		Agent      beepgrid.Agent `json:"agent"`
 		InstanceID string      `json:"instance_id"`
 	}
-	if agent := strings.TrimSpace(os.Getenv("NOTIF_AGENT_ID")); agent != "" {
-		worker, session, err := c.Enroll(ctx, notif.EnrollInput{Agent: agent, Name: value("NOTIF_AGENT_NAME", "Go worker"), Capabilities: []string{"message"}})
+	if agent := strings.TrimSpace(os.Getenv("BEEPGRID_AGENT_ID")); agent != "" {
+		worker, session, err := c.Enroll(ctx, beepgrid.EnrollInput{Agent: agent, Name: value("BEEPGRID_AGENT_NAME", "Go worker"), Capabilities: []string{"message"}})
 		if err != nil {
 			panic(err)
 		}
@@ -51,12 +51,12 @@ func main() {
 		}
 	}
 	if identity.Kind != "agent" || identity.Agent.ID == "" || identity.InstanceID == "" {
-		panic("without NOTIF_AGENT_ID, supply an existing worker credential for an agent connection")
+		panic("without BEEPGRID_AGENT_ID, supply an existing worker credential for an agent connection")
 	}
 	fmt.Println("Agent:", identity.Agent.ID, "Instance:", identity.InstanceID)
-	err := c.Run(ctx, func(ctx context.Context, d notif.Delivery) error {
+	err := c.Run(ctx, func(ctx context.Context, d beepgrid.Delivery) error {
 		if d.Payload.Type == "message" && d.Payload.Message != nil {
-			_, e := c.Send(ctx, notif.SendInput{ConversationID: d.Payload.Message.ConversationID, Body: "Go worker received: " + d.Payload.Message.Body}, "reply/"+d.ID)
+			_, e := c.Send(ctx, beepgrid.SendInput{ConversationID: d.Payload.Message.ConversationID, Body: "Go worker received: " + d.Payload.Message.Body}, "reply/"+d.ID)
 			return e
 		}
 		return nil

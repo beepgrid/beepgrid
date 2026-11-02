@@ -10,7 +10,7 @@ Node.js 22.13 or later. ESM with TypeScript declarations. No runtime dependencie
 
 ```ts
 import { Client } from '@beepgrid/sdk';
-const client = new Client(process.env.NOTIF_URL!, process.env.NOTIF_TOKEN!);
+const client = new Client(process.env.BEEPGRID_URL!, process.env.BEEPGRID_TOKEN!);
 ```
 
 Use an individually issued credential, supplied by your secret manager or a protected file. Never commit it.
@@ -25,10 +25,10 @@ starter below remains useful for independent jobs.
 Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout after building the package:
 
 ```sh
-export NOTIF_URL="https://your-workspace.example"
-export NOTIF_TOKEN_FILE="/absolute/path/beepgrid-worker-token"
-chmod 600 "$NOTIF_TOKEN_FILE"
-unset NOTIF_AGENT_ID
+export BEEPGRID_URL="https://your-workspace.example"
+export BEEPGRID_TOKEN_FILE="/absolute/path/beepgrid-worker-token"
+chmod 600 "$BEEPGRID_TOKEN_FILE"
+unset BEEPGRID_AGENT_ID
 node examples/typescript-worker/main.mjs
 ```
 
@@ -47,7 +47,7 @@ for await (const event of client.events({ after: savedCursor, signal })) {
 
 Load initial history once and merge by canonical message ID, retaining the server's recent-500 message bound. Establish the cursor/stream before loading the snapshot so messages committed during that read are not lost. Persist the cursor only after applying an event. A connection loss resumes from the last complete frame; revoked credentials terminate with an error. Use `summary: true` only for invalidation consumers. The stream is currently workspace-wide with server-side visibility checks. Normal 25-second stream rotation reconnects automatically. Authentication and permissions are checked again at the server on every read; applications should clear private cached state when their session or permissions change.
 
-`Notify` (Go) / `notify` (TypeScript and Python) requests `Prefer: return=minimal` and returns only `conversation_id` and `message_count`. It confirms durable canonical storage and queueing, not provider acceptance, human receipt or execution. `Send` / `send` keeps its full response by default. Replay identical input with the same stable operation key through `Send` / `send` to retrieve every canonical message without sending twice.
+`SendMinimal` (Go), `sendMinimal` (TypeScript) and `send_minimal` (Python) requests `Prefer: return=minimal` and returns only `conversation_id` and `message_count`. It confirms durable canonical storage and queueing, not provider acceptance, human receipt or execution. `Send` / `send` keeps its full response by default. Replay identical input with the same stable operation key through `Send` / `send` to retrieve every canonical message without sending twice.
 
 `directory("agent", "Reviewer")` returns a bounded authorized page. Continue larger results with `query` and `next_cursor`. `conversation`, `providerCatalog` and `connectionSetup` expose the corresponding existing API journeys.
 
@@ -55,4 +55,4 @@ Load initial history once and merge by canonical message ID, retaining the serve
 
 `startChat` starts explicit shared history with recipients and content plus optional title, choices, approval and `mentions`. Mention offsets count Unicode code points. An emoji counts as one code point; UTF-16 code units are not used. All members receive the original communication. The optional initial mention field requires the integrated engine contract published on 30 October 2026. `stageAttachment` creates a private 24-hour draft. Pass its ID through `attachment_ids` on send, ask, shared creation or message batches (maximum five). `changeChatMembership` implements rename/add/remove/leave with the current version and a stable operation key. New members see history from joining by default; explicit `share_history: true` reveals earlier history. Membership does not grant contact or decision rights. Removal revokes current history/file access. These helpers require the committed schema 32 engine contract.
 
-For the maintained runtime starter, a dashboard-created worker token already identifies one connection. Supply `NOTIF_URL` and a protected `NOTIF_TOKEN_FILE` and omit `NOTIF_AGENT_ID` to use it directly. Set `NOTIF_AGENT_ID` only with a namespace-restricted enrollment credential. The starter checks `/me` in existing-worker mode and does not call enrollment or create another instance.
+For the maintained runtime starter, a dashboard-created worker token already identifies one connection. Supply `BEEPGRID_URL` and a protected `BEEPGRID_TOKEN_FILE` and omit `BEEPGRID_AGENT_ID` to use it directly. Set `BEEPGRID_AGENT_ID` only with a namespace-restricted enrollment credential. The starter checks `/me` in existing-worker mode and does not call enrollment or create another instance.

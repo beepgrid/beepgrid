@@ -13,16 +13,16 @@ from beepgrid import Client
 
 
 def token():
-    file = os.getenv("NOTIF_TOKEN_FILE")
+    file = os.getenv("BEEPGRID_TOKEN_FILE")
     if file:
         path = pathlib.Path(file)
         if path.stat().st_mode & 0o077:
             raise RuntimeError("Credential file must be owner-only (chmod 600)")
         return path.read_text().strip()
-    return os.environ["NOTIF_TOKEN"]
+    return os.environ["BEEPGRID_TOKEN"]
 
 
-owner = Client(os.environ["NOTIF_URL"], token())
+owner = Client(os.environ["BEEPGRID_URL"], token())
 run_id = uuid.uuid4().hex[:12]
 first, first_session = owner.connect("file-demo/" + run_id + "/1", "Reviewer 1")
 second, second_session = owner.connect("file-demo/" + run_id + "/2", "Reviewer 2")

@@ -20,7 +20,7 @@ func TestProviderBatchReusesConnectionsAndPreservesAmbiguity(t *testing.T) {
 	var badSignature atomic.Bool
 	receiver := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
-		if !VerifySignature("local-provider-fixture", r.Header.Get("X-Notif-Timestamp"), r.Header.Get("X-Notif-Signature"), raw, time.Now()) {
+		if !VerifySignature("local-provider-fixture", r.Header.Get("X-Beepgrid-Timestamp"), r.Header.Get("X-Beepgrid-Signature"), raw, time.Now()) {
 			badSignature.Store(true)
 		}
 		index := calls.Add(1)

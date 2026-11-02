@@ -4,7 +4,7 @@ A new workspace app, written independently of the legacy `web/` interface. It us
 
 ## Local development
 
-Run the engine on loopback port 4010 with `NOTIF_PUBLIC_URL=http://127.0.0.1:4040`, then:
+Run the engine on loopback port 4010 with `BEEPGRID_PUBLIC_URL=http://127.0.0.1:4040`, then:
 
 ```sh
 cd workspace

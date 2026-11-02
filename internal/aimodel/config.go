@@ -28,12 +28,12 @@ type Config struct {
 func (c Config) String() string { return "AI configuration (credentials redacted)" }
 
 func FromEnv(get func(string) string) (Config, error) {
-	c := Config{Provider: get("NOTIF_AI_PROVIDER"), Model: get("NOTIF_AI_MODEL"), APIKey: get("NOTIF_AI_API_KEY"), BaseURL: get("NOTIF_AI_BASE_URL"), Options: json.RawMessage(get("NOTIF_AI_OPTIONS")), OutputMode: get("NOTIF_AI_OUTPUT_MODE")}
-	if v := get("NOTIF_AI_ALLOW_PRIVATE"); v != "" {
+	c := Config{Provider: get("BEEPGRID_AI_PROVIDER"), Model: get("BEEPGRID_AI_MODEL"), APIKey: get("BEEPGRID_AI_API_KEY"), BaseURL: get("BEEPGRID_AI_BASE_URL"), Options: json.RawMessage(get("BEEPGRID_AI_OPTIONS")), OutputMode: get("BEEPGRID_AI_OUTPUT_MODE")}
+	if v := get("BEEPGRID_AI_ALLOW_PRIVATE"); v != "" {
 		var err error
 		c.AllowPrivate, err = strconv.ParseBool(v)
 		if err != nil {
-			return Config{}, fmt.Errorf("NOTIF_AI_ALLOW_PRIVATE must be a boolean")
+			return Config{}, fmt.Errorf("BEEPGRID_AI_ALLOW_PRIVATE must be a boolean")
 		}
 	}
 	return c, nil
@@ -52,25 +52,25 @@ type Provider struct {
 // New validates configuration without network I/O or model discovery.
 func New(c Config) (*Provider, error) {
 	if !plain(c.Model, 256) || strings.TrimSpace(c.Model) != c.Model {
-		return nil, fmt.Errorf("NOTIF_AI_MODEL must name an explicitly selected model")
+		return nil, fmt.Errorf("BEEPGRID_AI_MODEL must name an explicitly selected model")
 	}
 	defaults := map[string]string{"openai": "https://api.openai.com/v1", "anthropic": "https://api.anthropic.com/v1", "google": "https://generativelanguage.googleapis.com/v1beta", "openai-compatible": ""}
 	base, ok := defaults[c.Provider]
 	if !ok {
-		return nil, fmt.Errorf("NOTIF_AI_PROVIDER must be openai, anthropic, google or openai-compatible")
+		return nil, fmt.Errorf("BEEPGRID_AI_PROVIDER must be openai, anthropic, google or openai-compatible")
 	}
 	if c.APIKey == "" && c.Provider != "openai-compatible" {
-		return nil, fmt.Errorf("NOTIF_AI_API_KEY is required for this provider")
+		return nil, fmt.Errorf("BEEPGRID_AI_API_KEY is required for this provider")
 	}
 	if c.APIKey != "" && !plain(c.APIKey, 8192) {
-		return nil, fmt.Errorf("NOTIF_AI_API_KEY must be a single-line credential")
+		return nil, fmt.Errorf("BEEPGRID_AI_API_KEY must be a single-line credential")
 	}
 	if c.BaseURL != "" {
 		base = c.BaseURL
 	}
 	u, err := url.Parse(base)
 	if err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, fmt.Errorf("NOTIF_AI_BASE_URL must be an HTTP(S) base URL without credentials, query or fragment")
+		return nil, fmt.Errorf("BEEPGRID_AI_BASE_URL must be an HTTP(S) base URL without credentials, query or fragment")
 	}
 	if c.OutputMode == "" {
 		c.OutputMode = "schema"
@@ -79,7 +79,7 @@ func New(c Config) (*Provider, error) {
 		}
 	}
 	if c.OutputMode != "schema" && c.OutputMode != "json" && c.OutputMode != "text" {
-		return nil, fmt.Errorf("NOTIF_AI_OUTPUT_MODE must be schema, json or text")
+		return nil, fmt.Errorf("BEEPGRID_AI_OUTPUT_MODE must be schema, json or text")
 	}
 	if c.Provider == "anthropic" && c.OutputMode == "json" {
 		return nil, fmt.Errorf("Anthropic output mode must be schema or text")
@@ -87,16 +87,16 @@ func New(c Config) (*Provider, error) {
 	options := map[string]any{}
 	if len(c.Options) != 0 {
 		if len(c.Options) > 8192 {
-			return nil, fmt.Errorf("NOTIF_AI_OPTIONS exceeds 8 KiB")
+			return nil, fmt.Errorf("BEEPGRID_AI_OPTIONS exceeds 8 KiB")
 		}
 		v, e := decode(c.Options)
 		if e != nil {
-			return nil, fmt.Errorf("NOTIF_AI_OPTIONS must be one JSON object without duplicate keys")
+			return nil, fmt.Errorf("BEEPGRID_AI_OPTIONS must be one JSON object without duplicate keys")
 		}
 		var object bool
 		options, object = v.(map[string]any)
 		if !object {
-			return nil, fmt.Errorf("NOTIF_AI_OPTIONS must be a JSON object")
+			return nil, fmt.Errorf("BEEPGRID_AI_OPTIONS must be a JSON object")
 		}
 	}
 	allowed := map[string]string{
@@ -107,14 +107,14 @@ func New(c Config) (*Provider, error) {
 	}
 	for k, v := range options {
 		if !slices.Contains(strings.Fields(allowed[c.Provider]), k) {
-			return nil, fmt.Errorf("NOTIF_AI_OPTIONS contains an unsupported or reserved setting")
+			return nil, fmt.Errorf("BEEPGRID_AI_OPTIONS contains an unsupported or reserved setting")
 		}
 		// These API objects also contain protected formatting fields. Only the
 		// generation controls below may be merged with our engine-owned schema.
 		if k == "text" || k == "output_config" || k == "reasoning" || k == "thinking" || k == "thinkingConfig" {
 			nested, ok := v.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("NOTIF_AI_OPTIONS contains an invalid generation object")
+				return nil, fmt.Errorf("BEEPGRID_AI_OPTIONS contains an invalid generation object")
 			}
 			keys := map[string]string{"text": "verbosity", "output_config": "effort", "reasoning": "effort summary enabled max_tokens", "thinking": "type budget_tokens", "thinkingConfig": "thinkingBudget thinkingLevel includeThoughts"}
 			if c.Provider == "openai" {
@@ -122,7 +122,7 @@ func New(c Config) (*Provider, error) {
 			}
 			for name := range nested {
 				if !slices.Contains(strings.Fields(keys[k]), name) {
-					return nil, fmt.Errorf("NOTIF_AI_OPTIONS attempts to override a protected generation field")
+					return nil, fmt.Errorf("BEEPGRID_AI_OPTIONS attempts to override a protected generation field")
 				}
 			}
 		}

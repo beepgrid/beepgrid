@@ -13,7 +13,7 @@ docker compose up -d --wait
 bash scripts/verify.sh
 ```
 
-The suite defaults to PostgreSQL on localhost:5499. To use another disposable database, set `NOTIF_TEST_DATABASE_URL`. Tests create isolated schemas and remove them afterward. Never point a qualification script at production data. Run database restart drills separately from other suites.
+The suite defaults to PostgreSQL on localhost:5499. To use another disposable database, set `BEEPGRID_TEST_DATABASE_URL`. Tests create isolated schemas and remove them afterward. Never point a qualification script at production data. Run database restart drills separately from other suites.
 
 The full suite checks race behavior in workspace and headless builds, real HTTP SDK flows, executable documentation, dependency advisories and packaging. For clean package consumers, also run `python3 scripts/sdk-package-check.py`. This packs local artifacts and installs them into temporary consumers; it does not publish them.
 

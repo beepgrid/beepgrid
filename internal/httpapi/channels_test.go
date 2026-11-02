@@ -44,10 +44,10 @@ func TestIncomingWebhookHasFixedIdentityAndDeduplicates(t *testing.T) {
 	send := func(raw []byte, sign bool) int {
 		req, _ := http.NewRequest("POST", server.URL+"/integrations/webhook/"+c.ID, bytes.NewReader(raw))
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
-		req.Header.Set("X-Notif-Timestamp", ts)
-		req.Header.Set("X-Notif-Event-ID", "invoice-1")
+		req.Header.Set("X-Beepgrid-Timestamp", ts)
+		req.Header.Set("X-Beepgrid-Event-ID", "invoice-1")
 		if sign {
-			req.Header.Set("X-Notif-Signature", engine.Signature(secret, ts, raw))
+			req.Header.Set("X-Beepgrid-Signature", engine.Signature(secret, ts, raw))
 		}
 		res, e := http.DefaultClient.Do(req)
 		if e != nil {
@@ -113,7 +113,7 @@ func TestSlackCallbacksVerifyPersonPolicyAndReplay(t *testing.T) {
 		t.Fatal(e)
 	}
 	callback := func(user, signature string) int {
-		payload := map[string]any{"user": map[string]string{"id": user}, "team": map[string]string{"id": "T1"}, "actions": []any{map[string]string{"action_id": "notif_approve", "value": string(engine.JSON(map[string]any{"request_id": q.ID, "version": q.Version}))}}}
+		payload := map[string]any{"user": map[string]string{"id": user}, "team": map[string]string{"id": "T1"}, "actions": []any{map[string]string{"action_id": "beepgrid_approve", "value": string(engine.JSON(map[string]any{"request_id": q.ID, "version": q.Version}))}}}
 		raw := []byte(url.Values{"payload": []string{string(engine.JSON(payload))}}.Encode())
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
 		h := hmac.New(sha256.New, []byte(secret))

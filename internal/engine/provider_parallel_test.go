@@ -19,7 +19,7 @@ func TestProviderLanesAcrossReplicasPreserveOrderAndExactAttempts(t *testing.T) 
 	s.AllowLocal = true
 	ctx := context.Background()
 	schema := strings.TrimSuffix(s.Pool.Config().ConnConfig.RuntimeParams["search_path"], ",public")
-	replica, err := OpenExisting(ctx, os.Getenv("NOTIF_TEST_DATABASE_URL"), schema, s.SecretKey)
+	replica, err := OpenExisting(ctx, os.Getenv("BEEPGRID_TEST_DATABASE_URL"), schema, s.SecretKey)
 	if err != nil {
 		t.Fatal(err)
 	}

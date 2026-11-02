@@ -64,11 +64,11 @@ func TestRetireMatchingUpgradeReleasesOnlyHeldAlerts(t *testing.T) {
 		t.Fatal(err)
 	}
 	schema := strings.Split(s.Pool.Config().ConnConfig.RuntimeParams["search_path"], ",")[0]
-	if err = Migrate(ctx, os.Getenv("NOTIF_TEST_DATABASE_URL"), schema); err != nil {
+	if err = Migrate(ctx, os.Getenv("BEEPGRID_TEST_DATABASE_URL"), schema); err != nil {
 		t.Fatal(err)
 	}
 	// Reapplying migration is safe; the ordinary request and publication survive.
-	if err = Migrate(ctx, os.Getenv("NOTIF_TEST_DATABASE_URL"), schema); err != nil {
+	if err = Migrate(ctx, os.Getenv("BEEPGRID_TEST_DATABASE_URL"), schema); err != nil {
 		t.Fatal(err)
 	}
 	var retired int

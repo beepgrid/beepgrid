@@ -36,9 +36,9 @@
     "recovery": "Acceptance is durable storage, not external delivery or business execution. Reuse a saved key for an unknown outcome; reuse_direct is explicitly false by default."
   },
   {
-    "python": "notify",
-    "go": "Notify",
-    "typescript": "notify",
+    "python": "send_minimal",
+    "go": "SendMinimal",
+    "typescript": "sendMinimal",
     "family": "messages",
     "purpose": "Send the same durable message with a compact acceptance receipt.",
     "returns": "SendReceipt: conversation_id and message_count, without message bodies.",

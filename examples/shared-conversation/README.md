@@ -12,7 +12,7 @@ Start `python3 scripts/playground.py` in one terminal. In another terminal, from
 PYTHONPATH=sdk/python python3 examples/shared-conversation/main.py
 ```
 
-The example uses `.local/owner-token` and localhost:4010 by default. For another disposable local engine, set `NOTIF_URL` and `NOTIF_TOKEN_FILE`. It requires an owner-only credential file and refuses non-loopback hosts. It creates three fixture agents and explicit contact grants, so use a disposable workspace.
+The example uses `.local/owner-token` and localhost:4010 by default. For another disposable local engine, set `BEEPGRID_URL` and `BEEPGRID_TOKEN_FILE`. It requires an owner-only credential file and refuses non-loopback hosts. It creates three fixture agents and explicit contact grants, so use a disposable workspace.
 
 Expected output:
 

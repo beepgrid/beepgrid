@@ -20,13 +20,13 @@ func (s *Server) incomingWebhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, engine.Missing())
 		return
 	}
-	if !engine.VerifySignature(c.Secret, r.Header.Get("X-Notif-Timestamp"), r.Header.Get("X-Notif-Signature"), raw, time.Now()) {
+	if !engine.VerifySignature(c.Secret, r.Header.Get("X-Beepgrid-Timestamp"), r.Header.Get("X-Beepgrid-Signature"), raw, time.Now()) {
 		writeError(w, engine.Denied())
 		return
 	}
-	eventID := r.Header.Get("X-Notif-Event-ID")
+	eventID := r.Header.Get("X-Beepgrid-Event-ID")
 	if !engine.ValidText(eventID, 160) {
-		writeError(w, engine.Bad("X-Notif-Event-ID is required."))
+		writeError(w, engine.Bad("X-Beepgrid-Event-ID is required."))
 		return
 	}
 	sender, e := s.Store.WebhookActor(r.Context(), scope, c.ID, c.Config["inbound_sender_id"])

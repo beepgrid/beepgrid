@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"io"
 	"net"
 	"net/http"
@@ -127,7 +127,7 @@ func TestSlowEventReaderHasBoundedWriteAndDoesNotBlockOtherRequests(t *testing.T
 	}
 	fmt.Fprintf(conn, "GET /api/v1/events?stream=1 HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nConnection: close\r\n\r\n", server.Listener.Addr(), c.Token)
 	// A second authenticated request must remain available while this peer never reads.
-	other := notif.New(server.URL, c.Token)
+	other := beepgrid.New(server.URL, c.Token)
 	var me any
 	if e = other.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
 		t.Fatal(e)
@@ -175,7 +175,7 @@ func TestBrowserConversationStreamResumesHeaderAndProjectsCanonicalBody(t *testi
 	if e != nil {
 		t.Fatal(e)
 	}
-	_, session, e := c.Enroll(ctx, notif.EnrollInput{Agent: "stream/selected", Name: "Stream worker"})
+	_, session, e := c.Enroll(ctx, beepgrid.EnrollInput{Agent: "stream/selected", Name: "Stream worker"})
 	if e != nil {
 		t.Fatal(e)
 	}

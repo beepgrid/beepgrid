@@ -38,7 +38,7 @@ func TestOrdinaryBrowserCanLogoutDuringSuspension(t *testing.T) {
 		t.Fatal("suspension allowed normal authentication")
 	}
 	req, _ := http.NewRequest("POST", server.URL+"/api/v1/auth/logout", strings.NewReader("{}"))
-	req.AddCookie(&http.Cookie{Name: "notif_session", Value: token})
+	req.AddCookie(&http.Cookie{Name: "beepgrid_session", Value: token})
 	resp, err := server.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +52,7 @@ func TestOrdinaryBrowserCanLogoutDuringSuspension(t *testing.T) {
 	}
 	cleared := false
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "notif_session" && cookie.MaxAge < 0 {
+		if cookie.Name == "beepgrid_session" && cookie.MaxAge < 0 {
 			cleared = true
 		}
 	}

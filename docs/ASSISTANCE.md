@@ -9,9 +9,9 @@ Configure a built-in model adapter or keep your own HTTP model gateway. No provi
 Set these server environment variables, then enable the desired features in Settings:
 
 ```sh
-export NOTIF_AI_PROVIDER=anthropic
-export NOTIF_AI_MODEL=YOUR_EXPLICIT_MODEL_ID
-export NOTIF_AI_API_KEY=YOUR_PROVIDER_CREDENTIAL
+export BEEPGRID_AI_PROVIDER=anthropic
+export BEEPGRID_AI_MODEL=YOUR_EXPLICIT_MODEL_ID
+export BEEPGRID_AI_API_KEY=YOUR_PROVIDER_CREDENTIAL
 ```
 
 These are illustrative placeholders. Supply secrets through your environment or secret manager, never a tracked file or browser bundle. No API keys are discovered from other provider variables. Neither model discovery nor a model request runs at startup. An incomplete configuration fails startup instead of selecting a model for you. Coordinator remains off until an authorized person enables it.
@@ -21,17 +21,17 @@ These are illustrative placeholders. Supply secrets through your environment or 
 | `openai` | Responses / `https://api.openai.com/v1` | `schema` |
 | `anthropic` | Messages / `https://api.anthropic.com/v1` | `schema` |
 | `google` | GenerateContent / `https://generativelanguage.googleapis.com/v1beta` | `schema` |
-| `openai-compatible` | Chat Completions / explicit `NOTIF_AI_BASE_URL` required | `json` |
+| `openai-compatible` | Chat Completions / explicit `BEEPGRID_AI_BASE_URL` required | `json` |
 
-`NOTIF_AI_BASE_URL` is a base URL including the API version path, not the final operation URL. For example, a compatible endpoint at `http://127.0.0.1:11434/v1` receives POST requests at `/v1/chat/completions`. Specify your installed model's ID and set `NOTIF_AI_ALLOW_PRIVATE=true` to use an HTTP or private-network inference endpoint in production. This opt-in applies only to the configured AI endpoint; channel and legacy gateway address restrictions remain unchanged. Use HTTPS when sending credentials over a network. TLS certificate verification, connection-time DNS validation/pinning and redirect rejection remain enforced. Google model names may optionally start with `models/`.
+`BEEPGRID_AI_BASE_URL` is a base URL including the API version path, not the final operation URL. For example, a compatible endpoint at `http://127.0.0.1:11434/v1` receives POST requests at `/v1/chat/completions`. Specify your installed model's ID and set `BEEPGRID_AI_ALLOW_PRIVATE=true` to use an HTTP or private-network inference endpoint in production. This opt-in applies only to the configured AI endpoint; channel and legacy gateway address restrictions remain unchanged. Use HTTPS when sending credentials over a network. TLS certificate verification, connection-time DNS validation/pinning and redirect rejection remain enforced. Google model names may optionally start with `models/`.
 
 One model configuration serves Coordinator planning and reply summarization. It adds no required runtime, database or proxy service. Native APIs use provider-specific authentication headers; Google credentials never appear in query strings. OpenAI response storage and background execution are disabled. The adapters never send tools, hosted-agent definitions or previous conversation references.
 
 Applications embedding the public Go runtime set `runtime.Config.AI` with `runtime.AIConfig`. The optional `runtime.AIConfigFromEnv(os.Getenv)` helper reads exactly the same variables as the standalone binary. A library never reads environment variables implicitly. Models and workspace feature toggles remain explicit, and every tenant retains separate authorization and saved-plan visibility even when sharing a provider.
 
-`NOTIF_AI_OUTPUT_MODE` explicitly selects `schema`, `json` or `text`. Schema mode requests native structured output. JSON mode requests JSON-object output from OpenAI/compatible endpoints or JSON MIME output from Google. Anthropic supports `schema` or `text`. Text mode supplies the schema in the prompt for models without native structured output. Every mode enforces the same local schema, byte bounds and engine authorization checks; there is no silent mode change, JSON repair or cross-provider failover. Unsupported model/API settings produce a failed assistance call, leaving the normal delivery and human response paths available. Valid JSON alone is not proof of a correct interpretation.
+`BEEPGRID_AI_OUTPUT_MODE` explicitly selects `schema`, `json` or `text`. Schema mode requests native structured output. JSON mode requests JSON-object output from OpenAI/compatible endpoints or JSON MIME output from Google. Anthropic supports `schema` or `text`. Text mode supplies the schema in the prompt for models without native structured output. Every mode enforces the same local schema, byte bounds and engine authorization checks; there is no silent mode change, JSON repair or cross-provider failover. Unsupported model/API settings produce a failed assistance call, leaving the normal delivery and human response paths available. Valid JSON alone is not proof of a correct interpretation.
 
-Use `NOTIF_AI_OPTIONS` for a JSON object of provider generation settings. They are passed unchanged, except for engine-owned formatting, model selection and context fields. Unknown or protected settings fail configuration rather than being silently discarded.
+Use `BEEPGRID_AI_OPTIONS` for a JSON object of provider generation settings. They are passed unchanged, except for engine-owned formatting, model selection and context fields. Unknown or protected settings fail configuration rather than being silently discarded.
 
 | Provider | Supported settings |
 | --- | --- |
@@ -40,13 +40,13 @@ Use `NOTIF_AI_OPTIONS` for a JSON object of provider generation settings. They a
 | Google | `maxOutputTokens`, `temperature`, `topP`, `topK`, `seed`, `thinkingConfig` (`thinkingBudget`, `thinkingLevel`, `includeThoughts`), `stopSequences` |
 | Compatible | `max_tokens`, `max_completion_tokens`, `temperature`, `top_p`, `top_k`, `min_p`, `seed`, `frequency_penalty`, `presence_penalty`, `reasoning_effort`, `reasoning` (`effort`, `summary`, `enabled`, `max_tokens`), `thinking` (`type`, `budget_tokens`), `repeat_penalty`, `stop` |
 
-For example, `NOTIF_AI_OPTIONS='{"reasoning":{"effort":"high"},"max_output_tokens":8192}'` configures an OpenAI model that supports those settings. Token limits default to 4096 and can be set between 1 and 65536. API/model capability varies; setting a supported configuration field does not guarantee every model accepts it. Thinking budgets must fit within the existing call deadlines. The options object is limited to 8 KiB. Network envelopes are limited to 256 KiB, while the actual model result remains limited to 32 KiB. Truncation, refusal, unexpected tool content, duplicate JSON keys, missing/extra output fields and ambiguous multi-candidate responses fail closed. Provider body/error text and credentials are excluded from diagnostics. Each adapter call performs one request without application retries.
+For example, `BEEPGRID_AI_OPTIONS='{"reasoning":{"effort":"high"},"max_output_tokens":8192}'` configures an OpenAI model that supports those settings. Token limits default to 4096 and can be set between 1 and 65536. API/model capability varies; setting a supported configuration field does not guarantee every model accepts it. Thinking budgets must fit within the existing call deadlines. The options object is limited to 8 KiB. Network envelopes are limited to 256 KiB, while the actual model result remains limited to 32 KiB. Truncation, refusal, unexpected tool content, duplicate JSON keys, missing/extra output fields and ambiguous multi-candidate responses fail closed. Provider body/error text and credentials are excluded from diagnostics. Each adapter call performs one request without application retries.
 
 The implementation uses Go's HTTP/JSON stack behind the existing bounded assistance interface. Vercel AI SDK provides this pattern for TypeScript, but would require a JavaScript service here. The native adapters keep the existing Go deployment and avoid an additional dependency/runtime. Protocol references: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Anthropic structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), [Google GenerateContent](https://ai.google.dev/api/generate-content), [Google structured output](https://ai.google.dev/gemini-api/docs/structured-output), [DeepSeek JSON mode](https://api-docs.deepseek.com/guides/json_mode/), [Vercel AI SDK](https://ai-sdk.dev/docs/introduction).
 
 ## Existing custom gateways
 
-Use `NOTIF_OVERSEER_URL` / `NOTIF_OVERSEER_TOKEN` for an explicitly configured custom HTTP gateway. It overrides the built-in model for Coordinator planning and summarization. Gateway-only installations do not need `NOTIF_AI_*` variables. Native API credentials and gateway tokens remain separate. Engine credentials are never sent to the gateway. Production gateways use public-address validation, pinned dialing, HTTPS and redirect restrictions. Loopback development gateways require `serve --dev`.
+Use `BEEPGRID_OVERSEER_URL` / `BEEPGRID_OVERSEER_TOKEN` for an explicitly configured custom HTTP gateway. It overrides the built-in model for Coordinator planning and summarization. Gateway-only installations do not need `BEEPGRID_AI_*` variables. Native API credentials and gateway tokens remain separate. Engine credentials are never sent to the gateway. Production gateways use public-address validation, pinned dialing, HTTPS and redirect restrictions. Loopback development gateways require `serve --dev`.
 
 The gateway accepts JSON POST requests and returns JSON with HTTP 200. Model I/O runs outside the workspace transaction. Context and output are bounded to 32 KiB, with at most two active calls, one call per person per second and 1000 calls per adapter per hour. Coordinator planning and summarization have 30-second deadlines. Failures never turn into authorization or fabricated success.
 

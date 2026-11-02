@@ -50,7 +50,7 @@ func notifyWork(ctx context.Context, db DB, scope, recipient string) error {
 	if recipient == "" {
 		return nil
 	}
-	_, e := db.Exec(ctx, `SELECT pg_notify('notif_work',$1)`, string(JSON([]string{scope, recipient})))
+	_, e := db.Exec(ctx, `SELECT pg_notify('beepgrid_work',$1)`, string(JSON([]string{scope, recipient})))
 	return e
 }
 func (s *Store) WatchWork(a Actor) (<-chan struct{}, func()) {
@@ -81,7 +81,7 @@ func (s *Store) startWakeups() {
 		for ctx.Err() == nil {
 			conn, e := pgx.ConnectConfig(ctx, config)
 			if e == nil {
-				_, e = conn.Exec(ctx, `LISTEN notif_work; LISTEN notif_events; LISTEN notif_provider`)
+				_, e = conn.Exec(ctx, `LISTEN beepgrid_work; LISTEN beepgrid_events; LISTEN beepgrid_provider`)
 			}
 			if e == nil {
 				for ctx.Err() == nil {
@@ -89,11 +89,11 @@ func (s *Store) startWakeups() {
 					if err != nil {
 						break
 					}
-					if message.Channel == "notif_events" {
+					if message.Channel == "beepgrid_events" {
 						s.eventWakes.signal(message.Payload)
 						continue
 					}
-					if message.Channel == "notif_provider" {
+					if message.Channel == "beepgrid_provider" {
 						s.providerWakes.signal("")
 						continue
 					}

@@ -3,14 +3,14 @@
 This opt-in harness starts its own engine on ports 4014/4015 and creates/drops a generated database. It never uses an existing workspace. Run it with a PostgreSQL role allowed to create databases. Keep both ports free. The maximum is 25 independent authenticated worker processes, including replacements. These are deterministic SDK workers, not language-model inference jobs.
 
 ```sh
-go build -buildvcs=false -o .local/notif ./cmd/notif
-go build -buildvcs=false -o .local/notif-loadtest ./tools/loadtest
-NOTIF_TEST_DATABASE_URL=postgres://notif:notif@localhost:5499/notif?sslmode=disable \
-  .local/notif-loadtest --server .local/notif --agents 25 --rounds 8 \
+go build -buildvcs=false -o .local/beepgrid ./cmd/beepgrid
+go build -buildvcs=false -o .local/beepgrid-loadtest ./tools/loadtest
+BEEPGRID_TEST_DATABASE_URL=postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable \
+  .local/beepgrid-loadtest --server .local/beepgrid --agents 25 --rounds 8 \
   --payload 8192 --backlog 5000 --out .local/load-history
 ```
 
-Use a dedicated local PostgreSQL container for resource comparisons. Set `NOTIF_BENCHMARK_POSTGRES_CONTAINER` to its name so cgroup readings describe that container. Its counters include PostgreSQL background work and two short cgroup-reading commands. Unisolated readings from the default playground container are diagnostic only. Preserve durable database defaults.
+Use a dedicated local PostgreSQL container for resource comparisons. Set `BEEPGRID_BENCHMARK_POSTGRES_CONTAINER` to its name so cgroup readings describe that container. Its counters include PostgreSQL background work and two short cgroup-reading commands. Unisolated readings from the default playground container are diagnostic only. Preserve durable database defaults.
 
 Useful cases:
 

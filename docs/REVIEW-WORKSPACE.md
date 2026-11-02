@@ -8,17 +8,17 @@ From the repository root:
 
 ```sh
 docker compose up -d --wait postgres
-go build -buildvcs=false -trimpath -o .local/notif-product ./cmd/notif
+go build -buildvcs=false -trimpath -o .local/beepgrid-product ./cmd/beepgrid
 mkdir -p .local/product-review
 ```
 
 Run the engine from `.local/product-review` in its own terminal:
 
 ```sh
-NOTIF_SCHEMA=product_review_20261030 NOTIF_WORKSPACE=product-review \
-NOTIF_ENVIRONMENT=review NOTIF_COMPANY='Beepgrid Lab' \
-NOTIF_ADDR=127.0.0.1:4010 NOTIF_PUBLIC_URL=http://127.0.0.1:4040 \
-../notif-product serve --dev
+BEEPGRID_SCHEMA=product_review_20261030 BEEPGRID_WORKSPACE=product-review \
+BEEPGRID_ENVIRONMENT=review BEEPGRID_COMPANY='Beepgrid Lab' \
+BEEPGRID_ADDR=127.0.0.1:4010 BEEPGRID_PUBLIC_URL=http://127.0.0.1:4040 \
+../beepgrid-product serve --dev
 ```
 
 From the repository root, populate and run the controlled workers:

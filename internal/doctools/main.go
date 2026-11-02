@@ -15,7 +15,7 @@ import (
 
 func main() {
 	fs := token.NewFileSet()
-	packages, err := parser.ParseDir(fs, "sdk/go/notif", func(i os.FileInfo) bool { return !strings.HasSuffix(i.Name(), "_test.go") }, parser.ParseComments)
+	packages, err := parser.ParseDir(fs, "sdk/go", func(i os.FileInfo) bool { return !strings.HasSuffix(i.Name(), "_test.go") }, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}

@@ -36,7 +36,7 @@ for package in ["typescript", "react"]:
     assert not any("node_modules" in name or name.endswith(".test.tsx") for name in names)
     artifacts.append(output / details["filename"])
 
-python = os.environ.get("NOTIF_PACKAGE_PYTHON", sys.executable)
+python = os.environ.get("BEEPGRID_PACKAGE_PYTHON", sys.executable)
 with tempfile.TemporaryDirectory(prefix="beepgrid-sdk-consumer-") as directory:
     scratch = pathlib.Path(directory)
     node = scratch / "node"
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix="beepgrid-sdk-consumer-") as directory:
     run(["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund", *artifacts, "react@19.3.1", "react-dom@19.3.1", "@types/react@19", "@types/react-dom@19"], cwd=node)
     (node / "consumer.mjs").write_text('''import assert from 'node:assert/strict';
 import { Client } from '@beepgrid/sdk';
-import { browserClient, NotifRequest, NotifConversation } from '@beepgrid/react';
+import { browserClient, BeepgridRequest, BeepgridConversation } from '@beepgrid/react';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 assert.equal(typeof new Client('http://localhost','fixture').uploadAttachment,'function');
@@ -56,12 +56,12 @@ assert.equal(typeof new Client('http://localhost','fixture').rotateCredential,'f
 assert.equal(typeof new Client('http://localhost','fixture').renewCredential,'function');
 assert.equal(typeof browserClient('http://localhost').events,'function');
 assert.match(import.meta.resolve('@beepgrid/react/styles.css'),/styles.css$/);
-assert.equal(typeof NotifConversation,'function');
-assert.ok(renderToString(createElement(NotifRequest,{client:new Client('http://localhost',''),id:'request-fixture'})).length>0);
+assert.equal(typeof BeepgridConversation,'function');
+assert.ok(renderToString(createElement(BeepgridRequest,{client:new Client('http://localhost',''),id:'request-fixture'})).length>0);
 ''')
     run(["node", "consumer.mjs"], cwd=node)
     (node / "consumer.ts").write_text('''import { Client, type Attachment, type EventOptions, type StartChatInput, type ChatMembershipInput, type ChatMembershipResult } from '@beepgrid/sdk';
-import { NotifRequest } from '@beepgrid/react';
+import { BeepgridRequest } from '@beepgrid/react';
 const client = new Client('http://localhost','fixture');
 const upload: Promise<Attachment> = client.uploadAttachment('c',new Blob(['x']),'brief.txt');
 const events: EventOptions = { after: 1 };
@@ -74,7 +74,7 @@ const followup: Promise<import('@beepgrid/sdk').RequestItem> = client.ask({conve
 const keys: Promise<import('@beepgrid/sdk').Credential[]> = client.credentials();
 const replacement: Promise<import('@beepgrid/sdk').CredentialReplacement> = client.rotateCredential('key',1,300);
 const renewal: Promise<import('@beepgrid/sdk').Credential> = client.renewCredential();
-void [upload, draft, changed, replaced, followup, keys, replacement, renewal, events, shared, NotifRequest];
+void [upload, draft, changed, replaced, followup, keys, replacement, renewal, events, shared, BeepgridRequest];
 ''')
     run([root/"sdk/typescript/node_modules/.bin/tsc", "--noEmit", "--strict", "--module", "nodenext", "--target", "es2022", "consumer.ts"], cwd=node)
     wheel_stage = scratch / "python-source"
@@ -96,7 +96,7 @@ void [upload, draft, changed, replaced, followup, keys, replacement, renewal, ev
     shutil.copy2(candidates[0], wheel)
     with zipfile.ZipFile(wheel) as archive:
         names = set(archive.namelist())
-        assert "beepgrid/events.py" in names and "notif/events.py" in names and any(name.endswith("/licenses/LICENSE") for name in names)
+        assert "beepgrid/events.py" in names and "beepgrid/runtime.py" in names and any(name.endswith("/licenses/LICENSE") for name in names)
     artifacts.append(wheel)
     venv = scratch / "venv"
     run([python, "-m", "venv", venv])
@@ -107,12 +107,14 @@ void [upload, draft, changed, replaced, followup, keys, replacement, renewal, ev
     go.mkdir()
     (go / "go.mod").write_text('module example.com/beepgrid-consumer\n\ngo 1.26.0\n\nrequire github.com/beepgrid/beepgrid/sdk/go v0.0.0\nreplace github.com/beepgrid/beepgrid/sdk/go => ' + json.dumps(str(root / "sdk/go")) + '\n')
     (go / "main.go").write_text('''package main
-import "github.com/beepgrid/beepgrid/sdk/go/notif"
-func main(){c:=notif.New("http://localhost","fixture");_ = c.UploadAttachment;_ = c.StageAttachment;_ = c.ChangeChatMembership;_ = c.RotateCredential;_ = c.RenewCredential;_ = notif.CredentialEdit{Version:1,ClearPermissions:true};_ = notif.ChatMembershipInput{Operation:"add",Version:1,Members:[]string{"peer"}};_ = c.StreamEvents;_ = c.Directory;_ = c.Cancel;_ = c.StartChat;_ = notif.StartChatInput{AttachmentIDs:[]string{"draft"},Mentions:[]notif.Mention{{PrincipalID:"a",Start:2,End:13}}}}
+import "github.com/beepgrid/beepgrid/sdk/go"
+func main(){c:=beepgrid.New("http://localhost","fixture");_ = c.UploadAttachment;_ = c.StageAttachment;_ = c.ChangeChatMembership;_ = c.RotateCredential;_ = c.RenewCredential;_ = beepgrid.CredentialEdit{Version:1,ClearPermissions:true};_ = beepgrid.ChatMembershipInput{Operation:"add",Version:1,Members:[]string{"peer"}};_ = c.StreamEvents;_ = c.Directory;_ = c.Cancel;_ = c.StartChat;_ = beepgrid.StartChatInput{AttachmentIDs:[]string{"draft"},Mentions:[]beepgrid.Mention{{PrincipalID:"a",Start:2,End:13}}}}
 ''')
     run(["go", "run", "-buildvcs=false", "."], cwd=go)
 
-git = os.environ.get("NOTIF_GIT", "git")
+run([sys.executable, root / "scripts/branding-check.py", *artifacts])
+
+git = os.environ.get("BEEPGRID_GIT", "git")
 commit = run([git, "rev-parse", "HEAD"], capture_output=True).stdout.strip()
 dirty = bool(run([git, "status", "--porcelain"], capture_output=True).stdout.strip())
 manifest = {"source_commit":commit,"source_dirty":dirty,"published":False,"namespaces":"Beepgrid public package names","artifacts":[{"file":path.name,"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"bytes":path.stat().st_size} for path in artifacts],"verified_consumers":["Python source distribution rebuild","Node ESM","TypeScript declarations","React SSR and stylesheet export","Python wheel in clean venv","Go external module with local replace"],"limitations":["Local artifact qualification only; publication and registry installs are verified separately"]}

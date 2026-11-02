@@ -1,5 +1,5 @@
 import { readEvents, type EventOptions } from "./events.js";
-export { type NotifEvent, type EventOptions } from "./events.js";
+export { type BeepgridEvent, type EventOptions } from "./events.js";
 export type Target = {
   kind: "person" | "agent" | "service" | "group" | "instance";
   id: string;
@@ -179,14 +179,14 @@ export type OverseerPlan = {
 export type ChannelPolicy = { mode: "preferred" | "all"; destinations: string[]; followup_seconds: number };
 export type ChannelOverride = { source: { kind: "agent" | "group"; id: string }; policy: ChannelPolicy };
 export type DeliveryPreferences = { person_id: string; version: number; default: ChannelPolicy | null; overrides: ChannelOverride[] };
-export class NotifError extends Error {
+export class BeepgridError extends Error {
   constructor(
     public readonly code: string,
     message: string,
     public readonly status: number,
   ) {
     super(message);
-    this.name = "NotifError";
+    this.name = "BeepgridError";
   }
 }
 export type QueryInput = {collection: string; search?: string; filters?: Record<string,string>; limit?: number; cursor?: string};
@@ -270,7 +270,7 @@ export class Client {
         continue;
       }
       if (!response.ok)
-        throw new NotifError(
+        throw new BeepgridError(
           value.error?.code ?? "HTTP_ERROR",
           value.error?.message ?? `HTTP ${response.status}`,
           response.status,
@@ -304,12 +304,12 @@ export class Client {
     if (!file.size || file.size>5*1024*1024) throw new Error("Attachments must be between 1 byte and 5 MiB");
     const form=new FormData(); form.append("file",file,name);
     const response=await this.transport(`${this.baseURL}${path}`,{method:"POST",headers:{Authorization:`Bearer ${this.token}`},body:form,signal:signal??AbortSignal.timeout(20000),redirect:"error"});
-    const value=await response.json(); if(!response.ok) throw new NotifError(value.error?.code??"HTTP_ERROR",value.error?.message??"Attachment upload rejected",response.status);
+    const value=await response.json(); if(!response.ok) throw new BeepgridError(value.error?.code??"HTTP_ERROR",value.error?.message??"Attachment upload rejected",response.status);
     return value as Attachment;
   }
   async downloadAttachment(id:string,signal?:AbortSignal):Promise<Blob> {
     const response=await this.transport(`${this.baseURL}/api/v1/attachments/${encodeURIComponent(id)}`,{headers:{Authorization:`Bearer ${this.token}`},signal:signal??AbortSignal.timeout(20000),redirect:"error"});
-    if(!response.ok) { let value:any;try{value=await response.json();}catch{} throw new NotifError(value?.error?.code??"HTTP_ERROR",value?.error?.message??"Attachment download rejected",response.status); }
+    if(!response.ok) { let value:any;try{value=await response.json();}catch{} throw new BeepgridError(value?.error?.code??"HTTP_ERROR",value?.error?.message??"Attachment download rejected",response.status); }
     if (Number(response.headers.get("Content-Length"))>5*1024*1024) { await response.body?.cancel();throw new Error("Attachment exceeds 5 MiB"); }
     const reader=response.body?.getReader();const chunks:Uint8Array<ArrayBuffer>[]=[];let size=0;
     if(reader) try {for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>5*1024*1024)throw new Error("Attachment exceeds 5 MiB");chunks.push(new Uint8Array(value));}}finally{await reader.cancel();reader.releaseLock();}
@@ -348,7 +348,7 @@ export class Client {
   }
   // Confirms durable acceptance only, never provider delivery or execution.
   // send(input, sameKey) can recover the complete canonical receipt later.
-  notify(input: SendInput, key: string = crypto.randomUUID()) {
+  sendMinimal(input: SendInput, key: string = crypto.randomUUID()) {
     return this.call<{ conversation_id: string; message_count: number }>(
       "POST",
       "/api/v1/messages",
@@ -502,7 +502,7 @@ export class Client {
         );
       } catch (e) {
         if (signal?.aborted) throw e;
-        if (e instanceof NotifError && e.status < 500 && e.status !== 429)
+        if (e instanceof BeepgridError && e.status < 500 && e.status !== 429)
           throw e;
         await delay(2000, signal);
         continue;

@@ -44,7 +44,7 @@ class Model(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
 schema = 'doc_tour_' + secrets.token_hex(8)
-database = os.getenv('NOTIF_TEST_DATABASE_URL', 'postgres://notif:notif@localhost:5499/notif?sslmode=disable')
+database = os.getenv('BEEPGRID_TEST_DATABASE_URL', 'postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable')
 model = ThreadingHTTPServer(('127.0.0.1', 0), Model)
 threading.Thread(target=model.serve_forever, daemon=True).start()
 port = free_port()
@@ -53,17 +53,17 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-doc-tour-') as scratch:
     credential = Path(scratch) / 'owner-token'
     credential.touch(mode=0o600)
     credential.write_text(secrets.token_hex(32))
-    env = {**{key: value for key, value in os.environ.items() if not key.startswith('NOTIF_')}, 'NOTIF_DATABASE_URL': database, 'NOTIF_SCHEMA': schema,
-           'NOTIF_ADDR': f'127.0.0.1:{port}', 'NOTIF_PUBLIC_URL': origin,
-           'NOTIF_WORKSPACE': 'documentation-tours', 'NOTIF_SECRET_KEY': secrets.token_hex(32),
-           'NOTIF_BOOTSTRAP_TOKEN': credential.read_text(), 'NOTIF_URL': origin, 'NOTIF_TOKEN_FILE': str(credential),
-           'NOTIF_ATTACHMENTS_DIR': str(Path(scratch) / 'files'), 'PYTHONPATH': str(root / 'sdk/python'),
-           'NOTIF_AI_API_KEY': '', 'NOTIF_OVERSEER_URL': '', 'NOTIF_OVERSEER_TOKEN': '', 'NOTIF_TOKEN': '',
-           'NOTIF_DOC_BINARY': str(root / '.local/notif-doc-tour'), 'NOTIF_AI_PROVIDER': 'openai-compatible', 'NOTIF_AI_BASE_URL': f'http://127.0.0.1:{model.server_port}/v1',
-           'NOTIF_AI_ALLOW_PRIVATE': 'true', 'NOTIF_AI_MODEL': 'documentation-fixture', 'NOTIF_AI_OUTPUT_MODE': 'json'}
-    binary = root / '.local/notif-doc-tour'
+    env = {**{key: value for key, value in os.environ.items() if not key.startswith('BEEPGRID_')}, 'BEEPGRID_DATABASE_URL': database, 'BEEPGRID_SCHEMA': schema,
+           'BEEPGRID_ADDR': f'127.0.0.1:{port}', 'BEEPGRID_PUBLIC_URL': origin,
+           'BEEPGRID_WORKSPACE': 'documentation-tours', 'BEEPGRID_SECRET_KEY': secrets.token_hex(32),
+           'BEEPGRID_BOOTSTRAP_TOKEN': credential.read_text(), 'BEEPGRID_URL': origin, 'BEEPGRID_TOKEN_FILE': str(credential),
+           'BEEPGRID_ATTACHMENTS_DIR': str(Path(scratch) / 'files'), 'PYTHONPATH': str(root / 'sdk/python'),
+           'BEEPGRID_AI_API_KEY': '', 'BEEPGRID_OVERSEER_URL': '', 'BEEPGRID_OVERSEER_TOKEN': '', 'BEEPGRID_TOKEN': '',
+           'BEEPGRID_DOC_BINARY': str(root / '.local/beepgrid-doc-tour'), 'BEEPGRID_AI_PROVIDER': 'openai-compatible', 'BEEPGRID_AI_BASE_URL': f'http://127.0.0.1:{model.server_port}/v1',
+           'BEEPGRID_AI_ALLOW_PRIVATE': 'true', 'BEEPGRID_AI_MODEL': 'documentation-fixture', 'BEEPGRID_AI_OUTPUT_MODE': 'json'}
+    binary = root / '.local/beepgrid-doc-tour'
     binary.parent.mkdir(exist_ok=True)
-    subprocess.run(['go', 'build', '-buildvcs=false', '-o', str(binary), './cmd/notif'], cwd=root, check=True)
+    subprocess.run(['go', 'build', '-buildvcs=false', '-o', str(binary), './cmd/beepgrid'], cwd=root, check=True)
     subprocess.run([str(binary), 'migrate'], env=env, cwd=root, check=True)
     with open(Path(scratch) / 'server.log', 'w+') as log:
         server = subprocess.Popen([str(binary), 'serve'], env=env, cwd=root, stdout=log, stderr=log)
@@ -91,7 +91,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-doc-tour-') as scratch:
             evidence = []
             for command, language in commands:
                 if language in ['python','typescript','go']:
-                    subprocess.run(command, env={**env,'NOTIF_TOUR_MESSAGES_ONLY':'1'},cwd=root,check=True,timeout=60)
+                    subprocess.run(command, env={**env,'BEEPGRID_TOUR_MESSAGES_ONLY':'1'},cwd=root,check=True,timeout=60)
                 time.sleep(1.1)
                 subprocess.run(command, env=env, cwd=root, check=True, timeout=150)
                 source = root / command[-1].removeprefix('./')
@@ -102,7 +102,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-doc-tour-') as scratch:
                 'tours': [item for item in evidence if item['language'] not in recipe_names],
                 'recipes': [item for item in evidence if item['language'] in recipe_names],
                 'recipe_source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in (root/'examples/a2a-workflows').glob('*.py')},
-                'source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['sdk/go/notif','sdk/typescript/src','sdk/python/beepgrid','sdk/react/src'] for p in (root/folder).glob('*') if p.suffix in ['.go','.ts','.tsx','.py'] and not p.name.endswith('_test.go')}}, indent=2) + '\n')
+                'source_hashes': {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['sdk/go','sdk/typescript/src','sdk/python/beepgrid','sdk/react/src'] for p in (root/folder).glob('*') if p.suffix in ['.go','.ts','.tsx','.py'] and not p.name.endswith('_test.go')}}, indent=2) + '\n')
             print('PASS: documentation tours; evidence: .local/documentation-qualification.json')
         finally:
             server.terminate()

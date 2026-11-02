@@ -13,11 +13,11 @@ from beepgrid import Client
 class Fixture:
     def __init__(self, names):
         root = Path(__file__).resolve().parents[2]
-        url = os.getenv('NOTIF_URL', 'http://localhost:4010')
+        url = os.getenv('BEEPGRID_URL', 'http://localhost:4010')
         host = urlsplit(url).hostname
         if host != 'localhost' and not (host and ipaddress.ip_address(host).is_loopback):
             raise RuntimeError('Use a disposable loopback workspace for fixture provisioning')
-        credential = Path(os.getenv('NOTIF_TOKEN_FILE', str(root / '.local/owner-token')))
+        credential = Path(os.getenv('BEEPGRID_TOKEN_FILE', str(root / '.local/owner-token')))
         if credential.stat().st_mode & 0o077:
             raise RuntimeError('Credential file must be private: chmod 600')
         self._admin = Client(url, credential.read_text().strip())

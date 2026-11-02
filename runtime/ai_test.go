@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestEmbeddedRuntimeAIConfigurationAndTenantBoundaries(t *testing.T) {
@@ -30,7 +30,7 @@ func TestEmbeddedRuntimeAIConfigurationAndTenantBoundaries(t *testing.T) {
 			http.Error(w, "invalid", 400)
 			return
 		}
-		var payload struct{ Sources []struct{ Agent notif.Agent } }
+		var payload struct{ Sources []struct{ Agent beepgrid.Agent } }
 		if err := json.Unmarshal([]byte(wire.Messages[1].Content), &payload); err != nil || len(payload.Sources) != 1 {
 			t.Error("cross-tenant model context", err)
 			http.Error(w, "invalid", 400)
@@ -40,7 +40,7 @@ func TestEmbeddedRuntimeAIConfigurationAndTenantBoundaries(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"role": "assistant", "content": string(text)}}}})
 	}))
 	defer model.Close()
-	values := map[string]string{"NOTIF_AI_PROVIDER": "openai-compatible", "NOTIF_AI_MODEL": "explicit-model", "NOTIF_AI_API_KEY": "model-only-fixture", "NOTIF_AI_BASE_URL": model.URL + "/v1", "NOTIF_AI_ALLOW_PRIVATE": "true"}
+	values := map[string]string{"BEEPGRID_AI_PROVIDER": "openai-compatible", "BEEPGRID_AI_MODEL": "explicit-model", "BEEPGRID_AI_API_KEY": "model-only-fixture", "BEEPGRID_AI_BASE_URL": model.URL + "/v1", "BEEPGRID_AI_ALLOW_PRIVATE": "true"}
 	ai, err := AIConfigFromEnv(func(k string) string { return values[k] })
 	if err != nil {
 		t.Fatal(err)
@@ -64,12 +64,12 @@ func TestEmbeddedRuntimeAIConfigurationAndTenantBoundaries(t *testing.T) {
 	if err = configured.ProvisionWorkspace(ctx, idB, "B", tokenB); err != nil {
 		t.Fatal(err)
 	}
-	a, b := notif.New(api.URL, tokenA), notif.New(api.URL, tokenB)
-	_, sessionA, err := a.Enroll(ctx, notif.EnrollInput{Agent: "same-name", Name: "A agent"})
+	a, b := beepgrid.New(api.URL, tokenA), beepgrid.New(api.URL, tokenB)
+	_, sessionA, err := a.Enroll(ctx, beepgrid.EnrollInput{Agent: "same-name", Name: "A agent"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, sessionB, err := b.Enroll(ctx, notif.EnrollInput{Agent: "same-name", Name: "B agent"})
+	_, sessionB, err := b.Enroll(ctx, beepgrid.EnrollInput{Agent: "same-name", Name: "B agent"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,31 +78,31 @@ func TestEmbeddedRuntimeAIConfigurationAndTenantBoundaries(t *testing.T) {
 		t.Fatal("embedded configuration enabled a feature or chose a different model", err)
 	}
 	yes := true
-	if _, err = a.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes}); err != nil {
+	if _, err = a.UpdateAssistance(ctx, beepgrid.AssistanceUpdate{Overseer: &yes}); err != nil {
 		t.Fatal(err)
 	}
-	plan, err := a.PlanOverseer(ctx, notif.OverseerInput{Prompt: "A status"})
+	plan, err := a.PlanOverseer(ctx, beepgrid.OverseerInput{Prompt: "A status"})
 	if err != nil || len(plan.Sources) != 1 || plan.Sources[0].Agent.ID != sessionA.Agent.ID || plan.RequiresConfirmation {
 		t.Fatal("wrong tenant source", err)
 	}
-	if _, err = b.PlanOverseer(ctx, notif.OverseerInput{Prompt: "B status"}); err == nil || calls.Load() != 1 {
+	if _, err = b.PlanOverseer(ctx, beepgrid.OverseerInput{Prompt: "B status"}); err == nil || calls.Load() != 1 {
 		t.Fatal("workspace toggle crossed tenant boundary", err)
 	}
-	if _, err = b.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes}); err != nil {
+	if _, err = b.UpdateAssistance(ctx, beepgrid.AssistanceUpdate{Overseer: &yes}); err != nil {
 		t.Fatal(err)
 	}
-	other, err := b.PlanOverseer(ctx, notif.OverseerInput{Prompt: "B status"})
+	other, err := b.PlanOverseer(ctx, beepgrid.OverseerInput{Prompt: "B status"})
 	if err != nil || len(other.Sources) != 1 || other.Sources[0].Agent.ID != sessionB.Agent.ID || calls.Load() != 2 {
 		t.Fatal("shared provider mixed tenant data", err)
 	}
 	_, err = b.OverseerPlan(ctx, plan.ID)
-	var apiError *notif.APIError
+	var apiError *beepgrid.APIError
 	if !errors.As(err, &apiError) || apiError.Status != 404 {
 		t.Fatal("cross-tenant plan exposed", err)
 	}
 	bad := c
 	bad.AI.Model = ""
-	if _, err = Open(ctx, bad); err == nil || !strings.Contains(err.Error(), "NOTIF_AI_MODEL") {
+	if _, err = Open(ctx, bad); err == nil || !strings.Contains(err.Error(), "BEEPGRID_AI_MODEL") {
 		t.Fatal("embedded runtime chose a default model", err)
 	}
 }

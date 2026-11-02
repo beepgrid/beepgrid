@@ -404,7 +404,7 @@ func (s *Store) requestEvent(ctx context.Context, db DB, a Actor, r Request, kin
  emitted AS (INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data)
  SELECT $1,r.sequence-(SELECT count(*) FROM targets)+t.ordinal+1,$5,$6,t.conversation_id,t.recipient_id,jsonb_set($7::jsonb,'{conversation_id}',to_jsonb(t.conversation_id))
  FROM targets t CROSS JOIN reservation r RETURNING sequence)
- SELECT pg_notify('notif_events',$1),pg_notify('notif_work',json_build_array($1::text,t.recipient_id)::text) FROM targets t`, a.Scope, r.ID, r.RequesterID, r.ConversationID, kind, a.ID, JSON(r))
+ SELECT pg_notify('beepgrid_events',$1),pg_notify('beepgrid_work',json_build_array($1::text,t.recipient_id)::text) FROM targets t`, a.Scope, r.ID, r.RequesterID, r.ConversationID, kind, a.ID, JSON(r))
 	return err
 }
 func (s *Store) EndRequest(ctx context.Context, a Actor, id, state string, version int) (Request, error) {

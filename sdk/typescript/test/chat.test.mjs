@@ -18,8 +18,8 @@ test('membership keeps a stable key and leaves earlier history opt-in explicit',
  });
  assert.equal((await client.changeChatMembership('a/b',input,'membership-1')).version,4);assert.equal(calls,2);
 });
-test('StartChat mentions address a member while all observers receive the original',{skip:!process.env.NOTIF_SDK_TEST_URL||!process.env.NOTIF_SDK_EXPECT_START_CHAT_MENTIONS},async()=>{
- const owner=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
+test('StartChat mentions address a member while all observers receive the original',{skip:!process.env.BEEPGRID_SDK_TEST_URL||!process.env.BEEPGRID_SDK_EXPECT_START_CHAT_MENTIONS},async()=>{
+ const owner=new Client(process.env.BEEPGRID_SDK_TEST_URL,process.env.BEEPGRID_SDK_TEST_TOKEN);
  const me=await owner.call('GET','/api/v1/me');
  const reviewer=await owner.connect('sdk/shared-reviewer-'+crypto.randomUUID(),'Reviewer 2');
  const observer=await owner.connect('sdk/shared-observer-'+crypto.randomUUID(),'Observer 3');

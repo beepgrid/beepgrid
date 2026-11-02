@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 }
 
 func run() error {
-	path := os.Getenv("NOTIF_TOKEN_FILE")
+	path := os.Getenv("BEEPGRID_TOKEN_FILE")
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -32,7 +32,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	client := notif.New(os.Getenv("NOTIF_URL"), strings.TrimSpace(string(token)))
+	client := beepgrid.New(os.Getenv("BEEPGRID_URL"), strings.TrimSpace(string(token)))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	var input struct {
@@ -47,8 +47,8 @@ func run() error {
 		return err
 	}
 	if input.Operation == "start" {
-		chat, err := client.StartChat(ctx, notif.StartChatInput{
-			Targets: []notif.Target{{Kind: "agent", ID: input.ReviewerID}, {Kind: "person", ID: input.PersonID}},
+		chat, err := client.StartChat(ctx, beepgrid.StartChatInput{
+			Targets: []beepgrid.Target{{Kind: "agent", ID: input.ReviewerID}, {Kind: "person", ID: input.PersonID}},
 			Title:   "Search API migration", Body: "Can we retire /v1/search?",
 		}, input.Key+"/start")
 		if err != nil {
@@ -70,15 +70,15 @@ func run() error {
 		return err
 	}
 	// Adding someone discloses history only because this example opts in explicitly.
-	if _, err := client.ChangeChatMembership(ctx, input.ConversationID, notif.ChatMembershipInput{
+	if _, err := client.ChangeChatMembership(ctx, input.ConversationID, beepgrid.ChatMembershipInput{
 		Operation: "add", Version: history.Version, Members: []string{input.DevOpsID}, ShareHistory: true,
 	}, input.Key+"/invite"); err != nil {
 		return err
 	}
 	body := "Looping in @DevOps to move the two remaining jobs."
-	message, err := client.Send(ctx, notif.SendInput{
+	message, err := client.Send(ctx, beepgrid.SendInput{
 		ConversationID: input.ConversationID, Body: body,
-		Mentions: []notif.Mention{{PrincipalID: input.DevOpsID, Start: 11, End: 18}},
+		Mentions: []beepgrid.Mention{{PrincipalID: input.DevOpsID, Start: 11, End: 18}},
 	}, input.Key+"/loop-in")
 	if err != nil {
 		return err

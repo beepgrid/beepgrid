@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -66,17 +66,17 @@ func run(ctx context.Context, args []string) error {
 	if e := f.Parse(args); e != nil {
 		return e
 	}
-	token := os.Getenv("NOTIF_TOKEN")
-	human := os.Getenv("NOTIF_PERSON_ID")
+	token := os.Getenv("BEEPGRID_TOKEN")
+	human := os.Getenv("BEEPGRID_PERSON_ID")
 	if token == "" || human == "" {
-		return fmt.Errorf("NOTIF_TOKEN (launcher) and NOTIF_PERSON_ID are required")
+		return fmt.Errorf("BEEPGRID_TOKEN (launcher) and BEEPGRID_PERSON_ID are required")
 	}
-	base := os.Getenv("NOTIF_URL")
+	base := os.Getenv("BEEPGRID_URL")
 	if base == "" {
 		base = "http://localhost:4010"
 	}
-	launcher := notif.New(base, token)
-	c, _, e := launcher.Enroll(ctx, notif.EnrollInput{Agent: "examples/checkpoint", Name: "Checkpoint worker", Capabilities: []string{"question", "checkpoint-resume"}})
+	launcher := beepgrid.New(base, token)
+	c, _, e := launcher.Enroll(ctx, beepgrid.EnrollInput{Agent: "examples/checkpoint", Name: "Checkpoint worker", Capabilities: []string{"question", "checkpoint-resume"}})
 	if e != nil {
 		return e
 	}
@@ -95,7 +95,7 @@ func run(ctx context.Context, args []string) error {
 	}
 	// A stable key recovers even if the process dies after API commit and before saving this file.
 	if state.RequestID == "" {
-		q, e := c.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: human}, Title: "Choose the checkpoint example report format", Choices: []string{"Brief", "Detailed"}}, "checkpoint/format/v1")
+		q, e := c.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: human}, Title: "Choose the checkpoint example report format", Choices: []string{"Brief", "Detailed"}}, "checkpoint/format/v1")
 		if e != nil {
 			return e
 		}
@@ -141,7 +141,7 @@ func run(ctx context.Context, args []string) error {
 	}
 	// The only side effect is an idempotent message. For real effects, enforce permits at the tool boundary
 	// and use a destination idempotency key or reconciliation. A checkpoint alone is not exactly-once execution.
-	_, e = c.Send(ctx, notif.SendInput{ConversationID: q.ConversationID, Body: "Checkpoint workflow resumed and finished with format: " + strings.TrimSpace(answer)}, "checkpoint/result/v1")
+	_, e = c.Send(ctx, beepgrid.SendInput{ConversationID: q.ConversationID, Body: "Checkpoint workflow resumed and finished with format: " + strings.TrimSpace(answer)}, "checkpoint/result/v1")
 	if e != nil {
 		return e
 	}

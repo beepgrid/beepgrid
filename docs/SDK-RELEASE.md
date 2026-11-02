@@ -2,7 +2,7 @@
 
 Packages: `@beepgrid/sdk`, `@beepgrid/react`, Python `beepgrid`, and the standalone Go module `github.com/beepgrid/beepgrid/sdk/go`. Go SDK tags use `sdk/go/v<version>`; engine tags use `v<version>`.
 
-Run `python3 scripts/sdk-package-check.py`. The Python interpreter selected with `NOTIF_PACKAGE_PYTHON` must have setuptools 77 or newer, build, wheel and pip. It builds the two npm tarballs, Python wheel and source distribution, then rebuilds the wheel from that source distribution, checks licenses/readmes/changelogs, and installs them into temporary consumers outside the repository. It exercises Node ESM exports, TypeScript declarations, React SSR/styles, a clean Python venv, and a separate Go module with an explicit local replace. It never publishes, modifies provider accounts, runs models or deploys. The local Go replace verifies consumer compatibility, not registry availability.
+Run `python3 scripts/sdk-package-check.py`. The Python interpreter selected with `BEEPGRID_PACKAGE_PYTHON` must have setuptools 77 or newer, build, wheel and pip. It builds the two npm tarballs, Python wheel and source distribution, then rebuilds the wheel from that source distribution, checks licenses/readmes/changelogs, and installs them into temporary consumers outside the repository. It exercises Node ESM exports, TypeScript declarations, React SSR/styles, a clean Python venv, and a separate Go module with an explicit local replace. It never publishes, modifies provider accounts, runs models or deploys. The local Go replace verifies consumer compatibility, not registry availability.
 
 Artifacts and a SHA256/provenance manifest go to `.local/sdk-release` (or `--output`). The manifest records source commit and dirty state, artifact sizes/hashes and verification limits. A dirty source manifest cannot be presented as a release built from a clean commit. The manual `prepare SDK artifacts` GitHub workflow runs the same check and uploads development artifacts with read-only repository permissions. Remote workflow execution remains unverified until explicitly dispatched later.
 
@@ -21,3 +21,9 @@ Before a release, rerun real PostgreSQL default/headless race suites, the isolat
 6. Install from each public registry with clean caches before announcing the release.
 
 No payment integration, marketing analytics or private managed source belongs in any public artifact. Credentials remain outside source and packages. Never move published tags or replace released files; ship a new patch version.
+
+## Upgrade to 0.2.0
+
+This release finishes the Beepgrid namespace migration. Set `BEEPGRID_*` configuration variables, import the Go SDK directly from `github.com/beepgrid/beepgrid/sdk/go`, and use `BeepgridError`, `BeepgridEvent` and the `Beepgrid*` React exports. The compact-send helpers are `sendMinimal` in TypeScript, `send_minimal` in Python and `SendMinimal` in Go. Standard `send`/`Send` behavior is unchanged.
+
+Webhook receivers verify `X-Beepgrid-Timestamp`, `X-Beepgrid-Signature` and `X-Beepgrid-Event-ID`. Update receiver configuration with the server release. Existing browser sessions sign in again after the cookie namespace change. Migration 38 upgrades persisted receipt fields and the metering function while preserving canonical messages, operation keys, permissions and existing migration checksums. Current packages contain no compatibility package under the retired name. Previous immutable registry versions and historical migration SQL remain historical records.

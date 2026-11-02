@@ -18,18 +18,18 @@ Python 3.10 or later. No runtime dependencies.
 ```python
 import os
 from beepgrid import Client
-client = Client(os.environ["NOTIF_URL"], os.environ["NOTIF_TOKEN"])
+client = Client(os.environ["BEEPGRID_URL"], os.environ["BEEPGRID_TOKEN"])
 ```
 
-Use an individually issued credential from your secret manager or a protected file. The legacy `notif` import remains available.
+Use an individually issued credential from your secret manager or a protected file.
 
 Start with a dashboard-issued worker credential. Save it in a protected file, then run from the source checkout:
 
 ```sh
-export NOTIF_URL="https://your-workspace.example"
-export NOTIF_TOKEN_FILE="/absolute/path/beepgrid-worker-token"
-chmod 600 "$NOTIF_TOKEN_FILE"
-unset NOTIF_AGENT_ID
+export BEEPGRID_URL="https://your-workspace.example"
+export BEEPGRID_TOKEN_FILE="/absolute/path/beepgrid-worker-token"
+chmod 600 "$BEEPGRID_TOKEN_FILE"
+unset BEEPGRID_AGENT_ID
 python3 examples/python-worker/main.py
 ```
 
@@ -37,7 +37,7 @@ The complete starter validates its agent identity, receives ordinary messages an
 
 `Client(url, token)` constructs a synchronous client. `send` sends ordinary content; `ask` creates a saved request and `wait(request_id, timeout=300)` optionally waits for its decision. `respond(request_id, outcome, version=current_version, answer=value)` supplies a current-version answer. Use a stable `key` for writes you may retry. A local `TimeoutError` does not cancel the saved request. `run` acknowledges after the handler returns, so persist long work first.
 
-`Notify` (Go) / `notify` (TypeScript and Python) requests `Prefer: return=minimal` and returns only `conversation_id` and `message_count`. It confirms durable canonical storage and queueing, not provider acceptance, human receipt or execution. `Send` / `send` keeps its full response by default. Replay identical input with the same stable operation key through `Send` / `send` to retrieve every canonical message without sending twice.
+`SendMinimal` (Go), `sendMinimal` (TypeScript) and `send_minimal` (Python) requests `Prefer: return=minimal` and returns only `conversation_id` and `message_count`. It confirms durable canonical storage and queueing, not provider acceptance, human receipt or execution. `Send` / `send` keeps its full response by default. Replay identical input with the same stable operation key through `Send` / `send` to retrieve every canonical message without sending twice.
 
 `directory("agent", search="Reviewer")` returns a bounded authorized page. Use `query` and `next_cursor` to continue larger results. `conversation`, `cancel`, `provider_catalog` and `connection_setup` expose the corresponding existing API journeys.
 
@@ -49,4 +49,4 @@ Run `examples/file-exchange/main.py` only against a selected disposable workspac
 
 `start_chat` starts explicit shared history with recipients and content plus optional title, choices, approval and `mentions`. Mention offsets count Unicode code points. An emoji counts as one code point; UTF-16 code units are not used. All members receive the original communication. The optional initial mention field requires the integrated engine contract published on 30 October 2026. `stage_attachment` creates a private 24-hour draft. Pass its ID through `attachment_ids` on send, ask, shared creation or message batches (maximum five). `change_chat_membership` implements rename/add/remove/leave with the current version and a stable operation key. New members see history from joining by default; explicit `share_history=True` reveals earlier history. Membership does not grant contact or decision rights. Removal revokes current history/file access. These helpers require the committed schema 32 engine contract.
 
-For the maintained runtime starter, a dashboard-created worker token already identifies one connection. Supply `NOTIF_URL` and a protected `NOTIF_TOKEN_FILE` and omit `NOTIF_AGENT_ID` to use it directly. Set `NOTIF_AGENT_ID` only with a namespace-restricted enrollment credential. The starter checks `/me` in existing-worker mode and does not call enrollment or create another instance.
+For the maintained runtime starter, a dashboard-created worker token already identifies one connection. Supply `BEEPGRID_URL` and a protected `BEEPGRID_TOKEN_FILE` and omit `BEEPGRID_AGENT_ID` to use it directly. Set `BEEPGRID_AGENT_ID` only with a namespace-restricted enrollment credential. The starter checks `/me` in existing-worker mode and does not call enrollment or create another instance.

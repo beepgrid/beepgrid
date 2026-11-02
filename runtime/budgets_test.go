@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/beepgrid/beepgrid/internal/engine"
-	sdk "github.com/beepgrid/beepgrid/sdk/go/notif"
+	sdk "github.com/beepgrid/beepgrid/sdk/go"
 	"net/http/httptest"
 	"sync"
 	"sync/atomic"

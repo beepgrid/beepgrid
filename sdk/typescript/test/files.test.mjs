@@ -22,8 +22,8 @@ test('file requests preserve binary bytes, type, path and prevent redirects with
  await assert.rejects(()=>lost.stageAttachment(new Blob(['x']),'x'),/lost response/);assert.equal(calls,2);
 });
 
-test('real file journey, directory and current isolation',{skip:!process.env.NOTIF_SDK_TEST_URL},async()=>{
- const owner=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
+test('real file journey, directory and current isolation',{skip:!process.env.BEEPGRID_SDK_TEST_URL},async()=>{
+ const owner=new Client(process.env.BEEPGRID_SDK_TEST_URL,process.env.BEEPGRID_SDK_TEST_TOKEN);
  const {client:worker,session}=await owner.connect('sdk/files-'+crypto.randomUUID(),'File worker');
  const me=await owner.call('GET','/api/v1/me');
  const role=await owner.call('POST','/api/v1/roles',{name:'File reader '+crypto.randomUUID(),rules:[{action:'view',target_kind:'person',target_id:me.person.id}]});

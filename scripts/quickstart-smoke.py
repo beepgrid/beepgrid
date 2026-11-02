@@ -19,9 +19,9 @@ with socket.socket() as probe:
     probe.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
     probe.bind(('127.0.0.1',4010))
 schema = 'quickstart_test_'+secrets.token_hex(8)
-env = dict(os.environ, NOTIF_SCHEMA=schema)
-database = env.get('NOTIF_TEST_DATABASE_URL','postgres://notif:notif@localhost:5499/notif?sslmode=disable')
-env['NOTIF_DATABASE_URL']=database
+env = dict(os.environ, BEEPGRID_SCHEMA=schema)
+database = env.get('BEEPGRID_TEST_DATABASE_URL','postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable')
+env['BEEPGRID_DATABASE_URL']=database
 child = None
 log_path = root/'.local/quickstart-smoke.log'
 log_path.parent.mkdir(exist_ok=True,mode=0o700)

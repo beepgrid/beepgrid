@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/beepgrid/beepgrid/internal/engine"
 	"github.com/beepgrid/beepgrid/internal/httpapi"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -13,9 +13,9 @@ import (
 )
 
 func TestSeedCreatesRestrictedLauncherWithoutPrintingItsToken(t *testing.T) {
-	url := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	url := os.Getenv("BEEPGRID_TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("Set NOTIF_TEST_DATABASE_URL")
+		t.Skip("Set BEEPGRID_TEST_DATABASE_URL")
 	}
 	ctx := context.Background()
 	schema := "seed_" + engine.Digest(engine.Secret())[:20]
@@ -33,8 +33,8 @@ func TestSeedCreatesRestrictedLauncherWithoutPrintingItsToken(t *testing.T) {
 	server := httptest.NewServer(h)
 	defer server.Close()
 	h.PublicURL = server.URL
-	t.Setenv("NOTIF_URL", server.URL)
-	t.Setenv("NOTIF_TOKEN", token)
+	t.Setenv("BEEPGRID_URL", server.URL)
+	t.Setenv("BEEPGRID_TOKEN", token)
 	out := filepath.Join(t.TempDir(), "launcher-token")
 	if e = seed(ctx, []string{"--out", out, "--prefix", "team/"}); e != nil {
 		t.Fatal(e)
@@ -47,15 +47,15 @@ func TestSeedCreatesRestrictedLauncherWithoutPrintingItsToken(t *testing.T) {
 	if info.Mode().Perm() != 0600 {
 		t.Fatal("unsafe credential permissions")
 	}
-	launcher := notif.New(server.URL, strings.TrimSpace(string(raw)))
-	worker, session, e := launcher.Enroll(ctx, notif.EnrollInput{Agent: "team/scout", Name: "Scout"})
+	launcher := beepgrid.New(server.URL, strings.TrimSpace(string(raw)))
+	worker, session, e := launcher.Enroll(ctx, beepgrid.EnrollInput{Agent: "team/scout", Name: "Scout"})
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, _, e = launcher.Enroll(ctx, notif.EnrollInput{Agent: "other/scout", Name: "Other"}); e == nil {
+	if _, _, e = launcher.Enroll(ctx, beepgrid.EnrollInput{Agent: "other/scout", Name: "Other"}); e == nil {
 		t.Fatal("namespace escaped")
 	}
-	if _, e = worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: a.ID}, Title: "Allowed?"}, "seed-test"); e != nil {
+	if _, e = worker.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: a.ID}, Title: "Allowed?"}, "seed-test"); e != nil {
 		t.Fatal(e)
 	}
 	if session.Agent.ID == a.ID {

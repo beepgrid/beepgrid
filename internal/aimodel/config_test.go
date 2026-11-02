@@ -11,7 +11,7 @@ func TestExplicitConfigurationAndEnvironment(t *testing.T) {
 	if !(Config{}).Empty() {
 		t.Fatal("unconfigured assistance must stay absent")
 	}
-	values := map[string]string{"NOTIF_AI_PROVIDER": "openai-compatible", "NOTIF_AI_MODEL": "chosen/model", "NOTIF_AI_BASE_URL": "http://localhost:11434/v1", "NOTIF_AI_ALLOW_PRIVATE": "true", "NOTIF_AI_OPTIONS": `{"temperature":0.2,"max_tokens":2048}`}
+	values := map[string]string{"BEEPGRID_AI_PROVIDER": "openai-compatible", "BEEPGRID_AI_MODEL": "chosen/model", "BEEPGRID_AI_BASE_URL": "http://localhost:11434/v1", "BEEPGRID_AI_ALLOW_PRIVATE": "true", "BEEPGRID_AI_OPTIONS": `{"temperature":0.2,"max_tokens":2048}`}
 	c, err := FromEnv(func(k string) string { return values[k] })
 	if err != nil || c.Model != "chosen/model" || !c.AllowPrivate {
 		t.Fatal("environment configuration failed", err)
@@ -20,12 +20,12 @@ func TestExplicitConfigurationAndEnvironment(t *testing.T) {
 	if err != nil || p.Endpoint() != "http://localhost:11434/v1/chat/completions" || p.config.OutputMode != "json" {
 		t.Fatal("compatible endpoint failed", err)
 	}
-	delete(values, "NOTIF_AI_MODEL")
+	delete(values, "BEEPGRID_AI_MODEL")
 	c, _ = FromEnv(func(k string) string { return values[k] })
 	if _, err := New(c); err == nil {
 		t.Fatal("selected a default model")
 	}
-	values["NOTIF_AI_ALLOW_PRIVATE"] = "sometimes"
+	values["BEEPGRID_AI_ALLOW_PRIVATE"] = "sometimes"
 	if _, err := FromEnv(func(k string) string { return values[k] }); err == nil {
 		t.Fatal("invalid private-address choice accepted")
 	}

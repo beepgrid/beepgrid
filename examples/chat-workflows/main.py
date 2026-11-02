@@ -12,10 +12,10 @@ from beepgrid import Client
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('workflow', choices=['group', 'selective', 'approval'])
 args = parser.parse_args()
-path = Path(os.environ['NOTIF_TOKEN_FILE'])
+path = Path(os.environ['BEEPGRID_TOKEN_FILE'])
 if path.stat().st_mode & 0o077:
     raise RuntimeError('Credential file must be owner-only (chmod 600)')
-owner = Client(os.environ['NOTIF_URL'], path.read_text().strip())
+owner = Client(os.environ['BEEPGRID_URL'], path.read_text().strip())
 person = owner.call('GET', '/api/v1/me')['person']['id']
 run = uuid.uuid4().hex[:12]
 builder, first = owner.connect('chat-demo/' + run + '/builder', 'Builder 1')
@@ -51,10 +51,10 @@ elif args.workflow == 'selective':
     for (client, _), chat_id in zip(agents, ids):
         client.send(conversation_id=chat_id, body='Holding the rollout; checking the remaining jobs.', key=run + '/' + chat_id)
     # The first agent cannot read the other agent's private conversation.
-    from beepgrid import NotifError
+    from beepgrid import BeepgridError
     try:
         builder.conversation(ids[1])
-    except NotifError as error:
+    except BeepgridError as error:
         assert error.status in (403, 404)
     else:
         raise AssertionError('Private history was exposed')

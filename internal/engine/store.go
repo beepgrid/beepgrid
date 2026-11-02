@@ -130,7 +130,7 @@ func normalize(err error) error {
 	}
 	var e *pgconn.PgError
 	if errors.As(err, &e) {
-		if e.Code == "P0001" && e.Message == "NOTIF_QUOTA_EXCEEDED" {
+		if e.Code == "P0001" && e.Message == "BEEPGRID_QUOTA_EXCEEDED" {
 			metric := "accepted-work"
 			switch e.Detail {
 			case "messages":
@@ -156,7 +156,7 @@ func event(ctx context.Context, db DB, a Actor, kind, conv, recipient string, da
 	if err := db.QueryRow(ctx, `UPDATE scopes SET sequence=sequence+1 WHERE id=$1 RETURNING sequence`, a.Scope).Scan(&seq); err != nil {
 		return err
 	}
-	_, err := db.Exec(ctx, `WITH inserted AS (INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING scope) SELECT pg_notify('notif_events',scope) FROM inserted`, a.Scope, seq, kind, a.ID, conv, recipient, JSON(data))
+	_, err := db.Exec(ctx, `WITH inserted AS (INSERT INTO events(scope,sequence,kind,actor_id,conversation_id,recipient_id,data) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING scope) SELECT pg_notify('beepgrid_events',scope) FROM inserted`, a.Scope, seq, kind, a.ID, conv, recipient, JSON(data))
 	if err == nil {
 		err = notifyWork(ctx, db, a.Scope, recipient)
 	}

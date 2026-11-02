@@ -5,17 +5,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"os"
 	"path/filepath"
 )
 
-func operatorClient() (*notif.Client, error) {
+func operatorClient() (*beepgrid.Client, error) {
 	token, err := clientToken(true)
 	if err != nil {
 		return nil, err
 	}
-	return notif.New(env("NOTIF_URL", "http://localhost:4010"), token), nil
+	return beepgrid.New(env("BEEPGRID_URL", "http://localhost:4010"), token), nil
 }
 func seed(ctx context.Context, args []string) error {
 	f := flag.NewFlagSet("seed", flag.ContinueOnError)
@@ -44,7 +44,7 @@ func seed(ctx context.Context, args []string) error {
 		return e
 	}
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 		Admin  bool         `json:"admin"`
 	}
 	if e = c.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
@@ -126,7 +126,7 @@ func seed(ctx context.Context, args []string) error {
 }
 func trace(ctx context.Context, args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("usage: notif trace REQUEST_ID")
+		return fmt.Errorf("usage: beepgrid trace REQUEST_ID")
 	}
 	c, e := operatorClient()
 	if e != nil {

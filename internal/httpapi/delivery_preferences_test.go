@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestDeliveryPreferencesSDKAndHeadlessContract(t *testing.T) {
 	_, client, _ := setup(t)
 	ctx := context.Background()
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if err := client.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil {
 		t.Fatal(err)
@@ -20,7 +20,7 @@ func TestDeliveryPreferencesSDKAndHeadlessContract(t *testing.T) {
 	if err != nil || p.Version != 0 || p.Default != nil {
 		t.Fatal(p, err)
 	}
-	p.Default = &notif.ChannelPolicy{Mode: "preferred", Destinations: []string{}, FollowupSeconds: 0}
+	p.Default = &beepgrid.ChannelPolicy{Mode: "preferred", Destinations: []string{}, FollowupSeconds: 0}
 	updated, err := client.SaveDeliveryPreferences(ctx, me.Person.ID, p)
 	if err != nil || updated.Version != 1 || updated.Default == nil {
 		t.Fatal(updated, err)

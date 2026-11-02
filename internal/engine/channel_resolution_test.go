@@ -230,7 +230,7 @@ func TestRequestFollowupDurabilityAndResolution(t *testing.T) {
 		t.Fatal("missing durable timer", wait, err)
 	}
 	schema := strings.Split(s.Pool.Config().ConnConfig.RuntimeParams["search_path"], ",")[0]
-	replica, err := OpenExisting(ctx, os.Getenv("NOTIF_TEST_DATABASE_URL"), schema, s.SecretKey)
+	replica, err := OpenExisting(ctx, os.Getenv("BEEPGRID_TEST_DATABASE_URL"), schema, s.SecretKey)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,10 +23,10 @@ import (
 	"github.com/beepgrid/beepgrid/internal/httpapi"
 	"github.com/beepgrid/beepgrid/internal/mcp"
 	"github.com/beepgrid/beepgrid/internal/web"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
-var Version = "0.1.1"
+var Version = "0.2.0"
 
 func env(k, fallback string) string {
 	if v := os.Getenv(k); v != "" {
@@ -36,7 +36,7 @@ func env(k, fallback string) string {
 }
 func Main() {
 	if e := run(); e != nil {
-		var api *notif.APIError
+		var api *beepgrid.APIError
 		code := "command_failed"
 		status := 0
 		if errors.As(e, &api) {
@@ -67,17 +67,17 @@ func run() error {
 		if *restored == *resume {
 			return fmt.Errorf("choose exactly one of --restored or --resume")
 		}
-		s, e := engine.OpenExisting(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"), nil)
+		s, e := engine.OpenExisting(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid"), nil)
 		if e != nil {
 			return e
 		}
 		defer s.Close()
-		scope := env("NOTIF_WORKSPACE", "local") + "/" + env("NOTIF_ENVIRONMENT", "development")
+		scope := env("BEEPGRID_WORKSPACE", "local") + "/" + env("BEEPGRID_ENVIRONMENT", "development")
 		if *resume {
 			return s.ResumeAfterReconciliation(ctx, scope)
 		}
 		token := engine.Secret()
-		path := env("NOTIF_RECOVERY_TOKEN_FILE", ".local/recovery-owner-token")
+		path := env("BEEPGRID_RECOVERY_TOKEN_FILE", ".local/recovery-owner-token")
 		if e = os.MkdirAll(filepath.Dir(path), 0700); e != nil {
 			return e
 		}
@@ -99,7 +99,7 @@ func run() error {
 		fmt.Println("Recovery hold set. New owner credential file:", path)
 		return nil
 	case "migrate":
-		return engine.Migrate(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"))
+		return engine.Migrate(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid"))
 	case "seed":
 		return seed(ctx, os.Args[2:])
 	case "trace":
@@ -116,8 +116,8 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		if id := os.Getenv("NOTIF_AGENT_ID"); id != "" {
-			worker, _, e := c.Enroll(ctx, notif.EnrollInput{Agent: id, Name: env("NOTIF_AGENT_NAME", id), Capabilities: []string{"message", "request"}})
+		if id := os.Getenv("BEEPGRID_AGENT_ID"); id != "" {
+			worker, _, e := c.Enroll(ctx, beepgrid.EnrollInput{Agent: id, Name: env("BEEPGRID_AGENT_NAME", id), Capabilities: []string{"message", "request"}})
 			if e != nil {
 				return e
 			}
@@ -176,13 +176,13 @@ func serve(ctx context.Context, args []string) error {
 	if e := f.Parse(args); e != nil {
 		return e
 	}
-	addr := env("NOTIF_ADDR", "127.0.0.1:4010")
-	public := env("NOTIF_PUBLIC_URL", "http://localhost:4010")
+	addr := env("BEEPGRID_ADDR", "127.0.0.1:4010")
+	public := env("BEEPGRID_PUBLIC_URL", "http://localhost:4010")
 	if e := httpapi.ValidatePublicURL(public); e != nil {
 		return e
 	}
-	token := os.Getenv("NOTIF_BOOTSTRAP_TOKEN")
-	key := os.Getenv("NOTIF_SECRET_KEY")
+	token := os.Getenv("BEEPGRID_BOOTSTRAP_TOKEN")
+	key := os.Getenv("BEEPGRID_SECRET_KEY")
 	if *dev {
 		if !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
 			return fmt.Errorf("--dev requires a loopback listening address")
@@ -201,28 +201,28 @@ func serve(ctx context.Context, args []string) error {
 			}
 		}
 	} else if token == "" || key == "" {
-		return fmt.Errorf("NOTIF_BOOTSTRAP_TOKEN and NOTIF_SECRET_KEY are required; use --dev for local setup")
+		return fmt.Errorf("BEEPGRID_BOOTSTRAP_TOKEN and BEEPGRID_SECRET_KEY are required; use --dev for local setup")
 	}
 	decoded, e := hex.DecodeString(key)
 	if e != nil || len(decoded) != 32 {
-		return fmt.Errorf("NOTIF_SECRET_KEY must contain 64 hexadecimal characters")
+		return fmt.Errorf("BEEPGRID_SECRET_KEY must contain 64 hexadecimal characters")
 	}
 	openStore := engine.OpenExisting
 	if *dev {
 		openStore = engine.Open
 	}
-	store, e := openStore(ctx, env("NOTIF_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable"), env("NOTIF_SCHEMA", "notif"), decoded)
+	store, e := openStore(ctx, env("BEEPGRID_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"), env("BEEPGRID_SCHEMA", "beepgrid"), decoded)
 	if e != nil {
 		return e
 	}
 	defer store.Close()
-	stopDiagnostics, e := startDiagnostics(ctx, store, os.Getenv("NOTIF_PROFILE_ADDR"))
+	stopDiagnostics, e := startDiagnostics(ctx, store, os.Getenv("BEEPGRID_PROFILE_ADDR"))
 	if e != nil {
 		return e
 	}
 	defer stopDiagnostics()
 	store.AllowLocal = *dev
-	store.AttachmentsRoot = env("NOTIF_ATTACHMENTS_DIR", ".local/attachments")
+	store.AttachmentsRoot = env("BEEPGRID_ATTACHMENTS_DIR", ".local/attachments")
 	aiConfig, e := aimodel.FromEnv(os.Getenv)
 	if e != nil {
 		return e
@@ -230,10 +230,10 @@ func serve(ctx context.Context, args []string) error {
 	if e = store.ConfigureAI(ctx, aiConfig); e != nil {
 		return e
 	}
-	if e = store.ConfigureOverseer(ctx, os.Getenv("NOTIF_OVERSEER_URL"), os.Getenv("NOTIF_OVERSEER_TOKEN")); e != nil {
+	if e = store.ConfigureOverseer(ctx, os.Getenv("BEEPGRID_OVERSEER_URL"), os.Getenv("BEEPGRID_OVERSEER_TOKEN")); e != nil {
 		return e
 	}
-	owner, e := store.Bootstrap(ctx, env("NOTIF_WORKSPACE", "local")+"/"+env("NOTIF_ENVIRONMENT", "development"), env("NOTIF_COMPANY", "Local workspace"), env("NOTIF_ENVIRONMENT", "development"), token)
+	owner, e := store.Bootstrap(ctx, env("BEEPGRID_WORKSPACE", "local")+"/"+env("BEEPGRID_ENVIRONMENT", "development"), env("BEEPGRID_COMPANY", "Local workspace"), env("BEEPGRID_ENVIRONMENT", "development"), token)
 	if e != nil {
 		return e
 	}
@@ -243,7 +243,7 @@ func serve(ctx context.Context, args []string) error {
 		ui = web.Handler()
 	}
 	handler := httpapi.New(store, public, ui)
-	if e = handler.ConfigureOIDC(ctx, owner.Scope, os.Getenv("NOTIF_OIDC_ISSUER"), os.Getenv("NOTIF_OIDC_CLIENT_ID"), os.Getenv("NOTIF_OIDC_CLIENT_SECRET")); e != nil {
+	if e = handler.ConfigureOIDC(ctx, owner.Scope, os.Getenv("BEEPGRID_OIDC_ISSUER"), os.Getenv("BEEPGRID_OIDC_CLIENT_ID"), os.Getenv("BEEPGRID_OIDC_CLIENT_SECRET")); e != nil {
 		return e
 	}
 	server := &http.Server{Addr: addr, Handler: handler, BaseContext: func(net.Listener) context.Context { return ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
@@ -301,17 +301,17 @@ func demo(ctx context.Context, args []string) error {
 	if e := f.Parse(args); e != nil {
 		return e
 	}
-	token := os.Getenv("NOTIF_TOKEN")
+	token := os.Getenv("BEEPGRID_TOKEN")
 	if token == "" {
 		raw, e := os.ReadFile(".local/owner-token")
 		if e != nil {
-			return fmt.Errorf("NOTIF_TOKEN or local owner token is required")
+			return fmt.Errorf("BEEPGRID_TOKEN or local owner token is required")
 		}
 		token = strings.TrimSpace(string(raw))
 	}
-	admin := notif.New(env("NOTIF_URL", "http://localhost:4010"), token)
+	admin := beepgrid.New(env("BEEPGRID_URL", "http://localhost:4010"), token)
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if e := admin.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
 		return e
@@ -335,7 +335,7 @@ func demo(ctx context.Context, args []string) error {
 	if e := admin.Do(ctx, "POST", "/api/v1/roles", map[string]any{"id": roleID, "name": "Demo " + *name, "rules": []map[string]string{{"action": "view", "target_kind": "*", "target_id": "*"}, {"action": "message", "target_kind": "person", "target_id": me.Person.ID}, {"action": "ask", "target_kind": "person", "target_id": me.Person.ID}}}, &role, ""); e != nil {
 		return e
 	}
-	c, session, e := admin.Enroll(ctx, notif.EnrollInput{Agent: "demo/" + *name, Name: *name, Capabilities: []string{"message", "status"}})
+	c, session, e := admin.Enroll(ctx, beepgrid.EnrollInput{Agent: "demo/" + *name, Name: *name, Capabilities: []string{"message", "status"}})
 	if e != nil {
 		return e
 	}
@@ -345,16 +345,16 @@ func demo(ctx context.Context, args []string) error {
 	fmt.Printf("%s connected as %s (%s)\n", *name, session.Agent.ID, session.InstanceID)
 	_ = c.Heartbeat(ctx, map[string]any{"state": "ready", "runtime": "deterministic-example"})
 	if *ask {
-		q, e := c.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Which report format should I use?", Choices: []string{"Brief summary", "Detailed report"}}, "demo-question-"+session.InstanceID)
+		q, e := c.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Title: "Which report format should I use?", Choices: []string{"Brief summary", "Detailed report"}}, "demo-question-"+session.InstanceID)
 		if e != nil {
 			return e
 		}
 		fmt.Println("Question queued:", q.ID)
 	}
-	return c.Run(ctx, func(ctx context.Context, d notif.Delivery) error {
+	return c.Run(ctx, func(ctx context.Context, d beepgrid.Delivery) error {
 		if d.Payload.Type == "message" && d.Payload.Message != nil {
 			m := d.Payload.Message
-			_, e := c.Send(ctx, notif.SendInput{ConversationID: m.ConversationID, Body: *name + ": received your message. I am connected and ready. This example uses deterministic responses."}, "reply-"+d.ID)
+			_, e := c.Send(ctx, beepgrid.SendInput{ConversationID: m.ConversationID, Body: *name + ": received your message. I am connected and ready. This example uses deterministic responses."}, "reply-"+d.ID)
 			return e
 		}
 		if d.Payload.Type == "request.resolved" && d.Payload.Request != nil {

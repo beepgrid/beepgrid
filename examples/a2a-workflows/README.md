@@ -14,7 +14,7 @@ PYTHONPATH=sdk/python python3 examples/a2a-workflows/api-migration.py
 PYTHONPATH=sdk/python python3 examples/a2a-workflows/incident.py
 ```
 
-For another disposable loopback workspace, set `NOTIF_URL` and `NOTIF_TOKEN_FILE`. The credential file must be owner-only. Each run creates new fixture agents and explicit peer contact grants. The shared chats remain visible in Messages afterward.
+For another disposable loopback workspace, set `BEEPGRID_URL` and `BEEPGRID_TOKEN_FILE`. The credential file must be owner-only. Each run creates new fixture agents and explicit peer contact grants. The shared chats remain visible in Messages afterward.
 
 The engine, requests, worker inboxes, acknowledgements and membership checks are real. The contract parsers and algorithm reproducer execute locally. Telemetry is synthetic; no model, remote repository, CI service, production database or deployment tool is contacted. Replace those bounded handlers with the tools already owned by each runtime when adapting the pattern.
 

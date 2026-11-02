@@ -2,8 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Client} from '../dist/index.js';
 
-test('real staged files and shared membership retain history defaults and current access',{skip:!process.env.NOTIF_SDK_TEST_URL||!process.env.NOTIF_SDK_EXPECT_CHAT_LIFECYCLE},async()=>{
- const owner=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
+test('real staged files and shared membership retain history defaults and current access',{skip:!process.env.BEEPGRID_SDK_TEST_URL||!process.env.BEEPGRID_SDK_EXPECT_CHAT_LIFECYCLE},async()=>{
+ const owner=new Client(process.env.BEEPGRID_SDK_TEST_URL,process.env.BEEPGRID_SDK_TEST_TOKEN);
  const me=await owner.call('GET','/api/v1/me');const members=[];
  for(let i=0;i<3;i++)members.push(await owner.connect('sdk/ts-lifecycle/'+crypto.randomUUID(),'TypeScript lifecycle worker'));
  for(const member of members){
@@ -27,8 +27,8 @@ test('real staged files and shared membership retain history defaults and curren
  assert.equal(await (await reader.downloadAttachment(before.id)).text(),'Before joining');
 });
 
-test('real request replacement preserves old history and stable retries',{skip:!process.env.NOTIF_SDK_TEST_URL},async()=>{
- const owner=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
+test('real request replacement preserves old history and stable retries',{skip:!process.env.BEEPGRID_SDK_TEST_URL},async()=>{
+ const owner=new Client(process.env.BEEPGRID_SDK_TEST_URL,process.env.BEEPGRID_SDK_TEST_TOKEN);
  const {session}=await owner.connect('sdk/ts-replace/'+crypto.randomUUID(),'Replacement worker');
  const me=await owner.call('GET','/api/v1/me');
  await owner.saveContactPermissions({subject:{kind:'agent',id:session.agent.id},version:0,rules:['view','decide'].map(action=>({action,target_kind:'person',target_id:me.person.id}))});

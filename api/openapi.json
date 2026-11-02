@@ -4837,7 +4837,8 @@
                   },
                   "never_expires": {
                     "type": "boolean",
-                    "default": false
+                    "default": false,
+                    "description": "Explicitly request a non-expiring credential. Cannot be combined with an expiry or renewable worker lease."
                   },
                   "expires_at": {
                     "type": "string",
@@ -4855,7 +4856,8 @@
                         "execute",
                         "manage"
                       ]
-                    }
+                    },
+                    "description": "Optional credential-specific restriction to read, message, request, respond, execute or manage. Underlying identity permissions still apply."
                   }
                 },
                 "required": [
@@ -4974,7 +4976,8 @@
                 "properties": {
                   "revoke_workers": {
                     "type": "boolean",
-                    "default": false
+                    "default": false,
+                    "description": "Also revoke worker credentials enrolled through this credential."
                   }
                 },
                 "required": [],
@@ -5091,7 +5094,8 @@
                     "description": "Human-readable name. It is not necessarily unique."
                   },
                   "never_expires": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Explicitly request a non-expiring credential. Cannot be combined with an expiry or renewable worker lease."
                   },
                   "expires_at": {
                     "type": "string",
@@ -5102,10 +5106,12 @@
                     "type": "array",
                     "items": {
                       "type": "string"
-                    }
+                    },
+                    "description": "Optional credential-specific restriction to read, message, request, respond, execute or manage. Underlying identity permissions still apply."
                   },
                   "clear_permissions": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Remove the credential-specific permission restriction. This does not grant permissions absent from the underlying identity."
                   }
                 },
                 "required": [
@@ -5223,7 +5229,8 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 86400,
-                    "default": 3600
+                    "default": 3600,
+                    "description": "How long the previous token remains usable after rotation, from zero to 86400 seconds. Defaults to 3600."
                   }
                 },
                 "required": [
@@ -11045,7 +11052,7 @@
             }
           },
           {
-            "name": "X-Notif-Timestamp",
+            "name": "X-Beepgrid-Timestamp",
             "in": "header",
             "required": true,
             "schema": {
@@ -11053,7 +11060,7 @@
             }
           },
           {
-            "name": "X-Notif-Signature",
+            "name": "X-Beepgrid-Signature",
             "in": "header",
             "required": true,
             "schema": {
@@ -11061,7 +11068,7 @@
             }
           },
           {
-            "name": "X-Notif-Event-ID",
+            "name": "X-Beepgrid-Event-ID",
             "in": "header",
             "required": true,
             "schema": {
@@ -12516,7 +12523,8 @@
             "description": "Application-supplied JSON metadata. Do not put credentials here."
           },
           "connection_name": {
-            "type": "string"
+            "type": "string",
+            "description": "Human-readable label for this Agent runtime connection."
           },
           "never_expires": {
             "type": "boolean",
@@ -12525,7 +12533,8 @@
           },
           "renewable": {
             "type": "boolean",
-            "default": false
+            "default": false,
+            "description": "Use a renewable 24-hour worker lease bounded by the supplied hard expiry. Renewal never extends the hard deadline."
           },
           "expires_at": {
             "type": "string",
@@ -13889,7 +13898,7 @@
               "preferred",
               "all"
             ],
-            "description": "primary, copy or fallback routing mode."
+            "description": "preferred follows destination order with failure fallback and optional unanswered-request follow-up; all sends to all selected channels immediately."
           },
           "destinations": {
             "type": "array",
@@ -13897,7 +13906,8 @@
               "type": "string"
             },
             "maxItems": 16,
-            "uniqueItems": true
+            "uniqueItems": true,
+            "description": "Recipient-owned delivery destination IDs in preference order. An empty list keeps delivery in the workspace only."
           },
           "followup_seconds": {
             "type": "integer",
@@ -13935,10 +13945,12 @@
               "kind",
               "id"
             ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Sender selector for a channel override: an exact Agent or an Agent role group."
           },
           "policy": {
-            "$ref": "#/components/schemas/ChannelPolicy"
+            "$ref": "#/components/schemas/ChannelPolicy",
+            "description": "Channel delivery policy. It changes delivery destinations without granting contact or decision authority."
           }
         },
         "required": [
@@ -13951,7 +13963,8 @@
         "type": "object",
         "properties": {
           "person_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Stable recipient Person identity ID."
           },
           "version": {
             "type": "integer",
@@ -13966,14 +13979,16 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Recipient default channel policy; null preserves existing destination-based routing."
           },
           "overrides": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ChannelOverride"
             },
-            "maxItems": 64
+            "maxItems": 64,
+            "description": "Ordered sender-specific delivery preferences. An exact Agent match precedes matching Agent roles, then the recipient default."
           }
         },
         "required": [
@@ -13995,7 +14010,8 @@
             "description": "Person, agent or service identity ID. This is an API term, not a separate product entity."
           },
           "owner_name": {
-            "type": "string"
+            "type": "string",
+            "description": "Display name of the identity that owns the credential."
           },
           "name": {
             "type": "string",
@@ -14010,7 +14026,8 @@
             "description": "Permitted enrollment namespace prefix for a bounded launcher."
           },
           "token_hint": {
-            "type": "string"
+            "type": "string",
+            "description": "Non-secret token suffix used to identify a credential. It cannot authenticate."
           },
           "created_at": {
             "type": "string",
@@ -14021,7 +14038,8 @@
               "string",
               "null"
             ],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Most recently recorded authenticated use, or null. Updates are throttled and are not an exact per-request audit trail."
           },
           "expires_at": {
             "type": [
@@ -14029,21 +14047,23 @@
               "null"
             ],
             "format": "date-time",
-            "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+            "description": "Credential expiry timestamp, or null for a non-expiring credential. Renewable worker leases remain bounded by renewable_until."
           },
           "renewable_until": {
             "type": [
               "string",
               "null"
             ],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Hard deadline for a renewable worker credential, or null when it is not renewable."
           },
           "previous_until": {
             "type": [
               "string",
               "null"
             ],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Deadline for the previous token during rotation overlap, or null when no previous token remains valid."
           },
           "permissions": {
             "type": [
@@ -14059,17 +14079,20 @@
                 "execute",
                 "manage"
               ]
-            }
+            },
+            "description": "Optional credential-specific restriction to read, message, request, respond, execute or manage. Underlying identity permissions still apply."
           },
           "version": {
             "type": "integer",
             "description": "Current optimistic-concurrency version. Read the object before a guarded change; a stale version conflicts."
           },
           "revoked": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether the credential has been revoked and can no longer authenticate."
           },
           "parent_credential_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Credential that enrolled this worker, when applicable; used for optional worker revocation with the parent."
           }
         },
         "required": [],
@@ -14096,7 +14119,7 @@
               "null"
             ],
             "format": "date-time",
-            "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+            "description": "Credential expiry timestamp, or null for a non-expiring credential. Renewable worker leases remain bounded by renewable_until."
           }
         },
         "required": [],
@@ -14110,7 +14133,8 @@
             "description": "Bearer credential. Save in protected server-side storage and never expose it in browser code or logs."
           },
           "credential": {
-            "$ref": "#/components/schemas/Credential"
+            "$ref": "#/components/schemas/Credential",
+            "description": "Non-secret credential metadata returned with a newly rotated bearer token."
           }
         },
         "required": [],
@@ -14362,7 +14386,7 @@
       "session": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "notif_session"
+        "name": "beepgrid_session"
       }
     }
   }

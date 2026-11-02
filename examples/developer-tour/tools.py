@@ -12,7 +12,7 @@ state = runpy.run_path('examples/developer-tour/main.py')
 owner, builder, billing = (state[name] for name in ['owner', 'builder', 'billing'])
 builder_id, billing_id, person_id = (state[name] for name in ['builder_id', 'billing_id', 'person_id'])
 run_id = uuid.uuid4().hex
-binary = os.getenv('NOTIF_DOC_BINARY', '.local/notif')
+binary = os.getenv('BEEPGRID_DOC_BINARY', '.local/beepgrid')
 called = set()
 
 with tempfile.TemporaryDirectory(prefix='beepgrid-mcp-tour-') as scratch:
@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-mcp-tour-') as scratch:
         file.write_text(session['token'])
 
     def rpc(name, arguments, credential=builder_file):
-        env = {**os.environ, 'NOTIF_TOKEN': '', 'NOTIF_TOKEN_FILE': str(credential), 'NOTIF_AGENT_ID': ''}
+        env = {**os.environ, 'BEEPGRID_TOKEN': '', 'BEEPGRID_TOKEN_FILE': str(credential), 'BEEPGRID_AGENT_ID': ''}
         request = {'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': name, 'arguments': arguments}}
         process = subprocess.run([binary, 'mcp'], input=json.dumps(request) + '\n', text=True,
                                  capture_output=True, env=env, check=True, timeout=20)
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-mcp-tour-') as scratch:
     current = owner.conversation(chat['conversation_id'])
     assert rpc('change_chat_membership', {'conversation_id': chat['conversation_id'], 'operation': 'rename',
         'version': current['version'], 'title': 'Staging review', 'idempotency_key': run_id + '/rename'},
-        Path(os.environ['NOTIF_TOKEN_FILE']))['version'] > current['version']
+        Path(os.environ['BEEPGRID_TOKEN_FILE']))['version'] > current['version']
     # endregion membership
 
     # region files

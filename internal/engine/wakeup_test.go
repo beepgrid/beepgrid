@@ -12,7 +12,7 @@ func TestEventHintsAcrossReplicasCommitRollbackAndCleanup(t *testing.T) {
 	s, a := testStore(t)
 	ctx := context.Background()
 	schema := strings.TrimSuffix(s.Pool.Config().ConnConfig.RuntimeParams["search_path"], ",public")
-	other, err := OpenExisting(ctx, os.Getenv("NOTIF_TEST_DATABASE_URL"), schema, s.SecretKey)
+	other, err := OpenExisting(ctx, os.Getenv("BEEPGRID_TEST_DATABASE_URL"), schema, s.SecretKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestEventHintsAcrossReplicasCommitRollbackAndCleanup(t *testing.T) {
 	defer tick.Stop()
 wait:
 	for {
-		if _, err = s.Pool.Exec(ctx, `SELECT pg_notify('notif_events',$1)`, a.Scope); err != nil {
+		if _, err = s.Pool.Exec(ctx, `SELECT pg_notify('beepgrid_events',$1)`, a.Scope); err != nil {
 			t.Fatal(err)
 		}
 		select {
@@ -93,7 +93,7 @@ func TestProviderWakeHintsExcludeNativeTrafficAndFollowCommit(t *testing.T) {
 	defer tick.Stop()
 wait:
 	for {
-		if _, err := s.Pool.Exec(ctx, `SELECT pg_notify('notif_provider','')`); err != nil {
+		if _, err := s.Pool.Exec(ctx, `SELECT pg_notify('beepgrid_provider','')`); err != nil {
 			t.Fatal(err)
 		}
 		select {

@@ -13,10 +13,10 @@ import urllib.error
 import urllib.request
 
 root = Path(__file__).resolve().parents[1]
-database = os.environ['NOTIF_TEST_DATABASE_URL']
+database = os.environ['BEEPGRID_TEST_DATABASE_URL']
 schema = 'cli_smoke_' + secrets.token_hex(6)
-headless = root / '.local/notif-headless'
-workspace = root / '.local/notif'
+headless = root / '.local/beepgrid-headless'
+workspace = root / '.local/beepgrid'
 assert headless.is_file() and workspace.is_file(), 'Build both distributions first'
 with socket.socket() as sock:
     sock.bind(('127.0.0.1', 0))
@@ -30,20 +30,20 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
     owner = directory / 'owner-token'
     owner.touch(mode=0o600)
     owner.write_text(token)
-    environment = {**{key: value for key, value in os.environ.items() if not key.startswith('NOTIF_')},
-        'NOTIF_DATABASE_URL': database, 'NOTIF_SCHEMA': schema,
-        'NOTIF_WORKSPACE': 'cli-smoke', 'NOTIF_ENVIRONMENT': 'test',
-        'NOTIF_COMPANY': 'CLI test', 'NOTIF_BOOTSTRAP_TOKEN': token,
-        'NOTIF_SECRET_KEY': secrets.token_hex(32), 'NOTIF_ADDR': f'127.0.0.1:{port}',
-        'NOTIF_PUBLIC_URL': url, 'NOTIF_URL': url, 'NOTIF_TOKEN_FILE': str(owner),
-        'NOTIF_ATTACHMENTS_DIR': str(directory / 'attachments'),
+    environment = {**{key: value for key, value in os.environ.items() if not key.startswith('BEEPGRID_')},
+        'BEEPGRID_DATABASE_URL': database, 'BEEPGRID_SCHEMA': schema,
+        'BEEPGRID_WORKSPACE': 'cli-smoke', 'BEEPGRID_ENVIRONMENT': 'test',
+        'BEEPGRID_COMPANY': 'CLI test', 'BEEPGRID_BOOTSTRAP_TOKEN': token,
+        'BEEPGRID_SECRET_KEY': secrets.token_hex(32), 'BEEPGRID_ADDR': f'127.0.0.1:{port}',
+        'BEEPGRID_PUBLIC_URL': url, 'BEEPGRID_URL': url, 'BEEPGRID_TOKEN_FILE': str(owner),
+        'BEEPGRID_ATTACHMENTS_DIR': str(directory / 'attachments'),
         # Never contact external models or providers in this packaging check.
-        'NOTIF_OVERSEER_URL': '', 'NOTIF_OVERSEER_TOKEN': '',
+        'BEEPGRID_OVERSEER_URL': '', 'BEEPGRID_OVERSEER_TOKEN': '',
     }
-    environment.pop('NOTIF_TOKEN', None)
+    environment.pop('BEEPGRID_TOKEN', None)
 
     def cli(args, body=None, credential=owner, expected=0, binary=headless):
-        env = {**environment, 'NOTIF_TOKEN_FILE': str(credential)}
+        env = {**environment, 'BEEPGRID_TOKEN_FILE': str(credential)}
         result = subprocess.run([str(binary), *args], input=None if body is None else json.dumps(body),
                                 text=True, capture_output=True, env=env, cwd=directory, timeout=40)
         assert result.returncode == expected, (args, result.returncode, result.stderr)
@@ -156,7 +156,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
             def mcp_call(name, arguments):
                 request = {'jsonrpc':'2.0','id':100,'method':'tools/call','params':{'name':name,'arguments':arguments}}
                 result = subprocess.run([str(headless), 'mcp'], input=json.dumps(request)+'\n',
-                    env={**environment, 'NOTIF_TOKEN_FILE':str(worker)}, cwd=directory, text=True, capture_output=True, timeout=10)
+                    env={**environment, 'BEEPGRID_TOKEN_FILE':str(worker)}, cwd=directory, text=True, capture_output=True, timeout=10)
                 assert result.returncode == 0, result.stderr
                 reply = json.loads(result.stdout)['result']
                 assert not reply.get('isError'), reply
@@ -180,7 +180,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-cli-') as directory:
                         {'jsonrpc':'2.0','method':'notifications/initialized'},
                         {'jsonrpc':'2.0','id':2,'method':'tools/list'}]
             mcp = subprocess.run([str(headless), 'mcp'], input='\n'.join(map(json.dumps,messages))+'\n',
-                                 env={**environment,'NOTIF_TOKEN_FILE':str(worker)}, cwd=directory,
+                                 env={**environment,'BEEPGRID_TOKEN_FILE':str(worker)}, cwd=directory,
                                  capture_output=True, text=True, timeout=10)
             assert mcp.returncode == 0, mcp.stderr
             replies = [json.loads(line) for line in mcp.stdout.splitlines()]

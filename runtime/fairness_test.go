@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/beepgrid/beepgrid/internal/engine"
-	sdk "github.com/beepgrid/beepgrid/sdk/go/notif"
+	sdk "github.com/beepgrid/beepgrid/sdk/go"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"

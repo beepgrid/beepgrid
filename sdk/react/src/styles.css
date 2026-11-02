@@ -1,5 +1,5 @@
-.notif-request,
-.notif-conversation {
+.beepgrid-request,
+.beepgrid-conversation {
   font:
     14px/1.5 system-ui,
     sans-serif;
@@ -10,8 +10,8 @@
   padding: 20px;
   max-width: 700px;
 }
-.notif-request button,
-.notif-conversation button {
+.beepgrid-request button,
+.beepgrid-conversation button {
   font: inherit;
   border: 1px solid #b7cbbb;
   border-radius: 5px;
@@ -20,21 +20,21 @@
   margin: 5px;
   cursor: pointer;
 }
-.notif-request button:disabled,
-.notif-conversation button:disabled {
+.beepgrid-request button:disabled,
+.beepgrid-conversation button:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.notif-request fieldset {
+.beepgrid-request fieldset {
   border: 0;
   padding: 0;
 }
-.notif-request label {
+.beepgrid-request label {
   display: block;
   margin: 10px 0;
 }
-.notif-request textarea,
-.notif-conversation textarea {
+.beepgrid-request textarea,
+.beepgrid-conversation textarea {
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -44,15 +44,15 @@
   border: 1px solid #bacabd;
   border-radius: 5px;
 }
-.notif-conversation [role="log"] {
+.beepgrid-conversation [role="log"] {
   max-height: 420px;
   overflow: auto;
 }
-.notif-conversation article {
+.beepgrid-conversation article {
   border-bottom: 1px solid #edf0eb;
   margin-bottom: 16px;
 }
-.notif-request [role="alert"],
-.notif-conversation [role="alert"] {
+.beepgrid-request [role="alert"],
+.beepgrid-conversation [role="alert"] {
   color: #a0322a;
 }

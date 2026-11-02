@@ -2,7 +2,7 @@
 """Local product-review workspace. Uses real APIs, never production data.
 
 Start a --dev engine with company='Beepgrid Lab', environment='review', and a
-dedicated NOTIF_SCHEMA. Then run seed, followed by workers. Credentials are
+dedicated BEEPGRID_SCHEMA. Then run seed, followed by workers. Credentials are
 written only to the ignored, private state directory. Responses are deliberate
 fixtures, not model execution or provider qualification.
 """

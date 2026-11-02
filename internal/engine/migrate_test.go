@@ -11,7 +11,7 @@ import (
 func TestUpgradeConcurrentMigrationsAndRestartRecovery(t *testing.T) {
 	s, a := testStore(t)
 	ctx := context.Background()
-	url := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	url := os.Getenv("BEEPGRID_TEST_DATABASE_URL")
 	name := s.Pool.Config().ConnConfig.RuntimeParams["search_path"]
 	name = name[:len(name)-7]
 	w := testWorker(t, s, a, "restart-worker")

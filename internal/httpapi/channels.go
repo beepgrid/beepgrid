@@ -164,9 +164,9 @@ func (s *Server) channelRoutes() {
 		}
 		outcome := ""
 		switch payload.Actions[0].ActionID {
-		case "notif_approve":
+		case "beepgrid_approve":
 			outcome = "approved"
-		case "notif_deny":
+		case "beepgrid_deny":
 			outcome = "denied"
 		default:
 			writeError(w, engine.Bad("Unsupported Slack action."))

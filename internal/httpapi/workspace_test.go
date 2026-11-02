@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"net/http"
 	"strings"
 	"testing"
@@ -39,7 +39,7 @@ func TestWorkspaceAccountBridgeScopeAndSuspension(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	employee := notif.New(server.URL, credential["token"].(string))
+	employee := beepgrid.New(server.URL, credential["token"].(string))
 	if e = employee.Do(ctx, "GET", "/api/v1/workspace/account", nil, &result, ""); e == nil || calls != 1 {
 		t.Fatal("ordinary employee triggered server bridge", e, calls)
 	}
@@ -100,7 +100,7 @@ func TestAccountBridgeRechecksRevocationBeforeReturning(t *testing.T) {
 		}
 		return ManagedAccount{ID: "only-local"}, nil
 	}
-	reader := notif.New(server.URL, key["token"].(string))
+	reader := beepgrid.New(server.URL, key["token"].(string))
 	var out map[string]any
 	if e = reader.Do(ctx, "GET", "/api/v1/workspace/account", nil, &out, ""); e == nil {
 		t.Fatal("revoked credential received late managed data")
@@ -110,24 +110,24 @@ func TestAccountBridgeRechecksRevocationBeforeReturning(t *testing.T) {
 func TestWorkspaceSDKQueriesCapabilitiesAndPreviewedBatches(t *testing.T) {
 	_, admin, _ := setup(t)
 	ctx := context.Background()
-	_, session, e := admin.Enroll(ctx, notif.EnrollInput{Agent: "workspace-sdk", Name: "Workspace worker"})
+	_, session, e := admin.Enroll(ctx, beepgrid.EnrollInput{Agent: "workspace-sdk", Name: "Workspace worker"})
 	if e != nil {
 		t.Fatal(e)
 	}
-	target := notif.Target{Kind: "agent", ID: session.Agent.ID}
-	preview, e := admin.DispatchPreview(ctx, notif.DispatchPreviewInput{Targets: []notif.Target{target}, Operation: "message"})
+	target := beepgrid.Target{Kind: "agent", ID: session.Agent.ID}
+	preview, e := admin.DispatchPreview(ctx, beepgrid.DispatchPreviewInput{Targets: []beepgrid.Target{target}, Operation: "message"})
 	if e != nil || preview.Sends || preview.Token == "" {
 		t.Fatal(preview, e)
 	}
-	sent, e := admin.SendBatch(ctx, notif.SendBatchInput{Targets: []notif.Target{target, target}, Body: "one logical recipient", PreviewToken: preview.Token}, "sdk-batch")
+	sent, e := admin.SendBatch(ctx, beepgrid.SendBatchInput{Targets: []beepgrid.Target{target, target}, Body: "one logical recipient", PreviewToken: preview.Token}, "sdk-batch")
 	if e != nil || len(sent) != 1 {
 		t.Fatal(sent, e)
 	}
-	deliveries, e := admin.Query(ctx, notif.QueryInput{Collection: "deliveries", Filters: map[string]string{"operation_id": sent[0].Result.Messages[0].ID}})
+	deliveries, e := admin.Query(ctx, beepgrid.QueryInput{Collection: "deliveries", Filters: map[string]string{"operation_id": sent[0].Result.Messages[0].ID}})
 	if e != nil || len(deliveries.Items) != 1 {
 		t.Fatal(deliveries, e)
 	}
-	page, e := admin.Query(ctx, notif.QueryInput{Collection: "messages", Filters: map[string]string{"conversation_id": sent[0].Result.ConversationID}, Limit: 1})
+	page, e := admin.Query(ctx, beepgrid.QueryInput{Collection: "messages", Filters: map[string]string{"conversation_id": sent[0].Result.ConversationID}, Limit: 1})
 	if e != nil || len(page.Items) != 1 {
 		t.Fatal(page, e)
 	}
@@ -135,11 +135,11 @@ func TestWorkspaceSDKQueriesCapabilitiesAndPreviewedBatches(t *testing.T) {
 	if e = admin.Do(ctx, "POST", "/api/v1/contact-permissions", map[string]any{"subject": target, "rules": []map[string]string{{"action": "view", "target_kind": "person", "target_id": adminPersonID(t, admin)}}, "version": 0}, &contactPolicy, ""); e != nil {
 		t.Fatal(e)
 	}
-	requests, e := admin.AskBatch(ctx, notif.AskBatchInput{Targets: []notif.Target{target}, Request: notif.AskInput{Title: "Progress?"}}, "sdk-ask-batch")
+	requests, e := admin.AskBatch(ctx, beepgrid.AskBatchInput{Targets: []beepgrid.Target{target}, Request: beepgrid.AskInput{Title: "Progress?"}}, "sdk-ask-batch")
 	if e != nil || len(requests) != 1 {
 		t.Fatal(requests, e)
 	}
-	caps, e := admin.Capabilities(ctx, notif.CapabilityInput{RequestID: requests[0].Request.ID})
+	caps, e := admin.Capabilities(ctx, beepgrid.CapabilityInput{RequestID: requests[0].Request.ID})
 	if e != nil || !caps.Operations["cancel"] || caps.RequestVersion != 1 {
 		t.Fatal(caps, e)
 	}
@@ -157,7 +157,7 @@ func TestWorkspaceSDKQueriesCapabilitiesAndPreviewedBatches(t *testing.T) {
 	}
 }
 
-func adminPersonID(t *testing.T, client *notif.Client) string {
+func adminPersonID(t *testing.T, client *beepgrid.Client) string {
 	t.Helper()
 	var me struct {
 		Person struct {

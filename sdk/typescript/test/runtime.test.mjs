@@ -339,12 +339,12 @@ test("custom checkpoint bridge durably appends before wake and routes results se
 });
 test(
   "real PostgreSQL HTTP receive: burst intake, exact instance, approval result, files",
-  { skip: !process.env.NOTIF_SDK_TEST_URL },
+  { skip: !process.env.BEEPGRID_SDK_TEST_URL },
   async (t) => {
     const { Client } = await import("../dist/index.js");
     const owner = new Client(
-      process.env.NOTIF_SDK_TEST_URL,
-      process.env.NOTIF_SDK_TEST_TOKEN,
+      process.env.BEEPGRID_SDK_TEST_URL,
+      process.env.BEEPGRID_SDK_TEST_TOKEN,
     );
     const me = await owner.call("GET", "/api/v1/me");
     const { client, session } = await owner.connect(

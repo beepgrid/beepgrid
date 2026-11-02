@@ -14,18 +14,18 @@ import urllib.parse
 import urllib.request
 
 root = pathlib.Path(__file__).resolve().parents[1]
-database = os.environ.get('NOTIF_TEST_DATABASE_URL', 'postgres://notif:notif@localhost:5499/notif?sslmode=disable')
+database = os.environ.get('BEEPGRID_TEST_DATABASE_URL', 'postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable')
 parsed = urllib.parse.urlsplit(database)
 container_database = database
 if parsed.hostname in ('localhost', '127.0.0.1', '::1'):
     credentials = parsed.netloc.rsplit('@', 1)[0] + '@' if '@' in parsed.netloc else ''
     container_database = urllib.parse.urlunsplit(parsed._replace(netloc=credentials+'host.docker.internal:'+str(parsed.port or 5432)))
 suffix = secrets.token_hex(6)
-schema, name = 'container_test_'+suffix, 'notif-smoke-'+suffix
-image = os.environ.get('NOTIF_TEST_IMAGE', 'notif:local-review')
-headless = os.environ.get('NOTIF_TEST_HEADLESS') == '1'
+schema, name = 'container_test_'+suffix, 'beepgrid-smoke-'+suffix
+image = os.environ.get('BEEPGRID_TEST_IMAGE', 'beepgrid:local-review')
+headless = os.environ.get('BEEPGRID_TEST_HEADLESS') == '1'
 token = secrets.token_hex(32)
-port = int(os.environ.get('NOTIF_CONTAINER_TEST_PORT', '4013'))
+port = int(os.environ.get('BEEPGRID_CONTAINER_TEST_PORT', '4013'))
 url = 'http://localhost:'+str(port)
 network = ['--add-host=host.docker.internal:host-gateway'] if platform.system() == 'Linux' else []
 
@@ -36,14 +36,14 @@ user = docker(['image', 'inspect', image, '--format', '{{.Config.User}}'])
 assert user not in ('', '0', 'root', '0:0'), 'Image must use a non-root runtime identity'
 started = False
 try:
-    with tempfile.TemporaryDirectory(prefix='notif-image-') as directory:
+    with tempfile.TemporaryDirectory(prefix='beepgrid-image-') as directory:
         env_file = pathlib.Path(directory)/'runtime.env'
         env_file.touch(mode=0o600)
         env_file.write_text('\n'.join(k+'='+v for k,v in {
-            'NOTIF_DATABASE_URL':container_database,'NOTIF_SCHEMA':schema,
-            'NOTIF_WORKSPACE':'container-test','NOTIF_ENVIRONMENT':'development',
-            'NOTIF_BOOTSTRAP_TOKEN':token,'NOTIF_SECRET_KEY':secrets.token_hex(32),
-            'NOTIF_ADDR':'0.0.0.0:4010','NOTIF_PUBLIC_URL':url,
+            'BEEPGRID_DATABASE_URL':container_database,'BEEPGRID_SCHEMA':schema,
+            'BEEPGRID_WORKSPACE':'container-test','BEEPGRID_ENVIRONMENT':'development',
+            'BEEPGRID_BOOTSTRAP_TOKEN':token,'BEEPGRID_SECRET_KEY':secrets.token_hex(32),
+            'BEEPGRID_ADDR':'0.0.0.0:4010','BEEPGRID_PUBLIC_URL':url,
         }.items())+'\n')
         docker(['run','--rm',*network,'--env-file',str(env_file),image,'migrate'])
         docker(['run','-d','--name',name,*network,'--env-file',str(env_file),'-p','127.0.0.1:'+str(port)+':4010',image,'serve'])

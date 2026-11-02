@@ -70,7 +70,7 @@ func TestOIDCVerifiedCodeFlow(t *testing.T) {
 				t.Error("PKCE verifier not checked")
 			}
 			head := enc(map[string]string{"alg": "RS256", "kid": "test"})
-			claims := enc(map[string]any{"iss": issuer, "aud": "notif-test", "sub": "employee-1", "nonce": nonce, "exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(), "name": "Taylor", "email": "taylor@example.test", "email_verified": true})
+			claims := enc(map[string]any{"iss": issuer, "aud": "beepgrid-test", "sub": "employee-1", "nonce": nonce, "exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(), "name": "Taylor", "email": "taylor@example.test", "email_verified": true})
 			input := head + "." + claims
 			digest := sha256.Sum256([]byte(input))
 			sig, _ := rsa.SignPKCS1v15(rand.Reader, private, crypto.SHA256, digest[:])
@@ -85,7 +85,7 @@ func TestOIDCVerifiedCodeFlow(t *testing.T) {
 	server := httptest.NewServer(h)
 	defer server.Close()
 	h.PublicURL = server.URL
-	if e = h.ConfigureOIDC(context.Background(), "test/dev", issuer, "notif-test", "client-secret"); e != nil {
+	if e = h.ConfigureOIDC(context.Background(), "test/dev", issuer, "beepgrid-test", "client-secret"); e != nil {
 		t.Fatal(e)
 	}
 	jar, _ := cookiejar.New(nil)

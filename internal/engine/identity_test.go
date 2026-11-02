@@ -10,9 +10,9 @@ import (
 
 func testStore(t testing.TB) (*Store, Actor) {
 	t.Helper()
-	url := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	url := os.Getenv("BEEPGRID_TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("Set NOTIF_TEST_DATABASE_URL for PostgreSQL integration tests.")
+		t.Skip("Set BEEPGRID_TEST_DATABASE_URL for PostgreSQL integration tests.")
 	}
 	schema := "test_" + strings.TrimPrefix(ID(""), "_")
 	ctx := context.Background()

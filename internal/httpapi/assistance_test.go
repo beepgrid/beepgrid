@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestAssistanceSDKHTTPJourney(t *testing.T) {
@@ -17,12 +17,12 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 	ctx := context.Background()
 	store.AllowLocal = true
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if err := owner.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil {
 		t.Fatal(err)
 	}
-	worker, session, err := owner.Enroll(ctx, notif.EnrollInput{Agent: "assistance/scout", Name: "Scout"})
+	worker, session, err := owner.Enroll(ctx, beepgrid.EnrollInput{Agent: "assistance/scout", Name: "Scout"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 		t.Fatal(settings, err)
 	}
 	yes := true
-	if _, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes}); err == nil {
+	if _, err = owner.UpdateAssistance(ctx, beepgrid.AssistanceUpdate{Overseer: &yes}); err == nil {
 		t.Fatal("enabled unconfigured provider")
 	}
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,18 +65,18 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 	if err = store.ConfigureOverseer(ctx, provider.URL, ""); err != nil {
 		t.Fatal(err)
 	}
-	settings, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes})
+	settings, err = owner.UpdateAssistance(ctx, beepgrid.AssistanceUpdate{Overseer: &yes})
 	if err != nil || !settings.Overseer {
 		t.Fatal(settings, err)
 	}
-	if _, err = worker.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &yes}); err == nil {
+	if _, err = worker.UpdateAssistance(ctx, beepgrid.AssistanceUpdate{Overseer: &yes}); err == nil {
 		t.Fatal("worker changed workspace assistance")
 	}
-	source, err := worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Use GST inclusive prices?", SharedKey: "report/2026/v1"}, "source")
+	source, err := worker.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Title: "Use GST inclusive prices?", SharedKey: "report/2026/v1"}, "source")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = owner.Respond(ctx, source.ID, notif.Response{Outcome: "answered", Answer: "Yes", Version: 1}); err != nil {
+	if _, err = owner.Respond(ctx, source.ID, beepgrid.Response{Outcome: "answered", Answer: "Yes", Version: 1}); err != nil {
 		t.Fatal(err)
 	}
 	var published struct {
@@ -85,7 +85,7 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 	if err = owner.Do(ctx, "POST", "/api/v1/answers", map[string]any{"request_id": source.ID, "audience": []string{session.Agent.ID}}, &published, ""); err != nil {
 		t.Fatal(err)
 	}
-	q, err := worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Use GST inclusive prices?", SharedKey: "report/2026/v1"}, "future")
+	q, err := worker.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Title: "Use GST inclusive prices?", SharedKey: "report/2026/v1"}, "future")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 	if err != nil || q.State != "resolved" || q.Response.SourceAnswerID != published.ID {
 		t.Fatal(q, err)
 	}
-	plan, err := owner.PlanOverseer(ctx, notif.OverseerInput{Prompt: "Ask Scout what is complete"})
+	plan, err := owner.PlanOverseer(ctx, beepgrid.OverseerInput{Prompt: "Ask Scout what is complete"})
 	if err != nil || !plan.RequiresConfirmation {
 		t.Fatal(plan, err)
 	}
@@ -101,7 +101,7 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 	if err != nil || len(plan.Dispatches) != 1 {
 		t.Fatal(plan, err)
 	}
-	if _, err = worker.Respond(ctx, plan.Dispatches[0].RequestID, notif.Response{Outcome: "answered", Answer: "Three pages complete", Version: 1}); err != nil {
+	if _, err = worker.Respond(ctx, plan.Dispatches[0].RequestID, beepgrid.Response{Outcome: "answered", Answer: "Three pages complete", Version: 1}); err != nil {
 		t.Fatal(err)
 	}
 	// The same configured provider connection deliberately rate limits one person to one call/sec.
@@ -124,7 +124,7 @@ func TestAssistanceSDKHTTPJourney(t *testing.T) {
 		t.Fatal("forged automatic provenance")
 	}
 	no := false
-	if _, err = owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &no}); err != nil {
+	if _, err = owner.UpdateAssistance(ctx, beepgrid.AssistanceUpdate{Overseer: &no}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = owner.OverseerPlan(ctx, plan.ID); err == nil {
@@ -146,13 +146,13 @@ func TestRetiredMatchingAPIIsUnavailable(t *testing.T) {
 	}
 	for _, path := range []string{"/api/v1/requests/missing/suggestions", "/api/v1/answer-proposals/missing"} {
 		err := owner.Do(ctx, "POST", path, map[string]any{}, nil, "")
-		var apiError *notif.APIError
+		var apiError *beepgrid.APIError
 		if !errors.As(err, &apiError) || (apiError.Status != 404 && apiError.Status != 405) {
 			t.Fatal("retired route still available", path, err)
 		}
 	}
 	err := owner.Do(ctx, "POST", "/api/v1/assistance/settings", map[string]any{"automatic_answers": true}, nil, "")
-	var apiError *notif.APIError
+	var apiError *beepgrid.APIError
 	if !errors.As(err, &apiError) || apiError.Status != 400 {
 		t.Fatal("retired toggle accepted", err)
 	}

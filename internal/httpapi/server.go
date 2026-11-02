@@ -115,7 +115,7 @@ func (s *Server) protect(fn func(http.ResponseWriter, *http.Request) error) http
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if token == "" {
-			if c, e := r.Cookie("notif_session"); e == nil {
+			if c, e := r.Cookie("beepgrid_session"); e == nil {
 				token = c.Value
 			}
 		}
@@ -195,14 +195,14 @@ func (s *Server) routes() {
 			writeError(w, e)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "notif_session", Value: token, Path: "/", HttpOnly: true, Secure: strings.HasPrefix(s.PublicURL, "https://"), SameSite: http.SameSiteStrictMode, MaxAge: 43200})
+		http.SetCookie(w, &http.Cookie{Name: "beepgrid_session", Value: token, Path: "/", HttpOnly: true, Secure: strings.HasPrefix(s.PublicURL, "https://"), SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 		output(w, 200, map[string]bool{"ok": true})
 	})
 	m.HandleFunc("POST /api/v1/auth/logout", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		if e := s.Store.Logout(r.Context(), actor(r)); e != nil {
 			return e
 		}
-		http.SetCookie(w, &http.Cookie{Name: "notif_session", Path: "/", HttpOnly: true, MaxAge: -1, SameSite: http.SameSiteStrictMode})
+		http.SetCookie(w, &http.Cookie{Name: "beepgrid_session", Path: "/", HttpOnly: true, MaxAge: -1, SameSite: http.SameSiteStrictMode})
 		output(w, 200, map[string]bool{"ok": true})
 		return nil
 	}))
@@ -664,7 +664,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) error {
 func ValidatePublicURL(raw string) error {
 	u, e := url.Parse(raw)
 	if e != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.Path != "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return engine.Bad("NOTIF_PUBLIC_URL must be an HTTP(S) origin without a path.")
+		return engine.Bad("BEEPGRID_PUBLIC_URL must be an HTTP(S) origin without a path.")
 	}
 	return nil
 }

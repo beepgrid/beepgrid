@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +27,7 @@ func TestStdioFramingAndScopedTools(t *testing.T) {
 	defer backend.Close()
 	input := strings.Join([]string{`{"jsonrpc":"2.0","id":1,"method":"initialize"}`, `{"jsonrpc":"2.0","method":"notifications/initialized"}`, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_agents","arguments":{}}}`, `{"jsonrpc":"2.0","id":4,"method":"unknown"}`}, "\n")
 	var out bytes.Buffer
-	if e := Serve(context.Background(), notif.New(backend.URL, "scoped-worker-token"), strings.NewReader(input), &out); e != nil {
+	if e := Serve(context.Background(), beepgrid.New(backend.URL, "scoped-worker-token"), strings.NewReader(input), &out); e != nil {
 		t.Fatal(e)
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
@@ -67,7 +67,7 @@ func TestStableToolRetryKeyAndInvalidRequest(t *testing.T) {
 	input := `{ "jsonrpc":"1.0", "id":1,"method":"ping" }
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"send","arguments":{"body":"Hello","target":{"kind":"agent","id":"a"},"idempotency_key":"saved-checkpoint-7"}}}`
 	var out bytes.Buffer
-	if e := Serve(context.Background(), notif.New(backend.URL, "test"), strings.NewReader(input), &out); e != nil {
+	if e := Serve(context.Background(), beepgrid.New(backend.URL, "test"), strings.NewReader(input), &out); e != nil {
 		t.Fatal(e)
 	}
 	if calls != 1 || !strings.Contains(out.String(), "-32600") || !strings.Contains(out.String(), "message-1") {
@@ -99,7 +99,7 @@ func TestExecutionToolsPreserveScopeAndExactAction(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"execution-1","state":"authorized"}`))
 	}))
 	defer backend.Close()
-	c := notif.New(backend.URL, "worker")
+	c := beepgrid.New(backend.URL, "worker")
 	if _, e := call(context.Background(), c, "redeem_approval", json.RawMessage(`{"id":"request-1","action":{"name":"fixture","executor_id":"worker","resource":"fixture","resource_version":"v1","operation_key":"once","arguments":{}}}`)); e != nil {
 		t.Fatal(e)
 	}
@@ -137,7 +137,7 @@ func TestFileToolsPreserveBytesAndRejectOversizedInputs(t *testing.T) {
 		}
 	}))
 	defer backend.Close()
-	c := notif.New(backend.URL, "scoped")
+	c := beepgrid.New(backend.URL, "scoped")
 	if _, err := call(context.Background(), c, "upload_attachment", json.RawMessage(`{"conversation_id":"conv","file_name":"brief.pdf","media_type":"application/pdf","base64":"ZmlsZSBieXRlcw=="}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestLiveInputOwnsInbox(t *testing.T) {
 	defer backend.Close()
 	input := strings.Join([]string{`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"receive","arguments":{}}}`, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"acknowledge","arguments":{"id":"del_1","generation":1}}}`}, "\n")
 	var out bytes.Buffer
-	if err := ServeWithInput(context.Background(), notif.New(backend.URL, "worker"), strings.NewReader(input), &out, true); err != nil {
+	if err := ServeWithInput(context.Background(), beepgrid.New(backend.URL, "worker"), strings.NewReader(input), &out, true); err != nil {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")

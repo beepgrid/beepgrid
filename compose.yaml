@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: notif
-      POSTGRES_PASSWORD: notif
-      POSTGRES_DB: notif
+      POSTGRES_USER: beepgrid
+      POSTGRES_PASSWORD: beepgrid
+      POSTGRES_DB: beepgrid
     ports:
       - "127.0.0.1:5499:5432"
     volumes:
       - postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notif"]
+      test: ["CMD-SHELL", "pg_isready -U beepgrid"]
       interval: 2s
       timeout: 3s
       retries: 30

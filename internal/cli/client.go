@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 const clientHelp = `Beep Grid
@@ -35,7 +35,7 @@ Clients (flags before positional arguments):
 	file-download --out FILE ATTACHMENT_ID
   mcp, trace REQUEST_ID, version
 
-Clients use NOTIF_URL and NOTIF_TOKEN_FILE (or NOTIF_TOKEN).
+Clients use BEEPGRID_URL and BEEPGRID_TOKEN_FILE (or BEEPGRID_TOKEN).
 JSON goes to stdout; errors go to stderr. Input is limited to 4 MiB.
 The JSON commands (send through enroll) accept --timeout (30s; wait 5m).
 See docs/CLI.md for schemas, permissions and safe retry examples.
@@ -45,7 +45,7 @@ type usageError struct{ error }
 
 func clientExitCode(err error) int {
 	var usage usageError
-	var api *notif.APIError
+	var api *beepgrid.APIError
 	switch {
 	case errors.As(err, &usage):
 		return 2
@@ -59,15 +59,15 @@ func clientExitCode(err error) int {
 }
 
 func clientToken(localOwner bool) (string, error) {
-	if token := strings.TrimSpace(os.Getenv("NOTIF_TOKEN")); token != "" {
+	if token := strings.TrimSpace(os.Getenv("BEEPGRID_TOKEN")); token != "" {
 		return token, nil
 	}
-	file := os.Getenv("NOTIF_TOKEN_FILE")
+	file := os.Getenv("BEEPGRID_TOKEN_FILE")
 	if file == "" && localOwner {
 		file = ".local/owner-token"
 	}
 	if file == "" {
-		return "", usageError{fmt.Errorf("set NOTIF_TOKEN_FILE or NOTIF_TOKEN explicitly for this client")}
+		return "", usageError{fmt.Errorf("set BEEPGRID_TOKEN_FILE or BEEPGRID_TOKEN explicitly for this client")}
 	}
 	raw, err := os.ReadFile(file)
 	if err != nil {
@@ -80,12 +80,12 @@ func clientToken(localOwner bool) (string, error) {
 	return token, nil
 }
 
-func clientFromEnv() (*notif.Client, error) {
+func clientFromEnv() (*beepgrid.Client, error) {
 	token, err := clientToken(false)
 	if err != nil {
 		return nil, err
 	}
-	c := notif.New(env("NOTIF_URL", "http://localhost:4010"), token)
+	c := beepgrid.New(env("BEEPGRID_URL", "http://localhost:4010"), token)
 	// Bearer credentials must never follow a redirect to another server.
 	c.HTTP.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return c, nil
@@ -192,7 +192,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 	var result any
 	need := func(count int) error {
 		if len(pos) != count {
-			return usageError{fmt.Errorf("invalid %s arguments; see notif help (flags precede positional arguments)", command)}
+			return usageError{fmt.Errorf("invalid %s arguments; see beepgrid help (flags precede positional arguments)", command)}
 		}
 		return nil
 	}
@@ -215,7 +215,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 			break
 		}
 		var data []byte
-		data, err = io.ReadAll(io.LimitReader(file, notif.MaxAttachmentBytes+1))
+		data, err = io.ReadAll(io.LimitReader(file, beepgrid.MaxAttachmentBytes+1))
 		file.Close()
 		if err == nil {
 			if command == "file-stage" {
@@ -239,13 +239,13 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		}
 		result = map[string]any{"output_file": *out, "bytes": len(data)}
 	case "send":
-		var in notif.SendInput
+		var in beepgrid.SendInput
 		if *input != "" {
 			if err = need(0); err == nil {
 				err = readClientInput(*input, stdin, &in)
 			}
 		} else if len(pos) >= 3 {
-			in.Target = notif.Target{Kind: pos[0], ID: pos[1]}
+			in.Target = beepgrid.Target{Kind: pos[0], ID: pos[1]}
 			in.Body = strings.Join(pos[2:], " ")
 		} else {
 			err = usageError{fmt.Errorf("send needs --input or target kind, ID and message")}
@@ -254,7 +254,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 			result, err = c.Send(ctx, in, *key)
 		}
 	case "ask", "approve", "task":
-		var in notif.AskInput
+		var in beepgrid.AskInput
 		if err = need(0); err == nil {
 			err = readClientInput(*input, stdin, &in)
 		}
@@ -265,7 +265,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 			result, err = c.Ask(ctx, in, *key)
 		}
 	case "respond":
-		var in notif.Response
+		var in beepgrid.Response
 		if err = need(1); err == nil {
 			err = readClientInput(*input, stdin, &in)
 		}
@@ -278,17 +278,17 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		}
 	case "list":
 		if err = need(1); err == nil {
-			result, err = c.Query(ctx, notif.QueryInput{Collection: pos[0], Search: *search, Limit: *limit, Cursor: *cursor})
+			result, err = c.Query(ctx, beepgrid.QueryInput{Collection: pos[0], Search: *search, Limit: *limit, Cursor: *cursor})
 		}
 	case "enroll":
-		var in notif.EnrollInput
+		var in beepgrid.EnrollInput
 		if output == nil {
 			err = usageError{fmt.Errorf("enroll requires --out TOKEN_FILE; credentials are never printed")}
 		} else if err = need(0); err == nil {
 			err = readClientInput(*input, stdin, &in)
 		}
 		if err == nil {
-			var session notif.Session
+			var session beepgrid.Session
 			_, session, err = c.Enroll(ctx, in)
 			if err == nil {
 				_, err = io.WriteString(output, session.Token+"\n")

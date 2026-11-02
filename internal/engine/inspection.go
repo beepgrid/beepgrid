@@ -118,7 +118,7 @@ func (s *Store) TestConnection(ctx context.Context, a Actor, id, destination, ke
 			policy := map[string]any{"sender_id": a.ID, "credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "action": "message", "target": target}
 			payload := map[string]any{"type": "message", "message": m, "conversation_id": conv, "_policy": policy, "diagnostic": true}
 			out = Delivery{ID: ID("del"), RecipientID: p.ID, OperationID: m.ID, ConnectionID: id, Address: d.Address, State: "queued", ExpiresAt: time.Now().Add(time.Hour), Payload: payload}
-			_, e = db.Exec(ctx, `WITH queued AS (INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id) SELECT pg_notify('notif_provider','') FROM queued`, out.ID, a.Scope, m.ID, p.ID, id, d.Address, JSON(payload), out.ExpiresAt)
+			_, e = db.Exec(ctx, `WITH queued AS (INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id) SELECT pg_notify('beepgrid_provider','') FROM queued`, out.ID, a.Scope, m.ID, p.ID, id, d.Address, JSON(payload), out.ExpiresAt)
 			if e != nil {
 				return e
 			}

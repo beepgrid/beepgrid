@@ -1,6 +1,6 @@
 """Complete Python API tour. Run only in a disposable, empty test workspace.
 
-NOTIF_URL and an owner-only NOTIF_TOKEN_FILE are required. Coordinator examples
+BEEPGRID_URL and an owner-only BEEPGRID_TOKEN_FILE are required. Coordinator examples
 also require an engine configured with a model provider. The verification runner
 uses a deterministic local provider, not a live model. No external tool executes.
 """
@@ -11,10 +11,10 @@ import time
 import uuid
 from beepgrid import Client, mention_context
 
-credential = Path(os.environ['NOTIF_TOKEN_FILE'])
+credential = Path(os.environ['BEEPGRID_TOKEN_FILE'])
 if credential.stat().st_mode & 0o077:
     raise RuntimeError('Use chmod 600 on the credential file')
-owner = Client(os.environ['NOTIF_URL'], credential.read_text().strip())
+owner = Client(os.environ['BEEPGRID_URL'], credential.read_text().strip())
 run_id = uuid.uuid4().hex
 person_id = owner.call('GET', '/api/v1/me')['person']['id']
 builder, builder_session = owner.connect('tour/' + run_id + '/builder', 'Builder 7')
@@ -31,6 +31,18 @@ for agent_id, peer_id in [(builder_id, billing_id), (billing_id, builder_id)]:
         'role_id': role['id'], 'subject_kind': 'principal', 'subject_id': agent_id})
 target = {'kind': 'agent', 'id': billing_id}
 targets = [{'kind': 'agent', 'id': builder_id}, target]
+
+issued = owner.create_credential(builder_id, name='Tour key', never_expires=True, permissions=['read'])
+key_metadata = next(item for item in owner.credentials() if item['id'] == issued['id'])
+edited = owner.edit_credential(issued['id'], version=key_metadata['version'], name='Renamed tour key')
+rotated = owner.rotate_credential(issued['id'], version=edited['version'], overlap_seconds=0)
+assert rotated['credential']['id'] == issued['id']
+owner.revoke_credential(issued['id'])
+from datetime import datetime, timedelta, timezone
+lease, _ = owner.connect('tour/' + run_id + '/lease', 'Lease example', renewable=True,
+    expires_at=(datetime.now(timezone.utc) + timedelta(days=2)).isoformat())
+assert lease.renew_credential()['renewable_until']
+
 # endregion setup
 
 # region messages
@@ -40,7 +52,7 @@ sent = builder.send(target=target, body='Check the payment ledger for orders 241
 billing.send(conversation_id=sent['conversation_id'], body='Both payments settled yesterday.')
 assert len(builder.conversation(sent['conversation_id'])['messages']) == 2
 receipt_options = dict(target=target, body='The reconciliation is complete.', key=run_id + '/receipt')
-receipt = builder.notify(**receipt_options)
+receipt = builder.send_minimal(**receipt_options)
 full = builder.send(**receipt_options)
 assert full['conversation_id'] == receipt['conversation_id']
 preview = owner.dispatch_preview(targets, 'message')
@@ -48,7 +60,7 @@ batch = owner.send_batch(targets, 'Hold the staging rollout until checkout jobs 
                         preview_token=preview['token'], key=run_id + '/batch')
 assert len({item['result']['conversation_id'] for item in batch}) == 2
 # endregion messages
-if os.getenv("NOTIF_TOUR_MESSAGES_ONLY") == "1":
+if os.getenv("BEEPGRID_TOUR_MESSAGES_ONLY") == "1":
     print("PASS: Python first exchange")
     raise SystemExit(0)
 
@@ -111,6 +123,25 @@ connection = owner.call('POST', '/api/v1/connections', {
 assert owner.connection_setup(connection['id'])
 # endregion queries
 
+
+# region identity
+subject = {'kind': 'agent', 'id': builder_id}
+contact_preview = owner.preview_contact_permissions(subject)
+contact_policy = owner.save_contact_permissions(subject, [
+    {'action': 'view', 'target_kind': 'agent', 'target_id': billing_id}],
+    version=contact_preview['policy']['version'])
+assert contact_policy['version'] > contact_preview['policy']['version']
+# endregion identity
+
+# region channels
+preferences = owner.delivery_preferences(person_id)
+saved_preferences = owner.save_delivery_preferences(person_id, {
+    'version': preferences['version'],
+    'default': {'mode': 'preferred', 'destinations': [], 'followup_seconds': 0},
+    'overrides': []})
+assert saved_preferences['version'] > preferences['version']
+# endregion channels
+
 # region workers
 billing.heartbeat()
 for delivery in billing.inbox():
@@ -149,7 +180,7 @@ assert builder.report_execution(execution['id'], 'succeeded', {'fixture': True})
 
 # region coordinator
 settings = owner.assistance()
-assert settings['overseer_configured'], 'Configure NOTIF_AI_PROVIDER and NOTIF_AI_MODEL on the engine first'
+assert settings['overseer_configured'], 'Configure BEEPGRID_AI_PROVIDER and BEEPGRID_AI_MODEL on the engine first'
 owner.update_assistance(overseer=True, version=settings['version'])
 plan = owner.plan_overseer('Ask the available specialists whether staging is ready.')
 assert owner.overseer_plan(plan['id'])['id'] == plan['id']

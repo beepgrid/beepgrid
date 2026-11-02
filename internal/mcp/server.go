@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"io"
 )
 
@@ -51,12 +51,12 @@ func Tools() any {
 		{"request_status", "List requests visible to this caller.", schema(nil, map[string]any{})},
 	}
 }
-func Serve(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer) error {
+func Serve(ctx context.Context, c *beepgrid.Client, in io.Reader, out io.Writer) error {
 	return ServeWithInput(ctx, c, in, out, false)
 }
 
 // ServeWithInput disables competing inbox tools when a live receiver owns intake.
-func ServeWithInput(ctx context.Context, c *notif.Client, in io.Reader, out io.Writer, liveInput bool) error {
+func ServeWithInput(ctx context.Context, c *beepgrid.Client, in io.Reader, out io.Writer, liveInput bool) error {
 	done := make(chan struct{})
 	defer close(done)
 	if closer, ok := in.(io.ReadCloser); ok {
@@ -150,7 +150,7 @@ func ServeWithInput(ctx context.Context, c *notif.Client, in io.Reader, out io.W
 	}
 	return scanner.Err()
 }
-func call(ctx context.Context, c *notif.Client, name string, args json.RawMessage) (any, error) {
+func call(ctx context.Context, c *beepgrid.Client, name string, args json.RawMessage) (any, error) {
 	var value any
 	switch name {
 	case "list_directory":
@@ -227,7 +227,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 		if e := json.Unmarshal(args, &in); e != nil {
 			return nil, e
 		}
-		e := c.Ack(ctx, notif.Delivery{ID: in.ID, Generation: in.Generation})
+		e := c.Ack(ctx, beepgrid.Delivery{ID: in.ID, Generation: in.Generation})
 		return map[string]bool{"received": e == nil}, e
 	case "report_progress":
 		var in struct {
@@ -246,7 +246,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 		return value, e
 	case "send":
 		var in struct {
-			notif.SendInput
+			beepgrid.SendInput
 			IdempotencyKey string `json:"idempotency_key"`
 		}
 		if e := json.Unmarshal(args, &in); e != nil {
@@ -255,7 +255,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 		return c.Send(ctx, in.SendInput, in.IdempotencyKey)
 	case "start_chat":
 		var in struct {
-			notif.StartChatInput
+			beepgrid.StartChatInput
 			IdempotencyKey string `json:"idempotency_key"`
 		}
 		if err := json.Unmarshal(args, &in); err != nil {
@@ -264,7 +264,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 		return c.StartChat(ctx, in.StartChatInput, in.IdempotencyKey)
 	case "change_chat_membership":
 		var in struct {
-			notif.ChatMembershipInput
+			beepgrid.ChatMembershipInput
 			ConversationID string `json:"conversation_id"`
 			IdempotencyKey string `json:"idempotency_key"`
 		}
@@ -274,7 +274,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 		return c.ChangeChatMembership(ctx, in.ConversationID, in.ChatMembershipInput, in.IdempotencyKey)
 	case "ask":
 		var in struct {
-			notif.AskInput
+			beepgrid.AskInput
 			IdempotencyKey string `json:"idempotency_key"`
 		}
 		if e := json.Unmarshal(args, &in); e != nil {
@@ -284,7 +284,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 	case "redeem_approval":
 		var in struct {
 			ID     string       `json:"id"`
-			Action notif.Action `json:"action"`
+			Action beepgrid.Action `json:"action"`
 		}
 		if e := json.Unmarshal(args, &in); e != nil {
 			return nil, e
@@ -311,7 +311,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 		return c.SetRequestBlocking(ctx, in.ID, in.Blocking)
 	case "replace_request":
 		var in struct {
-			notif.ReplaceRequestInput
+			beepgrid.ReplaceRequestInput
 			ID  string `json:"id"`
 			Key string `json:"idempotency_key"`
 		}
@@ -334,7 +334,7 @@ func call(ctx context.Context, c *notif.Client, name string, args json.RawMessag
 	case "reply":
 		var in struct {
 			ID string `json:"id"`
-			notif.Response
+			beepgrid.Response
 		}
 		if e := json.Unmarshal(args, &in); e != nil {
 			return nil, e

@@ -35,7 +35,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -189,7 +189,7 @@ func worker() error {
 	think, _ := strconv.Atoi(os.Getenv("LOAD_THINK_MS"))
 	jitter, _ := strconv.Atoi(os.Getenv("LOAD_JITTER_MS"))
 	tr := &transport{base: baseTransport(), half: time.Duration(half) * time.Millisecond / 2, jitter: time.Duration(jitter) * time.Millisecond, drop: os.Getenv("LOAD_DROP") == "1"}
-	c := notif.New(os.Getenv("NOTIF_URL"), os.Getenv("NOTIF_TOKEN"))
+	c := beepgrid.New(os.Getenv("BEEPGRID_URL"), os.Getenv("BEEPGRID_TOKEN"))
 	c.HTTP.Transport = tr
 	path := os.Getenv("LOAD_REPORT")
 	out, e := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
@@ -200,7 +200,7 @@ func worker() error {
 	if _, e = out.WriteString("{\"ready\":true}\n"); e != nil {
 		return e
 	}
-	e = c.Run(ctx, func(ctx context.Context, d notif.Delivery) error {
+	e = c.Run(ctx, func(ctx context.Context, d beepgrid.Delivery) error {
 		if d.Payload.Message == nil {
 			return fmt.Errorf("unexpected payload")
 		}
@@ -230,7 +230,7 @@ func worker() error {
 				return ctx.Err()
 			}
 		}
-		result, e := c.Send(ctx, notif.SendInput{ConversationID: d.Payload.Message.ConversationID, Body: fmt.Sprintf("completed/%d/%s", j.Sequence, d.Payload.Message.ID)}, "load/reply/"+d.Payload.Message.ID)
+		result, e := c.Send(ctx, beepgrid.SendInput{ConversationID: d.Payload.Message.ConversationID, Body: fmt.Sprintf("completed/%d/%s", j.Sequence, d.Payload.Message.ID)}, "load/reply/"+d.Payload.Message.ID)
 		if e != nil {
 			return e
 		}
@@ -262,7 +262,7 @@ type config struct {
 	think, drop, profile, entropy, crash, provider, plans                       bool
 }
 
-func call(c *notif.Client, method, path string, in, out any) error {
+func call(c *beepgrid.Client, method, path string, in, out any) error {
 	return c.Do(context.Background(), method, path, in, out, "")
 }
 func metric(url string) (map[string]float64, error) {
@@ -312,7 +312,7 @@ func delta(a, b map[string]float64) map[string]float64 {
 }
 func run() (err error) {
 	var cfg config
-	flag.StringVar(&cfg.server, "server", ".local/notif", "server binary")
+	flag.StringVar(&cfg.server, "server", ".local/beepgrid", "server binary")
 	flag.StringVar(&cfg.label, "label", "screen", "variant label")
 	flag.StringVar(&cfg.out, "out", ".local/server-perf/screen", "owned output directory")
 	flag.StringVar(&cfg.mode, "mode", "burst", "burst or idle")
@@ -382,16 +382,16 @@ func run() (err error) {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	database := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	database := os.Getenv("BEEPGRID_TEST_DATABASE_URL")
 	if database == "" {
-		database = "postgres://notif:notif@localhost:5499/notif?sslmode=disable"
+		database = "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable"
 	}
 	admin, e := pgx.Connect(ctx, database)
 	if e != nil {
 		return e
 	}
 	defer admin.Close(context.Background())
-	name := "notif_load_" + token()[:12]
+	name := "beepgrid_load_" + token()[:12]
 	if _, e = admin.Exec(ctx, "CREATE DATABASE "+name); e != nil {
 		return e
 	}
@@ -407,7 +407,7 @@ func run() (err error) {
 		return e
 	}
 	ownerToken, key := token()+token(), token()+token()
-	env := append(os.Environ(), "NOTIF_DATABASE_URL="+dbURL, "NOTIF_SCHEMA=notif", "NOTIF_WORKSPACE=load", "NOTIF_ENVIRONMENT=development", "NOTIF_BOOTSTRAP_TOKEN="+ownerToken, "NOTIF_SECRET_KEY="+key[:64], "NOTIF_ADDR=127.0.0.1:4014", "NOTIF_PUBLIC_URL=http://localhost:4014", "NOTIF_PROFILE_ADDR=127.0.0.1:4015", "NOTIF_ATTACHMENTS_DIR="+filepath.Join(cfg.out, "attachments"))
+	env := append(os.Environ(), "BEEPGRID_DATABASE_URL="+dbURL, "BEEPGRID_SCHEMA=beepgrid", "BEEPGRID_WORKSPACE=load", "BEEPGRID_ENVIRONMENT=development", "BEEPGRID_BOOTSTRAP_TOKEN="+ownerToken, "BEEPGRID_SECRET_KEY="+key[:64], "BEEPGRID_ADDR=127.0.0.1:4014", "BEEPGRID_PUBLIC_URL=http://localhost:4014", "BEEPGRID_PROFILE_ADDR=127.0.0.1:4015", "BEEPGRID_ATTACHMENTS_DIR="+filepath.Join(cfg.out, "attachments"))
 	migrate := exec.CommandContext(ctx, cfg.server, "migrate")
 	migrate.Env = env
 	if out, e := migrate.CombinedOutput(); e != nil {
@@ -444,11 +444,11 @@ func run() (err error) {
 		return e
 	}
 	defer db.Close(context.Background())
-	c := notif.New("http://localhost:4014", ownerToken)
+	c := beepgrid.New("http://localhost:4014", ownerToken)
 	ownerTransport := &transport{base: baseTransport()}
 	c.HTTP.Transport = ownerTransport
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if e = call(c, "GET", "/api/v1/me", nil, &me); e != nil {
 		return e
@@ -498,7 +498,7 @@ func run() (err error) {
 		}
 	}
 	files := []string{}
-	sessions := []notif.Session{}
+	sessions := []beepgrid.Session{}
 	executable, _ := os.Executable()
 	defer func() {
 		for _, w := range workers {
@@ -509,7 +509,7 @@ func run() (err error) {
 		}
 	}()
 	for i := 0; i < cfg.agents; i++ {
-		_, session, e := c.Enroll(ctx, notif.EnrollInput{Agent: fmt.Sprint("load/", i), Name: fmt.Sprint("Load worker ", i), Capabilities: []string{"message", "request"}})
+		_, session, e := c.Enroll(ctx, beepgrid.EnrollInput{Agent: fmt.Sprint("load/", i), Name: fmt.Sprint("Load worker ", i), Capabilities: []string{"message", "request"}})
 		if e != nil {
 			return e
 		}
@@ -525,7 +525,7 @@ func run() (err error) {
 			think = []int{0, 10, 40, 100, 200}[i%5]
 		}
 		w := exec.Command(executable, "worker")
-		w.Env = append(os.Environ(), "NOTIF_URL=http://localhost:4014", "NOTIF_TOKEN="+session.Token, "LOAD_REPORT="+file, "LOAD_RTT_MS="+strconv.Itoa(cfg.rtt), "LOAD_THINK_MS="+strconv.Itoa(think), "LOAD_JITTER_MS="+strconv.Itoa(cfg.jitter), "LOAD_CRASH_CLAIM="+map[bool]string{true: "1", false: "0"}[cfg.crash && i == 0], "LOAD_DROP="+map[bool]string{true: "1", false: "0"}[cfg.drop])
+		w.Env = append(os.Environ(), "BEEPGRID_URL=http://localhost:4014", "BEEPGRID_TOKEN="+session.Token, "LOAD_REPORT="+file, "LOAD_RTT_MS="+strconv.Itoa(cfg.rtt), "LOAD_THINK_MS="+strconv.Itoa(think), "LOAD_JITTER_MS="+strconv.Itoa(cfg.jitter), "LOAD_CRASH_CLAIM="+map[bool]string{true: "1", false: "0"}[cfg.crash && i == 0], "LOAD_DROP="+map[bool]string{true: "1", false: "0"}[cfg.drop])
 		w.Stderr = log
 		if e = w.Start(); e != nil {
 			return e
@@ -540,19 +540,19 @@ func run() (err error) {
 	}
 	if cfg.backlog > 0 {
 		// Archived receipt history is fixture setup, not a throughput/enrollment claim.
-		_, e = db.Exec(ctx, `INSERT INTO notif.deliveries(id,scope,operation_id,recipient_id,payload,expires_at,state,created_at) SELECT 'history_'||p.id||'_'||n,'load/development','old_'||n,p.id,'{}',now()+interval '1 day','received',now()-interval '1 day' FROM notif.principals p CROSS JOIN generate_series(1,$1::int) n WHERE p.kind='agent'`, cfg.backlog)
+		_, e = db.Exec(ctx, `INSERT INTO beepgrid.deliveries(id,scope,operation_id,recipient_id,payload,expires_at,state,created_at) SELECT 'history_'||p.id||'_'||n,'load/development','old_'||n,p.id,'{}',now()+interval '1 day','received',now()-interval '1 day' FROM beepgrid.principals p CROSS JOIN generate_series(1,$1::int) n WHERE p.kind='agent'`, cfg.backlog)
 		if e != nil {
 			return e
 		}
-		if _, e = db.Exec(ctx, `ANALYZE notif.deliveries`); e != nil {
+		if _, e = db.Exec(ctx, `ANALYZE beepgrid.deliveries`); e != nil {
 			return e
 		}
 	}
 	if cfg.plans {
 		plans := map[string]json.RawMessage{}
 		queries := map[string]string{
-			"claim":    `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT id FROM notif.deliveries WHERE scope=$1 AND recipient_id=$2 AND connection_id='' AND expires_at>now() AND (exact_instance='' OR exact_instance=$3) AND ((state='queued' AND next_at<=now()) OR (state='leased' AND (lease_until<now() OR owner_instance=$3))) ORDER BY created_at,id LIMIT 1`,
-			"provider": `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT id FROM notif.deliveries WHERE scope=$1 AND connection_id<>'' AND state='queued' AND next_at<=now() ORDER BY next_at,id LIMIT 1`,
+			"claim":    `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT id FROM beepgrid.deliveries WHERE scope=$1 AND recipient_id=$2 AND connection_id='' AND expires_at>now() AND (exact_instance='' OR exact_instance=$3) AND ((state='queued' AND next_at<=now()) OR (state='leased' AND (lease_until<now() OR owner_instance=$3))) ORDER BY created_at,id LIMIT 1`,
+			"provider": `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT id FROM beepgrid.deliveries WHERE scope=$1 AND connection_id<>'' AND state='queued' AND next_at<=now() ORDER BY next_at,id LIMIT 1`,
 		}
 		for name, query := range queries {
 			var raw []byte
@@ -648,7 +648,7 @@ func run() (err error) {
 			sum := sha256.Sum256([]byte(padding))
 			body, _ := json.Marshal(job{round, time.Now().UnixNano(), padding, hex.EncodeToString(sum[:])})
 			started := time.Now()
-			r, e := c.Send(ctx, notif.SendInput{Target: notif.Target{Kind: "group", ID: group.ID}, Body: string(body), Title: "Load fixture"}, fmt.Sprint("round/", round))
+			r, e := c.Send(ctx, beepgrid.SendInput{Target: beepgrid.Target{Kind: "group", ID: group.ID}, Body: string(body), Title: "Load fixture"}, fmt.Sprint("round/", round))
 			if e != nil {
 				return e
 			}
@@ -659,8 +659,8 @@ func run() (err error) {
 		}
 		deadline := time.Now().Add(90 * time.Second)
 		replaced := false
-		var stale notif.Delivery
-		var oldSession notif.Session
+		var stale beepgrid.Delivery
+		var oldSession beepgrid.Session
 		for {
 			if cfg.crash && !replaced {
 				raw, _ := os.ReadFile(files[0])
@@ -670,15 +670,15 @@ func run() (err error) {
 						Generation int64  `json:"generation"`
 					}
 					if json.Unmarshal(line, &claim) == nil && claim.ID != "" {
-						stale = notif.Delivery{ID: claim.ID, Generation: claim.Generation}
+						stale = beepgrid.Delivery{ID: claim.ID, Generation: claim.Generation}
 						oldSession = sessions[0]
 						waitWorker(workers[0])
-						_, replacement, e := c.Enroll(ctx, notif.EnrollInput{Agent: "load/0", Name: "Load worker 0", Capabilities: []string{"message", "request"}})
+						_, replacement, e := c.Enroll(ctx, beepgrid.EnrollInput{Agent: "load/0", Name: "Load worker 0", Capabilities: []string{"message", "request"}})
 						if e != nil {
 							return e
 						}
 						w := exec.Command(executable, "worker")
-						w.Env = append(os.Environ(), "NOTIF_URL=http://localhost:4014", "NOTIF_TOKEN="+replacement.Token, "LOAD_REPORT="+files[0], "LOAD_RTT_MS="+strconv.Itoa(cfg.rtt), "LOAD_JITTER_MS="+strconv.Itoa(cfg.jitter), "LOAD_DROP="+map[bool]string{true: "1", false: "0"}[cfg.drop])
+						w.Env = append(os.Environ(), "BEEPGRID_URL=http://localhost:4014", "BEEPGRID_TOKEN="+replacement.Token, "LOAD_REPORT="+files[0], "LOAD_RTT_MS="+strconv.Itoa(cfg.rtt), "LOAD_JITTER_MS="+strconv.Itoa(cfg.jitter), "LOAD_DROP="+map[bool]string{true: "1", false: "0"}[cfg.drop])
 						w.Stderr = log
 						if e = w.Start(); e != nil {
 							return e
@@ -697,13 +697,13 @@ func run() (err error) {
 				count += len(obs)
 			}
 			var acknowledged int
-			if e = db.QueryRow(ctx, `SELECT count(*) FROM notif.deliveries WHERE state='received' AND operation_id NOT LIKE 'old_%' AND recipient_id=ANY($1::text[])`, members).Scan(&acknowledged); e != nil {
+			if e = db.QueryRow(ctx, `SELECT count(*) FROM beepgrid.deliveries WHERE state='received' AND operation_id NOT LIKE 'old_%' AND recipient_id=ANY($1::text[])`, members).Scan(&acknowledged); e != nil {
 				return e
 			}
 			providerDrained := true
 			if cfg.provider {
 				var terminal int
-				if e = db.QueryRow(ctx, `SELECT count(*) FROM notif.deliveries WHERE connection_id=$1 AND state IN('provider_accepted','failed','unknown')`, providerID).Scan(&terminal); e != nil {
+				if e = db.QueryRow(ctx, `SELECT count(*) FROM beepgrid.deliveries WHERE connection_id=$1 AND state IN('provider_accepted','failed','unknown')`, providerID).Scan(&terminal); e != nil {
 					return e
 				}
 				providerDrained = terminal == cfg.agents*cfg.rounds
@@ -713,9 +713,9 @@ func run() (err error) {
 					if !replaced {
 						return fmt.Errorf("crash was not exercised")
 					}
-					old := notif.New(c.BaseURL, oldSession.Token)
+					old := beepgrid.New(c.BaseURL, oldSession.Token)
 					e := old.Ack(ctx, stale)
-					var apiErr *notif.APIError
+					var apiErr *beepgrid.APIError
 					if !errors.As(e, &apiErr) || apiErr.Status != 409 {
 						return fmt.Errorf("stale generation was not rejected: %v", e)
 					}
@@ -778,17 +778,17 @@ func run() (err error) {
 		calls += int(summary["calls"])
 	}
 	var privacyErrors int
-	if e = db.QueryRow(ctx, `SELECT count(*) FROM notif.conversations c WHERE (SELECT count(*) FROM notif.participants p WHERE p.conversation_id=c.id AND p.scope=c.scope)<>2 OR NOT EXISTS(SELECT 1 FROM notif.participants p WHERE p.conversation_id=c.id AND p.scope=c.scope AND p.principal_id=$1) OR EXISTS(SELECT 1 FROM notif.messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM notif.participants p WHERE p.scope=m.scope AND p.conversation_id=m.conversation_id AND p.principal_id=m.sender_id))`, me.Person.ID).Scan(&privacyErrors); e != nil {
+	if e = db.QueryRow(ctx, `SELECT count(*) FROM beepgrid.conversations c WHERE (SELECT count(*) FROM beepgrid.participants p WHERE p.conversation_id=c.id AND p.scope=c.scope)<>2 OR NOT EXISTS(SELECT 1 FROM beepgrid.participants p WHERE p.conversation_id=c.id AND p.scope=c.scope AND p.principal_id=$1) OR EXISTS(SELECT 1 FROM beepgrid.messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM beepgrid.participants p WHERE p.scope=m.scope AND p.conversation_id=m.conversation_id AND p.principal_id=m.sender_id))`, me.Person.ID).Scan(&privacyErrors); e != nil {
 		return e
 	}
 	if privacyErrors != 0 {
 		return fmt.Errorf("private conversation or attribution violation")
 	}
 	var messages, replies, acked int
-	if e = db.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE body LIKE 'completed/%') FROM notif.messages`).Scan(&messages, &replies); e != nil {
+	if e = db.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE body LIKE 'completed/%') FROM beepgrid.messages`).Scan(&messages, &replies); e != nil {
 		return e
 	}
-	if e = db.QueryRow(ctx, `SELECT count(*) FROM notif.deliveries WHERE state='received' AND operation_id NOT LIKE 'old_%'`).Scan(&acked); e != nil {
+	if e = db.QueryRow(ctx, `SELECT count(*) FROM beepgrid.deliveries WHERE state='received' AND operation_id NOT LIKE 'old_%'`).Scan(&acked); e != nil {
 		return e
 	}
 	expected := 0
@@ -899,7 +899,7 @@ func urlParse(raw, name string) (string, error) {
 }
 
 func browserPoll(ctx context.Context, base, token string, tr *transport, updates <-chan struct{}) {
-	c := notif.New(base, token)
+	c := beepgrid.New(base, token)
 	c.HTTP.Transport = tr
 	paths := []string{"me", "people", "agents", "services", "requests", "conversations", "groups", "activity", "roles", "connections", "role-bindings", "destinations"}
 	for ctx.Err() == nil {
@@ -986,7 +986,7 @@ func browserStream(ctx context.Context, base, token string, tr *transport, updat
 func entropyPadding(round, size int) string {
 	var b strings.Builder
 	for block := 0; b.Len() < size; block++ {
-		sum := sha256.Sum256([]byte(fmt.Sprintf("notif-load/%d/%d", round, block)))
+		sum := sha256.Sum256([]byte(fmt.Sprintf("beepgrid-load/%d/%d", round, block)))
 		b.WriteString(base64.RawStdEncoding.EncodeToString(sum[:]))
 	}
 	return b.String()[:size]
@@ -1007,9 +1007,9 @@ func newProviderFixture(delay time.Duration) *providerFixture {
 	p := &providerFixture{secret: token(), attempts: map[string]int{}, order: map[string]int{}}
 	p.server = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, e := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-		id := r.Header.Get("X-Notif-Event-ID")
+		id := r.Header.Get("X-Beepgrid-Event-ID")
 		p.mu.Lock()
-		if e != nil || id == "" || !engine.VerifySignature(p.secret, r.Header.Get("X-Notif-Timestamp"), r.Header.Get("X-Notif-Signature"), raw, time.Now()) || bytes.Contains(raw, []byte("_policy")) {
+		if e != nil || id == "" || !engine.VerifySignature(p.secret, r.Header.Get("X-Beepgrid-Timestamp"), r.Header.Get("X-Beepgrid-Signature"), raw, time.Now()) || bytes.Contains(raw, []byte("_policy")) {
 			p.failed = true
 		}
 		if p.attempts[id] == 0 {
@@ -1082,14 +1082,14 @@ func (p *providerFixture) verify(ctx context.Context, db *pgx.Conn, id string, e
 	}
 	for state, want := range counts {
 		var got int
-		if e := db.QueryRow(ctx, `SELECT count(*) FROM notif.deliveries WHERE connection_id=$1 AND state=$2`, id, state).Scan(&got); e != nil {
+		if e := db.QueryRow(ctx, `SELECT count(*) FROM beepgrid.deliveries WHERE connection_id=$1 AND state=$2`, id, state).Scan(&got); e != nil {
 			return e
 		} else if got != want {
 			return fmt.Errorf("provider %s count %d instead of %d", state, got, want)
 		}
 	}
 	var recorded int
-	if e := db.QueryRow(ctx, `SELECT count(*) FROM notif.delivery_attempts WHERE delivery_id IN(SELECT id FROM notif.deliveries WHERE connection_id=$1)`, id).Scan(&recorded); e != nil {
+	if e := db.QueryRow(ctx, `SELECT count(*) FROM beepgrid.delivery_attempts WHERE delivery_id IN(SELECT id FROM beepgrid.deliveries WHERE connection_id=$1)`, id).Scan(&recorded); e != nil {
 		return e
 	}
 	if recorded != attempts {
@@ -1106,8 +1106,8 @@ func usageCPU(u *syscall.Rusage) float64 {
 	return float64(u.Utime.Sec+u.Stime.Sec) + float64(u.Utime.Usec+u.Stime.Usec)/1e6
 }
 func benchmarkPostgres() string {
-	if name := os.Getenv("NOTIF_BENCHMARK_POSTGRES_CONTAINER"); name != "" {
+	if name := os.Getenv("BEEPGRID_BENCHMARK_POSTGRES_CONTAINER"); name != "" {
 		return name
 	}
-	return "notif-postgres-1"
+	return "beepgrid-postgres-1"
 }

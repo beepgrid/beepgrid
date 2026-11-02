@@ -34,7 +34,7 @@ The React package offers authenticated request/conversation components and a hea
 
 ## MCP
 
-Run `notif mcp` as a stdio server with `NOTIF_URL` and a protected `NOTIF_TOKEN_FILE` (or `NOTIF_TOKEN`). A worker token acts as that instance. Alternatively supply a launcher token plus `NOTIF_AGENT_ID`/`NOTIF_AGENT_NAME` for startup enrollment. Stdout is JSON-RPC only; logs go to stderr.
+Run `beepgrid mcp` as a stdio server with `BEEPGRID_URL` and a protected `BEEPGRID_TOKEN_FILE` (or `BEEPGRID_TOKEN`). A worker token acts as that instance. Alternatively supply a launcher token plus `BEEPGRID_AGENT_ID`/`BEEPGRID_AGENT_NAME` for startup enrollment. Stdout is JSON-RPC only; logs go to stderr.
 
 Tools include `list_agents`, `send`, `ask`, `get_request`, `reply`, `request_status`, `receive`, `acknowledge` and `report_progress`. Calls use the caller's existing permissions. The legacy initialize handshake advertises protocol `2025-11-25`; tool calls also work without a handshake. Scoped directory/history/file tools are also available; MCP byte transfer is bounded to 64 KiB, with 5 MiB through SDKs. See [local host recipes](LOCAL-MCP.md). Remote Streamable HTTP MCP is outside this release. A host must call receive/poll or provide a listener; the stdio adapter cannot wake an arbitrary dormant model by itself.
 
@@ -58,7 +58,7 @@ Email decisions open `/requests/REQUEST_ID` and require a Person login and curre
 
 ## Signed webhooks
 
-Outgoing webhooks POST canonical public payloads. Internal policy/cluster metadata is removed. Headers are `X-Notif-Event-ID`, `X-Notif-Timestamp` and `X-Notif-Signature`. Compute the signature as HMAC-SHA256 over `v1:TIMESTAMP:` followed by the exact raw body, prefixed `v1=`. Verify constant-time and reject timestamps older than five minutes or more than one minute in the future. Dedupe the event ID before any downstream effect.
+Outgoing webhooks POST canonical public payloads. Internal policy/cluster metadata is removed. Headers are `X-Beepgrid-Event-ID`, `X-Beepgrid-Timestamp` and `X-Beepgrid-Signature`. Compute the signature as HMAC-SHA256 over `v1:TIMESTAMP:` followed by the exact raw body, prefixed `v1=`. Verify constant-time and reject timestamps older than five minutes or more than one minute in the future. Dedupe the event ID before any downstream effect.
 
 Incoming `/integrations/webhook/CONNECTION_ID` uses the same signature headers and a SendInput body. The connection's administrator-bound `inbound_sender_id` must be a Service. The body cannot select a sender. Its role controls whom it may contact. The event ID is required; identical replay returns the prior result, while changed content with the same ID returns 409. For richer questions/actions use the authenticated REST/SDK interface directly.
 

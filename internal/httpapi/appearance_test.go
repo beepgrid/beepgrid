@@ -4,17 +4,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestAppearanceHTTPRequiresTargetManagement(t *testing.T) {
 	_, admin, _ := setup(t)
 	ctx := context.Background()
-	worker, session, err := admin.Enroll(ctx, notif.EnrollInput{Agent: "appearance/builder", Name: "Builder"})
+	worker, session, err := admin.Enroll(ctx, beepgrid.EnrollInput{Agent: "appearance/builder", Name: "Builder"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := map[string]any{"target": notif.Target{Kind: "agent", ID: session.Agent.ID}, "icon": "mark-5"}
+	input := map[string]any{"target": beepgrid.Target{Kind: "agent", ID: session.Agent.ID}, "icon": "mark-5"}
 	if err = worker.Do(ctx, "POST", "/api/v1/appearance", input, nil, ""); err == nil {
 		t.Fatal("unmanaged worker changed its appearance")
 	}

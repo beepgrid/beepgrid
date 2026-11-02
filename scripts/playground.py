@@ -9,7 +9,7 @@ import urllib.request
 
 root = pathlib.Path(__file__).resolve().parents[1]
 subprocess.run(['docker', 'compose', 'up', '-d', '--wait'], cwd=root, check=True)
-subprocess.run(['go', 'build', '-buildvcs=false', '-trimpath', '-o', '.local/notif', './cmd/notif'], cwd=root, check=True)
+subprocess.run(['go', 'build', '-buildvcs=false', '-trimpath', '-o', '.local/beepgrid', './cmd/beepgrid'], cwd=root, check=True)
 children = []
 logs = []
 log_dir = root / '.local/playground'
@@ -18,7 +18,7 @@ log_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 def start(name, args):
     log = open(log_dir / (name + '.log'), 'ab')
     logs.append(log)
-    child = subprocess.Popen([str(root / '.local/notif'), *args], cwd=root,
+    child = subprocess.Popen([str(root / '.local/beepgrid'), *args], cwd=root,
                              stdout=log, stderr=subprocess.STDOUT)
     children.append(child)
     return child

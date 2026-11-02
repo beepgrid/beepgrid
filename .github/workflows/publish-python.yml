@@ -33,10 +33,11 @@ jobs:
           PY
           PYTHONPATH=sdk/python python -m unittest discover -s sdk/python/tests
           python -m build sdk/python --outdir dist
+          python scripts/branding-check.py dist
           python -m twine check --strict dist/*
           python -m pip install --no-deps dist/*.whl
           cd /tmp
-          python -c 'from beepgrid import Client; from notif import Client as Legacy; assert Client is Legacy'
+          python -c 'from beepgrid import Client, BeepgridError; assert callable(Client.send_minimal)'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: python-distributions

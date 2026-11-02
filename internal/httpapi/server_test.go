@@ -11,14 +11,14 @@ import (
 	"testing"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
-func setup(t *testing.T) (*engine.Store, *notif.Client, *httptest.Server) {
+func setup(t *testing.T) (*engine.Store, *beepgrid.Client, *httptest.Server) {
 	t.Helper()
-	database := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	database := os.Getenv("BEEPGRID_TEST_DATABASE_URL")
 	if database == "" {
-		t.Skip("Set NOTIF_TEST_DATABASE_URL to run HTTP and SDK integration tests.")
+		t.Skip("Set BEEPGRID_TEST_DATABASE_URL to run HTTP and SDK integration tests.")
 	}
 	ctx := context.Background()
 	schema := "api_" + strings.TrimPrefix(engine.ID(""), "_")
@@ -34,18 +34,18 @@ func setup(t *testing.T) (*engine.Store, *notif.Client, *httptest.Server) {
 	server := httptest.NewServer(h)
 	h.PublicURL = server.URL
 	t.Cleanup(func() { server.Close(); _, _ = s.Pool.Exec(ctx, `DROP SCHEMA `+schema+` CASCADE`); s.Close() })
-	return s, notif.New(server.URL, token), server
+	return s, beepgrid.New(server.URL, token), server
 }
 func TestGoSDKHTTPJourney(t *testing.T) {
 	_, admin, _ := setup(t)
 	ctx := context.Background()
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if e := admin.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
 		t.Fatal(e)
 	}
-	worker, session, e := admin.Enroll(ctx, notif.EnrollInput{Agent: "test/scout", Name: "Scout", Capabilities: []string{"message"}})
+	worker, session, e := admin.Enroll(ctx, beepgrid.EnrollInput{Agent: "test/scout", Name: "Scout", Capabilities: []string{"message"}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -58,11 +58,11 @@ func TestGoSDKHTTPJourney(t *testing.T) {
 	if e = admin.Do(ctx, "POST", "/api/v1/role-bindings", map[string]any{"role_id": role.ID, "subject_kind": "principal", "subject_id": session.Agent.ID}, nil, ""); e != nil {
 		t.Fatal(e)
 	}
-	q, e := worker.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Title: "Can I continue?", Choices: []string{"Continue", "Wait"}}, "sdk-ask")
+	q, e := worker.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Title: "Can I continue?", Choices: []string{"Continue", "Wait"}}, "sdk-ask")
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, e = admin.Send(ctx, notif.SendInput{ConversationID: q.ConversationID, Body: "What did you finish?"}, "clarification"); e != nil {
+	if _, e = admin.Send(ctx, beepgrid.SendInput{ConversationID: q.ConversationID, Body: "What did you finish?"}, "clarification"); e != nil {
 		t.Fatal(e)
 	}
 	jobs, e := worker.Inbox(ctx)
@@ -72,7 +72,7 @@ func TestGoSDKHTTPJourney(t *testing.T) {
 	if e = worker.Ack(ctx, jobs[0]); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = admin.Respond(ctx, q.ID, notif.Response{Outcome: "answered", Answer: "Continue", Version: q.Version}); e != nil {
+	if _, e = admin.Respond(ctx, q.ID, beepgrid.Response{Outcome: "answered", Answer: "Continue", Version: q.Version}); e != nil {
 		t.Fatal(e)
 	}
 	result, e := worker.Wait(ctx, q.ID)
@@ -157,14 +157,14 @@ func TestSDKRetriesLostResponseAfterCommitWithoutDuplicate(t *testing.T) {
 	}))
 	defer proxy.Close()
 	handler.PublicURL = proxy.URL
-	client := notif.New(proxy.URL, original.Token)
+	client := beepgrid.New(proxy.URL, original.Token)
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if e := client.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
 		t.Fatal(e)
 	}
-	result, e := client.Send(ctx, notif.SendInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Body: "Committed before reply was lost"}, "lost-reply")
+	result, e := client.Send(ctx, beepgrid.SendInput{Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Body: "Committed before reply was lost"}, "lost-reply")
 	if e != nil || len(result.Messages) != 1 {
 		t.Fatal(result, e)
 	}
@@ -179,24 +179,24 @@ func TestGoSDKApprovalExecutionLifecycle(t *testing.T) {
 	_, admin, _ := setup(t)
 	ctx := context.Background()
 	var me struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if e := admin.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); e != nil {
 		t.Fatal(e)
 	}
-	worker, session, e := admin.Enroll(ctx, notif.EnrollInput{Agent: "release/test", Name: "Executor"})
+	worker, session, e := admin.Enroll(ctx, beepgrid.EnrollInput{Agent: "release/test", Name: "Executor"})
 	if e != nil {
 		t.Fatal(e)
 	}
-	action := notif.Action{Name: "local_test", ExecutorID: session.Agent.ID, Resource: "fixture", ResourceVersion: "1", OperationKey: "fixture/1", Arguments: map[string]any{"text": "ok"}}
-	q, e := admin.Ask(ctx, notif.AskInput{Kind: "approval", Title: "Fixture?", Target: notif.Target{Kind: "person", ID: me.Person.ID}, Action: &action}, "approval")
+	action := beepgrid.Action{Name: "local_test", ExecutorID: session.Agent.ID, Resource: "fixture", ResourceVersion: "1", OperationKey: "fixture/1", Arguments: map[string]any{"text": "ok"}}
+	q, e := admin.Ask(ctx, beepgrid.AskInput{Kind: "approval", Title: "Fixture?", Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Action: &action}, "approval")
 	if e != nil {
 		t.Fatal(e)
 	}
 	if _, e = worker.Redeem(ctx, q.ID, action); e == nil {
 		t.Fatal("unapproved action redeemed")
 	}
-	if _, e = admin.Respond(ctx, q.ID, notif.Response{Outcome: "approved", Version: q.Version}); e != nil {
+	if _, e = admin.Respond(ctx, q.ID, beepgrid.Response{Outcome: "approved", Version: q.Version}); e != nil {
 		t.Fatal(e)
 	}
 	execution, e := worker.Redeem(ctx, q.ID, action)

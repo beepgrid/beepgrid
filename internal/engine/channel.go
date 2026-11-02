@@ -61,7 +61,7 @@ func (s *Store) seal(plain []byte) ([]byte, error) {
 	if _, e = rand.Read(nonce); e != nil {
 		return nil, e
 	}
-	return g.Seal(nonce, nonce, plain, []byte("notif/connection/v1")), nil
+	return g.Seal(nonce, nonce, plain, []byte("beepgrid/connection/v1")), nil
 }
 func (s *Store) unseal(raw []byte) ([]byte, error) {
 	block, e := aes.NewCipher(s.SecretKey)
@@ -75,7 +75,7 @@ func (s *Store) unseal(raw []byte) ([]byte, error) {
 	if len(raw) < g.NonceSize() {
 		return nil, fmt.Errorf("invalid encrypted secret")
 	}
-	return g.Open(nil, raw[:g.NonceSize()], raw[g.NonceSize():], []byte("notif/connection/v1"))
+	return g.Open(nil, raw[:g.NonceSize()], raw[g.NonceSize():], []byte("beepgrid/connection/v1"))
 }
 
 // AES-GCM envelopes contain a 12-byte nonce and 16-byte tag. The encrypted
@@ -813,7 +813,7 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 		}
 		if q, ok := d.Payload["request"].(map[string]any); ok && q["kind"] == "approval" && d.Payload["type"] == "request" {
 			value := string(JSON(map[string]any{"request_id": q["id"], "version": q["version"]}))
-			slackBody["blocks"] = []any{map[string]any{"type": "section", "text": map[string]any{"type": "plain_text", "text": text}}, map[string]any{"type": "actions", "elements": []any{map[string]any{"type": "button", "action_id": "notif_approve", "text": map[string]string{"type": "plain_text", "text": "Approve"}, "value": value, "style": "primary"}, map[string]any{"type": "button", "action_id": "notif_deny", "text": map[string]string{"type": "plain_text", "text": "Deny"}, "value": value}}}}
+			slackBody["blocks"] = []any{map[string]any{"type": "section", "text": map[string]any{"type": "plain_text", "text": text}}, map[string]any{"type": "actions", "elements": []any{map[string]any{"type": "button", "action_id": "beepgrid_approve", "text": map[string]string{"type": "plain_text", "text": "Approve"}, "value": value, "style": "primary"}, map[string]any{"type": "button", "action_id": "beepgrid_deny", "text": map[string]string{"type": "plain_text", "text": "Deny"}, "value": value}}}}
 		}
 		body = JSON(slackBody)
 	}
@@ -838,9 +838,9 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 		}
 	} else {
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
-		req.Header.Set("X-Notif-Timestamp", ts)
-		req.Header.Set("X-Notif-Signature", Signature(c.Secret, ts, body))
-		req.Header.Set("X-Notif-Event-ID", d.ID)
+		req.Header.Set("X-Beepgrid-Timestamp", ts)
+		req.Header.Set("X-Beepgrid-Signature", Signature(c.Secret, ts, body))
+		req.Header.Set("X-Beepgrid-Event-ID", d.ID)
 	}
 	transport := s.providerTransport
 	if transport == nil {
@@ -983,7 +983,7 @@ func (s *Store) queueFallback(ctx context.Context, db DB, scope string, previous
 		if !s.currentDeliveryPolicy(ctx, db, scope, d) {
 			continue
 		}
-		_, e = db.Exec(ctx, `WITH queued AS (INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id) SELECT pg_notify('notif_provider','') FROM queued`, ID("del"), scope, d.OperationID, d.RecipientID, r.id, r.address, JSON(d.Payload), d.ExpiresAt)
+		_, e = db.Exec(ctx, `WITH queued AS (INSERT INTO deliveries(id,scope,operation_id,recipient_id,connection_id,address,payload,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING id) SELECT pg_notify('beepgrid_provider','') FROM queued`, ID("del"), scope, d.OperationID, d.RecipientID, r.id, r.address, JSON(d.Payload), d.ExpiresAt)
 		return e
 	}
 	return nil

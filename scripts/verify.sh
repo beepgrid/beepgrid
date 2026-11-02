@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export NOTIF_TEST_DATABASE_URL="${NOTIF_TEST_DATABASE_URL:-postgres://notif:notif@localhost:5499/notif?sslmode=disable}"
-psql "$NOTIF_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null
+export BEEPGRID_TEST_DATABASE_URL="${BEEPGRID_TEST_DATABASE_URL:-postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable}"
+psql "$BEEPGRID_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null
+python3 scripts/branding-check.py
 npm --prefix sdk/typescript audit --package-lock-only --audit-level=moderate
 npm --prefix sdk/react audit --package-lock-only --audit-level=moderate
 npm --prefix workspace audit --package-lock-only --audit-level=moderate
@@ -20,6 +21,7 @@ npm --prefix workspace ci --no-fund
 npm --prefix workspace test
 npm --prefix workspace run build
 npm --prefix workspace run embed
+python3 scripts/branding-check.py sdk/typescript/dist sdk/react/dist internal/web/dist
 go vet ./...
 go -C sdk/go vet ./...
 go -C sdk/go test -race ./... -count=1
@@ -31,7 +33,7 @@ python3 scripts/documentation-inventory-check.py
 python3 -m unittest discover -s scripts -p test_codex_capacity.py
 python3 scripts/release-audit.py
 GOFLAGS=-buildvcs=false go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-go build -buildvcs=false -trimpath -o .local/notif ./cmd/notif
-go build -buildvcs=false -trimpath -tags headless -o .local/notif-headless ./cmd/notif
+go build -buildvcs=false -trimpath -o .local/beepgrid ./cmd/beepgrid
+go build -buildvcs=false -trimpath -tags headless -o .local/beepgrid-headless ./cmd/beepgrid
 python3 scripts/headless-build.py
 python3 scripts/cli-smoke.py

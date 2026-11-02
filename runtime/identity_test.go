@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestVerifiedPersonCompositionCannotReplaceOwnerOrCrossWorkspace(t *testing.T) {
@@ -57,9 +57,9 @@ func TestVerifiedPersonCompositionCannotReplaceOwnerOrCrossWorkspace(t *testing.
 	defer server.Close()
 	var me struct {
 		Admin  bool
-		Person notif.Person
+		Person beepgrid.Person
 	}
-	if err = notif.New(server.URL, a.Token).Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil || !me.Admin {
+	if err = beepgrid.New(server.URL, a.Token).Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil || !me.Admin {
 		t.Fatal("intentional owner", me, err)
 	}
 	member := owner
@@ -72,7 +72,7 @@ func TestVerifiedPersonCompositionCannotReplaceOwnerOrCrossWorkspace(t *testing.
 	if b.PersonID == a.PersonID {
 		t.Fatal("merged by email")
 	}
-	if err = notif.New(server.URL, b.Token).Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil || me.Admin {
+	if err = beepgrid.New(server.URL, b.Token).Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil || me.Admin {
 		t.Fatal("new member elevated", me, err)
 	}
 	if err = s.RevokePersonSession(ctx, a.Token); err != nil {

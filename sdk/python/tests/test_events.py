@@ -2,7 +2,7 @@ import io
 import json
 import unittest
 from unittest.mock import patch
-from beepgrid import Client, NotifError
+from beepgrid import Client, BeepgridError
 from beepgrid.events import read_frames
 
 
@@ -39,7 +39,7 @@ class EventTests(unittest.TestCase):
         import urllib.error
         error = urllib.error.HTTPError("http://localhost", 403, "denied", {}, io.BytesIO())
         with patch("beepgrid._open", side_effect=error) as call:
-            with self.assertRaises(NotifError) as caught:
+            with self.assertRaises(BeepgridError) as caught:
                 next(Client("http://localhost", "fixture").events())
             self.assertEqual(caught.exception.status, 403)
             self.assertEqual(call.call_count, 1)

@@ -40,13 +40,13 @@ func TestSlackThreadsRoundTripAndDuplicateEvents(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if e = s.DispatchOnce(ctx, "https://notif.test"); e != nil {
+	if e = s.DispatchOnce(ctx, "https://beepgrid.test"); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = s.Send(ctx, w, SendInput{ConversationID: first.ConversationID, Body: "Same thread"}, "slack-second"); e != nil {
 		t.Fatal(e)
 	}
-	if e = s.DispatchOnce(ctx, "https://notif.test"); e != nil {
+	if e = s.DispatchOnce(ctx, "https://beepgrid.test"); e != nil {
 		t.Fatal(e)
 	}
 	if len(posted) != 2 || posted[1]["thread_ts"] != "123.4" {

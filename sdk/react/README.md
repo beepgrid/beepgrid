@@ -8,16 +8,16 @@ npm install @beepgrid/react @beepgrid/sdk react
 
 React 19 or later. Optional components for embedding Beepgrid in your own application.
 
-This package provides `NotifRequest`, `NotifConversation`, `useNotifRequest` and `browserClient`. It uses the same authorization and durable request API as the employee app. Polling is cancelled when a component unmounts; this never cancels the request.
+This package provides `BeepgridRequest`, `BeepgridConversation`, `useBeepgridRequest` and `browserClient`. It uses the same authorization and durable request API as the employee app. Polling is cancelled when a component unmounts; this never cancels the request.
 
 ```tsx
 import { useMemo } from 'react';
-import { browserClient, NotifRequest, NotifConversation } from '@beepgrid/react';
+import { browserClient, BeepgridRequest, BeepgridConversation } from '@beepgrid/react';
 import '@beepgrid/react/styles.css';
 
 export function Decision({ requestId }: { requestId: string }) {
   const client = useMemo(() => browserClient(), []);
-  return <NotifRequest client={client} id={requestId}
+  return <BeepgridRequest client={client} id={requestId}
     onConversation={id => location.assign('/conversations/' + id)} />;
 }
 ```

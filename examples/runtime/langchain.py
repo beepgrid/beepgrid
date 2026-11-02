@@ -12,8 +12,8 @@ from beepgrid.runtime import LiveInbox, LangGraphBridge
 
 def connect():
     client = Client(
-        os.environ["NOTIF_URL"],
-        Path(os.environ["NOTIF_TOKEN_FILE"]).read_text().strip(),
+        os.environ["BEEPGRID_URL"],
+        Path(os.environ["BEEPGRID_TOKEN_FILE"]).read_text().strip(),
     )
     inbox = LiveInbox(
         client,

@@ -134,7 +134,7 @@ func (s *Store) lifecycleConnection(ctx context.Context, scope string, shared bo
 	if err != nil {
 		return nil, nil, err
 	}
-	h := sha256.Sum256([]byte("notif-lifecycle:" + scope))
+	h := sha256.Sum256([]byte("beepgrid-lifecycle:" + scope))
 	key := int64(binary.BigEndian.Uint64(h[:8]))
 	lock, unlock := "pg_try_advisory_lock", "pg_advisory_unlock"
 	if shared {
@@ -301,7 +301,7 @@ func (s *Store) ExportWorkspace(ctx context.Context, scope string, output io.Wri
 		_, e := io.Copy(tarout, reader)
 		return e
 	}
-	manifest := JSON(map[string]any{"format": "notif-customer-export-v1", "schema_version": SchemaVersion, "scope": scope, "company": company, "environment": environment, "omitted": []string{"credentials", "idempotency", "provider_events", "attachment_uploads", "connection secret and config", "instance credential_id"}})
+	manifest := JSON(map[string]any{"format": "beepgrid-customer-export-v1", "schema_version": SchemaVersion, "scope": scope, "company": company, "environment": environment, "omitted": []string{"credentials", "idempotency", "provider_events", "attachment_uploads", "connection secret and config", "instance credential_id"}})
 	if err = write("manifest.json", int64(len(manifest)), bytes.NewReader(manifest)); err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ func (s *Store) ExportWorkspace(ctx context.Context, scope string, output io.Wri
 			continue
 		}
 		if err = func() error {
-			f, e := os.CreateTemp("", "notif-export-*")
+			f, e := os.CreateTemp("", "beepgrid-export-*")
 			if e != nil {
 				return e
 			}

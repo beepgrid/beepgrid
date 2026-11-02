@@ -40,11 +40,11 @@ it("uses the existing worker credential and verifies its exact instance reply", 
   });
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Run your worker" });
-  expect(screen.getByText(/NOTIF_TOKEN_FILE=/)).not.toHaveTextContent(
+  expect(screen.getByText(/BEEPGRID_TOKEN_FILE=/)).not.toHaveTextContent(
     "test-only-session",
   );
-  expect(screen.getByText(/NOTIF_TOKEN_FILE=/)).not.toHaveTextContent(
-    "NOTIF_AGENT_ID=",
+  expect(screen.getByText(/BEEPGRID_TOKEN_FILE=/)).not.toHaveTextContent(
+    "BEEPGRID_AGENT_ID=",
   );
   fireEvent.click(screen.getByRole("button", { name: "Send a test message" }));
   await screen.findByText("Waiting for your worker’s reply...");
@@ -86,13 +86,13 @@ it("guides the chosen MCP method without exposing a token in configuration or re
   fireEvent.click(screen.getByRole("button", { name: "Create connection" }));
   await screen.findByRole("heading", { name: "Connect your tool host" });
   expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).toHaveTextContent(
-    'NOTIF_TOKEN_FILE = "/absolute/path/worker-token"',
+    'BEEPGRID_TOKEN_FILE = "/absolute/path/worker-token"',
   );
   expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).not.toHaveTextContent(
     "test-only-secret-never-in-config",
   );
   expect(screen.getByText(/\[mcp_servers.beepgrid\]/)).not.toHaveTextContent(
-    "NOTIF_AGENT_ID",
+    "BEEPGRID_AGENT_ID",
   );
   expect(screen.getByText(/Tools do not wake an idle model/)).toBeVisible();
   fireEvent.click(screen.getByRole("tab", { name: "Other MCP clients" }));

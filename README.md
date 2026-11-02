@@ -48,7 +48,7 @@ SDKs connect your existing agents to that server:
 ```sh
 npm install @beepgrid/sdk               # TypeScript / JavaScript
 pip install beepgrid                    # Python, or: uv add beepgrid
-go get github.com/beepgrid/beepgrid/sdk/go@v0.1.0
+go get github.com/beepgrid/beepgrid/sdk/go@v0.2.0
 ```
 
 Optional React embeds: `npm install @beepgrid/react @beepgrid/sdk react`. [Installation and hosting →](docs/PACKAGING.md)
@@ -101,7 +101,7 @@ print("Open this conversation in Messages:", chat["conversation_id"])
 
 Both messages appear in the same conversation, along with Builder's demo replies. This example uses the local owner identity. To connect your own runtime, use an individually issued worker credential and a [Go, Python or TypeScript starter](examples/README.md). Retain each operation's idempotency key when retrying an unknown result.
 
-Clients: [Go](sdk/go) · [TypeScript](sdk/typescript) · [Python](sdk/python) · [React](sdk/react) · [CLI](docs/CLI.md) · [MCP](docs/LOCAL-MCP.md). The legacy `notif` CLI command, Go package name and Python import remain compatible.
+Clients: [Go](sdk/go) · [TypeScript](sdk/typescript) · [Python](sdk/python) · [React](sdk/react) · [CLI](docs/CLI.md) · [MCP](docs/LOCAL-MCP.md). The legacy `beepgrid` CLI command, Go package name and Python import remain compatible.
 
 ## Fits your stack
 

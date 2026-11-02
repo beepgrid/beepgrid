@@ -5,7 +5,7 @@ Uses the local/provider-configured Coordinator setup from the main tour first.
 """
 import runpy
 import uuid
-from beepgrid import NotifError
+from beepgrid import BeepgridError
 state = runpy.run_path('examples/developer-tour/main.py')
 owner, builder, billing = (state[name] for name in ['owner', 'builder', 'billing'])
 builder_id, billing_id, person_id = (state[name] for name in ['builder_id', 'billing_id', 'person_id'])
@@ -43,7 +43,7 @@ owner.change_chat_membership(chat_id, operation='add', version=history['version'
 assert not reviewer.conversation(chat_id).get('messages', [])
 try:
     reviewer.download_attachment(file['id'])
-except NotifError as error:
+except BeepgridError as error:
     assert error.status in (403, 404)
 else:
     raise AssertionError('Earlier file leaked to a future-only member')
@@ -53,7 +53,7 @@ history = owner.conversation(chat_id)
 owner.change_chat_membership(chat_id, operation='remove', version=history['version'], members=[reviewer_id])
 try:
     reviewer.conversation(chat_id)
-except NotifError as error:
+except BeepgridError as error:
     assert error.status in (403, 404)
 else:
     raise AssertionError('Removed member retained current history access')

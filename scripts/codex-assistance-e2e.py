@@ -27,7 +27,7 @@ parser.add_argument("--protocol", choices=("gateway", "openai", "anthropic", "go
 parser.add_argument("--followup-only", action="store_true", help="Use local fixtures for setup and one real subscription-backed follow-up call")
 args = parser.parse_args()
 sys.path.insert(0, str(root / "sdk/python"))
-from beepgrid import Client, NotifError
+from beepgrid import Client, BeepgridError
 
 environment = {k: os.environ[k] for k in ("PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CODEX_HOME") if k in os.environ}
 codex = shutil.which("codex", path=environment.get("PATH"))
@@ -62,7 +62,7 @@ def passed(name):
 
 
 def turn(label, prompt, schema=None, session=None):
-    with tempfile.TemporaryDirectory(prefix="notif-assistance-model-") as directory:
+    with tempfile.TemporaryDirectory(prefix="beepgrid-assistance-model-") as directory:
         target = pathlib.Path(directory)
         command = [codex, "--no-daemon", "exec", "--ignore-user-config", "--ephemeral", "--json",
                    "--skip-git-repo-check", "--sandbox", "read-only", "--disable", "shell_tool", "--disable", "multi_agent",
@@ -73,12 +73,12 @@ def turn(label, prompt, schema=None, session=None):
             (target / "schema.json").write_text(json.dumps(schema))
             command += ["--output-schema", str(target / "schema.json"), "-o", str(target / "result.json")]
         if session:
-            child_env.update(NOTIF_URL=url, NOTIF_TOKEN=session["token"])
-            command += ["-c", "mcp_servers.notif.command=" + json.dumps(str(binary)),
-                        "-c", 'mcp_servers.notif.args=["mcp"]',
-                        "-c", 'mcp_servers.notif.env_vars=["NOTIF_URL","NOTIF_TOKEN"]',
-                        "-c", 'mcp_servers.notif.default_tools_approval_mode="approve"',
-                        "-c", 'mcp_servers.notif.enabled_tools=["reply","report_progress"]']
+            child_env.update(BEEPGRID_URL=url, BEEPGRID_TOKEN=session["token"])
+            command += ["-c", "mcp_servers.beepgrid.command=" + json.dumps(str(binary)),
+                        "-c", 'mcp_servers.beepgrid.args=["mcp"]',
+                        "-c", 'mcp_servers.beepgrid.env_vars=["BEEPGRID_URL","BEEPGRID_TOKEN"]',
+                        "-c", 'mcp_servers.beepgrid.default_tools_approval_mode="approve"',
+                        "-c", 'mcp_servers.beepgrid.enabled_tools=["reply","report_progress"]']
         command += ["-"]
         start = time.monotonic()
         result = subprocess.run(command, input=prompt, cwd=directory, env=child_env, text=True, capture_output=True, timeout=120)
@@ -191,18 +191,18 @@ provider = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Provider)
 provider.daemon_threads = True
 threading.Thread(target=provider.serve_forever, daemon=True).start()
 provider_url = "http://127.0.0.1:" + str(provider.server_port)
-binary = root / ".local" / "notif-assistance-e2e"
-subprocess.run(["go", "build", "-buildvcs=false", "-o", str(binary), "./cmd/notif"], cwd=root, check=True)
-database = os.environ.get("NOTIF_TEST_DATABASE_URL", "postgres://notif:notif@localhost:5499/notif?sslmode=disable")
-engine_env = dict(environment, NOTIF_DATABASE_URL=database, NOTIF_SCHEMA=schema_name, NOTIF_WORKSPACE="assistance-audit",
-                  NOTIF_BOOTSTRAP_TOKEN=secrets.token_hex(32), NOTIF_SECRET_KEY=secrets.token_hex(32), NOTIF_ADDR="127.0.0.1:" + str(port),
-                  NOTIF_PUBLIC_URL=url,
-                  NOTIF_OVERSEER_URL=provider_url, NOTIF_OVERSEER_TOKEN=provider_token)
+binary = root / ".local" / "beepgrid-assistance-e2e"
+subprocess.run(["go", "build", "-buildvcs=false", "-o", str(binary), "./cmd/beepgrid"], cwd=root, check=True)
+database = os.environ.get("BEEPGRID_TEST_DATABASE_URL", "postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable")
+engine_env = dict(environment, BEEPGRID_DATABASE_URL=database, BEEPGRID_SCHEMA=schema_name, BEEPGRID_WORKSPACE="assistance-audit",
+                  BEEPGRID_BOOTSTRAP_TOKEN=secrets.token_hex(32), BEEPGRID_SECRET_KEY=secrets.token_hex(32), BEEPGRID_ADDR="127.0.0.1:" + str(port),
+                  BEEPGRID_PUBLIC_URL=url,
+                  BEEPGRID_OVERSEER_URL=provider_url, BEEPGRID_OVERSEER_TOKEN=provider_token)
 if args.protocol != "gateway":
-    for key in ("NOTIF_OVERSEER_URL", "NOTIF_OVERSEER_TOKEN"):
+    for key in ("BEEPGRID_OVERSEER_URL", "BEEPGRID_OVERSEER_TOKEN"):
         engine_env.pop(key)
-    engine_env.update(NOTIF_AI_PROVIDER=args.protocol, NOTIF_AI_MODEL=model, NOTIF_AI_API_KEY=provider_token,
-                      NOTIF_AI_BASE_URL=provider_url + "/v1", NOTIF_AI_ALLOW_PRIVATE="true")
+    engine_env.update(BEEPGRID_AI_PROVIDER=args.protocol, BEEPGRID_AI_MODEL=model, BEEPGRID_AI_API_KEY=provider_token,
+                      BEEPGRID_AI_BASE_URL=provider_url + "/v1", BEEPGRID_AI_ALLOW_PRIVATE="true")
 subprocess.run([str(binary), "migrate"], cwd=local, env=engine_env, check=True)
 with (local / "server.log").open("w") as log:
     server = subprocess.Popen([str(binary), "serve", "--dev"], cwd=local, env=engine_env, stdout=log, stderr=log)
@@ -217,7 +217,7 @@ with (local / "server.log").open("w") as log:
                 time.sleep(.1)
         else:
             raise RuntimeError("Engine readiness timeout")
-        owner = Client(url, engine_env["NOTIF_BOOTSTRAP_TOKEN"], timeout=45)
+        owner = Client(url, engine_env["BEEPGRID_BOOTSTRAP_TOKEN"], timeout=45)
         person = owner.call("GET", "/api/v1/me")["person"]["id"]
         worker, session = owner.connect("audit/scout", "Scout")
         role = owner.call("POST", "/api/v1/roles", {"name": "Audit worker", "rules": [
@@ -255,7 +255,7 @@ with (local / "server.log").open("w") as log:
         try:
             owner.overseer_plan(plan["id"])
             raise AssertionError("Derived summary survived source removal")
-        except NotifError as error:
+        except BeepgridError as error:
             assert error.status == 404
         passed("Current source removal denies saved derived data")
         owner.update_assistance(overseer=False)

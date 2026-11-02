@@ -6,8 +6,8 @@ import { SQLiteInbox } from "../../sdk/typescript/dist/runtime/node.js";
 
 export function connect(binding, { onError = console.error } = {}) {
   const client = new Client(
-    process.env.NOTIF_URL,
-    readFileSync(process.env.NOTIF_TOKEN_FILE, "utf8").trim(),
+    process.env.BEEPGRID_URL,
+    readFileSync(process.env.BEEPGRID_TOKEN_FILE, "utf8").trim(),
   );
   const store = new SQLiteInbox(
     process.env.BEEPGRID_INBOX_PATH,

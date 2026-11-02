@@ -380,7 +380,7 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 		}
 		queued++
 	}
-	if _, e = db.Exec(ctx, `SELECT pg_notify('notif_provider','')`); e != nil {
+	if _, e = db.Exec(ctx, `SELECT pg_notify('beepgrid_provider','')`); e != nil {
 		return e
 	}
 	if queued == 0 {

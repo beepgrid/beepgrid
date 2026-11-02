@@ -6,13 +6,13 @@ import subprocess
 import tempfile
 import time
 import uuid
-from beepgrid import Client, NotifError
+from beepgrid import Client, BeepgridError
 
 root = pathlib.Path(__file__).resolve().parents[1]
-url = os.environ["NOTIF_SDK_TEST_URL"]
-owner = Client(url, os.environ["NOTIF_SDK_TEST_TOKEN"])
+url = os.environ["BEEPGRID_SDK_TEST_URL"]
+owner = Client(url, os.environ["BEEPGRID_SDK_TEST_TOKEN"])
 person = owner.call("GET", "/api/v1/me")["person"]["id"]
-binary = root / ".local/notif-go-starter"
+binary = root / ".local/beepgrid-go-starter"
 subprocess.run(["go", "build", "-buildvcs=false", "-o", str(binary), "./examples/go-worker"], cwd=root, check=True)
 commands = [("Go", [str(binary)]), ("Python", ["python3", "examples/python-worker/main.py"]), ("TypeScript", ["node", "examples/typescript-worker/main.mjs"])]
 role = owner.call("POST", "/api/v1/roles", {"name": "Starter contact " + uuid.uuid4().hex[:12],
@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix="beepgrid-starter-") as directory:
         launcher = Client(url, issued["token"])
         try:
             launcher.connect("outside/" + unique, "Outside the permitted namespace")
-        except NotifError as error:
+        except BeepgridError as error:
             assert error.status == 403
         else:
             raise AssertionError("Launcher escaped its bounded namespace")
@@ -68,11 +68,11 @@ with tempfile.TemporaryDirectory(prefix="beepgrid-starter-") as directory:
             credential.touch(mode=0o600)
             credential.write_text(credential_value)
             # The starter gets the UI's exact URL + protected token-file shape.
-            # Do not pass the test owner's credential or any inherited NOTIF_ vars.
-            environment = {key: value for key, value in os.environ.items() if not key.startswith("NOTIF_")}
-            environment.update(NOTIF_URL=url, NOTIF_TOKEN_FILE=str(credential), PYTHONPATH=str(root / "sdk/python"))
+            # Do not pass the test owner's credential or any inherited BEEPGRID_ vars.
+            environment = {key: value for key, value in os.environ.items() if not key.startswith("BEEPGRID_")}
+            environment.update(BEEPGRID_URL=url, BEEPGRID_TOKEN_FILE=str(credential), PYTHONPATH=str(root / "sdk/python"))
             if mode == "enroll":
-                environment.update(NOTIF_AGENT_ID=logical, NOTIF_AGENT_NAME=name)
+                environment.update(BEEPGRID_AGENT_ID=logical, BEEPGRID_AGENT_NAME=name)
             process = subprocess.Popen(command, cwd=root, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             try:
                 if mode == "enroll":

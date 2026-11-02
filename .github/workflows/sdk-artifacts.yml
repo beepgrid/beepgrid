@@ -18,7 +18,7 @@ jobs:
         run: |
           python3 -m venv .local/package-tools
           .local/package-tools/bin/python -m pip install 'setuptools>=77' wheel build
-          NOTIF_PACKAGE_PYTHON="$PWD/.local/package-tools/bin/python" python3 scripts/sdk-package-check.py
+          BEEPGRID_PACKAGE_PYTHON="$PWD/.local/package-tools/bin/python" python3 scripts/sdk-package-check.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sdk-development-artifacts

@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	notif "github.com/beepgrid/beepgrid/sdk/go/notif"
+	beepgrid "github.com/beepgrid/beepgrid/sdk/go"
 	"os"
 	"strings"
 	"time"
@@ -33,12 +33,12 @@ func decoded(raw json.RawMessage) map[string]any {
 func main() {
 	// region setup
 	ctx := context.Background()
-	credential := os.Getenv("NOTIF_TOKEN_FILE")
+	credential := os.Getenv("BEEPGRID_TOKEN_FILE")
 	info := must(os.Stat(credential))
 	check(info.Mode().Perm()&0077 == 0)
 	token := must(os.ReadFile(credential))
-	owner := notif.New(os.Getenv("NOTIF_URL"), strings.TrimSpace(string(token)))
-	runID := notif.Key()
+	owner := beepgrid.New(os.Getenv("BEEPGRID_URL"), strings.TrimSpace(string(token)))
+	runID := beepgrid.Key()
 	var me struct {
 		Person struct {
 			ID string `json:"id"`
@@ -47,11 +47,11 @@ func main() {
 	if err := owner.Do(ctx, "GET", "/api/v1/me", nil, &me, ""); err != nil {
 		panic(err)
 	}
-	builder, builderSession, err := owner.Enroll(ctx, notif.EnrollInput{Agent: "tour/" + runID + "/builder", Name: "Builder 7"})
+	builder, builderSession, err := owner.Enroll(ctx, beepgrid.EnrollInput{Agent: "tour/" + runID + "/builder", Name: "Builder 7"})
 	if err != nil {
 		panic(err)
 	}
-	billing, billingSession, err := owner.Enroll(ctx, notif.EnrollInput{Agent: "tour/" + runID + "/billing", Name: "Billing 2"})
+	billing, billingSession, err := owner.Enroll(ctx, beepgrid.EnrollInput{Agent: "tour/" + runID + "/billing", Name: "Billing 2"})
 	if err != nil {
 		panic(err)
 	}
@@ -73,63 +73,85 @@ func main() {
 			panic(err)
 		}
 	}
-	target := notif.Target{Kind: "agent", ID: billingID}
-	targets := []notif.Target{{Kind: "agent", ID: builderID}, target}
+	target := beepgrid.Target{Kind: "agent", ID: billingID}
+	targets := []beepgrid.Target{{Kind: "agent", ID: builderID}, target}
+
+	issued := must(owner.CreateCredential(ctx, beepgrid.CredentialInput{PrincipalID: builderID, Kind: "api", Name: "Tour key", NeverExpires: true, Permissions: []string{"read"}}))
+	var keyMetadata beepgrid.Credential
+	for _, item := range must(owner.Credentials(ctx)) {
+		if item.ID == issued.ID {
+			keyMetadata = item
+		}
+	}
+	newName := "Renamed tour key"
+	edited := must(owner.EditCredential(ctx, issued.ID, beepgrid.CredentialEdit{Version: keyMetadata.Version, Name: &newName}))
+	rotated := must(owner.RotateCredential(ctx, issued.ID, edited.Version, 0))
+	check(rotated.Credential.ID == issued.ID)
+	if err := owner.RevokeCredential(ctx, issued.ID, false); err != nil {
+		panic(err)
+	}
+	deadline := time.Now().Add(48 * time.Hour)
+	lease, _, err := owner.Enroll(ctx, beepgrid.EnrollInput{Agent: "tour/" + runID + "/lease", Name: "Lease example", Renewable: true, ExpiresAt: &deadline})
+	if err != nil {
+		panic(err)
+	}
+	check(must(lease.RenewCredential(ctx)).RenewableUntil != nil)
+
 	// endregion setup
 
 	// region messages
 	check(len(must(builder.Directory(ctx, "agent", "")).Items) > 0)
-	sent := must(builder.Send(ctx, notif.SendInput{Target: target, Body: "Check the payment ledger for orders 241 and 242."}, runID+"/message"))
-	must(billing.Send(ctx, notif.SendInput{ConversationID: sent.ConversationID, Body: "Both payments settled yesterday."}, notif.Key()))
+	sent := must(builder.Send(ctx, beepgrid.SendInput{Target: target, Body: "Check the payment ledger for orders 241 and 242."}, runID+"/message"))
+	must(billing.Send(ctx, beepgrid.SendInput{ConversationID: sent.ConversationID, Body: "Both payments settled yesterday."}, beepgrid.Key()))
 	check(len(decoded(must(builder.Conversation(ctx, sent.ConversationID)))["messages"].([]any)) == 2)
-	receiptInput := notif.SendInput{Target: target, Body: "The reconciliation is complete."}
-	receipt := must(builder.Notify(ctx, receiptInput, runID+"/receipt"))
+	receiptInput := beepgrid.SendInput{Target: target, Body: "The reconciliation is complete."}
+	receipt := must(builder.SendMinimal(ctx, receiptInput, runID+"/receipt"))
 	check(must(builder.Send(ctx, receiptInput, runID+"/receipt")).ConversationID == receipt.ConversationID)
-	preview := must(owner.DispatchPreview(ctx, notif.DispatchPreviewInput{Targets: targets, Operation: "message"}))
-	batch := must(owner.SendBatch(ctx, notif.SendBatchInput{Targets: targets, Body: "Hold the staging rollout until checkout jobs drain.", PreviewToken: preview.Token}, runID+"/batch"))
+	preview := must(owner.DispatchPreview(ctx, beepgrid.DispatchPreviewInput{Targets: targets, Operation: "message"}))
+	batch := must(owner.SendBatch(ctx, beepgrid.SendBatchInput{Targets: targets, Body: "Hold the staging rollout until checkout jobs drain.", PreviewToken: preview.Token}, runID+"/batch"))
 	check(len(batch) == 2 && batch[0].Result.ConversationID != batch[1].Result.ConversationID)
 	// endregion messages
-	if os.Getenv("NOTIF_TOUR_MESSAGES_ONLY") == "1" {
+	if os.Getenv("BEEPGRID_TOUR_MESSAGES_ONLY") == "1" {
 		fmt.Println("PASS: Go first exchange")
 		return
 	}
 
 	// region requests
-	request := must(builder.Ask(ctx, notif.AskInput{Target: target, Body: "Which region contains order 241?", Choices: []string{"EU", "US"}}, runID+"/ask"))
+	request := must(builder.Ask(ctx, beepgrid.AskInput{Target: target, Body: "Which region contains order 241?", Choices: []string{"EU", "US"}}, runID+"/ask"))
 	current := must(billing.GetRequest(ctx, request.ID))
-	must(billing.Respond(ctx, request.ID, notif.Response{Outcome: "answered", Version: current.Version, Answer: "EU"}))
+	must(billing.Respond(ctx, request.ID, beepgrid.Response{Outcome: "answered", Version: current.Version, Answer: "EU"}))
 	waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Second)
 	check(must(builder.Wait(waitCtx, request.ID)).Response.Answer == "EU")
 	waitCancel()
-	pending := must(builder.Ask(ctx, notif.AskInput{Target: target, Body: "Check order 243 as well."}, notif.Key()))
-	revised := must(builder.ReplaceRequest(ctx, pending.ID, notif.ReplaceRequestInput{Version: pending.Version, Body: "Check orders 243 and 244."}, runID+"/replace")).Replacement
+	pending := must(builder.Ask(ctx, beepgrid.AskInput{Target: target, Body: "Check order 243 as well."}, beepgrid.Key()))
+	revised := must(builder.ReplaceRequest(ctx, pending.ID, beepgrid.ReplaceRequestInput{Version: pending.Version, Body: "Check orders 243 and 244."}, runID+"/replace")).Replacement
 	check(must(builder.Cancel(ctx, revised.ID, revised.Version)).State == "cancelled")
-	check(len(must(owner.AskBatch(ctx, notif.AskBatchInput{Targets: targets, Request: notif.AskInput{Body: "Is staging available?"}}, runID+"/ask-batch"))) == 2)
-	blocking := must(builder.Ask(ctx, notif.AskInput{Target: target, Body: "I need the ledger before continuing."}, notif.Key()))
+	check(len(must(owner.AskBatch(ctx, beepgrid.AskBatchInput{Targets: targets, Request: beepgrid.AskInput{Body: "Is staging available?"}}, runID+"/ask-batch"))) == 2)
+	blocking := must(builder.Ask(ctx, beepgrid.AskInput{Target: target, Body: "I need the ledger before continuing."}, beepgrid.Key()))
 	check(must(builder.SetRequestBlocking(ctx, blocking.ID, true)).Blocking)
 	must(builder.SetRequestBlocking(ctx, blocking.ID, false))
 	// endregion requests
 
 	// region chats
-	chat := must(owner.StartChat(ctx, notif.StartChatInput{Targets: targets, Body: "👋 @Billing 2 check these orders.", Mentions: []notif.Mention{{PrincipalID: billingID, Start: 2, End: 12}}}, runID+"/chat"))
+	chat := must(owner.StartChat(ctx, beepgrid.StartChatInput{Targets: targets, Body: "👋 @Billing 2 check these orders.", Mentions: []beepgrid.Mention{{PrincipalID: billingID, Start: 2, End: 12}}}, runID+"/chat"))
 	check(chat.Messages[0].AttentionFor(billingID) != "")
 	history := decoded(must(owner.Conversation(ctx, chat.ConversationID)))
 	version := int(history["version"].(float64))
-	changed := must(owner.ChangeChatMembership(ctx, chat.ConversationID, notif.ChatMembershipInput{Operation: "rename", Version: version, Title: "Checkout reconciliation"}, runID+"/rename"))
+	changed := must(owner.ChangeChatMembership(ctx, chat.ConversationID, beepgrid.ChatMembershipInput{Operation: "rename", Version: version, Title: "Checkout reconciliation"}, runID+"/rename"))
 	check(changed.Version > version)
 	// endregion chats
 
 	// region files
 	pdf := []byte("%PDF-1.4\nPayment reconciliation fixture\n%%EOF")
 	draft := must(builder.StageAttachment(ctx, "orders.pdf", "application/pdf", pdf))
-	withFile := must(builder.Send(ctx, notif.SendInput{Target: target, Body: "Please check these payment records.", AttachmentIDs: []string{draft.ID}}, notif.Key()))
+	withFile := must(builder.Send(ctx, beepgrid.SendInput{Target: target, Body: "Please check these payment records.", AttachmentIDs: []string{draft.ID}}, beepgrid.Key()))
 	check(must(billing.Attachments(ctx, withFile.ConversationID))[0].ID == draft.ID)
 	check(string(must(billing.DownloadAttachment(ctx, draft.ID))) == string(pdf))
 	check(must(builder.UploadAttachment(ctx, withFile.ConversationID, "notes.txt", "text/plain", []byte("Orders 241 and 242"))).ID != draft.ID)
 	// endregion files
 
 	// region queries
-	input := notif.QueryInput{Collection: "messages", Filters: map[string]string{"conversation_id": sent.ConversationID}, Limit: 1}
+	input := beepgrid.QueryInput{Collection: "messages", Filters: map[string]string{"conversation_id": sent.ConversationID}, Limit: 1}
 	page := must(owner.Query(ctx, input))
 	seen := len(page.Items)
 	for page.NextCursor != "" {
@@ -138,7 +160,7 @@ func main() {
 		seen += len(page.Items)
 	}
 	check(seen == 2)
-	check(must(owner.Capabilities(ctx, notif.CapabilityInput{RequestID: blocking.ID})).Operations["cancel"])
+	check(must(owner.Capabilities(ctx, beepgrid.CapabilityInput{RequestID: blocking.ID})).Operations["cancel"])
 	check(decoded(must(owner.Access(ctx, "")))["roles"] != nil)
 	check(decoded(must(owner.RequestTrace(ctx, blocking.ID, "")))["request"] != nil)
 	check(decoded(must(owner.Workspace(ctx)))["deployment"] == "self_hosted")
@@ -147,11 +169,27 @@ func main() {
 	var connection struct {
 		ID string `json:"id"`
 	}
-	if err := owner.Do(ctx, "POST", "/api/v1/connections", map[string]any{"name": "Tour webhook " + runID, "kind": "webhook", "enabled": false, "config": map[string]string{"url": "https://example.com/beepgrid"}, "secret": notif.Key()}, &connection, ""); err != nil {
+	if err := owner.Do(ctx, "POST", "/api/v1/connections", map[string]any{"name": "Tour webhook " + runID, "kind": "webhook", "enabled": false, "config": map[string]string{"url": "https://example.com/beepgrid"}, "secret": beepgrid.Key()}, &connection, ""); err != nil {
 		panic(err)
 	}
 	check(len(must(owner.ConnectionSetup(ctx, connection.ID))) > 0)
 	// endregion queries
+
+	// region identity
+	subject := beepgrid.Target{Kind: "agent", ID: builderID}
+	contactPreview := must(owner.PreviewContactPermissions(ctx, beepgrid.ContactPreviewInput{Subject: subject}))
+	contactVersion := int64(contactPreview["policy"].(map[string]any)["version"].(float64))
+	contactPolicy := must(owner.SaveContactPermissions(ctx, beepgrid.ContactPermissionsInput{Subject: subject, Version: contactVersion,
+		Rules: []beepgrid.PermissionRule{{Action: "view", TargetKind: "agent", TargetID: billingID}}}))
+	check(int64(contactPolicy["version"].(float64)) > contactVersion)
+	// endregion identity
+
+	// region channels
+	preferences := must(owner.DeliveryPreferences(ctx, me.Person.ID))
+	savedPreferences := must(owner.SaveDeliveryPreferences(ctx, me.Person.ID, beepgrid.DeliveryPreferences{Version: preferences.Version,
+		Default: &beepgrid.ChannelPolicy{Mode: "preferred", Destinations: []string{}, FollowupSeconds: 0}, Overrides: []beepgrid.ChannelOverride{}}))
+	check(savedPreferences.Version > preferences.Version)
+	// endregion channels
 
 	// region workers
 	if err := billing.Heartbeat(ctx, nil); err != nil {
@@ -162,10 +200,10 @@ func main() {
 			panic(err)
 		}
 	}
-	must(builder.Send(ctx, notif.SendInput{Target: target, Body: "A final worker event."}, notif.Key()))
+	must(builder.Send(ctx, beepgrid.SendInput{Target: target, Body: "A final worker event."}, beepgrid.Key()))
 	workerCtx, cancelWorker := context.WithTimeout(ctx, 500*time.Millisecond)
 	processed := 0
-	err = billing.Run(workerCtx, func(_ context.Context, delivery notif.Delivery) error {
+	err = billing.Run(workerCtx, func(_ context.Context, delivery beepgrid.Delivery) error {
 		check(delivery.ID != "")
 		processed++
 		return nil
@@ -177,7 +215,7 @@ func main() {
 	// region events
 	streamCtx, cancelStream := context.WithTimeout(ctx, 5*time.Second)
 	found := false
-	err = billing.StreamEvents(streamCtx, notif.EventOptions{}, func(event notif.Event) error {
+	err = billing.StreamEvents(streamCtx, beepgrid.EventOptions{}, func(event beepgrid.Event) error {
 		if event.Kind == "message.created" && event.ConversationID == sent.ConversationID {
 			check(event.Sequence > 0)
 			found = true
@@ -190,9 +228,9 @@ func main() {
 	// endregion events
 
 	// region execution
-	action := notif.Action{Name: "reconcile-orders", ExecutorID: builderID, Resource: "orders", ResourceVersion: "v2", Arguments: map[string]any{"ids": []int{241, 242}}, OperationKey: runID + "/business"}
-	approval := must(owner.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: me.Person.ID}, Body: "Apply this reconciliation?", Kind: "approval", Action: &action}, notif.Key()))
-	must(owner.Respond(ctx, approval.ID, notif.Response{Outcome: "approved", Version: approval.Version}))
+	action := beepgrid.Action{Name: "reconcile-orders", ExecutorID: builderID, Resource: "orders", ResourceVersion: "v2", Arguments: map[string]any{"ids": []int{241, 242}}, OperationKey: runID + "/business"}
+	approval := must(owner.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: me.Person.ID}, Body: "Apply this reconciliation?", Kind: "approval", Action: &action}, beepgrid.Key()))
+	must(owner.Respond(ctx, approval.ID, beepgrid.Response{Outcome: "approved", Version: approval.Version}))
 	execution := must(builder.Redeem(ctx, approval.ID, action))
 	check(must(builder.ReportExecution(ctx, execution.ID, "succeeded", map[string]bool{"fixture": true})).State == "succeeded")
 	// endregion execution
@@ -201,15 +239,15 @@ func main() {
 	settings := must(owner.Assistance(ctx))
 	check(settings.OverseerConfigured)
 	enabled := true
-	must(owner.UpdateAssistance(ctx, notif.AssistanceUpdate{Overseer: &enabled, Version: settings.Version}))
-	plan := must(owner.PlanOverseer(ctx, notif.OverseerInput{Prompt: "Ask the available specialists whether staging is ready."}, notif.Key()))
+	must(owner.UpdateAssistance(ctx, beepgrid.AssistanceUpdate{Overseer: &enabled, Version: settings.Version}))
+	plan := must(owner.PlanOverseer(ctx, beepgrid.OverseerInput{Prompt: "Ask the available specialists whether staging is ready."}, beepgrid.Key()))
 	check(must(owner.OverseerPlan(ctx, plan.ID)).ID == plan.ID)
 	check(len(must(owner.OverseerPlans(ctx))) > 0)
 	check(must(owner.ConfirmOverseer(ctx, plan.ID)).ID == plan.ID)
 	time.Sleep(1100 * time.Millisecond)
 	check(must(owner.SummarizeOverseer(ctx, plan.ID)).ID == plan.ID)
 	time.Sleep(1100 * time.Millisecond)
-	check(must(owner.Coordinate(ctx, notif.OverseerInput{Prompt: "Ask the specialists to report any release blockers."}, runID+"/coordinate")).ID != "")
+	check(must(owner.Coordinate(ctx, beepgrid.OverseerInput{Prompt: "Ask the specialists to report any release blockers."}, runID+"/coordinate")).ID != "")
 	// endregion coordinator
 	fmt.Println("PASS: Go developer tour")
 }

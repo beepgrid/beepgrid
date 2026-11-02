@@ -41,7 +41,7 @@ def read_frames(response):
 
 
 def read_events(client, *, after=0, summary=False, conversation_id="", stop=lambda: False):
-    from . import NotifError, _open
+    from . import BeepgridError, _open
     if isinstance(after, bool) or not isinstance(after, int) or after < 0:
         raise ValueError("Invalid event cursor")
     cursor = after
@@ -54,7 +54,7 @@ def read_events(client, *, after=0, summary=False, conversation_id="", stop=lamb
         try:
             with _open(request, timeout=max(35, client.timeout)) as response:
                 if not response.headers.get("Content-Type", "").startswith("text/event-stream"):
-                    raise NotifError("INVALID_EVENT_STREAM", "Expected an event stream", 502)
+                    raise BeepgridError("INVALID_EVENT_STREAM", "Expected an event stream", 502)
                 for sequence, event in read_frames(response):
                     if stop(): return
                     if sequence > cursor:
@@ -64,9 +64,9 @@ def read_events(client, *, after=0, summary=False, conversation_id="", stop=lamb
         except urllib.error.HTTPError as error:
             error.close()
             if error.code < 500 and error.code != 429:
-                raise NotifError("EVENT_STREAM_REJECTED", "Event stream rejected", error.code) from error
+                raise BeepgridError("EVENT_STREAM_REJECTED", "Event stream rejected", error.code) from error
         except (ValueError, UnicodeError) as error:
-            raise NotifError("INVALID_EVENT_STREAM", "Invalid event frame", 502) from error
+            raise BeepgridError("INVALID_EVENT_STREAM", "Invalid event frame", 502) from error
         except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead):
             pass
         if not stop(): time.sleep(.1)

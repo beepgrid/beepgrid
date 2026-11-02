@@ -7,7 +7,7 @@ import re
 import subprocess
 
 root = pathlib.Path(__file__).resolve().parents[1]
-git = os.environ.get('NOTIF_GIT', 'git')
+git = os.environ.get('BEEPGRID_GIT', 'git')
 tracked = subprocess.check_output([git, 'ls-files', '-z'], cwd=root).decode().split('\0')
 patterns = [re.compile(rb'ntf_[0-9a-f]{32}_[0-9a-f]{32}'),
             re.compile(rb'(?:sk-proj-|xoxb-)[A-Za-z0-9_-]{35,}'),

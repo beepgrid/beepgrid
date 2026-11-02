@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Client, NotifError } from "../dist/index.js";
-test("real question in existing chat without a redundant target", {skip: !process.env.NOTIF_SDK_TEST_URL}, async () => {
-  const owner = new Client(process.env.NOTIF_SDK_TEST_URL, process.env.NOTIF_SDK_TEST_TOKEN);
+import { Client, BeepgridError } from "../dist/index.js";
+test("real question in existing chat without a redundant target", {skip: !process.env.BEEPGRID_SDK_TEST_URL}, async () => {
+  const owner = new Client(process.env.BEEPGRID_SDK_TEST_URL, process.env.BEEPGRID_SDK_TEST_TOKEN);
   const me = await owner.call("GET", "/api/v1/me");
   const {client: worker, session} = await owner.connect("sdk/ts-followup-" + crypto.randomUUID(), "Follow-up worker");
   const target = {kind:"agent", id:session.agent.id};
@@ -43,7 +43,7 @@ test("structured errors survive the client boundary", async () => {
   await assert.rejects(
     c.getRequest("secret"),
     (e) =>
-      e instanceof NotifError && e.code === "POLICY_DENIED" && e.status === 403,
+      e instanceof BeepgridError && e.code === "POLICY_DENIED" && e.status === 403,
   );
 });
 test("cancelling a waiter does not cancel the request", async () => {
@@ -60,11 +60,11 @@ test("cancelling a waiter does not cancel the request", async () => {
 });
 test(
   "real HTTP worker enrollment and private message",
-  { skip: !process.env.NOTIF_SDK_TEST_URL },
+  { skip: !process.env.BEEPGRID_SDK_TEST_URL },
   async () => {
     const c = new Client(
-      process.env.NOTIF_SDK_TEST_URL,
-      process.env.NOTIF_SDK_TEST_TOKEN,
+      process.env.BEEPGRID_SDK_TEST_URL,
+      process.env.BEEPGRID_SDK_TEST_TOKEN,
     );
     const { client, session } = await c.connect(
       "sdk/ts-" + crypto.randomUUID(),
@@ -85,11 +85,11 @@ test(
 
 test(
   "real HTTP approval and execution lifecycle",
-  { skip: !process.env.NOTIF_SDK_TEST_URL },
+  { skip: !process.env.BEEPGRID_SDK_TEST_URL },
   async () => {
     const owner = new Client(
-      process.env.NOTIF_SDK_TEST_URL,
-      process.env.NOTIF_SDK_TEST_TOKEN,
+      process.env.BEEPGRID_SDK_TEST_URL,
+      process.env.BEEPGRID_SDK_TEST_TOKEN,
     );
     const me = await owner.call("GET", "/api/v1/me");
     const { client: worker, session } = await owner.connect(
@@ -182,8 +182,8 @@ test("optional assistance helpers retain server authority and cancellation", asy
   assert.equal(calls[6].signal,abort.signal);
 });
 
-test("real workspace queries and preview-fenced batches",{skip:!process.env.NOTIF_SDK_TEST_URL},async()=>{
- const c=new Client(process.env.NOTIF_SDK_TEST_URL,process.env.NOTIF_SDK_TEST_TOKEN);
+test("real workspace queries and preview-fenced batches",{skip:!process.env.BEEPGRID_SDK_TEST_URL},async()=>{
+ const c=new Client(process.env.BEEPGRID_SDK_TEST_URL,process.env.BEEPGRID_SDK_TEST_TOKEN);
  const {session}=await c.connect("sdk/query-ts-"+crypto.randomUUID(),"Query worker");
  const target={kind:"agent",id:session.agent.id};
  const preview=await c.dispatchPreview({targets:[target],operation:"message"});
@@ -199,8 +199,8 @@ test("real workspace queries and preview-fenced batches",{skip:!process.env.NOTI
  assert.equal((await c.workspace()).deployment,"self_hosted");assert.ok((await c.account()).applied);assert.ok((await c.access()).roles);
 });
 
-test("real recipient preferences preserve inheritance and reject stale edits", {skip: !process.env.NOTIF_SDK_TEST_URL}, async () => {
-  const c = new Client(process.env.NOTIF_SDK_TEST_URL, process.env.NOTIF_SDK_TEST_TOKEN);
+test("real recipient preferences preserve inheritance and reject stale edits", {skip: !process.env.BEEPGRID_SDK_TEST_URL}, async () => {
+  const c = new Client(process.env.BEEPGRID_SDK_TEST_URL, process.env.BEEPGRID_SDK_TEST_TOKEN);
   const {person} = await c.call("GET", "/api/v1/me");
   const before = await c.deliveryPreferences(person.id);
   const saved = await c.saveDeliveryPreferences(person.id, {...before, default: {mode:"preferred", destinations:[], followup_seconds:0}});
@@ -211,8 +211,8 @@ test("real recipient preferences preserve inheritance and reject stale edits", {
   assert.deepEqual(restored.default, before.default);
 });
 
-test("real token lifecycle keeps names, limits and rotation metadata", {skip: !process.env.NOTIF_SDK_TEST_URL}, async () => {
-  const owner = new Client(process.env.NOTIF_SDK_TEST_URL, process.env.NOTIF_SDK_TEST_TOKEN);
+test("real token lifecycle keeps names, limits and rotation metadata", {skip: !process.env.BEEPGRID_SDK_TEST_URL}, async () => {
+  const owner = new Client(process.env.BEEPGRID_SDK_TEST_URL, process.env.BEEPGRID_SDK_TEST_TOKEN);
   const me = await owner.call("GET", "/api/v1/me");
   const issued = await owner.createCredential({principal_id:me.person.id,kind:"api",name:"TypeScript reports",permissions:["read"]});
   const meta = (await owner.credentials()).find(c=>c.id===issued.id);

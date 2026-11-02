@@ -23,7 +23,7 @@ test("each live setup prompt routes an AI to a complete credential-free environm
     assert.ok(text.includes("ins_existing"));
     assert.ok(text.includes(env.binding), env.id);
     assert.ok(text.includes("Ask me for the absolute path"));
-    assert.ok(text.includes("NOTIF_TOKEN must be unset"));
+    assert.ok(text.includes("BEEPGRID_TOKEN must be unset"));
     assert.ok(text.includes("npm install @beepgrid/sdk"));
     assert.ok(text.includes("uv add beepgrid"));
     assert.ok(text.includes("python3 -m pip install beepgrid"));

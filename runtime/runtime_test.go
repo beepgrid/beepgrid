@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func service(t *testing.T) (*Service, Config) {
@@ -21,7 +21,7 @@ func service(t *testing.T) (*Service, Config) {
 
 func serviceWithBudget(t *testing.T, budget int32) (*Service, Config) {
 	t.Helper()
-	db := os.Getenv("NOTIF_TEST_DATABASE_URL")
+	db := os.Getenv("BEEPGRID_TEST_DATABASE_URL")
 	if db == "" {
 		t.Skip("PostgreSQL is required")
 	}
@@ -62,21 +62,21 @@ func TestSharedRuntimeTenantIsolationAndSuspension(t *testing.T) {
 	}
 	server := httptest.NewServer(s.Handler())
 	defer server.Close()
-	a, b := notif.New(server.URL, tokenA), notif.New(server.URL, tokenB)
+	a, b := beepgrid.New(server.URL, tokenA), beepgrid.New(server.URL, tokenB)
 	var person struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if err := a.Do(ctx, "GET", "/api/v1/me", nil, &person, ""); err != nil {
 		t.Fatal(err)
 	}
-	_, session, err := b.Enroll(ctx, notif.EnrollInput{Agent: "same-name", Name: "Scout"})
+	_, session, err := b.Enroll(ctx, beepgrid.EnrollInput{Agent: "same-name", Name: "Scout"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.Send(ctx, notif.SendInput{Target: notif.Target{Kind: "agent", ID: session.Agent.ID}, Body: "cross tenant"}, "cross"); err == nil {
+	if _, err = a.Send(ctx, beepgrid.SendInput{Target: beepgrid.Target{Kind: "agent", ID: session.Agent.ID}, Body: "cross tenant"}, "cross"); err == nil {
 		t.Fatal("cross-tenant target accepted")
 	}
-	if _, err = b.Ask(ctx, notif.AskInput{Target: notif.Target{Kind: "person", ID: person.Person.ID}, Title: "Approve?", Choices: []string{"Yes"}}, "cross"); err == nil {
+	if _, err = b.Ask(ctx, beepgrid.AskInput{Target: beepgrid.Target{Kind: "person", ID: person.Person.ID}, Title: "Approve?", Choices: []string{"Yes"}}, "cross"); err == nil {
 		t.Fatal("cross-tenant approval accepted")
 	}
 	if err = s.SetSuspended(ctx, "tenant_a", true); err != nil {
@@ -160,23 +160,23 @@ func TestWorkspaceDeadlineSurvivesControlPlaneOutageAndRenewal(t *testing.T) {
 	defer replica.Close()
 	server := httptest.NewServer(replica.Handler())
 	defer server.Close()
-	a, b := notif.New(server.URL, tokenA), notif.New(server.URL, tokenB)
-	_, session, err := a.Enroll(ctx, notif.EnrollInput{Agent: "worker", Name: "Worker"})
+	a, b := beepgrid.New(server.URL, tokenA), beepgrid.New(server.URL, tokenB)
+	_, session, err := a.Enroll(ctx, beepgrid.EnrollInput{Agent: "worker", Name: "Worker"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	worker := notif.New(server.URL, session.Token)
+	worker := beepgrid.New(server.URL, session.Token)
 	cached, err := s.store.Authenticate(ctx, session.Token)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var person struct {
-		Person notif.Person `json:"person"`
+		Person beepgrid.Person `json:"person"`
 	}
 	if err = a.Do(ctx, "GET", "/api/v1/me", nil, &person, ""); err != nil {
 		t.Fatal(err)
 	}
-	sent, err := a.Send(ctx, notif.SendInput{Target: notif.Target{Kind: "agent", ID: session.Agent.ID}, Body: "Durable before expiry"}, "before-expiry")
+	sent, err := a.Send(ctx, beepgrid.SendInput{Target: beepgrid.Target{Kind: "agent", ID: session.Agent.ID}, Body: "Durable before expiry"}, "before-expiry")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestWorkspaceDeadlineSurvivesControlPlaneOutageAndRenewal(t *testing.T) {
 		t.Fatal("renewal failed", err)
 	}
 	var conversation struct {
-		Messages []notif.Message `json:"messages"`
+		Messages []beepgrid.Message `json:"messages"`
 	}
 	if err = a.Do(ctx, "GET", "/api/v1/conversations/"+sent.ConversationID, nil, &conversation, ""); err != nil {
 		t.Fatal(err)
@@ -281,8 +281,8 @@ func TestReplicaStreamDrainReplaysCanonicalEvents(t *testing.T) {
 	first, second := httptest.NewServer(s.Handler()), httptest.NewServer(other.Handler())
 	defer first.Close()
 	defer second.Close()
-	client := notif.New(second.URL, token)
-	_, session, err := client.Enroll(ctx, notif.EnrollInput{Agent: "worker", Name: "Worker"})
+	client := beepgrid.New(second.URL, token)
+	_, session, err := client.Enroll(ctx, beepgrid.EnrollInput{Agent: "worker", Name: "Worker"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestReplicaStreamDrainReplaysCanonicalEvents(t *testing.T) {
 	if cursor == "" {
 		t.Fatal("missing durable cursor")
 	}
-	sent, err := client.Send(ctx, notif.SendInput{Target: notif.Target{Kind: "agent", ID: session.Agent.ID}, Body: "During rolling restart"}, "rolling-message")
+	sent, err := client.Send(ctx, beepgrid.SendInput{Target: beepgrid.Target{Kind: "agent", ID: session.Agent.ID}, Body: "During rolling restart"}, "rolling-message")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestReplicaStreamDrainReplaysCanonicalEvents(t *testing.T) {
 	if !found {
 		t.Fatal("resumed replica missed event")
 	}
-	replay, err := client.Send(ctx, notif.SendInput{Target: notif.Target{Kind: "agent", ID: session.Agent.ID}, Body: "During rolling restart"}, "rolling-message")
+	replay, err := client.Send(ctx, beepgrid.SendInput{Target: beepgrid.Target{Kind: "agent", ID: session.Agent.ID}, Body: "During rolling restart"}, "rolling-message")
 	if err != nil || replay.Messages[0].ID != sent.Messages[0].ID {
 		t.Fatal("replay duplicated accepted work", err)
 	}

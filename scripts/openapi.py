@@ -180,8 +180,8 @@ paths['/api/v1/auth/login']['post']['security']=[]
 for path in ('/integrations/webhook/{id}','/integrations/slack/{id}','/integrations/slack/{id}/events'):
  add('POST',path,ref('SendInput') if 'webhook' in path else {'type':'object'})
  paths[path]['post']['security']=[]
- prefix='X-Notif-' if 'webhook' in path else 'X-Slack-Request-'
- for name in (['X-Notif-Timestamp','X-Notif-Signature','X-Notif-Event-ID'] if 'webhook' in path else ['X-Slack-Request-Timestamp','X-Slack-Signature']):paths[path]['post']['parameters'].append({'name':name,'in':'header','required':True,'schema':S})
+ prefix='X-Beepgrid-' if 'webhook' in path else 'X-Slack-Request-'
+ for name in (['X-Beepgrid-Timestamp','X-Beepgrid-Signature','X-Beepgrid-Event-ID'] if 'webhook' in path else ['X-Slack-Request-Timestamp','X-Slack-Signature']):paths[path]['post']['parameters'].append({'name':name,'in':'header','required':True,'schema':S})
 paths['/integrations/slack/{id}']['post']['requestBody']={'required':True,'content':{'application/x-www-form-urlencoded':{'schema':obj({'payload':S},['payload'])}}}
 for path in ('/auth/oidc/start','/auth/oidc/callback'):paths[path]['get']['responses']['303']={'description':'Redirect after verified login'}
 paths['/api/v1/requests/{id}/blocking']={'post': {'operationId': 'setRequestBlocking', 'description': 'Only the requesting agent may declare or clear its own open single-agent blocking dependency. Does not cancel the request.', 'parameters': [{'name': 'id', 'in': 'path', 'required': True, 'schema': {'type': 'string'}}], 'requestBody': {'required': True, 'content': {'application/json': {'schema': {'type': 'object', 'required': ['blocking'], 'additionalProperties': False, 'properties': {'blocking': {'type': 'boolean'}}}}}}, 'responses': {'200': {'description': 'Current request', 'content': {'application/json': {'schema': {'$ref': '#/components/schemas/Request'}}}}, '403': {'description': 'Caller is not the requesting agent'}, '409': {'description': 'Request is no longer open'}}}}
@@ -207,7 +207,7 @@ paths['/integrations/discord/{id}']['post']['security']=[]
 for header in ['X-Signature-Timestamp','X-Signature-Ed25519']:
     paths['/integrations/discord/{id}']['post']['parameters'].append({'name':header,'in':'header','required':True,'schema':S})
 
-spec={'openapi':'3.1.0','info':{'title':'Beep Grid open source API','version':'0.1.0-dev','license':{'name':'Apache-2.0'}},'servers':[{'url':'/'}], 'security':[{'bearer':[]},{'session':[]}], 'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'},'session':{'type':'apiKey','in':'cookie','name':'notif_session'}}}}
+spec={'openapi':'3.1.0','info':{'title':'Beep Grid open source API','version':'0.1.0-dev','license':{'name':'Apache-2.0'}},'servers':[{'url':'/'}], 'security':[{'bearer':[]},{'session':[]}], 'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'},'session':{'type':'apiKey','in':'cookie','name':'beepgrid_session'}}}}
 status_descriptions = {'400': 'Invalid input', '401': 'Authentication required', '403': 'Permission denied', '404': 'Not found or not visible', '409': 'Conflict with current state', '413': 'Payload too large', '429': 'Rate limit exceeded', '500': 'Server error', '503': 'Service unavailable'}
 for methods in paths.values():
     for operation in methods.values():
@@ -249,6 +249,9 @@ for methods in paths.values():
 schemas['SendInput']['properties']['body'].pop('maxLength',None)
 schemas['Rule']['properties']['action']['description']='Directional permission action: view, message, ask, decide, manage or an explicitly granted wildcard.'
 paths['/api/v1/route-preview']['post']['requestBody']['content']['application/json']['schema']['properties']['action']['description']='Communication action to inspect, for example message or ask; not a bound business Action descriptor.'
+schemas['ChannelPolicy']['properties']['mode']['description']='preferred follows destination order with failure fallback and optional unanswered-request follow-up; all sends to all selected channels immediately.'
+for model in ['Credential','IssuedCredential']:
+    schemas[model]['properties']['expires_at']['description']='Credential expiry timestamp, or null for a non-expiring credential. Renewable worker leases remain bounded by renewable_until.'
 schemas['Request']['properties']['kind']['enum']=['question','approval','task']
 schemas['Execution']['properties']['state']['enum']=['authorized','running','succeeded','failed','unknown']
 schemas['AskInput']['properties']['kind']['default']='question'

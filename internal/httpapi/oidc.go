@@ -57,7 +57,7 @@ func (s *Server) encryptState(value oidcState) (string, error) {
 	if _, e = rand.Read(nonce); e != nil {
 		return "", e
 	}
-	return base64.RawURLEncoding.EncodeToString(g.Seal(nonce, nonce, engine.JSON(value), []byte("notif/oidc/state"))), nil
+	return base64.RawURLEncoding.EncodeToString(g.Seal(nonce, nonce, engine.JSON(value), []byte("beepgrid/oidc/state"))), nil
 }
 func (s *Server) decryptState(raw string) (oidcState, error) {
 	var out oidcState
@@ -73,7 +73,7 @@ func (s *Server) decryptState(raw string) (oidcState, error) {
 	if e != nil || len(b) < g.NonceSize() {
 		return out, engine.Denied()
 	}
-	plain, e := g.Open(nil, b[:g.NonceSize()], b[g.NonceSize():], []byte("notif/oidc/state"))
+	plain, e := g.Open(nil, b[:g.NonceSize()], b[g.NonceSize():], []byte("beepgrid/oidc/state"))
 	if e != nil {
 		return out, engine.Denied()
 	}
@@ -98,7 +98,7 @@ func (s *Server) oidcRoutes() {
 			writeError(w, e)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "notif_oidc", Value: encoded, Path: "/auth/oidc", HttpOnly: true, Secure: strings.HasPrefix(s.PublicURL, "https://"), SameSite: http.SameSiteLaxMode, MaxAge: 600})
+		http.SetCookie(w, &http.Cookie{Name: "beepgrid_oidc", Value: encoded, Path: "/auth/oidc", HttpOnly: true, Secure: strings.HasPrefix(s.PublicURL, "https://"), SameSite: http.SameSiteLaxMode, MaxAge: 600})
 		http.Redirect(w, r, s.oidc.OAuth.AuthCodeURL(state.State, oauth2.S256ChallengeOption(state.Verifier), oidc.Nonce(state.Nonce)), http.StatusFound)
 	})
 	m.HandleFunc("GET /auth/oidc/callback", func(w http.ResponseWriter, r *http.Request) {
@@ -106,13 +106,13 @@ func (s *Server) oidcRoutes() {
 			writeError(w, engine.Missing())
 			return
 		}
-		cookie, e := r.Cookie("notif_oidc")
+		cookie, e := r.Cookie("beepgrid_oidc")
 		if e != nil {
 			writeError(w, engine.Denied())
 			return
 		}
 		state, e := s.decryptState(cookie.Value)
-		http.SetCookie(w, &http.Cookie{Name: "notif_oidc", Path: "/auth/oidc", HttpOnly: true, MaxAge: -1})
+		http.SetCookie(w, &http.Cookie{Name: "beepgrid_oidc", Path: "/auth/oidc", HttpOnly: true, MaxAge: -1})
 		if e != nil || r.URL.Query().Get("state") != state.State || r.URL.Query().Get("code") == "" {
 			writeError(w, engine.Denied())
 			return
@@ -151,7 +151,7 @@ func (s *Server) oidcRoutes() {
 			writeError(w, e)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "notif_session", Value: session, Path: "/", HttpOnly: true, Secure: strings.HasPrefix(s.PublicURL, "https://"), SameSite: http.SameSiteStrictMode, MaxAge: 43200})
+		http.SetCookie(w, &http.Cookie{Name: "beepgrid_session", Value: session, Path: "/", HttpOnly: true, Secure: strings.HasPrefix(s.PublicURL, "https://"), SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 		http.Redirect(w, r, "/inbox", http.StatusSeeOther)
 	})
 	m.HandleFunc("POST /api/v1/people/{id}/oidc-account", s.protect(func(w http.ResponseWriter, r *http.Request) error {

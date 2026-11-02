@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestClientCommandsShareSDKContracts(t *testing.T) {
@@ -38,8 +38,8 @@ func TestClientCommandsShareSDKContracts(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	t.Setenv("NOTIF_TOKEN", "worker-token")
-	t.Setenv("NOTIF_URL", server.URL)
+	t.Setenv("BEEPGRID_TOKEN", "worker-token")
+	t.Setenv("BEEPGRID_URL", server.URL)
 	run := func(args []string, input string) string {
 		t.Helper()
 		var out bytes.Buffer
@@ -84,8 +84,8 @@ func TestClientCommandsShareSDKContracts(t *testing.T) {
 }
 
 func TestClientInputAndAuthorityBoundaries(t *testing.T) {
-	t.Setenv("NOTIF_TOKEN", "")
-	t.Setenv("NOTIF_TOKEN_FILE", "")
+	t.Setenv("BEEPGRID_TOKEN", "")
+	t.Setenv("BEEPGRID_TOKEN_FILE", "")
 	if _, err := clientToken(false); err == nil {
 		t.Fatal("agent client inherited local owner")
 	}
@@ -93,12 +93,12 @@ func TestClientInputAndAuthorityBoundaries(t *testing.T) {
 	if err := os.WriteFile(file, []byte("worker\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("NOTIF_TOKEN_FILE", file)
+	t.Setenv("BEEPGRID_TOKEN_FILE", file)
 	if token, err := clientToken(false); err != nil || token != "worker" {
 		t.Fatal(token, err)
 	}
 	for _, input := range []string{`{"title":"x","typo":true}`, `{} {}`, `null trailing`, strings.Repeat(" ", (4<<20)+1)} {
-		if err := readClientInput("-", strings.NewReader(input), &notif.AskInput{}); err == nil {
+		if err := readClientInput("-", strings.NewReader(input), &beepgrid.AskInput{}); err == nil {
 			t.Fatal("invalid input accepted")
 		}
 	}
@@ -115,7 +115,7 @@ func TestClientInputAndAuthorityBoundaries(t *testing.T) {
 			t.Fatal(args, err)
 		}
 	}
-	if clientExitCode(&notif.APIError{Status: 403}) != 3 || clientExitCode(context.DeadlineExceeded) != 4 || clientExitCode(errors.New("network")) != 1 {
+	if clientExitCode(&beepgrid.APIError{Status: 403}) != 3 || clientExitCode(context.DeadlineExceeded) != 4 || clientExitCode(errors.New("network")) != 1 {
 		t.Fatal("unstable exit codes")
 	}
 }
@@ -128,8 +128,8 @@ func TestClientTimeoutDoesNotSendCancel(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"r1","state":"open","version":1}`))
 	}))
 	defer server.Close()
-	t.Setenv("NOTIF_TOKEN", "worker")
-	t.Setenv("NOTIF_URL", server.URL)
+	t.Setenv("BEEPGRID_TOKEN", "worker")
+	t.Setenv("BEEPGRID_URL", server.URL)
 	start := time.Now()
 	_, err := runClientCommand(context.Background(), []string{"wait", "--timeout", "50ms", "r1"}, strings.NewReader(""), &bytes.Buffer{})
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
@@ -148,8 +148,8 @@ func TestClientDoesNotForwardCredentialsOnRedirect(t *testing.T) {
 		http.Redirect(w, r, target.URL+"/api/v1/me", http.StatusTemporaryRedirect)
 	}))
 	defer origin.Close()
-	t.Setenv("NOTIF_TOKEN", "worker")
-	t.Setenv("NOTIF_URL", origin.URL)
+	t.Setenv("BEEPGRID_TOKEN", "worker")
+	t.Setenv("BEEPGRID_URL", origin.URL)
 	_, err := runClientCommand(context.Background(), []string{"api", "GET", "/api/v1/me"}, strings.NewReader(""), &bytes.Buffer{})
 	if err == nil || forwarded {
 		t.Fatal("redirect was followed", err, forwarded)

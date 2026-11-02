@@ -7,7 +7,7 @@ import "encoding/json"
 // The schema guard prevents version 11 binaries from reading body placeholders.
 type storedSendReceipt struct {
 	*SendResult
-	SharedBody *string `json:"_notif_body_v1,omitempty"`
+	SharedBody *string `json:"_beepgrid_body_v1,omitempty"`
 }
 
 func encodeReceipt(operation string, output any) []byte {

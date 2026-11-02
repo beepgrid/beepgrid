@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/beepgrid/beepgrid/internal/engine"
-	"github.com/beepgrid/beepgrid/sdk/go/notif"
+	"github.com/beepgrid/beepgrid/sdk/go"
 )
 
 func TestHTTPDraftFirstMessageAndMembership(t *testing.T) {
@@ -81,7 +81,7 @@ func TestHTTPDraftFirstMessageAndMembership(t *testing.T) {
 		t.Fatal(changed, err)
 	}
 	// Actor-bound HTTP reads get the same history fence as engine readers.
-	newcomer := notif.New(server.URL, lastToken)
+	newcomer := beepgrid.New(server.URL, lastToken)
 	var chat engine.Conversation
 	if err = newcomer.Do(ctx, "GET", "/api/v1/conversations/"+sent.ConversationID, nil, &chat, ""); err != nil || len(chat.Messages) != 0 {
 		t.Fatal(chat, err)

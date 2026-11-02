@@ -1,21 +1,21 @@
-NOTIF_TEST_DATABASE_URL ?= postgres://notif:notif@localhost:5499/notif?sslmode=disable
-export NOTIF_TEST_DATABASE_URL
+BEEPGRID_TEST_DATABASE_URL ?= postgres://beepgrid:beepgrid@localhost:5499/beepgrid?sslmode=disable
+export BEEPGRID_TEST_DATABASE_URL
 .PHONY: infra build build-workspace build-headless image-workspace image-headless dev playground test test-headless web workspace sdk verify clean
 infra:
 	docker compose up -d --wait
 build: build-workspace
 build-workspace:
 	mkdir -p .local
-	go build -buildvcs=false -trimpath -o .local/notif ./cmd/notif
+	go build -buildvcs=false -trimpath -o .local/beepgrid ./cmd/beepgrid
 build-headless:
 	mkdir -p .local
-	go build -buildvcs=false -trimpath -tags headless -o .local/notif-headless ./cmd/notif
+	go build -buildvcs=false -trimpath -tags headless -o .local/beepgrid-headless ./cmd/beepgrid
 image-workspace:
 	docker build --target workspace -t beepgrid:workspace .
 image-headless:
 	docker build --target headless -t beepgrid:headless .
 dev: build
-	.local/notif serve --dev
+	.local/beepgrid serve --dev
 playground:
 	python3 scripts/playground.py
 test:

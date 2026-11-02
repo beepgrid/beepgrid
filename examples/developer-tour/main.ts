@@ -9,10 +9,10 @@ function readObject(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-const credential = process.env.NOTIF_TOKEN_FILE;
-assert.ok(credential && process.env.NOTIF_URL, 'Set NOTIF_TOKEN_FILE and NOTIF_URL');
+const credential = process.env.BEEPGRID_TOKEN_FILE;
+assert.ok(credential && process.env.BEEPGRID_URL, 'Set BEEPGRID_TOKEN_FILE and BEEPGRID_URL');
 assert.equal(statSync(credential).mode & 0o077, 0, 'Use chmod 600');
-const owner = new Client(process.env.NOTIF_URL, readFileSync(credential, 'utf8').trim());
+const owner = new Client(process.env.BEEPGRID_URL, readFileSync(credential, 'utf8').trim());
 const runId = crypto.randomUUID();
 const personId = (await owner.call<{person:{id:string}}>('GET', '/api/v1/me')).person.id;
 const { client: builder, session: builderSession } = await owner.connect(`tour/${runId}/builder`, 'Builder 7');
@@ -26,6 +26,17 @@ for (const [agentId, peerId] of [[builderId, billingId], [billingId, builderId]]
 }
 const target: Target = { kind: 'agent', id: billingId };
 const targets: Target[] = [{ kind: 'agent', id: builderId }, target];
+
+const issued = await owner.createCredential({principal_id: builderId, kind: 'api', name: 'Tour key', never_expires: true, permissions: ['read']});
+const keyMetadata = (await owner.credentials()).find(item => item.id === issued.id)!;
+const edited = await owner.editCredential(issued.id, {version: keyMetadata.version, name: 'Renamed tour key'});
+const rotated = await owner.rotateCredential(issued.id, edited.version, 0);
+assert.equal(rotated.credential.id, issued.id);
+await owner.revokeCredential(issued.id);
+const {client: lease} = await owner.connect(`tour/${runId}/lease`, 'Lease example', [], {},
+  {renewable: true, expires_at: new Date(Date.now() + 2 * 86400000).toISOString()});
+assert.ok((await lease.renewCredential()).renewable_until);
+
 // endregion setup
 
 // region messages
@@ -34,13 +45,13 @@ const sent = await builder.send({ target, body: 'Check the payment ledger for or
 await billing.send({ conversation_id: sent.conversation_id, body: 'Both payments settled yesterday.' });
 assert.equal((await builder.conversation(sent.conversation_id)).messages?.length, 2);
 const receiptInput = { target, body: 'The reconciliation is complete.' };
-const receipt = await builder.notify(receiptInput, runId + '/receipt');
+const receipt = await builder.sendMinimal(receiptInput, runId + '/receipt');
 assert.equal((await builder.send(receiptInput, runId + '/receipt')).conversation_id, receipt.conversation_id);
 const preview = await owner.dispatchPreview({ targets, operation: 'message' });
 const batch = await owner.sendBatch({ targets, body: 'Hold the staging rollout until checkout jobs drain.', preview_token: preview.token }, runId + '/batch');
 assert.equal(new Set(batch.map(item => item.result.conversation_id)).size, 2);
 // endregion messages
-if (process.env.NOTIF_TOUR_MESSAGES_ONLY === "1") { console.log("PASS: TypeScript first exchange"); process.exit(0); }
+if (process.env.BEEPGRID_TOUR_MESSAGES_ONLY === "1") { console.log("PASS: TypeScript first exchange"); process.exit(0); }
 
 // region requests
 const request = await builder.ask({ target, body: 'Which region contains order 241?', choices: ['EU', 'US'] }, runId + '/ask');
@@ -95,6 +106,23 @@ const connection = await owner.call<{id:string}>('POST', '/api/v1/connections', 
   config: { url: 'https://example.com/beepgrid' }, secret: crypto.randomUUID() });
 assert.ok(await owner.connectionSetup(connection.id));
 // endregion queries
+
+
+// region identity
+const subject: Target = { kind: 'agent', id: builderId };
+const contactPreview = readObject(await owner.previewContactPermissions({ subject }));
+const contactVersion = Number(readObject(contactPreview.policy).version);
+const contactPolicy = readObject(await owner.saveContactPermissions({subject, version: contactVersion,
+  rules: [{action: 'view', target_kind: 'agent', target_id: billingId}]}));
+assert.ok(Number(contactPolicy.version) > contactVersion);
+// endregion identity
+
+// region channels
+const preferences = await owner.deliveryPreferences(personId);
+const savedPreferences = await owner.saveDeliveryPreferences(personId, {person_id: personId, version: preferences.version,
+  default: {mode: 'preferred', destinations: [], followup_seconds: 0}, overrides: []});
+assert.ok(savedPreferences.version > preferences.version);
+// endregion channels
 
 // region workers
 await billing.heartbeat();
