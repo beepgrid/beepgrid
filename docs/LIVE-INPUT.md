@@ -54,12 +54,12 @@ use the same receiver, bindings, credentials and engine API.
 
 ## Manual setup
 
-Run engine/SDK preparation in a Beepgrid checkout. Add the integration to the
-project that **already runs your Agent**, not to a second replacement Agent.
+Install the SDK in the project that **already runs your Agent**. Add the integration to the
+existing host, not to a second replacement Agent.
 
-1. Get the source with `git clone https://github.com/beepgrid/beepgrid.git` if
-   needed. Record that checkout's absolute path.
-2. Save the supplied connection token in a private file outside the checkout,
+1. Use your managed engine's URL, or install the open-source engine using
+   [packaging](PACKAGING.md). No Beepgrid source checkout is required.
+2. Save the supplied connection token in a private file outside your project,
    or use your existing secret manager. For a terminal with Python 3, this asks
    for hidden input, creates a new mode-0600 file and refuses to overwrite one:
 
@@ -89,18 +89,21 @@ project that **already runs your Agent**, not to a second replacement Agent.
    See [access token management](ACCESS-TOKENS.md) for exact renewal and rotation
    behavior. Update the existing host's secret when rotating rather than
    enrolling on every message or process restart. Rotation does not extend expiry.
-3. Prepare the SDK in the **Beepgrid checkout**:
+3. Install the SDK in the **existing Agent project**:
 
    ```sh
-   npm --prefix sdk/typescript ci
-   npm --prefix sdk/typescript run build
+   npm install @beepgrid/sdk
    # For Python instead:
-   python3 -m pip install ./sdk/python
+   uv add beepgrid
+   # Or, if using pip:
+   python3 -m pip install beepgrid
    ```
 
-   SDKs currently ship from source. There is no published `npx` installer claimed
-   here. Link the local SDK into your Agent project, or import by absolute path
-   as in the [TypeScript host helper](../examples/runtime/typescript.mjs).
+   Import TypeScript helpers from `@beepgrid/sdk/runtime`,
+   `@beepgrid/sdk/runtime/node` and `@beepgrid/sdk/runtime/bindings`;
+   Python helpers from `beepgrid.runtime`. The
+   [TypeScript host helper](../examples/runtime/typescript.mjs) uses relative
+   imports for source-checkout development; use package imports in your project.
 4. Set these in the **existing Agent host's environment**. Replace the explicit
    example values with your engine origin, supplied instance ID and private paths:
 
@@ -126,16 +129,16 @@ project that **already runs your Agent**, not to a second replacement Agent.
    from the exact connection. A transport ACK is not proof of model execution.
 
 For AI-guided setup without the workspace, the following command only **prints an
-instruction prompt**. Run it in the Beepgrid checkout after building the SDK, then
+instruction prompt**. Run it in your project after installing the SDK, then
 paste its output into your coding assistant in the Agent project. It neither
 launches an Agent nor reads a credential:
 
 ```sh
-node sdk/typescript/bin/setup.mjs ai-sdk \
+npx beepgrid-setup ai-sdk \
   --url https://your-engine.example --instance ins_your_connection --mode steer
 ```
 
-Run `node sdk/typescript/bin/setup.mjs --help` to list environment IDs. Choose
+Run `npx beepgrid-setup --help` to list environment IDs. Choose
 `--mode queue` for Queue-only environments or when you prefer to finish current
 work first. The generator neither needs nor reads the worker token.
 
@@ -143,7 +146,7 @@ work first. The generator neither needs nor reads the worker token.
 
 Start the engine using [packaging](PACKAGING.md). Use a scoped launcher credential
 as explained in [CLI authentication](CLI.md#authenticate-without-a-browser).
-In the Beepgrid checkout, save enrollment input such as:
+Save enrollment input such as:
 
 ```json
 {"agent":"research/scout","name":"Scout","capabilities":["message","request"]}
@@ -152,7 +155,7 @@ In the Beepgrid checkout, save enrollment input such as:
 With `NOTIF_URL` set and `NOTIF_TOKEN_FILE` pointing to that launcher, run:
 
 ```sh
-.local/notif enroll --input enroll.json --out /private/path/scout-token
+beepgrid enroll --input enroll.json --out /private/path/scout-token
 ```
 
 This creates a protected token file and prints connection metadata including the
@@ -163,7 +166,7 @@ credential. Contact permissions and enrollment authority remain separate.
 
 An AI starting from the README should inspect the project's runtime and version,
 choose the matching row below, read that section plus manual setup, and use the
-source SDK. Plain HTTP, SDK calls and MCP tools remain available without the live
+published SDK. Plain HTTP, SDK calls and MCP tools remain available without the live
 receiver. Adding tools alone does not make a busy or idle model consume messages.
 
 ## Binding coverage
@@ -413,8 +416,8 @@ not two receivers for the same worker instance.
 ## Custom code
 
 TypeScript imports are available from `@beepgrid/sdk/runtime`,
-`@beepgrid/sdk/runtime/node` and `@beepgrid/sdk/runtime/bindings` in a local packed
-consumer. Source-checkout examples use relative imports.
+`@beepgrid/sdk/runtime/node` and `@beepgrid/sdk/runtime/bindings` in the npm package.
+Source-checkout examples use relative imports.
 
 ```ts
 const binding = checkpointBinding({

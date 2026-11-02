@@ -22,7 +22,7 @@ beepgrid serve --dev
 
 Open `http://localhost:4010`. The local owner credential is saved in `.local/owner-token` in your working directory. Keep it private. `--dev` is loopback-only. Production requires explicit credentials, encryption configuration and migrations, as described in [operations](OPERATIONS.md).
 
-The canonical command is `beepgrid`. Existing `notif` source builds remain compatible. A source install is also available with `go install github.com/beepgrid/beepgrid/cmd/beepgrid@v0.1.0`.
+The canonical command is `beepgrid`. Existing `notif` source builds remain compatible. A source install is also available with `go install github.com/beepgrid/beepgrid/cmd/beepgrid@v0.1.1`.
 
 ## Build targets
 

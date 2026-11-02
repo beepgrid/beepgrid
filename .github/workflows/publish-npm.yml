@@ -5,6 +5,12 @@ on:
       tag:
         description: Reviewed release tag (for example v0.1.0)
         required: true
+      package:
+        description: Packages whose versions match the release tag
+        type: choice
+        options: [both, sdk, react]
+        default: both
+        required: true
 permissions:
   contents: read
 jobs:
@@ -22,25 +28,38 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
-      - name: Validate and publish SDK, then React
+      - name: Validate selected package versions
         env:
           RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_PACKAGE: ${{ inputs.package }}
         run: |
           node --input-type=module - <<'JS'
           import {readFileSync} from 'node:fs';
           const tag=process.env.RELEASE_TAG;
           if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error('Use a stable version tag');
-          for (const p of ['typescript','react']) {
+          const selection=process.env.RELEASE_PACKAGE;
+          if (!['both','sdk','react'].includes(selection)) throw new Error('Invalid package selection');
+          const packages=selection==='both'?['typescript','react']:[selection==='sdk'?'typescript':'react'];
+          for (const p of packages) {
             const pkg=JSON.parse(readFileSync(`sdk/${p}/package.json`));
             if (`v${pkg.version}`!==tag) throw new Error('Package version differs from release tag');
           }
           JS
+      - name: Build and test SDK
+        run: |
           npm --prefix sdk/typescript ci --ignore-scripts
           npm --prefix sdk/typescript test
+      - name: Build and test React
+        if: inputs.package != 'sdk'
+        run: |
           npm --prefix sdk/react ci --ignore-scripts
           npm --prefix sdk/react run build
           npm --prefix sdk/react test
-          cd sdk/typescript
-          npm publish --access public --provenance
-          cd ../react
-          npm publish --access public --provenance
+      - name: Publish SDK with provenance
+        if: inputs.package != 'react'
+        working-directory: sdk/typescript
+        run: npm publish --access public --provenance
+      - name: Publish React with provenance
+        if: inputs.package != 'sdk'
+        working-directory: sdk/react
+        run: npm publish --access public --provenance

@@ -16,7 +16,7 @@ const client = new Client(process.env.NOTIF_URL!, process.env.NOTIF_TOKEN!);
 Use an individually issued credential, supplied by your secret manager or a protected file. Never commit it.
 
 For an Agent that is already running in a harness or framework, start with
-[live input](https://beepgrid.com/docs/live-input/). The additive `runtime` subpaths provide
+[live input](https://beepgrid.com/docs/guides/live-input/). The additive `runtime` subpaths provide
 independent receiving, durable custody and native Steer/Queue bindings. Keep
 your existing model, tools and session loop. The local SQLite helper requires
 Node 22.13 or later and a private persistent volume. The sequential worker

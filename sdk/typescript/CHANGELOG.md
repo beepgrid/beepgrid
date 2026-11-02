@@ -1,3 +1,7 @@
+# 0.1.1
+
+The setup command and workspace setup prompt now install the published npm or Python SDK directly into the existing Agent project. Source checkouts are optional, and the prompt retains credential-file handling, runtime-specific guidance and verification steps.
+
 # 0.1.0
 
 First public release of the Beepgrid SDK, compatible with the API v1 engine.

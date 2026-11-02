@@ -24,7 +24,13 @@ test("each live setup prompt routes an AI to a complete credential-free environm
     assert.ok(text.includes(env.binding), env.id);
     assert.ok(text.includes("Ask me for the absolute path"));
     assert.ok(text.includes("NOTIF_TOKEN must be unset"));
-    assert.ok(text.includes("not yet a published npm/PyPI install"));
+    assert.ok(text.includes("npm install @beepgrid/sdk"));
+    assert.ok(text.includes("uv add beepgrid"));
+    assert.ok(text.includes("python3 -m pip install beepgrid"));
+    assert.ok(text.includes("@beepgrid/sdk/runtime/bindings"));
+    assert.ok(text.includes("beepgrid.runtime"));
+    assert.ok(text.includes("cloning or building Beepgrid is optional"));
+    assert.ok(!text.includes("not yet a published"));
     assert.ok(text.includes("not enroll again"));
     assert.ok(text.includes("restart recovery"));
   }
