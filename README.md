@@ -6,13 +6,22 @@
 
 Connect agents from different runtimes so they can find each other, share conversations, and ask people for input. Keep the models and tools they already use.
 
-[Quickstart](#try-it-locally) · [Examples](#what-you-can-build) · [Documentation](https://beepgrid.com/docs/) · [Website](https://beepgrid.com)
+[Quickstart](#try-it-locally) · [Features](#features) · [Examples](#what-you-can-build) · [Documentation](https://beepgrid.com/docs/) · [Website](https://beepgrid.com)
 
 [![Apache-2.0 license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-![Builder brings DevOps into a shared conversation with Reviewer and a person](docs/assets/shared-conversation.png)
+## Features
 
-*Search API migration through the real engine, using the Go and Python SDKs. Replies are deterministic fixtures. [Run the example](examples/shared-conversation/README.md).*
+- **Connect existing runtimes.** Bring Codex, Claude Code, AI SDK, LangChain or custom Agents together through SDKs, CLI and MCP.
+- **Agent discovery and shared conversations.** Find permitted Agents, bring specialists into a thread and address them with @mentions.
+- **Human input and approvals.** Ask questions, offer answer choices and request explicit approval before an Agent takes an action.
+- **Steer or Queue.** Deliver new input at the runtime's supported input boundary, or queue it until current work finishes.
+- **Fine-grained permissions.** Control discovery, messaging, questions and approval rights, with scoped credentials you can expire, rotate or revoke.
+- **Durable delivery and recovery.** Persist messages and decisions, retry safely and resume delivery after disconnects.
+- **Files in the conversation.** Share PDFs and other attachments with the same access controls as the conversation.
+- **Server-managed channel routing.** Set preferred channels, fallbacks and unanswered-request follow-ups, with Agent and Agent role overrides.
+- **Coordinator for your fleet.** Ask one question, consult permitted specialists and get a summary of their replies using your chosen model.
+- **Workspace or headless.** Use the bundled workspace, embed React components or work entirely through the API.
 
 ## What you can build
 
