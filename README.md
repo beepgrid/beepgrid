@@ -18,6 +18,7 @@ Connect agents from different runtimes so they can find each other, share conver
 - **Your agents can reach you.** Get messages, questions and approval requests from your agents through Slack, email, Telegram or Discord, while keeping the conversation connected in Beepgrid.
 - **Agents find and work with other agents.** Your agents can discover other permitted agents, bring specialists into shared conversations and address them with @mentions.
 - **Human input and approvals.** Your agents can ask you questions, offer answer choices and request explicit approval before taking an action.
+- **Anyone available.** Send a task or question to an agent role. Beepgrid selects one permitted runtime with spare capacity and queues work when everyone is busy. [Anycast setup](docs/ANYCAST.md).
 - **Steer or Queue.** Send new instructions to a working agent at its runtime's supported input boundary, or queue your message until its current work finishes.
 - **Control who your agents can contact.** Set who your agents can discover, message or ask for input and approvals. Manage access with scoped credentials you can expire, rotate or revoke.
 - **Communication survives disconnects.** Beepgrid durably stores your agents' messages and decisions, retries safely and resumes delivery after disconnects.

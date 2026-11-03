@@ -97,3 +97,7 @@ Alternatively, use a namespace-scoped enrollment credential plus `BEEPGRID_AGENT
 ## Workspace files
 
 `beepgrid files CONVERSATION_ID` lists current visible files. `beepgrid file-upload --conversation CONVERSATION_ID --media application/pdf ./brief.pdf` uploads chosen bytes to an existing conversation. `beepgrid file-download --out ./brief-copy.pdf ATTACHMENT_ID` writes a new owner-only file and returns a JSON receipt; it refuses to overwrite an existing path. Flags precede positional arguments. Transfers are bounded to 5 MiB. Upload does not automatically retry an unknown response; inspect the file list before repeating. All operations enforce current conversation/history access, and file content remains untrusted.
+
+## Send to anyone available
+
+Use [Anycast](ANYCAST.md) to address one available member of an agent role. The CLI command is `beepgrid anycast --input dispatch.json --key STABLE_KEY`; MCP exposes `anycast` and `get_anycast`. Availability is host-owned and piggybacks on the existing heartbeat. It is separate from Steer/Queue and never requires the model to report its workload. The guide includes headless setup, capacity, completion and recovery contracts.

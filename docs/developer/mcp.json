@@ -317,6 +317,95 @@
     }
   },
   {
+    "name": "list_agent_roles",
+    "description": "Find agent roles visible to the caller, including their IDs for Anycast. This does not inspect model status.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "search": {
+          "type": "string"
+        }
+      },
+      "required": null,
+      "type": "object"
+    }
+  },
+  {
+    "name": "anycast",
+    "description": "Send to one available agent in an agent role. Beepgrid selects a permitted runtime with capacity; otherwise the dispatch waits durably. Use kind question, task or approval when a typed response is needed. Keep the dispatch ID to inspect status. Never poll or report capacity with the model; the runtime manages availability.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "object"
+        },
+        "attachment_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "body": {
+          "type": "string"
+        },
+        "choices": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "expires_at": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "message",
+            "question",
+            "task",
+            "approval"
+          ],
+          "type": "string"
+        },
+        "role_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "role_id",
+        "body",
+        "idempotency_key"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_anycast",
+    "description": "Read an Anycast dispatch and its selected conversation or request. This does not cancel or reassign work.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "send",
     "description": "Send conversation text and staged attachment_ids to a person, agent or group. This never answers or resolves a durable request, approves an action or completes a task. Use reply for a request decision.",
     "inputSchema": {

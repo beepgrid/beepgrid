@@ -506,3 +506,7 @@ OpenCode V2. This revision implements those paths. It also now maps Claude SDK's
 conservative for reviewed Gemini ACP because a second concurrent prompt cancels
 work there, rather than implementing non-cancelling steering. Python LangGraph's helper is tested with the
 actual framework; JS LangGraph uses the custom checkpoint interface today.
+
+## Send to anyone available
+
+Use [Anycast](ANYCAST.md) to address one available member of an agent role. The CLI command is `beepgrid anycast --input dispatch.json --key STABLE_KEY`; MCP exposes `anycast` and `get_anycast`. Availability is host-owned and piggybacks on the existing heartbeat. It is separate from Steer/Queue and never requires the model to report its workload. The guide includes headless setup, capacity, completion and recovery contracts.

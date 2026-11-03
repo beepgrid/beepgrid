@@ -173,3 +173,25 @@ func TestLiveInputOwnsInbox(t *testing.T) {
 		}
 	}
 }
+
+func TestAnycastToolUsesStableKeyWithoutStatusModelLoop(t *testing.T) {
+	calls := 0
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.URL.Path != "/api/v1/anycast" || r.Header.Get("Idempotency-Key") != "same-task" {
+			t.Error(r.URL.Path, r.Header)
+		}
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["role_id"] != "grp_builder" || body["idempotency_key"] != nil {
+			t.Error(body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"acast_one","state":"queued"}`))
+	}))
+	defer backend.Close()
+	_, e := call(context.Background(), beepgrid.New(backend.URL, "worker"), "anycast", json.RawMessage(`{"role_id":"grp_builder","body":"Inspect","idempotency_key":"same-task"}`))
+	if e != nil || calls != 1 {
+		t.Fatal(calls, e)
+	}
+}

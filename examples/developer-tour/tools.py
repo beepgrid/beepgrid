@@ -77,6 +77,19 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-mcp-tour-') as scratch:
     assert revised['replacement']['state'] == 'open'
     # endregion decisions
 
+    # region anycast
+    role = owner.call('POST', '/api/v1/groups', {'name': run_id + '/billing-role', 'purpose': 'agent_role', 'members': [billing_id]})
+    visibility = owner.call('POST', '/api/v1/roles', {'name': run_id + '/role-discovery', 'rules': [{'action': 'view', 'target_kind': 'group', 'target_id': role['id']}]})
+    owner.call('POST', '/api/v1/role-bindings', {'role_id': visibility['id'], 'subject_kind': 'principal', 'subject_id': builder_id})
+    assert any(item['id'] == role['id'] for item in rpc('list_agent_roles', {})['items'])
+    billing.heartbeat(anycast={'capacity': 1})
+    dispatch = rpc('anycast', {'role_id': role['id'], 'kind': 'question', 'body': 'Which region handles billing?', 'idempotency_key': run_id + '/anycast'})
+    assert dispatch['agent_id'] == billing_id
+    observed = rpc('get_anycast', {'id': dispatch['id']})
+    assert observed['request_id'] == dispatch['request_id']
+    billing.respond(dispatch['request_id'], 'answered', answer='eu-west-1', version=1)
+    # endregion anycast
+
     # region execution
     action = {'name': 'fixture', 'executor_id': builder_id, 'resource': 'staging', 'resource_version': 'v2', 'operation_key': run_id + '/fixture', 'arguments': {}}
     approval = owner.ask(target={'kind': 'person', 'id': person_id}, body='Approve this fixture?', kind='approval', action=action)
@@ -85,5 +98,7 @@ with tempfile.TemporaryDirectory(prefix='beepgrid-mcp-tour-') as scratch:
     assert rpc('report_execution', {'id': execution['id'], 'state': 'succeeded', 'result': {'fixture': True}})['state'] == 'succeeded'
     # endregion execution
 
-assert len(called) == 21, called
-print('PASS: all 21 MCP tools with actual canonical results')
+listing = subprocess.run([binary, 'mcp'], input=json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'}) + '\n', text=True, capture_output=True, env={**os.environ, 'BEEPGRID_TOKEN': 'schema-only', 'BEEPGRID_AGENT_ID': ''}, check=True)
+expected = {item['name'] for item in json.loads(listing.stdout)['result']['tools']}
+assert called == expected, (called, expected)
+print(f'PASS: all {len(called)} MCP tools with actual canonical results')

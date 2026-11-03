@@ -3487,3 +3487,9 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 .token-secret code{word-break:break-all;flex:1}.connection-security{font-size:14px}
 .connection-security summary{cursor:pointer;font-weight:500}.connection-security>.form{padding-top:12px}
 @media(max-width:700px){.token-toolbar{align-items:stretch;flex-direction:column}.token-toolbar input{max-width:none}.token-permissions{grid-template-columns:1fr}.token-table td:first-child{min-width:170px}}
+
+.anycast-list { display: grid; gap: 0; }
+.anycast-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.anycast-row > div:first-child { flex: 1 1 220px; min-width: 0; }
+.anycast-row p { margin: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 6em; overflow: auto; }
+.anycast-receipt > p, .anycast-row small { color: var(--muted); }

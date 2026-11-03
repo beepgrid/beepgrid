@@ -18,6 +18,9 @@ type recipient struct {
 type concurrentMessageKey struct{}
 
 func (s *Store) resolve(ctx context.Context, db DB, a Actor, target Target, action, actionName string, descriptor ...*Action) ([]recipient, error) {
+	if selected, ok := ctx.Value(anycastContextKey{}).(anycastSelection); ok && target == (Target{"group", selected.role}) {
+		return []recipient{selected.recipient}, nil
+	}
 	if len(descriptor) > 0 && descriptor[0] != nil {
 		actionName = descriptor[0].Name
 	}
@@ -334,6 +337,10 @@ func insertMessage(ctx context.Context, db DB, a Actor, conv, body string) (Mess
 	return m, event(ctx, db, a, "message.created", conv, "", m)
 }
 func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, conv, action string, payload map[string]any, expiry time.Time) error {
+	if selected, ok := ctx.Value(anycastContextKey{}).(anycastSelection); ok {
+		payload["anycast_id"] = selected.id
+		payload["anycast_role_id"] = selected.role
+	}
 	if s.recipientBlocked(ctx, db, a, action, r.ID) {
 		return Denied()
 	}
@@ -437,7 +444,7 @@ func (s *Store) sendTx(ctx context.Context, tx pgx.Tx, a Actor, in SendInput, ke
 			if len(in.Mentions) > 0 {
 				return Bad("Mentions require an existing shared conversation.")
 			}
-			if len(in.AttachmentIDs) > 0 {
+			if len(in.AttachmentIDs) > 0 || ctx.Value(anycastContextKey{}) != nil {
 				for _, r := range rs {
 					conv, err := newConversation(ctx, tx, a, in.Title, r.ID)
 					if err != nil {

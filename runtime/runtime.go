@@ -164,9 +164,12 @@ func (s *Service) RunWorkers(ctx context.Context) {
 			if err == nil {
 				_, err = s.store.ProcessAttachmentCleanup(step)
 			}
+			if err == nil {
+				_, err = s.store.ProcessAnycast(step)
+			}
 			cancel()
 			if err != nil && ctx.Err() == nil {
-				slog.Error("workspace erasure requires retry", "error_type", fmt.Sprintf("%T", err))
+				slog.Error("workspace maintenance requires retry", "error_type", fmt.Sprintf("%T", err))
 			}
 			select {
 			case <-ctx.Done():

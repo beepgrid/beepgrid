@@ -18,6 +18,12 @@ const deliveryFields = `id,recipient_id,operation_id,payload,state,generation,at
 // currentDeliveryPolicy rechecks the originating credential, group membership and route grants before exposing content.
 func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, d Delivery) bool {
 	ctx = withPolicySnapshot(ctx)
+	if role, ok := d.Payload["anycast_role_id"].(string); ok {
+		var member bool
+		if e := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memberships m JOIN groups g ON g.id=m.group_id AND g.scope=m.scope JOIN anycast_dispatches a ON a.scope=m.scope AND a.role_id=g.id AND a.agent_id=m.principal_id WHERE m.scope=$1 AND m.group_id=$2 AND m.principal_id=$3 AND g.purpose='agent_role' AND a.id=$4 AND a.state IN ('assigned','accepted'))`, scope, role, d.RecipientID, d.Payload["anycast_id"]).Scan(&member); e != nil || !member {
+			return false
+		}
+	}
 	if d.ConnectionID != "" && d.Routing.Managed {
 		var valid bool
 		if err := db.QueryRow(ctx, `SELECT
@@ -129,10 +135,20 @@ func (s *Store) Inbox(ctx context.Context, a Actor) ([]Delivery, error) {
 				if _, e = tx.Exec(ctx, `UPDATE deliveries SET state='cancelled',last_error='Current policy or request validity denied delivery' WHERE scope=$1 AND id=$2`, a.Scope, d.ID); e != nil {
 					return e
 				}
+				if id, ok := d.Payload["anycast_id"].(string); ok {
+					if _, e = tx.Exec(ctx, `UPDATE anycast_dispatches SET state='blocked',last_error='Current permissions or request validity denied delivery',updated_at=now() WHERE scope=$1 AND id=$2 AND state='assigned'`, a.Scope, id); e != nil {
+						return e
+					}
+				}
 				continue
 			}
 			if e = tx.QueryRow(ctx, `UPDATE deliveries SET state='leased',owner_instance=$3,generation=generation+1,lease_until=now()+interval '30 seconds',attempts=attempts+1 WHERE scope=$1 AND id=$2 RETURNING generation,attempts`, a.Scope, d.ID, a.InstanceID).Scan(&d.Generation, &d.Attempts); e != nil {
 				return e
+			}
+			if id, ok := d.Payload["anycast_id"].(string); ok {
+				if _, e = tx.Exec(ctx, `UPDATE anycast_dispatches SET state='accepted',updated_at=now() WHERE scope=$1 AND id=$2 AND state='assigned'`, a.Scope, id); e != nil {
+					return e
+				}
 			}
 			delete(d.Payload, "_policy")
 			d.State = "leased"

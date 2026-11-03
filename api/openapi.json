@@ -7676,6 +7676,510 @@
         ]
       }
     },
+    "/api/v1/anycast": {
+      "post": {
+        "operationId": "post_api_v1_anycast",
+        "description": "Queue a message or request for one available permitted member of an agent role.\n\nAuthenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.\n\nReturns: AnycastDispatch with current state and, after selection, agent, runtime, conversation and optional request IDs.\n\nRecovery: Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnycastDispatch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnycastInput"
+              }
+            }
+          }
+        },
+        "summary": "Queue a message or request for one available permitted member of an agent role",
+        "tags": [
+          "communication"
+        ]
+      },
+      "get": {
+        "operationId": "get_api_v1_anycast",
+        "description": "List up to 100 of your latest Anycast dispatches.\n\nAuthenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.\n\nReturns: Up to 100 AnycastDispatch records, newest first. Input contains a 240-character body preview and omits choices, action and attachment IDs. Read an individual dispatch for its full input.\n\nRecovery: Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnycastDispatch"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "summary": "List up to 100 of your latest Anycast dispatches",
+        "tags": [
+          "communication"
+        ]
+      }
+    },
+    "/api/v1/anycast/{id}": {
+      "get": {
+        "operationId": "get_api_v1_anycast_id",
+        "description": "Read the current state of your Anycast dispatch.\n\nAuthenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.\n\nReturns: AnycastDispatch including selected conversation and request IDs when assigned.\n\nRecovery: Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnycastDispatch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Read the current state of your Anycast dispatch",
+        "tags": [
+          "communication"
+        ]
+      }
+    },
+    "/api/v1/anycast/{id}/cancel": {
+      "post": {
+        "operationId": "post_api_v1_anycast_id_cancel",
+        "description": "Cancel a queued Anycast dispatch before assignment.\n\nAuthenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.\n\nReturns: Object with cancelled: true. Assigned work must be followed up in its conversation.\n\nRecovery: Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cancelled": {
+                      "type": "boolean",
+                      "description": "True after queued work was cancelled. This does not stop assigned execution."
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Cancel a queued Anycast dispatch before assignment",
+        "tags": [
+          "communication"
+        ]
+      }
+    },
+    "/api/v1/worker/anycast/{id}/complete": {
+      "post": {
+        "operationId": "post_api_v1_worker_anycast_id_complete",
+        "description": "Release an accepted dispatch reservation after the host finishes or stops its handler.\n\nAuthenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.\n\nReturns: Object with completed: true. This is not a business execution success claim.\n\nRecovery: Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "completed": {
+                      "type": "boolean",
+                      "description": "True after the assigned runtime released its reservation. Not evidence of business execution success."
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Release an accepted dispatch reservation after the host finishes or stops its handler",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
     "/api/v1/worker/inbox": {
       "get": {
         "operationId": "get_api_v1_worker_inbox",
@@ -7786,7 +8290,7 @@
     "/api/v1/worker/heartbeat": {
       "post": {
         "operationId": "post_api_v1_worker_heartbeat",
-        "description": "Refresh this runtime's presence with optional progress metadata.\n\nCurrent worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.\n\nReturns: `{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.\n\nRecovery: Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established.",
+        "description": "Refresh this runtime's presence with optional progress metadata. Optional anycast: {capacity: 0..100} refreshes a runtime capacity advertisement for 60 seconds; renew from the host every 30 seconds.\n\nCurrent worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.\n\nReturns: `{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.\n\nRecovery: Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established.",
         "responses": {
           "200": {
             "description": "Success",
@@ -7871,7 +8375,26 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "anycast": {
+                    "type": "object",
+                    "properties": {
+                      "capacity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100,
+                        "description": "Host-owned concurrent Anycast capacity after unrelated work. The server subtracts reservations. Valid for 60 seconds."
+                      }
+                    },
+                    "required": [
+                      "capacity"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Optional host-owned capacity advertisement. A model should never be prompted to generate it."
+                  }
+                },
+                "additionalProperties": true
               }
             }
           }
@@ -14135,6 +14658,127 @@
           "credential": {
             "$ref": "#/components/schemas/Credential",
             "description": "Non-secret credential metadata returned with a newly rotated bearer token."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "AnycastInput": {
+        "type": "object",
+        "properties": {
+          "role_id": {
+            "type": "string",
+            "description": "ID of a group with purpose agent_role, not an IAM role."
+          },
+          "kind": {
+            "enum": [
+              "message",
+              "question",
+              "task",
+              "approval"
+            ],
+            "description": "Resource or operation kind. Use one of the listed values, not a display label."
+          },
+          "body": {
+            "type": "string",
+            "description": "Message or request content, bounded to 32 KiB of UTF-8 bytes."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional short label. A normal message does not require a title."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional exact answer strings. A chosen answer must match an offered value."
+          },
+          "action": {
+            "$ref": "#/components/schemas/Action",
+            "description": "Optional exact bound-action descriptor for the advanced execution contract."
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "IDs of staged private drafts to claim in the initial operation; at most five."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+          }
+        },
+        "required": [
+          "role_id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "AnycastDispatch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable identifier returned by the engine. Treat it as opaque."
+          },
+          "role_id": {
+            "type": "string",
+            "description": "Policy role ID used by a binding; not the agent_role directory-group ID."
+          },
+          "role_name": {
+            "type": "string",
+            "description": "Display name of the addressed agent role."
+          },
+          "requester_id": {
+            "type": "string",
+            "description": "Identity that opened the requested decision."
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "assigned",
+              "accepted",
+              "completed",
+              "cancelled",
+              "expired",
+              "blocked"
+            ],
+            "description": "Lifecycle state. Read the resource-specific enum; request and execution states differ."
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Logical agent identity ID, shared by its runtime instances."
+          },
+          "instance_id": {
+            "type": "string",
+            "description": "Exact connected runtime ID, separate from the logical agent identity."
+          },
+          "conversation_id": {
+            "type": "string",
+            "description": "Canonical conversation ID. Use it to continue the same authorized history."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Canonical durable request ID. This is not a worker delivery ID."
+          },
+          "input": {
+            "$ref": "#/components/schemas/AnycastInput",
+            "description": "The saved caller input for this durable dispatch."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation timestamp in RFC 3339 UTC."
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "Expiry timestamp. Ordinary communication has no implicit deadline (represented as 9999-01-01T00:00:00Z). Bound action approvals default to seven days; explicit expiry must be within ninety days. Local wait timeout never changes it."
+          },
+          "last_error": {
+            "type": "string",
+            "description": "Latest safe delivery error, not a successful execution report."
           }
         },
         "required": [],

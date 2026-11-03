@@ -1230,7 +1230,7 @@
     "name": "Execution"
   },
   {
-    "definition": "struct {\n\tID         string `json:\"id\"`\n\tGeneration int64  `json:\"generation\"`\n\tPayload    struct {\n\t\tType           string   `json:\"type\"`\n\t\tConversationID string   `json:\"conversation_id\"`\n\t\tMessage        *Message `json:\"message,omitempty\"`\n\t\tRequest        *Request `json:\"request,omitempty\"`\n\t} `json:\"payload\"`\n}",
+    "definition": "struct {\n\tID         string `json:\"id\"`\n\tGeneration int64  `json:\"generation\"`\n\tPayload    struct {\n\t\tAnycastID      string   `json:\"anycast_id,omitempty\"`\n\t\tAnycastRoleID  string   `json:\"anycast_role_id,omitempty\"`\n\t\tType           string   `json:\"type\"`\n\t\tConversationID string   `json:\"conversation_id\"`\n\t\tMessage        *Message `json:\"message,omitempty\"`\n\t\tRequest        *Request `json:\"request,omitempty\"`\n\t} `json:\"payload\"`\n}",
     "doc": "",
     "fields": [
       {
@@ -1249,7 +1249,7 @@
         "doc": "",
         "name": "Payload",
         "tag": "`json:\"payload\"`",
-        "type": "struct {\n\tType           string   `json:\"type\"`\n\tConversationID string   `json:\"conversation_id\"`\n\tMessage        *Message `json:\"message,omitempty\"`\n\tRequest        *Request `json:\"request,omitempty\"`\n}"
+        "type": "struct {\n\tAnycastID      string   `json:\"anycast_id,omitempty\"`\n\tAnycastRoleID  string   `json:\"anycast_role_id,omitempty\"`\n\tType           string   `json:\"type\"`\n\tConversationID string   `json:\"conversation_id\"`\n\tMessage        *Message `json:\"message,omitempty\"`\n\tRequest        *Request `json:\"request,omitempty\"`\n}"
       }
     ],
     "file": "sdk/go/client.go",

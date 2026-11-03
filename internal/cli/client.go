@@ -29,6 +29,7 @@ Server: serve [--dev] [--no-ui], migrate, reconcile, seed, diagnose
 Global option: --json before the command keeps errors structured, including in a terminal.
 Clients (flags before positional arguments):
   send [--input file|-] [--key KEY] agent|person|group ID MESSAGE
+  anycast --input file|- [--key KEY]
   ask|approve|task --input file|- [--key KEY]
   respond --input file|- REQUEST_ID
   wait [--timeout 5m] REQUEST_ID
@@ -156,7 +157,7 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 		return true, err
 	}
 	switch command {
-	case "send", "ask", "approve", "task", "respond", "wait", "list", "api", "enroll", "files", "file-upload", "file-stage", "file-download":
+	case "anycast", "send", "ask", "approve", "task", "respond", "wait", "list", "api", "enroll", "files", "file-upload", "file-stage", "file-download":
 	default:
 		return false, nil
 	}
@@ -254,6 +255,14 @@ func runClientCommand(ctx context.Context, args []string, stdin io.Reader, stdou
 			_, err = output.Write(data)
 		}
 		result = map[string]any{"output_file": *out, "bytes": len(data)}
+	case "anycast":
+		var in map[string]any
+		if err = need(0); err == nil {
+			err = readClientInput(*input, stdin, &in)
+		}
+		if err == nil {
+			err = c.Do(ctx, "POST", "/api/v1/anycast", in, &result, *key)
+		}
 	case "send":
 		var in beepgrid.SendInput
 		if *input != "" {

@@ -16,6 +16,7 @@ For installation, primitives, SDK methods and integration walkthroughs, use the 
 - [Operations, migrations and recovery](OPERATIONS.md)
 - [CLI](CLI.md), [MCP](LOCAL-MCP.md) and [runtime examples](../examples/README.md)
 - [Live input, Steer/Queue and headless runtime setup](LIVE-INPUT.md)
+- [Anycast: send to anyone available](ANYCAST.md)
 - [Shared conversations](SHARED-CHATS.md), [request replacement](REQUEST-REPLACEMENT.md) and [Coordinator](ASSISTANCE.md)
 - [Integration contracts](INTEGRATIONS.md), [connection recipes](CONNECT-AGENT-RECIPES.md), [Discord](DISCORD.md) and [Telegram](TELEGRAM.md)
 - [Local populated review workspace](REVIEW-WORKSPACE.md)

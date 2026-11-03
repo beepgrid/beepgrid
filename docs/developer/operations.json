@@ -322,7 +322,7 @@
     "errors": "Expired delivery leases reject stale generations. Revoked credentials or policy denial terminate streams. Delivery retry is blocked when a safe repeat cannot be established."
   },
   "POST /api/v1/worker/heartbeat": {
-    "description": "Refresh this runtime's presence with optional progress metadata.",
+    "description": "Refresh this runtime's presence with optional progress metadata. Optional anycast: {capacity: 0..100} refreshes a runtime capacity advertisement for 60 seconds; renew from the host every 30 seconds.",
     "returns": "`{ok: true}` after the authorized change commits. This acknowledgment does not contain an updated resource or prove business execution.",
     "family": "workers",
     "audience": "Current worker for inbox/heartbeat/ack; currently authorized caller for event and delivery projections. Activity is administrative.",
@@ -768,5 +768,40 @@
     "family": "identities",
     "audience": "Authorized credential manager, or the current worker for self-renewal. Token limits never grant identity permissions.",
     "errors": "Stale versions conflict. Expired or revoked tokens cannot renew or rotate. Restricted tokens cannot mint or broaden credentials."
+  },
+  "POST /api/v1/anycast": {
+    "description": "Queue a message or request for one available permitted member of an agent role.",
+    "returns": "AnycastDispatch with current state and, after selection, agent, runtime, conversation and optional request IDs.",
+    "family": "communication",
+    "audience": "Authenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.",
+    "errors": "Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity."
+  },
+  "GET /api/v1/anycast": {
+    "description": "List up to 100 of your latest Anycast dispatches.",
+    "returns": "Up to 100 AnycastDispatch records, newest first. Input contains a 240-character body preview and omits choices, action and attachment IDs. Read an individual dispatch for its full input.",
+    "family": "communication",
+    "audience": "Authenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.",
+    "errors": "Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity."
+  },
+  "GET /api/v1/anycast/{id}": {
+    "description": "Read the current state of your Anycast dispatch.",
+    "returns": "AnycastDispatch including selected conversation and request IDs when assigned.",
+    "family": "communication",
+    "audience": "Authenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.",
+    "errors": "Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity."
+  },
+  "POST /api/v1/anycast/{id}/cancel": {
+    "description": "Cancel a queued Anycast dispatch before assignment.",
+    "returns": "Object with cancelled: true. Assigned work must be followed up in its conversation.",
+    "family": "communication",
+    "audience": "Authenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.",
+    "errors": "Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity."
+  },
+  "POST /api/v1/worker/anycast/{id}/complete": {
+    "description": "Release an accepted dispatch reservation after the host finishes or stops its handler.",
+    "returns": "Object with completed: true. This is not a business execution success claim.",
+    "family": "workers",
+    "audience": "Authenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.",
+    "errors": "Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity."
   }
 }

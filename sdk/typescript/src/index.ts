@@ -116,6 +116,8 @@ export type Delivery = {
   id: string;
   generation: number;
   payload: {
+    anycast_id?: string;
+    anycast_role_id?: string;
     type: string;
     conversation_id: string;
     message?: Message;

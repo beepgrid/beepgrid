@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/beepgrid/beepgrid/sdk/go"
 	"io"
+	"net/url"
 )
 
 type tool struct {
@@ -40,6 +41,9 @@ func Tools() any {
 		{"acknowledge", "Acknowledge a delivery with its current lease generation.", schema([]string{"id", "generation"}, map[string]any{"id": textType(), "generation": map[string]string{"type": "integer"}})},
 		{"report_progress", "Publish bounded worker-reported structured progress.", schema(nil, map[string]any{"progress": map[string]string{"type": "object"}})},
 		{"list_agents", "List agents visible to the authenticated caller.", schema(nil, map[string]any{})},
+		{"list_agent_roles", "Find agent roles visible to the caller, including their IDs for Anycast. This does not inspect model status.", schema(nil, map[string]any{"search": textType(), "cursor": textType()})},
+		{"anycast", "Send to one available agent in an agent role. Beepgrid selects a permitted runtime with capacity; otherwise the dispatch waits durably. Use kind question, task or approval when a typed response is needed. Keep the dispatch ID to inspect status. Never poll or report capacity with the model; the runtime manages availability.", schema([]string{"role_id", "body", "idempotency_key"}, map[string]any{"role_id": textType(), "body": textType(), "title": textType(), "kind": map[string]any{"type": "string", "enum": []string{"message", "question", "task", "approval"}}, "choices": map[string]any{"type": "array", "items": textType()}, "action": map[string]string{"type": "object"}, "expires_at": textType(), "attachment_ids": attachmentIDsType(), "idempotency_key": textType()})},
+		{"get_anycast", "Read an Anycast dispatch and its selected conversation or request. This does not cancel or reassign work.", schema([]string{"id"}, map[string]any{"id": textType()})},
 		{"send", "Send conversation text and staged attachment_ids to a person, agent or group. This never answers or resolves a durable request, approves an action or completes a task. Use reply for a request decision.", schema([]string{"body"}, map[string]any{"body": textType(), "target": map[string]any{"type": "object", "properties": map[string]any{"kind": textType(), "id": textType()}, "required": []string{"kind", "id"}}, "conversation_id": textType(), "title": textType(), "idempotency_key": textType(), "mentions": mentionsType(), "attachment_ids": attachmentIDsType(), "reuse_direct": map[string]string{"type": "boolean"}})},
 		{"ask", "Request a reply, choices or an approval decision, optionally with staged attachment_ids. Ordinary information and follow-ups use send. If a response does not answer your question, ask again in the same conversation. A title is optional. An approval without an action descriptor only communicates a decision and cannot be redeemed. The caller may continue working. Set blocking only when this agent cannot continue until one individual agent answers. Mentions address current conversation participants; all members receive the original message and may contribute.", schema(nil, map[string]any{"target": map[string]any{"type": "object"}, "title": textType(), "body": textType(), "kind": textType(), "choices": map[string]any{"type": "array", "items": textType()}, "action": map[string]any{"type": "object"}, "shared_key": textType(), "conversation_id": textType(), "idempotency_key": textType(), "mentions": mentionsType(), "attachment_ids": attachmentIDsType(), "blocking": map[string]string{"type": "boolean"}, "reuse_direct": map[string]string{"type": "boolean"}})},
 		{"set_blocking", "Declare or clear an explicit blocking dependency on your own open request. Only use this when you cannot continue until that individual agent answers. Ordinary waiting and offline state do not imply deadlock.", schema([]string{"id", "blocking"}, map[string]any{"id": textType(), "blocking": map[string]string{"type": "boolean"}})},
@@ -153,6 +157,34 @@ func ServeWithInput(ctx context.Context, c *beepgrid.Client, in io.Reader, out i
 func call(ctx context.Context, c *beepgrid.Client, name string, args json.RawMessage) (any, error) {
 	var value any
 	switch name {
+	case "list_agent_roles":
+		var in struct {
+			Search string `json:"search"`
+			Cursor string `json:"cursor"`
+		}
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		e := c.Do(ctx, "POST", "/api/v1/query", map[string]any{"collection": "groups", "filters": map[string]string{"purpose": "agent_role"}, "search": in.Search, "cursor": in.Cursor, "limit": 50}, &value, "")
+		return value, e
+	case "anycast":
+		var in map[string]any
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		key, _ := in["idempotency_key"].(string)
+		delete(in, "idempotency_key")
+		e := c.Do(ctx, "POST", "/api/v1/anycast", in, &value, key)
+		return value, e
+	case "get_anycast":
+		var in struct {
+			ID string `json:"id"`
+		}
+		if e := json.Unmarshal(args, &in); e != nil {
+			return nil, e
+		}
+		e := c.Do(ctx, "GET", "/api/v1/anycast/"+url.PathEscape(in.ID), nil, &value, "")
+		return value, e
 	case "list_directory":
 		var in struct {
 			Kind   string `json:"kind"`
@@ -218,7 +250,10 @@ func call(ctx context.Context, c *beepgrid.Client, name string, args json.RawMes
 		}
 		return map[string]any{"id": in.ID, "size": len(raw), "base64": base64.StdEncoding.EncodeToString(raw)}, nil
 	case "receive":
-		return c.Inbox(ctx)
+		// Preserve additive engine payload fields even when the CLI is built with
+		// an older published SDK, whose typed Delivery projection may omit them.
+		e := c.Do(ctx, "GET", "/api/v1/worker/inbox", nil, &value, "")
+		return value, e
 	case "acknowledge":
 		var in struct {
 			ID         string `json:"id"`
@@ -235,6 +270,9 @@ func call(ctx context.Context, c *beepgrid.Client, name string, args json.RawMes
 		}
 		if e := json.Unmarshal(args, &in); e != nil {
 			return nil, e
+		}
+		if _, present := in.Progress["anycast"]; present {
+			return nil, fmt.Errorf("Anycast capacity belongs in the host heartbeat, not model progress reports")
 		}
 		e := c.Heartbeat(ctx, in.Progress)
 		return map[string]bool{"ok": e == nil}, e
@@ -283,7 +321,7 @@ func call(ctx context.Context, c *beepgrid.Client, name string, args json.RawMes
 		return c.Ask(ctx, in.AskInput, in.IdempotencyKey)
 	case "redeem_approval":
 		var in struct {
-			ID     string       `json:"id"`
+			ID     string          `json:"id"`
 			Action beepgrid.Action `json:"action"`
 		}
 		if e := json.Unmarshal(args, &in); e != nil {

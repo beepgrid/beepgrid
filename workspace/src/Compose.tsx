@@ -1,7 +1,8 @@
 import { useState, useRef, type ReactNode } from "react";
 import { useCollection, useDraft, useOperation, useSession } from "./data";
 import { MentionEditor } from "./Mentions";
-import type { Identity, Mention, Target, Attachment } from "./contracts";
+import type { Identity, Mention, Target, Attachment, Group } from "./contracts";
+import { AnycastReceipt, type AnycastDispatch } from "./Anycast";
 import { bytes, upload } from "./client";
 import { fileSize } from "./Attachments";
 import { navigate } from "./navigation";
@@ -18,6 +19,8 @@ export function MessageComposer({
   delivery = "individual",
   participants = [],
   disabled = false,
+  anycastRole = "",
+  onQueued,
 }: {
   targets?: Target[];
   conversation?: string;
@@ -28,10 +31,13 @@ export function MessageComposer({
   delivery?: "individual" | "group";
   participants?: Identity[];
   disabled?: boolean;
+  anycastRole?: string;
+  onQueued?: (id: string) => void;
 }) {
   const draftID =
     "message:" +
-    (conversation ||
+    (anycastRole ||
+      conversation ||
       targets
         .map((t) => t.kind + t.id)
         .sort()
@@ -136,7 +142,7 @@ export function MessageComposer({
       setError(Error("Your message is too long. Keep it under 32 KB."));
       return;
     }
-    if (!conversation && !targets.length) {
+    if (!conversation && !targets.length && !anycastRole) {
       setError(Error("Choose a recipient first."));
       return;
     }
@@ -150,7 +156,23 @@ export function MessageComposer({
     }
     const request = replyRequired || approval || clean.length > 0;
     let result: { conversation_id?: string } | undefined;
-    if (!conversation && targets.length > 1 && delivery === "individual") {
+    if (anycastRole && !conversation) {
+      const sent = await op.run<AnycastDispatch>("/anycast", {
+        role_id: anycastRole,
+        body,
+        attachment_ids,
+        kind: request ? (approval ? "approval" : "question") : "message",
+        choices: clean,
+      });
+      if (sent) {
+        result = sent;
+        if (!sent.conversation_id) onQueued?.(sent.id);
+      }
+    } else if (
+      !conversation &&
+      targets.length > 1 &&
+      delivery === "individual"
+    ) {
       if (request) {
         const sent = await op.run<{ request: { conversation_id: string } }[]>(
           "/request-batches",
@@ -219,7 +241,8 @@ export function MessageComposer({
       setApproval(false);
       setFiles([]);
       op.forget();
-      onSent?.(result.conversation_id || conversation);
+      if (!anycastRole || result.conversation_id)
+        onSent?.(result.conversation_id || conversation);
     }
   }
   return (
@@ -376,7 +399,7 @@ export function MessageComposer({
               disabled ||
               waitingFiles ||
               (!body.trim() && !files.length) ||
-              (!conversation && !targets.length)
+              (!conversation && !targets.length && !anycastRole)
             }
           >
             {op.pending ? "Sending..." : "Send"}
@@ -399,6 +422,15 @@ export function Compose({
   onClose: () => void;
 }) {
   const me = useSession();
+  const [audience, setAudience] = useState<"specific" | "any">("specific");
+  const [roleID, setRoleID] = useState("");
+  const [queuedID, setQueuedID] = useState("");
+  const roles = useCollection<Group>(
+    "groups",
+    "",
+    { purpose: "agent_role" },
+    !conversation && audience === "any",
+  );
   const [targets, setTargets] = useState(initial),
     [picking, setPicking] = useState(!initial.length),
     [delivery, setDelivery] = useState<"individual" | "group">("individual"),
@@ -419,11 +451,68 @@ export function Compose({
   );
   return (
     <Modal
-      title={conversation ? "Message" : "New message"}
+      title={
+        queuedID ? "Message saved" : conversation ? "Message" : "New message"
+      }
       onClose={onClose}
       className="compose-dialog"
     >
-      {!conversation ? (
+      {!conversation && !queuedID ? (
+        <div className="delivery-mode">
+          <div role="group" aria-label="Recipient selection">
+            <button
+              type="button"
+              aria-pressed={audience === "specific"}
+              onClick={() => setAudience("specific")}
+            >
+              Choose recipients
+            </button>
+            <button
+              type="button"
+              aria-pressed={audience === "any"}
+              onClick={() => setAudience("any")}
+            >
+              Anyone available
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {queuedID ? <AnycastReceipt id={queuedID} /> : null}
+      {!conversation && !queuedID && audience === "any" ? (
+        <div className="field">
+          <label htmlFor="anycast-role">Agent role</label>
+          <select
+            id="anycast-role"
+            value={roleID}
+            onChange={(e) => setRoleID(e.target.value)}
+          >
+            <option value="">Choose an agent role</option>
+            {roles.items.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </select>
+          <small>
+            One available agent gets the message. If everyone is busy, Beepgrid
+            keeps it queued.{" "}
+            <a
+              href="https://beepgrid.com/docs/guides/anycast/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Runtime setup
+            </a>
+          </small>
+          <ErrorView error={roles.error} />
+          {roles.hasNextPage ? (
+            <Button onClick={() => void roles.fetchNextPage()}>
+              Load more roles
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {!conversation && !queuedID && audience === "specific" ? (
         <div className="field">
           {picking ? (
             <TargetPicker
@@ -445,7 +534,10 @@ export function Compose({
           )}
         </div>
       ) : null}
-      {!conversation && targets.length > 1 ? (
+      {!conversation &&
+      !queuedID &&
+      audience === "specific" &&
+      targets.length > 1 ? (
         <div className="delivery-mode">
           <div role="group" aria-label="Message delivery">
             <button
@@ -472,21 +564,30 @@ export function Compose({
           </small>
         </div>
       ) : null}
-      <MessageComposer
-        targets={targets}
-        delivery={delivery}
-        conversation={conversation}
-        replyRequired={mode === "question"}
-        participants={
-          delivery === "group"
-            ? [me.person, ...participants.filter((p) => p.id !== me.person.id)]
-            : []
-        }
-        onSent={(id) => {
-          onClose();
-          if (id) navigate("/conversations/" + id);
-        }}
-      />
+      {!queuedID ? (
+        <MessageComposer
+          targets={audience === "any" ? [] : targets}
+          anycastRole={audience === "any" ? roleID : ""}
+          onQueued={setQueuedID}
+          delivery={delivery}
+          conversation={conversation}
+          replyRequired={mode === "question"}
+          participants={
+            delivery === "group"
+              ? [
+                  me.person,
+                  ...participants.filter((p) => p.id !== me.person.id),
+                ]
+              : []
+          }
+          onSent={(id) => {
+            onClose();
+            if (id) navigate("/conversations/" + id);
+          }}
+        />
+      ) : (
+        <Button onClick={onClose}>Done</Button>
+      )}
     </Modal>
   );
 }

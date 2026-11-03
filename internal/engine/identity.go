@@ -369,13 +369,26 @@ func (s *Store) Heartbeat(ctx context.Context, a Actor, progress map[string]any)
 	if len(JSON(progress)) > 8192 {
 		return Bad("Progress payload too large.")
 	}
+	availability, err := parseAnycastAvailability(progress)
+	if err != nil {
+		return err
+	}
+	var capacity *int
+	if availability != nil {
+		capacity = &availability.Capacity
+	}
 	return s.tx(ctx, a, func(tx pgx.Tx) error {
-		tag, e := tx.Exec(ctx, `UPDATE instances SET last_seen=now(),progress=$3 WHERE scope=$1 AND id=$2 AND credential_id=$4`, a.Scope, a.InstanceID, JSON(progress), a.CredentialID)
+		tag, e := tx.Exec(ctx, `UPDATE instances SET last_seen=now(),progress=$3,anycast_capacity=COALESCE($5,anycast_capacity),anycast_until=CASE WHEN $5::integer IS NULL THEN anycast_until ELSE now()+interval '60 seconds' END WHERE scope=$1 AND id=$2 AND credential_id=$4`, a.Scope, a.InstanceID, JSON(progress), a.CredentialID, capacity)
 		if e != nil {
 			return e
 		}
 		if tag.RowsAffected() != 1 {
 			return Denied()
+		}
+		if availability != nil {
+			if availability.Capacity > 0 {
+				return s.routeAnycast(ctx, tx, a.Scope)
+			}
 		}
 		return nil
 	})

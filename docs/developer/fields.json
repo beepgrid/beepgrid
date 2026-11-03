@@ -255,5 +255,12 @@
   "revoke_workers": "Also revoke worker credentials enrolled through this credential.",
   "revoked": "Whether the credential has been revoked and can no longer authenticate.",
   "source": "Sender selector for a channel override: an exact Agent or an Agent role group.",
-  "token_hint": "Non-secret token suffix used to identify a credential. It cannot authenticate."
+  "token_hint": "Non-secret token suffix used to identify a credential. It cannot authenticate.",
+  "anycast_id": "Stable Anycast dispatch ID. The runtime releases its reservation after processing, never on transport acknowledgement.",
+  "anycast_role_id": "Agent role whose one selected member receives this dispatch. Membership does not grant authority.",
+  "role_name": "Display name of the addressed agent role.",
+  "cancelled": "True after queued work was cancelled. This does not stop assigned execution.",
+  "completed": "True after the assigned runtime released its reservation. Not evidence of business execution success.",
+  "input": "The saved caller input for this durable dispatch.",
+  "anycast": "Optional host-owned capacity advertisement. A model should never be prompted to generate it."
 }

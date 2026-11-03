@@ -155,3 +155,26 @@ func TestClientDoesNotForwardCredentialsOnRedirect(t *testing.T) {
 		t.Fatal("redirect was followed", err, forwarded)
 	}
 }
+
+func TestAnycastCLIUsesStableKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/api/v1/anycast" || r.Header.Get("Idempotency-Key") != "dispatch-42" {
+			t.Error(r.Method, r.URL.Path, r.Header.Get("Idempotency-Key"))
+		}
+		var in map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		if in["role_id"] != "grp_builder" {
+			t.Error(in)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"acast_one","state":"queued"}`))
+	}))
+	defer server.Close()
+	t.Setenv("BEEPGRID_URL", server.URL)
+	t.Setenv("BEEPGRID_TOKEN", "scoped-worker")
+	var out bytes.Buffer
+	handled, e := runClientCommand(context.Background(), []string{"anycast", "--input", "-", "--key", "dispatch-42"}, strings.NewReader(`{"role_id":"grp_builder","body":"Inspect"}`), &out)
+	if !handled || e != nil || !strings.Contains(out.String(), "acast_one") {
+		t.Fatal(handled, e, out.String())
+	}
+}

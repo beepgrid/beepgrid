@@ -165,6 +165,8 @@ type Delivery struct {
 	ID         string `json:"id"`
 	Generation int64  `json:"generation"`
 	Payload    struct {
+		AnycastID      string   `json:"anycast_id,omitempty"`
+		AnycastRoleID  string   `json:"anycast_role_id,omitempty"`
 		Type           string   `json:"type"`
 		ConversationID string   `json:"conversation_id"`
 		Message        *Message `json:"message,omitempty"`

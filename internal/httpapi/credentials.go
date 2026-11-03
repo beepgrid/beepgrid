@@ -14,12 +14,17 @@ func credentialRequestPermission(r *http.Request) string {
 		return "read"
 	}
 	switch p {
+	case "anycast":
+		return "" // The decoded kind is checked by Store.Anycast in its transaction.
 	case "query", "capabilities", "permissions/explain", "route-preview", "dispatch-preview", "contact-permissions/preview", "roles/preview", "fleet/status", "worker/heartbeat", "credentials/self/renew":
 		return "read"
 	case "messages", "message-batches", "conversations", "attachments":
 		return "message"
 	case "requests", "request-batches":
 		return "request"
+	}
+	if strings.HasPrefix(p, "anycast/") || strings.HasPrefix(p, "worker/anycast/") {
+		return "read"
 	}
 	if strings.HasPrefix(p, "worker/inbox/") && strings.HasSuffix(p, "/ack") {
 		return "read"

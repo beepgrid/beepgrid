@@ -32,6 +32,7 @@ import { MentionText } from "../Mentions";
 import { RequestCard } from "../RequestCard";
 import { PendingQuestions } from "../PendingQuestions";
 import { Compose, MessageComposer } from "../Compose";
+import { AnycastQueue } from "../Anycast";
 import {
   Badge,
   Button,
@@ -78,9 +79,12 @@ export default function Conversations() {
       <PageHeader
         title="Messages"
         actions={
-          <Button primary icon="plus" onClick={() => setCompose(true)}>
-            New message
-          </Button>
+          <div className="actions">
+            <AnycastQueue />
+            <Button primary icon="plus" onClick={() => setCompose(true)}>
+              New message
+            </Button>
+          </div>
         }
       />
       {route.id ? (

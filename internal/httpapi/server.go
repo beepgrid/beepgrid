@@ -137,7 +137,7 @@ func (s *Server) protect(fn func(http.ResponseWriter, *http.Request) error) http
 			return
 		}
 		permission := credentialRequestPermission(r)
-		if !a.CredentialPermits(permission) {
+		if permission != "" && !a.CredentialPermits(permission) {
 			writeError(w, engine.Denied())
 			return
 		}
@@ -162,6 +162,7 @@ func ok(w http.ResponseWriter, value any, err error) error {
 }
 func (s *Server) routes() {
 	s.workspaceRoutes()
+	s.anycastRoutes()
 	m := s.mux
 	m.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -267,7 +267,7 @@ func (s *Store) askContinuedTx(ctx context.Context, tx pgx.Tx, a Actor, in AskIn
 		if err = linkAttachments(ctx, tx, a.Scope, conv, "", out.ID, files); err != nil {
 			return err
 		}
-		if continuation == nil && in.ConversationID == "" && in.SharedKey == "" {
+		if continuation == nil && in.ConversationID == "" && in.SharedKey == "" && ctx.Value(anycastContextKey{}) == nil {
 			if e = s.newRequestAudience(ctx, tx, a, *out, rs); e != nil {
 				return e
 			}

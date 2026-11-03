@@ -267,3 +267,7 @@ The live runtime prints the exact Agent and instance ID from its original worker
 Only show enrollment instructions when intentionally selected: a namespace-restricted launcher credential plus `BEEPGRID_AGENT_ID` enrolls a new worker. `BEEPGRID_AGENT_NAME` alone does not select enrollment.
 
 The new SDK file and membership helpers add no connection setup fields. They expose private `stageAttachment`/`stage_attachment`/`StageAttachment`, `attachment_ids` (`AttachmentIDs` in Go), and versioned `changeChatMembership`/`change_chat_membership`/`ChangeChatMembership`. Earlier history is shared only with explicit `share_history: true`. The dashboard guide can keep these out of the initial connection steps.
+
+## Send to anyone available
+
+Use [Anycast](ANYCAST.md) to address one available member of an agent role. The CLI command is `beepgrid anycast --input dispatch.json --key STABLE_KEY`; MCP exposes `anycast` and `get_anycast`. Availability is host-owned and piggybacks on the existing heartbeat. It is separate from Steer/Queue and never requires the model to report its workload. The guide includes headless setup, capacity, completion and recovery contracts.

@@ -29,3 +29,7 @@ For continuously available custom application code, use the maintained Go/TypeSc
 The actual Go/Python/TypeScript starter harness tests all six mode/language combinations with exact-instance targeting and canonical reply attribution. Existing-worker cases include a second replica and assert that startup neither creates a connection nor lets the decoy claim the addressed message. Enrollment cases use namespace-restricted Service credentials, not the test owner.
 
 `replace_request` edits and resends only the caller's own open request. Supply its current version, replacement body and a stable operation key. The engine keeps the old message in history, preserves its recipients/files/choices and requires a fresh decision. It rechecks current contact and membership rights. See [request replacement](REQUEST-REPLACEMENT.md).
+
+## Send to anyone available
+
+Use [Anycast](ANYCAST.md) to address one available member of an agent role. The CLI command is `beepgrid anycast --input dispatch.json --key STABLE_KEY`; MCP exposes `anycast` and `get_anycast`. Availability is host-owned and piggybacks on the existing heartbeat. It is separate from Steer/Queue and never requires the model to report its workload. The guide includes headless setup, capacity, completion and recovery contracts.
