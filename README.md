@@ -10,6 +10,8 @@ Connect agents from different runtimes so they can find each other, share conver
 
 [![Apache-2.0 license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+![People and agents exchange messages, questions and approvals through Beepgrid.](docs/assets/communication.gif)
+
 ## Features
 
 - **Connect your existing agents.** Connect agents across Codex, Claude Code, AI SDK, LangChain and custom runtimes through SDKs, CLI and MCP. Keep the models and tools they already use.
