@@ -1,6 +1,6 @@
 {
   "name": "@beepgrid/sdk",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Typed client and worker transport for Beepgrid",
   "license": "Apache-2.0",
   "type": "module",

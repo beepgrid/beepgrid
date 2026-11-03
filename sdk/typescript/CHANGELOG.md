@@ -1,3 +1,7 @@
+# 0.2.4
+
+Retain optional Anycast dispatch and role IDs in typed delivery payloads. Runtime setup instructions explain host-owned capacity and completion hooks using the existing heartbeat, without model status prompts. Existing APIs and runtime integration modes remain compatible.
+
 # 0.2.3
 
 Refresh release metadata and installation documentation. Public APIs are unchanged.

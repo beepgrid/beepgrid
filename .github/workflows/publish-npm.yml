@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Reviewed release tag (for example v0.2.3)
+        description: Reviewed engine or SDK tag (for example sdk/typescript/v0.2.4)
         required: true
       package:
         description: Packages whose versions match the release tag
@@ -36,13 +36,15 @@ jobs:
           node --input-type=module - <<'JS'
           import {readFileSync} from 'node:fs';
           const tag=process.env.RELEASE_TAG;
-          if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error('Use a stable version tag');
+          const match=/^(?:sdk\/typescript\/)?v(\d+\.\d+\.\d+)$/.exec(tag);
+          if (!match) throw new Error('Use a stable engine or TypeScript SDK version tag');
           const selection=process.env.RELEASE_PACKAGE;
           if (!['both','sdk','react'].includes(selection)) throw new Error('Invalid package selection');
+          if (tag.startsWith('sdk/typescript/') && selection !== 'sdk') throw new Error('TypeScript SDK tags publish only the SDK');
           const packages=selection==='both'?['typescript','react']:[selection==='sdk'?'typescript':'react'];
           for (const p of packages) {
             const pkg=JSON.parse(readFileSync(`sdk/${p}/package.json`));
-            if (`v${pkg.version}`!==tag) throw new Error('Package version differs from release tag');
+            if (pkg.version!==match[1]) throw new Error('Package version differs from release tag');
           }
           JS
       - name: Build and test SDK

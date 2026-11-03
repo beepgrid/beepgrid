@@ -72,7 +72,7 @@ Content-Type: application/json
 {}
 ```
 
-This endpoint is idempotent and restricted to the assigned runtime. It records that the runtime is finished with the dispatch, not that a business operation succeeded. ACK alone does not release capacity. A request's typed result remains the source of its outcome. Existing SDKs can call these endpoints through their generic HTTP transport; the current source also retains the two optional inbox fields in typed Go and TypeScript payloads. Dedicated SDK helpers are not required. With Go SDK 0.2.3, use `Client.Do` and your own payload struct or map when reading these fields: its older typed `Inbox` projection omits them. The CLI and MCP preserve the complete engine payload without needing a newer SDK.
+This endpoint is idempotent and restricted to the assigned runtime. It records that the runtime is finished with the dispatch, not that a business operation succeeded. ACK alone does not release capacity. A request's typed result remains the source of its outcome. Existing SDKs can call these endpoints through their generic HTTP transport; Go and TypeScript SDK 0.2.4 and later retain the two optional inbox fields in their typed payloads. Dedicated SDK helpers are not required. With Go SDK 0.2.3, use `Client.Do` and your own payload struct or map when reading these fields: its older typed `Inbox` projection omits them. The CLI and MCP preserve the complete engine payload without needing a newer SDK.
 
 ## Selection and recovery
 
