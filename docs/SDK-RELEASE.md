@@ -6,7 +6,7 @@ Run `python3 scripts/sdk-package-check.py`. The Python interpreter selected with
 
 Artifacts and a SHA256/provenance manifest go to `.local/sdk-release` (or `--output`). The manifest records source commit and dirty state, artifact sizes/hashes and verification limits. A dirty source manifest cannot be presented as a release built from a clean commit. The manual `prepare SDK artifacts` GitHub workflow runs the same check and uploads development artifacts with read-only repository permissions. Release workflows run only when explicitly dispatched; publishing is separate from local artifact verification.
 
-Use a consistent SemVer for the engine and npm packages until a separate compatibility policy is justified. Python versions must use the equivalent PEP 440 form. Keep wire changes additive within API v1; do not silently reinterpret operation keys, requests, responses, identities or worker lease generations. A breaking import/package rename needs migration instructions and a clean consumer test before publication. Pin React's SDK peer compatibility to the released client series when a release version is selected. Keep the CSS export marked as a side effect; SDK transport code is side-effect free.
+Engine and SDK versions advance independently. Publish only the packages whose public code changes, and retain the compatible SDK versions for an engine-only patch. Python versions use PEP 440 form. Keep wire changes additive within API v1; do not silently reinterpret operation keys, requests, responses, identities or worker lease generations. A breaking import/package rename needs migration instructions and a clean consumer test before publication. Pin React's SDK peer compatibility to the released client series when a release version is selected. Keep the CSS export marked as a side effect; SDK transport code is side-effect free.
 
 Before a release, rerun real PostgreSQL default/headless race suites, the isolated real HTTP SDK journey, CLI/MCP smoke and packed consumers on the integrated commit. Reconcile shared file/membership wrappers with the main task's final engine contract. Qualification must separately record source/protocol fixtures, designated live provider round trip, native approval, and recovery/revoke. Provider acceptance is not human receipt or business execution. Publishing, pushes, deployments and live-account setup require explicit authorization; a local qualification check does not perform them.
 
@@ -39,3 +39,9 @@ This patch includes clearer command-line setup guidance, package documentation a
 ## Patch 0.2.3
 
 This patch refreshes release metadata and installation documentation. Engine runtime behavior and public SDK APIs are unchanged. Use the current installation commands in [Packaging](PACKAGING.md).
+
+## Engine patch 0.2.6
+
+This engine/workspace patch adds Slack channel selection, per-channel Agent and Agent role access, unmentioned replies in mapped Slack threads, and server-rendered Agent attribution. Linked People remain distinct senders, with provider channel/thread context delivered separately. The headless API supports the same setup. Existing SDK versions continue to work without republication.
+
+The engine requires schema 40. Back up before migration; the new channel-settings table needs the runtime role's existing DML permissions. Older schema-39 binaries reject the newer schema, so rollback requires a schema-40-compatible build or a database restore with its associated data-loss window. Existing Slack apps must update the generated manifest and reinstall to grant channel-list and history scopes. Configuration and fixture qualification do not replace a live Slack round trip.
