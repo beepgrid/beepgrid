@@ -4,7 +4,7 @@ Agents address a Person. Beepgrid chooses the delivery channels and keeps one ca
 
 ## Configure in the workspace
 
-Open **Integrations → Delivery preferences**. Drag channels into order, or focus a drag handle and use the arrow keys. Choose **Preferred channel, then fallbacks** or **All selected channels**. Addresses are managed under **Delivery destinations**.
+Open **Integrations → Delivery preferences**. Drag channels into order, or focus a drag handle and use the arrow keys. Choose **Preferred channel, then fallbacks** or **All selected channels**. Addresses are managed under **Delivery destinations**. For Slack, configure channel names and Agent access in the connection, then choose a configured channel or a private DM as the destination.
 
 - **Preferred:** start with the first enabled, permitted destination. A definite delivery failure tries the next one immediately, after any safe provider retries.
 - **All selected:** send to every selected destination immediately. This is opt-in.
@@ -30,7 +30,7 @@ Agent roles use current `agent_role` group memberships at send time, not IAM per
 
 Verified incoming provider threads establish reply affinity. For a configured policy, the originating installation must still be selected. Its current thread replaces that installation's ordinary destination for the reply; outbound receipts never add more notification copies. A workspace-only policy never routes back to an old provider thread.
 
-Preferences select among existing destinations and grant no contact, disclosure, decision or provider permissions. Beepgrid rechecks current credentials, recipient access, destination revision, enabled connection and applicable identity links before dispatch.
+Slack channel access is an additional restriction shared across every destination for that channel. Selected Agent roles use current membership, and an empty restricted list blocks all Agents. Preferences select among existing destinations and grant no contact, disclosure, decision or provider permissions. Beepgrid rechecks current credentials, recipient access, destination revision, enabled connection and applicable identity links before dispatch.
 
 Saving changed preferences stops pending external sends from the previous configuration, including scheduled follow-ups. New sends use the new configuration. History is retained. Existing Primary, Fallback and Copy settings continue until a default or matching override replaces them.
 

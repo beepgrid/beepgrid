@@ -53,7 +53,7 @@ func (s *Store) nativeFanout(ctx context.Context, tx pgx.Tx, a Actor, in SendInp
 	expiry := time.Now().Add(7 * 24 * time.Hour)
 	for start := 0; start < len(items); start += batchSize {
 		raw := JSON(items[start:min(start+batchSize, len(items))])
-		if _, e := tx.Exec(ctx, nativeFanoutSQL, a.Scope, raw, title, a.ID, a.InstanceID, a.CredentialID, a.ProviderConnection, expiry, in.Body); e != nil {
+		if _, e := tx.Exec(ctx, nativeFanoutSQL, a.Scope, raw, title, a.ID, a.InstanceID, a.CredentialID, a.ProviderConnection, expiry, in.Body, JSON(deliveryIdentity(a))); e != nil {
 			return true, e
 		}
 	}

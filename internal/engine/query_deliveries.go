@@ -272,10 +272,10 @@ func (s *Store) deliveryReadRoutes(ctx context.Context, scope string, deliveries
 			continue
 		}
 		if a.Admin {
-			out[d.ID] = true
+			out[d.ID] = s.providerChannelAllowed(ctx, s.Pool, a, d.ConnectionID, d.Address)
 			continue
 		}
-		out[d.ID] = s.rulesAllow(ctx, s.Pool, a, rules[a.ID], p.Action, p.Target, d.ConnectionID, p.ActionName, payloadAction(d.Payload)) && !s.recipientBlocked(ctx, s.Pool, a, p.Action, d.RecipientID)
+		out[d.ID] = s.rulesAllow(ctx, s.Pool, a, rules[a.ID], p.Action, p.Target, d.ConnectionID, p.ActionName, payloadAction(d.Payload)) && !s.recipientBlocked(ctx, s.Pool, a, p.Action, d.RecipientID) && s.providerChannelAllowed(ctx, s.Pool, a, d.ConnectionID, d.Address)
 	}
 	return out, nil
 }

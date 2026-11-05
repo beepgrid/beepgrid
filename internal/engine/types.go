@@ -85,10 +85,11 @@ type Agent struct {
 	Instances []Instance `json:"instances"`
 }
 type Actor struct {
-	ProviderConnection string   `json:"-"`
-	TokenPermissions   []string `json:"-"`
-	CredentialPrevious bool     `json:"-"`
-	TokenDigest        string   `json:"-"`
+	MessageSource      map[string]string `json:"-"`
+	ProviderConnection string            `json:"-"`
+	TokenPermissions   []string          `json:"-"`
+	CredentialPrevious bool              `json:"-"`
+	TokenDigest        string            `json:"-"`
 
 	Principal
 	Scope          string `json:"scope"`

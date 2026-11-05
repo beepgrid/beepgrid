@@ -14,13 +14,14 @@ type policySnapshot struct {
 	rules       map[string][]Rule
 	memberships map[string]map[string]bool
 	assigned    map[string]map[string]bool
+	channels    map[string]map[string]ProviderChannel
 }
 
 func withPolicySnapshot(ctx context.Context) context.Context {
 	if ctx.Value(policySnapshotKey{}) != nil {
 		return ctx
 	}
-	return context.WithValue(ctx, policySnapshotKey{}, &policySnapshot{rules: map[string][]Rule{}, memberships: map[string]map[string]bool{}, assigned: map[string]map[string]bool{}})
+	return context.WithValue(ctx, policySnapshotKey{}, &policySnapshot{rules: map[string][]Rule{}, memberships: map[string]map[string]bool{}, assigned: map[string]map[string]bool{}, channels: map[string]map[string]ProviderChannel{}})
 }
 
 func assignedRoles(ctx context.Context, db DB, a Actor) (map[string]bool, error) {

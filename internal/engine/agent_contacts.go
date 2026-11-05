@@ -52,18 +52,18 @@ func (s *Store) AgentContacts(ctx context.Context, caller Actor, id string, in A
 			return err
 		}
 		type route struct {
-			connection, kind, mode string
-			enabled                bool
+			connection, kind, mode, address string
+			enabled                         bool
 		}
 		routes := map[string][]route{}
-		rows, err := db.Query(ctx, `SELECT d.principal_id,c.id,c.kind,d.mode,c.enabled FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) ORDER BY d.priority,d.id`, caller.Scope, ids)
+		rows, err := db.Query(ctx, `SELECT d.principal_id,c.id,c.kind,d.mode,c.enabled,d.address FROM destinations d JOIN connections c ON c.scope=d.scope AND c.id=d.connection_id WHERE d.scope=$1 AND d.principal_id=ANY($2::text[]) ORDER BY d.priority,d.id`, caller.Scope, ids)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var pid string
 			var r route
-			if err = rows.Scan(&pid, &r.connection, &r.kind, &r.mode, &r.enabled); err != nil {
+			if err = rows.Scan(&pid, &r.connection, &r.kind, &r.mode, &r.enabled, &r.address); err != nil {
 				rows.Close()
 				return err
 			}
@@ -91,7 +91,7 @@ func (s *Store) AgentContacts(ctx context.Context, caller Actor, id string, in A
 			for _, r := range routes[peer.ID] {
 				visible := caller.Admin || caller.ID == peer.ID || s.allowed(ctx, db, caller, "view", Target{"destination", peer.ID}, "", "") || s.mayManageDestination(ctx, db, caller, r.connection, peer.ID)
 				permitted := s.allowed(ctx, db, subject, "message", t, r.connection, "") || s.allowed(ctx, db, subject, "ask", t, r.connection, "")
-				if visible && permitted {
+				if visible && permitted && s.providerChannelAllowed(ctx, db, subject, r.connection, r.address) {
 					c.Routes = append(c.Routes, PreviewRoute{Kind: r.kind, Mode: r.mode, Enabled: r.enabled, Permitted: true})
 				}
 			}

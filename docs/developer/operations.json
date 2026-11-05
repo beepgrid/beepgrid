@@ -803,5 +803,26 @@
     "family": "workers",
     "audience": "Authenticated sender with message or request token scope and current contact authority; reads and cancellation require the original sender or administrator. Completion requires the exact assigned worker.",
     "errors": "Invalid role/input is 400; policy denial is 403; hidden dispatch is 404; conflicting replay or lifecycle is 409; queue limit is 429. Retry with the same idempotency key and identical input. ACK does not release capacity."
+  },
+  "GET /api/v1/connections/{id}/channels": {
+    "description": "Read configured Slack channels and Agent access. One policy applies to the channel across recipient destinations.",
+    "returns": "Array of ProviderChannel records with address, display name, restricted flag, allowed Agent and Agent role targets, and version.",
+    "family": "integrations",
+    "audience": "Authorized connection managers only.",
+    "errors": "Unauthorized callers are denied. Existing channel configuration does not prove provider delivery."
+  },
+  "POST /api/v1/connections/{id}/channels": {
+    "description": "Save versioned Slack channel settings and an optional Agent allowlist. This narrows contact permission and does not grant conversation membership.",
+    "returns": "The saved ProviderChannel with its new version. Restricted channels with an empty allowed list block every Agent. People remain subject to their own contact and decision permissions.",
+    "family": "integrations",
+    "audience": "Authorized connection managers only. Targets must be existing Agents or Agent roles in this workspace.",
+    "errors": "Stale versions conflict. Use version 0 for a new channel. Restrictions apply to future dispatches, queued sends, replies and fallbacks; sends already in flight cannot be recalled."
+  },
+  "GET /api/v1/connections/{id}/slack-channels": {
+    "description": "List one page of joined, non-archived Slack channels. Pass next_cursor as the cursor query parameter to continue even after an empty page.",
+    "returns": "Object containing channels and optional next_cursor. The engine requests one bounded provider page and keeps bot credentials server-side.",
+    "family": "integrations",
+    "audience": "Authorized connection managers only, with a configured Slack bot.",
+    "errors": "Missing Slack scopes require updating the manifest and reinstalling the app. Invite the bot to each desired channel. Rate limits require waiting; this lookup never joins channels or changes the provider."
   }
 }

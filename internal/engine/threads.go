@@ -20,7 +20,8 @@ func (s *Store) recordThread(ctx context.Context, db DB, scope, connection, chan
 	_, e := db.Exec(ctx, `INSERT INTO provider_threads(scope,connection_id,channel_id,thread_id,conversation_id,person_id) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, scope, connection, channel, thread, conv, person)
 	return e
 }
-func (s *Store) SlackMessage(ctx context.Context, a Actor, c Connection, channel, thread, body, eventID string) (SendResult, error) {
+func (s *Store) SlackMessage(ctx context.Context, a Actor, c Connection, channel, thread, body, eventID string, mappedOnly ...bool) (SendResult, error) {
+	a.MessageSource = map[string]string{"provider": "slack", "connection_id": c.ID, "channel_id": channel, "thread_id": thread}
 	var result SendResult
 	err := s.tx(ctx, a, func(tx pgx.Tx) error {
 		hash := digestJSON([]string{a.ID, channel, thread, body})
@@ -44,6 +45,9 @@ func (s *Store) SlackMessage(ctx context.Context, a Actor, c Connection, channel
 		}
 		in := SendInput{ConversationID: conv, Body: body}
 		if conv == "" {
+			if len(mappedOnly) > 0 && mappedOnly[0] {
+				return Missing()
+			}
 			if c.Config["default_agent_id"] == "" {
 				return Bad("No default agent is configured for a new Slack conversation.")
 			}

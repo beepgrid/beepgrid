@@ -788,6 +788,13 @@ func (s *Store) deliver(ctx context.Context, c Connection, d Delivery, publicURL
 		text += "\n" + fmt.Sprint(q["body"])
 		text += "\n" + publicURL + "/requests/" + fmt.Sprint(q["id"])
 	}
+	if c.Kind == "slack" || c.Kind == "telegram" || c.Kind == "discord" || c.Kind == "email" {
+		prefix, err := s.providerAttribution(ctx, c.ID, d.Payload)
+		if err != nil {
+			return DispatchResult{State: "failed", Detail: "Message sender could not be verified.", Retry: true}
+		}
+		text = prefix + text
+	}
 	if c.Kind == "email" {
 		if conv, ok := d.Payload["conversation_id"].(string); ok && conv != "" {
 			text += "\n" + strings.TrimRight(publicURL, "/") + "/conversations/" + conv

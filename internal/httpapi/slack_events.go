@@ -56,7 +56,8 @@ func (s *Server) slackEvents(w http.ResponseWriter, r *http.Request) {
 		writeError(w, engine.Denied())
 		return
 	}
-	if event.Type != "event_callback" || event.Event.BotID != "" || event.Event.Subtype != "" || (event.Event.Type != "app_mention" && !(event.Event.Type == "message" && event.Event.ChannelType == "im")) {
+	channelReply := event.Event.Type == "message" && (event.Event.ChannelType == "channel" || event.Event.ChannelType == "group") && event.Event.Thread != ""
+	if event.Type != "event_callback" || event.Event.BotID != "" || event.Event.Subtype != "" || (event.Event.Type != "app_mention" && !(event.Event.Type == "message" && event.Event.ChannelType == "im") && !channelReply) {
 		output(w, 200, map[string]bool{"ignored": true})
 		return
 	}
@@ -74,7 +75,13 @@ func (s *Server) slackEvents(w http.ResponseWriter, r *http.Request) {
 	if thread == "" {
 		thread = event.Event.TS
 	}
-	result, e := s.Store.SlackMessage(r.Context(), a, c, event.Event.Channel, thread, event.Event.Text, event.ID)
+	// Slack can deliver a mention through both subscriptions. The immutable
+	// channel/message timestamp identifies the same message across those events.
+	result, e := s.Store.SlackMessage(r.Context(), a, c, event.Event.Channel, thread, event.Event.Text, event.Event.Channel+"/"+event.Event.TS, channelReply)
+	if channelReply && engine.ErrorStatus(e) == 404 {
+		output(w, 200, map[string]bool{"ignored": true})
+		return
+	}
 	if e != nil {
 		writeError(w, e)
 		return

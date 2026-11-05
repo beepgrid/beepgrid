@@ -175,6 +175,7 @@ func (s *Store) ReceiveDiscord(ctx context.Context, c Connection, scope string, 
 			return Denied()
 		}
 		a := Actor{Principal: p, Scope: scope, CredentialKind: "provider", ProviderConnection: c.ID}
+		a.MessageSource = map[string]string{"provider": "discord", "connection_id": c.ID, "channel_id": in.ChannelID, "thread_id": in.Message.ID}
 		key, hash := "discord/"+in.ID, digestJSON(in)
 		var previous string
 		var raw []byte

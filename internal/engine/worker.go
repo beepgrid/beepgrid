@@ -79,7 +79,7 @@ func (s *Store) currentDeliveryPolicy(ctx context.Context, db DB, scope string, 
 	if err != nil || !valid {
 		return false
 	}
-	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName, payloadAction(d.Payload)) && !s.recipientBlocked(ctx, db, sender, policy.Action, d.RecipientID)
+	return s.allowed(ctx, db, sender, policy.Action, policy.Target, d.ConnectionID, policy.ActionName, payloadAction(d.Payload)) && !s.recipientBlocked(ctx, db, sender, policy.Action, d.RecipientID) && s.providerChannelAllowed(ctx, db, sender, d.ConnectionID, d.Address)
 }
 func (s *Store) Inbox(ctx context.Context, a Actor) ([]Delivery, error) {
 	if a.InstanceID == "" {

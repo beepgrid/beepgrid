@@ -33,7 +33,7 @@ WITH input AS MATERIALIZED (
  FROM input i JOIN written w ON w.id=i.message->>'id' CROSS JOIN reservation r RETURNING sequence
 ), payloads AS MATERIALIZED (
  SELECT i.conversation_id,i.recipient_id,i.exact_instance,i.delivery_id,i.native,i.providers,i.message->>'id' AS message_id,
-        jsonb_build_object('type','message','message',i.message,'conversation_id',i.conversation_id,
+        $10::jsonb || jsonb_build_object('type','message','message',i.message,'conversation_id',i.conversation_id,
           '_policy',jsonb_build_object('action_name','','credential_id',$6::text,'provider_connection',$7::text,'sender_id',$4::text,'target',i.policy_target,'action','message')) AS payload
  FROM input i JOIN written w ON w.id=i.message->>'id'
 ), queued AS (

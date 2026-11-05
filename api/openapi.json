@@ -4442,6 +4442,315 @@
         ]
       }
     },
+    "/api/v1/connections/{id}/channels": {
+      "get": {
+        "operationId": "get_api_v1_connections_id_channels",
+        "description": "Read configured Slack channels and Agent access. One policy applies to the channel across recipient destinations.\n\nAuthorized connection managers only.\n\nReturns: Array of ProviderChannel records with address, display name, restricted flag, allowed Agent and Agent role targets, and version.\n\nRecovery: Unauthorized callers are denied. Existing channel configuration does not prove provider delivery.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderChannel"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Read configured Slack channels and Agent access",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "post": {
+        "operationId": "post_api_v1_connections_id_channels",
+        "description": "Save versioned Slack channel settings and an optional Agent allowlist. This narrows contact permission and does not grant conversation membership.\n\nAuthorized connection managers only. Targets must be existing Agents or Agent roles in this workspace.\n\nReturns: The saved ProviderChannel with its new version. Restricted channels with an empty allowed list block every Agent. People remain subject to their own contact and decision permissions.\n\nRecovery: Stale versions conflict. Use version 0 for a new channel. Restrictions apply to future dispatches, queued sends, replies and fallbacks; sends already in flight cannot be recalled.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderChannel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderChannel"
+              }
+            }
+          }
+        },
+        "summary": "Save versioned Slack channel settings and an optional Agent allowlist",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/connections/{id}/slack-channels": {
+      "get": {
+        "operationId": "get_api_v1_connections_id_slack_channels",
+        "description": "List one page of joined, non-archived Slack channels. Pass next_cursor as the cursor query parameter to continue even after an empty page.\n\nAuthorized connection managers only, with a configured Slack bot.\n\nReturns: Object containing channels and optional next_cursor. The engine requests one bounded provider page and keeps bot credentials server-side.\n\nRecovery: Missing Slack scopes require updating the manifest and reinstalling the app. Invite the bot to each desired channel. Rate limits require waiting; this lookup never joins channels or changes the provider.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "channels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderChannel"
+                      },
+                      "description": "One bounded page of Slack channels the configured bot has joined. Follow next_cursor even if this filtered page is empty."
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "description": "Opaque next-page cursor. Continue even when the current items array is empty."
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "List one page of joined, non-archived Slack channels",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
     "/api/v1/people/{id}/delivery-preferences": {
       "get": {
         "operationId": "get_api_v1_people_id_delivery_preferences",
@@ -14518,6 +14827,43 @@
           "version",
           "default",
           "overrides"
+        ],
+        "additionalProperties": false
+      },
+      "ProviderChannel": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Provider-native destination address for a linked identity."
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name. It is not necessarily unique."
+          },
+          "restricted": {
+            "type": "boolean",
+            "description": "Whether only the selected Agents and current Agent role members may send to this Slack channel. This never grants contact or decision authority."
+          },
+          "allowed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Target"
+            },
+            "maxItems": 100,
+            "description": "Agent and Agent role targets permitted by a restricted channel allowlist. An empty list with restricted=true blocks all Agents."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Current optimistic-concurrency version. Read the object before a guarded change; a stale version conflicts."
+          }
+        },
+        "required": [
+          "address",
+          "name",
+          "restricted",
+          "allowed",
+          "version"
         ],
         "additionalProperties": false
       },

@@ -177,6 +177,7 @@ func (s *Store) ReceiveTelegram(ctx context.Context, c Connection, scope string,
 			return Denied()
 		}
 		a := Actor{Principal: p, Scope: scope, CredentialKind: "provider", ProviderConnection: c.ID}
+		a.MessageSource = map[string]string{"provider": "telegram", "connection_id": c.ID, "channel_id": channel, "thread_id": strconv.FormatInt(message.ID, 10)}
 		key := "telegram/" + strconv.FormatInt(*in.ID, 10)
 		hash := digestJSON(in)
 		var previous string

@@ -42,11 +42,11 @@ Tools include `list_agents`, `send`, `ask`, `get_request`, `reply`, `request_sta
 
 1. Create a dedicated Slack app and obtain its signing secret. Save a connection with team_id and secret JSON containing signing_secret; bot_token can be added after installation. Read `GET /api/v1/connections/{id}/setup` to obtain the manifest and exact callbacks. Import that manifest, then install and save bot_token. Grant only the provider scopes needed for the chosen channels and subscriptions.
 2. Add a Slack connection with its immutable `team_id`. The UI stores bot/signing secrets encrypted. Set an optional `default_agent_id` for human-initiated conversations.
-3. Configure Slack interactivity to `/integrations/slack/CONNECTION_ID`. Configure events to `/integrations/slack/CONNECTION_ID/events`; the endpoint handles signed URL verification. Subscribe to the relevant app mentions and direct messages.
+3. Configure Slack interactivity to `/integrations/slack/CONNECTION_ID`. Configure events to `/integrations/slack/CONNECTION_ID/events`; the endpoint handles signed URL verification. Subscribe to direct messages, app mentions, and public/private channel message events using the generated manifest. Existing installations must update the manifest and reinstall to grant the new channel-list and history scopes.
 4. Link immutable Slack user+team IDs to People using `POST /people/{id}/slack-account`. Email matching is never automatic. Assign View/Message/Decide roles separately.
-5. Add the person's destination using the Slack channel ID. Incoming verified conversations also retain their own origin thread without changing the person's global destinations.
+5. In the connection, add Slack channels by name and choose **All agents with contact permission** or **Selected agents and roles** for each channel. Invite the bot to each chosen channel. Add the person's destination with **Slack destination → Slack channel**, or keep a private DM. Incoming verified conversations retain their own origin thread without changing the person's global destinations.
 
-Messages map to canonical conversation threads. Bot/subtype messages are ignored to prevent echo loops. Interactive approval buttons carry only request/version references, not authority. Signatures, timestamp freshness, account links, audience and current connection/action rights are required. Duplicate callbacks/events are deduplicated. Someone else in a room cannot reply to a private conversation merely because they can see it.
+Messages map to canonical conversation threads. Replies in an existing mapped channel thread do not need an @mention. Ordinary channel messages and unrelated threads are ignored. Slack message timestamps deduplicate overlapping mention/message subscriptions. Each linked Slack user remains a distinct Beepgrid Person; the Slack channel is source context, never the sender. Conversation membership and contact permissions still apply, so seeing a Slack thread does not automatically admit someone to its Beepgrid conversation. Bot/subtype messages are ignored to prevent echo loops. Interactive approval buttons carry only request/version references, not authority. Signatures, timestamp freshness, account links, audience and current connection/action rights are required. Duplicate callbacks/events are deduplicated. Someone else in a room cannot reply to a private conversation merely because they can see it.
 
 Slack room visibility remains Slack's responsibility. Use direct/private destinations for sensitive content. Posting personalized messages to the same room does not automatically coalesce them; explicit shared-room coalescing is deferred. The implementation is covered by protocol fixtures and a stub Slack transport; connecting a live workspace remains an account-specific validation step.
 
@@ -89,3 +89,31 @@ For `POST /api/v1/groups`, omitting `members` (or sending null) on an existing v
 ## Provider setup and qualification
 
 Catalog descriptors declare directions, replies, native approvals, file mode, identity and setup modes. Authorized installation managers read `GET /api/v1/connections/{id}/setup` for credential-free setup steps and Slack manifests. Diagnostics distinguish saved configuration, queued/verifying, action needed, disconnected and correlated engine-observed round trip. Configuration changes reset the diagnostic test evidence. Live production qualification is recorded separately from these observations and protocol fixtures. See [Telegram](TELEGRAM.md), [SDK coverage](SDK-COVERAGE.md) and [artifact preparation](SDK-RELEASE.md).
+
+## Channel access and sender identity
+
+Agent messages sent through Slack, Telegram, Discord and SMTP identify the sending Agent in the message text while retaining the configured app or bot identity. The server resolves attribution; the Agent does not need to add a signature.
+
+New message and request delivery payloads include `sender: {id, kind, name}`. Provider-originated messages also include a separate `source: {provider, connection_id, channel_id, thread_id}`. A Slack reply is not echoed back as a bot copy into its source channel. The canonical message's `sender_id` remains the actual Person or Agent. TypeScript and Python runtime bindings retain these structured fields as user data. They do not become system instructions or permission grants.
+
+Slack channel restrictions apply to the channel across all Person destinations, including replies and fallbacks. An empty restricted list blocks all Agents; an unrestricted channel still requires contact permission. Role membership and permissions are rechecked before dispatch, so queued messages cannot retain revoked access. People retain their separate conversation and decision rights. Channel visibility is governed by Slack.
+
+The same setup works headless:
+
+- `GET /api/v1/connections/{id}/slack-channels?cursor=...` lists one provider page of joined, non-archived channels. Continue with `next_cursor`, even after an empty page. The bot needs `channels:read` and `groups:read`. This never joins channels automatically.
+- `GET /api/v1/connections/{id}/channels` lists configured channel names and access.
+- `POST /api/v1/connections/{id}/channels` saves `{address, name, restricted, allowed, version}`. Use `version: 0` for a new channel and the returned version for edits. These endpoints require connection-management authority.
+
+For example, restrict `#engineering` to the Engineering Agent role:
+
+```json
+{
+  "address": "C0123456789",
+  "name": "#engineering",
+  "restricted": true,
+  "allowed": [{"kind": "group", "id": "grp_engineering"}],
+  "version": 0
+}
+```
+
+Then configure that channel ID as a Person's destination through the existing destinations API. Recipient delivery preferences choose among permitted destinations; channel access never grants contact or conversation membership. A shared thread can contain several authorized People, with each reply retaining its own sender identity.

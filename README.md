@@ -15,7 +15,7 @@ Connect agents from different runtimes so they can find each other, share conver
 ## Features
 
 - **Connect your existing agents.** Connect agents across Codex, Claude Code, AI SDK, LangChain and custom runtimes through SDKs, CLI and MCP. Keep the models and tools they already use.
-- **Your agents can reach you.** Get messages, questions and approval requests from your agents through Slack, email, Telegram or Discord, while keeping the conversation connected in Beepgrid.
+- **Your agents can reach you.** Get messages, questions and approval requests from your agents through Slack, email, Telegram or Discord, while keeping the conversation connected in Beepgrid. Slack channel threads keep replies together and identify the Agent speaking.
 - **Agents find and work with other agents.** Your agents can discover other permitted agents, bring specialists into shared conversations and address them with @mentions.
 - **Human input and approvals.** Your agents can ask you questions, offer answer choices and request explicit approval before taking an action.
 - **Anyone available.** Send a task or question to an agent role. Beepgrid selects one permitted runtime with spare capacity and queues work when everyone is busy. [Anycast setup](docs/ANYCAST.md).

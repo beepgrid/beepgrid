@@ -54,7 +54,7 @@ func (s *Store) appendMessageFiles(ctx context.Context, tx pgx.Tx, a Actor, conv
 		}
 		items = append(items, item)
 	}
-	_, err = tx.Exec(ctx, appendMessageSQL, a.Scope, JSON(m), JSON(items), a.CredentialID, a.ProviderConnection, time.Now().Add(7*24*time.Hour))
+	_, err = tx.Exec(ctx, appendMessageSQL, a.Scope, JSON(m), JSON(items), a.CredentialID, a.ProviderConnection, time.Now().Add(7*24*time.Hour), JSON(deliveryIdentity(a)))
 	if err == nil {
 		err = linkAttachments(ctx, tx, a.Scope, conv, m.ID, "", m.Attachments)
 	}

@@ -177,7 +177,7 @@ func ProviderCatalog() []ProviderCapability {
 		case "slack":
 			p.SetupModes = []string{"byo_manifest"}
 			p.Identity = "admin_linked_user_and_team"
-			p.Constraints = []string{"DMs and app mentions only", "No native file upload", "Replies are messages; final decisions use approval buttons or the workspace"}
+			p.Constraints = []string{"DMs, app mentions and replies in mapped Slack channel threads", "No native file upload", "Replies are messages; final decisions use approval buttons or the workspace"}
 		case "email":
 			p.Constraints = []string{"Outbound SMTP only", "Reply and decide in the authenticated workspace", "No inbound email or native file transfer"}
 		case "telegram":

@@ -16,7 +16,7 @@ WITH input AS MATERIALIZED (
  SELECT $1,r.sequence,'message.created',$2::jsonb->>'sender_id',$2::jsonb->>'conversation_id','',$2::jsonb
  FROM written CROSS JOIN reservation r RETURNING sequence
 ), payloads AS MATERIALIZED (
- SELECT i.*,jsonb_build_object('type','message','message',$2::jsonb,'conversation_id',$2::jsonb->>'conversation_id',
+ SELECT i.*,$7::jsonb || jsonb_build_object('type','message','message',$2::jsonb,'conversation_id',$2::jsonb->>'conversation_id',
  '_policy',jsonb_build_object('action_name','','credential_id',$4::text,'provider_connection',$5::text,
  'sender_id',$2::jsonb->>'sender_id','target',i.policy_target,'action','message')) AS payload
  FROM input i CROSS JOIN written

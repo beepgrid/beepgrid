@@ -198,7 +198,12 @@ func (s *Store) resolveProviderRoutes(ctx context.Context, db DB, a Actor, rs []
 		position := 0
 		for _, d := range selected {
 			key := d.ConnectionID + "\x00" + d.Address
-			if seen[key] || !d.Enabled || !s.allowed(ctx, db, a, action, r.PolicyTarget, d.ConnectionID, name, descriptor) {
+			// The original message is already visible in this provider room. Keep
+			// canonical/native delivery without reflecting a bot copy into it.
+			if a.ProviderConnection == d.ConnectionID && a.MessageSource["channel_id"] == d.Address {
+				continue
+			}
+			if seen[key] || !d.Enabled || !s.allowed(ctx, db, a, action, r.PolicyTarget, d.ConnectionID, name, descriptor) || !s.providerChannelAllowed(ctx, db, a, d.ConnectionID, d.Address) {
 				continue
 			}
 			if d.Kind == "telegram" && !s.telegramDestination(ctx, db, a.Scope, d.ConnectionID, r.ID, d.Address) {

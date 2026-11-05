@@ -55,7 +55,7 @@ func (s *Store) newRequestAudience(ctx context.Context, tx pgx.Tx, a Actor, requ
 	}
 	batchSize := max(1, (2<<20)/(len(request.Body)+len(request.Title)+2048))
 	for start := 0; start < len(items); start += batchSize {
-		if _, err = tx.Exec(ctx, requestAudienceSQL, a.Scope, JSON(items[start:min(start+batchSize, len(items))]), a.ID, a.CredentialID, a.ProviderConnection, request.ExpiresAt, request.ID, request.Title, len(recipients) > 1, actionName); err != nil {
+		if _, err = tx.Exec(ctx, requestAudienceSQL, a.Scope, JSON(items[start:min(start+batchSize, len(items))]), a.ID, a.CredentialID, a.ProviderConnection, request.ExpiresAt, request.ID, request.Title, len(recipients) > 1, actionName, JSON(deliveryIdentity(a))); err != nil {
 			return err
 		}
 	}

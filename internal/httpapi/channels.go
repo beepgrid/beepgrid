@@ -11,6 +11,22 @@ import (
 
 func (s *Server) channelRoutes() {
 	m := s.mux
+	m.HandleFunc("GET /api/v1/connections/{id}/slack-channels", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.SlackChannels(r.Context(), actor(r), r.PathValue("id"), r.URL.Query().Get("cursor"))
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("GET /api/v1/connections/{id}/channels", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		x, e := s.Store.ProviderChannels(r.Context(), actor(r), r.PathValue("id"))
+		return ok(w, x, e)
+	}))
+	m.HandleFunc("POST /api/v1/connections/{id}/channels", s.protect(func(w http.ResponseWriter, r *http.Request) error {
+		var in engine.ProviderChannel
+		if e := decode(r, &in); e != nil {
+			return e
+		}
+		x, e := s.Store.SaveProviderChannel(r.Context(), actor(r), r.PathValue("id"), in)
+		return ok(w, x, e)
+	}))
 	m.HandleFunc("GET /api/v1/people/{id}/delivery-preferences", s.protect(func(w http.ResponseWriter, r *http.Request) error {
 		x, e := s.Store.DeliveryPreferences(r.Context(), actor(r), r.PathValue("id"))
 		return ok(w, x, e)

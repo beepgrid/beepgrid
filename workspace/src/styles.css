@@ -3493,3 +3493,9 @@ button.question-prompt { display:block; width:100%; text-align:left; padding:0; 
 .anycast-row > div:first-child { flex: 1 1 220px; min-width: 0; }
 .anycast-row p { margin: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 6em; overflow: auto; }
 .anycast-receipt > p, .anycast-row small { color: var(--muted); }
+
+.slack-channel-list { display: grid; }
+.slack-channel-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.slack-channel-row small, .slack-channel-options small { display: block; color: var(--sub); font-size: 12px; margin-top: 3px; }
+.slack-channel-options { display: grid; gap: 10px; max-height: 280px; overflow: auto; padding: 12px 0; }
+.slack-channel-picker { margin-bottom: 18px; }

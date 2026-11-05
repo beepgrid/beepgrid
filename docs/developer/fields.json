@@ -262,5 +262,8 @@
   "cancelled": "True after queued work was cancelled. This does not stop assigned execution.",
   "completed": "True after the assigned runtime released its reservation. Not evidence of business execution success.",
   "input": "The saved caller input for this durable dispatch.",
-  "anycast": "Optional host-owned capacity advertisement. A model should never be prompted to generate it."
+  "anycast": "Optional host-owned capacity advertisement. A model should never be prompted to generate it.",
+  "restricted": "Whether only the selected Agents and current Agent role members may send to this Slack channel. This never grants contact or decision authority.",
+  "allowed": "Agent and Agent role targets permitted by a restricted channel allowlist. An empty list with restricted=true blocks all Agents.",
+  "channels": "One bounded page of Slack channels the configured bot has joined. Follow next_cursor even if this filtered page is empty."
 }

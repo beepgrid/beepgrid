@@ -24,7 +24,7 @@ WITH input AS MATERIALIZED (
  SELECT $1,r.sequence-(SELECT count(*) FROM input)+i.ordinality,'request.created',$3,i.conversation_id,i.recipient_id,i.request
  FROM input i JOIN audiences au ON au.principal_id=i.recipient_id CROSS JOIN reservation r RETURNING sequence
 ), payloads AS MATERIALIZED (
- SELECT i.*,jsonb_build_object('type','request','request',i.request,'conversation_id',i.conversation_id,
+ SELECT i.*,$11::jsonb || jsonb_build_object('type','request','request',i.request,'conversation_id',i.conversation_id,
  '_policy',jsonb_build_object('action_name',$10::text,'credential_id',$4::text,'provider_connection',$5::text,
  'sender_id',$3::text,'target',i.policy_target,'action','ask')) payload
  FROM input i JOIN audiences au ON au.principal_id=i.recipient_id

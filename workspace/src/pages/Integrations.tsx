@@ -1,3 +1,4 @@
+import { SlackChannels, SlackDestination } from "./SlackChannels";
 import { DeliveryPreferences } from "./DeliveryPreferences";
 import { useState } from "react";
 import {
@@ -587,6 +588,7 @@ export function ConnectionDetail({
               </details>
             ) : null}
           </section>
+          {c.kind === "slack" ? <SlackChannels connection={c.id} /> : null}
           <section className="section">
             <div className="actions">
               <h3>Recipients</h3>
@@ -978,25 +980,34 @@ export function DestinationForm({
             ) : null}
           </div>
         ) : null}
-        <Field
-          label="Provider address"
-          hint={
-            selectedConnection?.kind === "telegram"
-              ? "Use the linked person’s numeric Telegram user ID. Private bot chats only."
-              : selectedConnection?.kind === "discord"
-                ? "Use the linked person’s Discord user ID. The bot must be able to message them."
-                : selectedConnection?.kind === "slack"
-                  ? "Use their Slack DM channel ID."
-                  : undefined
-          }
-        >
-          <input
-            required
-            maxLength={512}
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
+        {selectedConnection?.kind === "slack" ? (
+          <SlackDestination
+            key={connection}
+            connection={connection}
+            address={address}
+            onChange={setAddress}
           />
-        </Field>
+        ) : (
+          <Field
+            label="Provider address"
+            hint={
+              selectedConnection?.kind === "telegram"
+                ? "Use the linked person’s numeric Telegram user ID. Private bot chats only."
+                : selectedConnection?.kind === "discord"
+                  ? "Use the linked person’s Discord user ID. The bot must be able to message them."
+                  : selectedConnection?.kind === "slack"
+                    ? "Use their Slack DM channel ID."
+                    : undefined
+            }
+          >
+            <input
+              required
+              maxLength={512}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </Field>
+        )}
         {["telegram", "discord"].includes(selectedConnection?.kind || "") &&
         linkedAccount ? (
           <Button

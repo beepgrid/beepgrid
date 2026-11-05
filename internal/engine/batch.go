@@ -163,7 +163,7 @@ func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in Dispatch
 		fingerprint = append(fingerprint, []any{r.ID, r.ExactInstance, native})
 		dests := byRecipient[r.ID]
 		for _, d := range dests {
-			allowed := s.allowed(ctx, db, a, in.Operation, r.PolicyTarget, d.cid, name, in.Descriptor)
+			allowed := s.allowed(ctx, db, a, in.Operation, r.PolicyTarget, d.cid, name, in.Descriptor) && s.providerChannelAllowed(ctx, db, a, d.cid, d.address)
 			reason := "Eligible in addition to canonical history; provider acceptance has not been tested."
 			if d.mode == "fallback" {
 				reason = "Eligible only after a definite delivery failure."
@@ -171,7 +171,7 @@ func (s *Store) previewDispatch(ctx context.Context, db DB, a Actor, in Dispatch
 			if !d.enabled {
 				reason = "Installation is disabled."
 			} else if !allowed {
-				reason = "Current contact permission excludes this installation."
+				reason = "Current contact or channel permission excludes this destination."
 			}
 			selected := false
 			effectiveMode := "excluded"

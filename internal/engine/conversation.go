@@ -351,6 +351,9 @@ func (s *Store) enqueue(ctx context.Context, db DB, a Actor, r recipient, op, co
 	}
 	payload["_policy"] = map[string]any{"action_name": actionName, "credential_id": a.CredentialID, "provider_connection": a.ProviderConnection, "sender_id": a.ID, "target": r.PolicyTarget, "action": action}
 	payload["conversation_id"] = conv
+	for key, value := range deliveryIdentity(a) {
+		payload[key] = value
+	}
 	externalState := "queued"
 	if r.Kind == "person" && payload["type"] == "request" {
 		var q Request
